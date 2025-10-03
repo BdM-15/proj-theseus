@@ -15,6 +15,10 @@ Architecture Note:
 This module does NOT bypass LightRAG - it MODIFIES LightRAG's extraction prompts
 by injecting domain knowledge at the right extension points (addon_params, PROMPTS).
 
+Phase 3 Updates:
+- Added Example 4: Deliverable extraction (Section F) with DELIVERABLE entity type
+- Demonstrates CLIN→DELIVERABLE, DELIVERABLE→EVENT (deadlines), and DELIVERABLE→LOCATION relationships
+
 References:
 - .venv/Lib/site-packages/lightrag/prompt.py: Prompt templates
 - .venv/Lib/site-packages/lightrag/operate.py (line 2024): entity_types injection
@@ -153,6 +157,45 @@ relation<|#|>Government<|#|>Facility Security Inspections<|#|>conducts, oversigh
 relation<|#|>SCIF<|#|>Arlington, VA<|#|>located_in, geographic location<|#|>The contractor's SCIF is located in Arlington, VA.
 relation<|#|>Facility Security Inspections<|#|>SCIF<|#|>targets, inspection scope<|#|>Facility security inspections will be conducted at the contractor's SCIF.
 relation<|#|>Contractor<|#|>SCIF<|#|>operates, facility ownership<|#|>The contractor operates the SCIF facility in Arlington, VA.
+<|COMPLETE|>
+
+""",
+        # Example 4: Deliverables and Section F (Phase 3 - DELIVERABLE entity)
+        """<Input Text>
+```
+Section F.3.1 - Deliverable Schedule. The contractor shall provide the following deliverables
+under CLIN 0001: (1) Monthly Status Reports due by the 5th business day of each month,
+(2) Quarterly Technical Review Briefings presented at the Government site in Arlington, VA,
+and (3) Final System Documentation delivered within 30 days of contract completion.
+All deliverables must comply with Section C.4 formatting requirements.
+```
+
+<Output>
+entity<|#|>Section F.3.1<|#|>SECTION<|#|>Section F.3.1 is an RFP section defining the deliverable schedule under FAR 15.210 Section F (Deliveries or Performance).
+entity<|#|>Monthly Status Reports<|#|>DELIVERABLE<|#|>Monthly Status Reports are recurring contract deliverables documenting project progress, performance metrics, and schedule adherence.
+entity<|#|>Quarterly Technical Review Briefings<|#|>DELIVERABLE<|#|>Quarterly Technical Review Briefings are formal presentations to the Government reviewing technical progress and risk status.
+entity<|#|>Final System Documentation<|#|>DELIVERABLE<|#|>Final System Documentation is the comprehensive technical documentation package delivered upon contract completion.
+entity<|#|>CLIN 0001<|#|>CONCEPT<|#|>CLIN 0001 is Contract Line Item Number 0001 defining the scope and deliverables for the base year period.
+entity<|#|>5th Business Day<|#|>EVENT<|#|>5th business day of each month is the deadline for monthly status report submission.
+entity<|#|>Government Site<|#|>LOCATION<|#|>Government site refers to the federal facility where quarterly briefings will be conducted.
+entity<|#|>Arlington, VA<|#|>LOCATION<|#|>Arlington, VA is the geographic location of the Government facility for quarterly briefings.
+entity<|#|>30 Days<|#|>EVENT<|#|>30 days after contract completion is the deadline for final system documentation delivery.
+entity<|#|>Section C.4<|#|>SECTION<|#|>Section C.4 is an RFP section in the Statement of Work defining deliverable formatting requirements.
+entity<|#|>Contractor<|#|>ORGANIZATION<|#|>Contractor is the organization responsible for producing and delivering all contract deliverables.
+relation<|#|>Section F.3.1<|#|>Monthly Status Reports<|#|>specifies, deliverable definition<|#|>Section F.3.1 defines the requirements for monthly status reports.
+relation<|#|>Section F.3.1<|#|>Quarterly Technical Review Briefings<|#|>specifies, deliverable definition<|#|>Section F.3.1 defines the requirements for quarterly technical review briefings.
+relation<|#|>Section F.3.1<|#|>Final System Documentation<|#|>specifies, deliverable definition<|#|>Section F.3.1 defines the requirements for final system documentation.
+relation<|#|>CLIN 0001<|#|>Monthly Status Reports<|#|>includes, deliverable scope<|#|>CLIN 0001 includes monthly status reports as a required deliverable.
+relation<|#|>CLIN 0001<|#|>Quarterly Technical Review Briefings<|#|>includes, deliverable scope<|#|>CLIN 0001 includes quarterly technical review briefings as a required deliverable.
+relation<|#|>CLIN 0001<|#|>Final System Documentation<|#|>includes, deliverable scope<|#|>CLIN 0001 includes final system documentation as a required deliverable.
+relation<|#|>Monthly Status Reports<|#|>5th Business Day<|#|>due_by, deadline<|#|>Monthly status reports must be submitted by the 5th business day of each month.
+relation<|#|>Quarterly Technical Review Briefings<|#|>Government Site<|#|>performed_at, presentation location<|#|>Quarterly briefings will be presented at the Government site.
+relation<|#|>Government Site<|#|>Arlington, VA<|#|>located_in, geographic location<|#|>The Government site is located in Arlington, VA.
+relation<|#|>Final System Documentation<|#|>30 Days<|#|>due_by, deadline<|#|>Final system documentation must be delivered within 30 days of contract completion.
+relation<|#|>Monthly Status Reports<|#|>Section C.4<|#|>references, formatting compliance<|#|>Monthly status reports must comply with Section C.4 formatting requirements.
+relation<|#|>Contractor<|#|>Monthly Status Reports<|#|>provides, deliverable responsibility<|#|>The contractor is responsible for providing monthly status reports.
+relation<|#|>Contractor<|#|>Quarterly Technical Review Briefings<|#|>provides, deliverable responsibility<|#|>The contractor is responsible for conducting quarterly technical review briefings.
+relation<|#|>Contractor<|#|>Final System Documentation<|#|>provides, deliverable responsibility<|#|>The contractor is responsible for delivering final system documentation.
 <|COMPLETE|>
 
 """,

@@ -38,6 +38,11 @@ class EntityType(str, Enum):
     
     Aligns with FINE_TUNING_ROADMAP.md entity classification for consistent
     extraction across LightRAG and PydanticAI agents.
+    
+    Phase 3 Addition:
+    - DELIVERABLE: Contract deliverables, work products, milestones (FAR 15.210 Section F)
+      Added based on ONTOLOGY_ALIGNMENT_ANALYSIS.md - critical gap identified in prompts
+      and models but missing from ontology. Central to Section F (Deliveries or Performance).
     """
     ORGANIZATION = "ORGANIZATION"    # Contractors, agencies, departments
     CONCEPT = "CONCEPT"              # CLINs, requirements, technical concepts
@@ -49,6 +54,7 @@ class EntityType(str, Enum):
     CLAUSE = "CLAUSE"                # FAR clauses, contract provisions
     SECTION = "SECTION"              # RFP sections (A-M, J-attachments)
     DOCUMENT = "DOCUMENT"            # Referenced documents, attachments
+    DELIVERABLE = "DELIVERABLE"      # Contract deliverables, work products, reports (Section F)
 
 
 # ============================================================================
@@ -144,6 +150,21 @@ VALID_RELATIONSHIPS: Dict[Tuple[str, str], List[str]] = {
     
     # LOCATION relationships
     ("LOCATION", "HOSTS"): ["EVENT", "ORGANIZATION"],
+    
+    # DELIVERABLE relationships (Phase 3 - FAR 15.210 Section F)
+    ("DELIVERABLE", "REQUIRES"): ["TECHNOLOGY", "ORGANIZATION", "CONCEPT", "REQUIREMENT"],
+    ("DELIVERABLE", "DELIVERED_BY"): ["ORGANIZATION", "PERSON"],
+    ("DELIVERABLE", "SUPPORTS"): ["REQUIREMENT", "SECTION", "CONCEPT"],
+    ("DELIVERABLE", "PERFORMED_AT"): ["LOCATION"],
+    ("DELIVERABLE", "DUE_BY"): ["EVENT"],
+    ("DELIVERABLE", "REFERENCES"): ["DOCUMENT", "SECTION", "REQUIREMENT"],
+    
+    # Relationships TO deliverables (inverse relationships)
+    ("REQUIREMENT", "PRODUCES"): ["DELIVERABLE", "CONCEPT"],
+    ("CONCEPT", "INCLUDES"): ["DELIVERABLE", "REQUIREMENT", "TECHNOLOGY"],  # CLINs include deliverables
+    ("EVENT", "MILESTONE_FOR"): ["DELIVERABLE", "REQUIREMENT"],
+    ("ORGANIZATION", "PROVIDES"): ["DELIVERABLE", "TECHNOLOGY", "CONCEPT"],
+    ("SECTION", "SPECIFIES"): ["DELIVERABLE", "REQUIREMENT", "CONCEPT"],
 }
 
 
@@ -401,6 +422,7 @@ COMMON_RFP_ENTITY_TYPES = {
     EntityType.CONCEPT,
     EntityType.EVENT,
     EntityType.DOCUMENT,
+    EntityType.DELIVERABLE,  # Phase 3: Added for Section F deliverables
 }
 
 
