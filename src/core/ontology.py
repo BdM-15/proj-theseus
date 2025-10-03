@@ -39,13 +39,19 @@ class EntityType(str, Enum):
     Aligns with FINE_TUNING_ROADMAP.md entity classification for consistent
     extraction across LightRAG and PydanticAI agents.
     
-    Phase 3 Addition:
+    Phase 3 Additions:
     - DELIVERABLE: Contract deliverables, work products, milestones (FAR 15.210 Section F)
       Added based on ONTOLOGY_ALIGNMENT_ANALYSIS.md - critical gap identified in prompts
       and models but missing from ontology. Central to Section F (Deliveries or Performance).
+    
+    Phase 3 Entity vs Attribute Decisions:
+    - Budget/Financial Data: Stored as CONCEPT attributes, NOT separate entity type
+      Rationale: Budget values are properties of CLINs/contracts, not standalone concepts.
+      Example: CLIN 0001 (CONCEPT) has metadata {"value": "$500,000", "type": "FFP"}
+      This prevents knowledge graph clutter while preserving financial context.
     """
     ORGANIZATION = "ORGANIZATION"    # Contractors, agencies, departments
-    CONCEPT = "CONCEPT"              # CLINs, requirements, technical concepts
+    CONCEPT = "CONCEPT"              # CLINs, requirements, technical concepts (includes budget as metadata)
     EVENT = "EVENT"                  # Milestones, deliveries, reviews
     TECHNOLOGY = "TECHNOLOGY"        # Systems, tools, platforms
     PERSON = "PERSON"                # POCs, contracting officers
