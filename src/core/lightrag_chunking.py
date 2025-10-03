@@ -107,7 +107,7 @@ def simple_chunking_func(
 # ============================================================================
 #
 # Previous Path A (archived) used complex regex preprocessing with:
-# - ShipleyRFPChunker class (400+ lines)
+# - CaptureRFPChunker class (400+ lines)
 # - Regex-based section identification
 # - Custom relationship mapping
 # - Requirement extraction preprocessing
