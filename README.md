@@ -1350,6 +1350,7 @@ govcon-capture-vibe/
 
 #### **Phase 4-6: RAG-Anything Enhancement**
 
+- **GitHub Repo**: https://github.com/HKUDS/RAG-Anything
 - **Multimodal Processing**: Handle RFPs with complex tables, images, and diagrams
 - **MinerU Integration**: High-fidelity extraction of visual elements
 - **Enhanced Accuracy**: Process technical drawings and complex layouts

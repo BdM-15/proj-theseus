@@ -717,3 +717,23 @@ httpx.ReadTimeout: C[14/76]: chunk-c3a2fda370c56a131dbaded9c5c78705:
 2025-10-05 14:32:07 | ERROR    | lightrag             | process_document | Failed to extract document 1/1: _N6945025R0003.pdf
 2025-10-05 14:32:35 | ERROR    | lightrag             | worker          | LLM func: Error in decorated function for task 1726840573104_145903.2734591: 
 2025-10-05 14:32:54 | ERROR    | lightrag             | worker          | LLM func: Error in decorated function for task 1726840573280_145922.3189815: 
+2025-10-05 14:53:19 | ERROR    | lightrag             | process_document | Traceback (most recent call last):
+  File "C:\Users\benma\govcon-capture-vibe\src\lightrag\utils.py", line 835, in wait_func
+    return await future
+           ^^^^^^^^^^^^
+lightrag.utils.WorkerTimeoutError: Worker execution timeout after 600s
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\benma\govcon-capture-vibe\src\lightrag\lightrag.py", line 1592, in process_document
+    await asyncio.gather(*first_stage_tasks)
+  File "C:\Users\benma\govcon-capture-vibe\src\lightrag\kg\nano_vector_db_impl.py", line 119, in upsert
+    embeddings_list = await asyncio.gather(*embedding_tasks)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\src\lightrag\utils.py", line 861, in wait_func
+    raise TimeoutError(f"{queue_name}: {str(e)}")
+TimeoutError: Embedding func: Worker execution timeout after 600s
+
+2025-10-05 14:53:19 | ERROR    | lightrag             | process_document | Failed to extract document 1/1: _N6945025R0003.pdf
+2025-10-05 15:02:07 | ERROR    | lightrag             | worker          | LLM func: Error in decorated function for task 1726840573456_147675.8892453: 
