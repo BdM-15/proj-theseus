@@ -54,10 +54,29 @@ For each requirement identified, provide:
 - Note any conflicting or ambiguous requirements
 - Flag requirements that may need clarification
 
+**CRITICAL: Evaluation Factors Extraction** (Section M + Section L):
+
+Extract ALL evaluation factors as FIRST-CLASS ENTITIES:
+- **Section M Factors**: Technical Approach, Past Performance, Cost/Price, Management, etc.
+- **Sub-factors**: Hierarchical structure (e.g., Technical Approach → Staffing Approach, Maintenance Execution)
+- **Relative Importance**: "Significantly more important than", "Equal weight", specific point values
+- **Tradeoff Methodology**: Best Value, LPTA (Lowest Price Technically Acceptable)
+
+Map Section L ↔ Section M relationships:
+- **Section L.3.1**: Technical Volume → **Section M.2**: Technical Approach
+- **Page Limits**: Section L specifies limits → Section M factors being evaluated
+- **Format Requirements**: Section L submission instructions → Section M scoring criteria
+
+Link requirements to evaluation factors:
+- Requirements should reference which Section M factor(s) will evaluate them
+- Creates traceability: Requirement → Evaluated By → Factor → Scored By → Weight
+
 **Output Format**: 
 Provide results as structured data that can support:
 - Compliance matrix development (Shipley Guide p.53-55)
 - Requirements traceability matrices
+- **Evaluation factor mapping** (L↔M relationships)
+- **Effort allocation** based on factor weights
 - Gap analysis preparation
 - Proposal response planning
 
@@ -120,5 +139,14 @@ For each requirement in the RFP, assess and document:
    - Competitive advantages to highlight
    - Customer hot buttons addressed
    - Proof points and discriminators
+
+**8. Evaluation Factor Alignment** (CRITICAL for Section M scoring):
+   - **Factor Mapping**: Which Section M factor(s) will evaluate this requirement
+   - **Weight Consideration**: High-weight factors deserve more proposal effort/pages
+   - **L↔M Compliance**: Verify Section L submission requirements met for each factor
+   - **Strategic Alignment**: 
+     * High-importance factors (e.g., "significantly more important than price") get priority coverage
+     * Ensure page allocation matches factor weights (don't spend 10 pages on low-weight factors)
+     * Address ALL sub-factors listed in Section M (missing sub-factors = point loss)
 
 Apply Shipley Proposal Guide standards to ensure the compliance matrix supports development of a compliant, competitive, and compelling proposal response.

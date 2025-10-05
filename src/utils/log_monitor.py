@@ -8,7 +8,7 @@ Usage:
     python -m src.utils.log_monitor
     
 Or programmatically:
-    from src.utils.log_monitor import monitor_processing_logs
+    from utils.log_monitor import monitor_processing_logs
     monitor_processing_logs("logs/govcon_server.log")
 """
 
@@ -21,7 +21,7 @@ from datetime import datetime
 
 # Import chunk metadata lookup
 try:
-    from src.core.lightrag_chunking import get_chunk_metadata
+    from core.lightrag_chunking import get_chunk_metadata
 except ImportError:
     # Fallback if run standalone
     def get_chunk_metadata(chunk_id: str) -> Optional[Dict[str, Any]]:

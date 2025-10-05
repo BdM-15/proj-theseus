@@ -22,7 +22,7 @@ from enum import Enum
 import logging
 
 # Import existing enums from our models
-from src.models.rfp_models import (
+from models.rfp_models import (
     ComplianceLevel, RequirementType, ComplianceStatus, RiskLevel, RFPSectionType
 )
 
@@ -51,7 +51,7 @@ class EntityType(str, Enum):
       This prevents knowledge graph clutter while preserving financial context.
     """
     ORGANIZATION = "ORGANIZATION"    # Contractors, agencies, departments
-    CONCEPT = "CONCEPT"              # CLINs, requirements, technical concepts (includes budget as metadata)
+    CONCEPT = "CONCEPT"              # CLINs, technical concepts, budget/pricing (includes financial metadata)
     EVENT = "EVENT"                  # Milestones, deliveries, reviews
     TECHNOLOGY = "TECHNOLOGY"        # Systems, tools, platforms
     PERSON = "PERSON"                # POCs, contracting officers
@@ -61,6 +61,7 @@ class EntityType(str, Enum):
     SECTION = "SECTION"              # RFP sections (A-M, J-attachments)
     DOCUMENT = "DOCUMENT"            # Referenced documents, attachments
     DELIVERABLE = "DELIVERABLE"      # Contract deliverables, work products, reports (Section F)
+    EVALUATION_FACTOR = "EVALUATION_FACTOR"  # Section M factors (basis for award) + Section L response instructions
 
 
 # ============================================================================
@@ -171,6 +172,20 @@ VALID_RELATIONSHIPS: Dict[Tuple[str, str], List[str]] = {
     ("EVENT", "MILESTONE_FOR"): ["DELIVERABLE", "REQUIREMENT"],
     ("ORGANIZATION", "PROVIDES"): ["DELIVERABLE", "TECHNOLOGY", "CONCEPT"],
     ("SECTION", "SPECIFIES"): ["DELIVERABLE", "REQUIREMENT", "CONCEPT"],
+    
+    # EVALUATION_FACTOR relationships (Phase 3 - Section L↔M CRITICAL relationships)
+    # These are THE most important relationships for winning contracts
+    ("EVALUATION_FACTOR", "DEFINED_IN"): ["SECTION"],  # Factor defined in Section M
+    ("EVALUATION_FACTOR", "REFERENCES"): ["SECTION", "REQUIREMENT", "EVALUATION_FACTOR"],  # Factor references Section L instructions or other factors
+    ("EVALUATION_FACTOR", "EVALUATES"): ["REQUIREMENT", "CONCEPT", "DELIVERABLE"],  # Factor evaluates specific requirements/deliverables
+    ("EVALUATION_FACTOR", "MORE_IMPORTANT_THAN"): ["EVALUATION_FACTOR"],  # Relative importance (e.g., Technical > Cost)
+    ("EVALUATION_FACTOR", "HAS_SUBFACTOR"): ["EVALUATION_FACTOR"],  # Hierarchical structure (Technical Approach has Staffing Approach subfactor)
+    ("EVALUATION_FACTOR", "REQUIRES"): ["DELIVERABLE", "REQUIREMENT"],  # Factor requires specific proposal content
+    
+    # Relationships TO evaluation factors (inverse relationships)
+    ("SECTION", "DEFINES"): ["EVALUATION_FACTOR", "REQUIREMENT", "CONCEPT"],  # Section M defines factors, Section L defines submission requirements
+    ("REQUIREMENT", "EVALUATED_BY"): ["EVALUATION_FACTOR"],  # Requirements are evaluated by specific factors
+    ("DELIVERABLE", "SCORED_BY"): ["EVALUATION_FACTOR"],  # Deliverables are scored by evaluation factors
 }
 
 

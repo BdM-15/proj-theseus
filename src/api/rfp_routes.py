@@ -26,9 +26,9 @@ from lightrag import LightRAG, QueryParam
 from lightrag.utils import logger
 
 # Import enhanced RFP processing
-from src.core.lightrag_chunking import rfp_aware_chunking_func
-from src.core.processor import EnhancedRFPProcessor
-from src.models.rfp_models import RFPAnalysisResult, ComplianceLevel, RequirementType
+from core.lightrag_chunking import simple_chunking_func
+from core.processor import EnhancedRFPProcessor
+from models.rfp_models import RFPAnalysisResult, ComplianceLevel, RequirementType
 
 # Global LightRAG instance - will be set by the main server
 _rag_instance: Optional[LightRAG] = None
@@ -1640,18 +1640,18 @@ async def get_enhanced_processing_status():
                 "enhanced_processing": False
             }
         
-        # Check if this LightRAG instance uses RFP-aware chunking
-        # With native integration, RFP processing is built into the chunking function
+        # Check if this LightRAG instance uses Path B simple chunking
+        # With native integration, ontology-guided extraction is built into the chunking function
         is_enhanced = hasattr(current_rag_instance, 'chunking_func') and \
-                     current_rag_instance.chunking_func.__name__ == 'rfp_aware_chunking_func'
+                     current_rag_instance.chunking_func.__name__ == 'simple_chunking_func'
 
         if is_enhanced:
             # Get basic processing status (simplified for native approach)
             processing_status = {
-                "integration_type": "native_rfp_chunking",
-                "chunking_function": "rfp_aware_chunking_func",
+                "integration_type": "path_b_ontology_guided",
+                "chunking_function": "simple_chunking_func",
                 "automatic_detection": True,
-                "fallback_behavior": "Standard LightRAG chunking for non-RFP documents"
+                "fallback_behavior": "Standard LightRAG chunking with ontology extraction"
             }
 
             return {
@@ -1800,13 +1800,16 @@ async def test_enhanced_chunking_with_mbos():
                 }
         
         # Test the enhanced chunking strategy
-        from src.core.chunking import ShipleyRFPChunker
-        chunker = ShipleyRFPChunker()
+        # NOTE: Path A ShipleyRFPChunker has been archived - this route is deprecated
+        # Use Path B ontology-guided extraction instead
+        logger.warning("This route uses archived Path A chunker - returning error")
         
-        logger.info("Testing enhanced RFP chunking strategy")
-        
-        # Process document with enhanced chunking
-        enhanced_chunks = chunker.process_document(document_text)
+        return {
+            "status": "deprecated",
+            "message": "This route uses Path A ShipleyRFPChunker which has been archived",
+            "recommendation": "Use Path B ontology-guided extraction with simple_chunking_func",
+            "see_documentation": "docs/PATH_B_IMPLEMENTATION_PLAN.md"
+        }
         
         # Get section summary
         section_summary = chunker.get_section_summary(enhanced_chunks)
@@ -2063,7 +2066,7 @@ async def assess_compliance_with_pydantic(
         processor = EnhancedRFPProcessor(rag_instance)
         
         # Create requirement object for assessment
-        from src.models.rfp_models import RFPRequirement
+        from models.rfp_models import RFPRequirement
         
         requirement = RFPRequirement(
             requirement_id=requirement_id,

@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from enum import Enum
 import logging
 
-from src.core.ontology import (
+from core.ontology import (
     EntityType,
     RelationshipType,
     VALID_RELATIONSHIPS,

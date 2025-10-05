@@ -1,0 +1,895 @@
+2025-10-03 16:52:14 | ERROR    | lightrag             | worker          | LLM func: Error in decorated function for task 2372346671040_237975.2310072: 
+2025-10-03 16:52:14 | ERROR    | lightrag             | _process_extract_entities | Failed to extract entities and relationships: C[5/48]: chunk-2237c7721f7046be538ef3e049506681: 
+2025-10-03 16:52:14 | ERROR    | lightrag             | process_document | Traceback (most recent call last):
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_transports\default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_transports\default.py", line 394, in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\connection_pool.py", line 256, in handle_async_request
+    raise exc from None
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\connection_pool.py", line 236, in handle_async_request
+    response = await connection.handle_async_request(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        pool_request.request
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\connection.py", line 103, in handle_async_request
+    return await self._connection.handle_async_request(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\http11.py", line 136, in handle_async_request
+    raise exc
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\http11.py", line 106, in handle_async_request
+    ) = await self._receive_response_headers(**kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\http11.py", line 177, in _receive_response_headers
+    event = await self._receive_event(timeout=timeout)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\http11.py", line 217, in _receive_event
+    data = await self._network_stream.read(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.READ_NUM_BYTES, timeout=timeout
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_backends\anyio.py", line 32, in read
+    with map_exceptions(exc_map):
+         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\benma\AppData\Roaming\uv\python\cpython-3.13.7-windows-x86_64-none\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.ReadTimeout
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\operate.py", line 2186, in _process_with_semaphore
+    return await _process_single_content(chunk)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\operate.py", line 2079, in _process_single_content
+    final_result, timestamp = await use_llm_func_with_cache(
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\utils.py", line 1687, in use_llm_func_with_cache
+    res: str = await use_llm_func(
+               ^^^^^^^^^^^^^^^^^^^
+        safe_user_prompt, system_prompt=safe_system_prompt, **kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\utils.py", line 835, in wait_func
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\utils.py", line 539, in worker
+    result = await asyncio.wait_for(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+        func(*args, **kwargs), timeout=max_execution_timeout
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\benma\AppData\Roaming\uv\python\cpython-3.13.7-windows-x86_64-none\Lib\asyncio\tasks.py", line 507, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\llm\ollama.py", line 140, in ollama_model_complete
+    return await _ollama_model_if_cache(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\tenacity\asyncio\__init__.py", line 189, in async_wrapped
+    return await copy(fn, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\tenacity\asyncio\__init__.py", line 111, in __call__
+    do = await self.iter(retry_state=retry_state)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\tenacity\asyncio\__init__.py", line 153, in iter
+    result = await action(retry_state)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\tenacity\_utils.py", line 99, in inner
+    return call(*args, **kwargs)
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\tenacity\__init__.py", line 400, in <lambda>
+    self._add_action_func(lambda rs: rs.outcome.result())
+                                     ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\benma\AppData\Roaming\uv\python\cpython-3.13.7-windows-x86_64-none\Lib\concurrent\futures\_base.py", line 449, in result
+    return self.__get_result()
+           ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\benma\AppData\Roaming\uv\python\cpython-3.13.7-windows-x86_64-none\Lib\concurrent\futures\_base.py", line 401, in __get_result
+    raise self._exception
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\tenacity\asyncio\__init__.py", line 114, in __call__
+    result = await fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\llm\ollama.py", line 114, in _ollama_model_if_cache
+    raise e
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\llm\ollama.py", line 77, in _ollama_model_if_cache
+    response = await ollama_client.chat(model=model, messages=messages, **kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\ollama\_client.py", line 953, in chat
+    return await self._request(
+           ^^^^^^^^^^^^^^^^^^^^
+    ...<14 lines>...
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\ollama\_client.py", line 751, in _request
+    return cls(**(await self._request_raw(*args, **kwargs)).json())
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\ollama\_client.py", line 691, in _request_raw
+    r = await self._client.request(*args, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_client.py", line 1540, in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_client.py", line 1629, in send
+    response = await self._send_handling_auth(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_client.py", line 1657, in _send_handling_auth
+    response = await self._send_handling_redirects(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_client.py", line 1694, in _send_handling_redirects
+    response = await self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_client.py", line 1730, in _send_single_request
+    response = await transport.handle_async_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_transports\default.py", line 393, in handle_async_request
+    with map_httpcore_exceptions():
+         ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\benma\AppData\Roaming\uv\python\cpython-3.13.7-windows-x86_64-none\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_transports\default.py", line 118, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ReadTimeout
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\operate.py", line 2190, in _process_with_semaphore
+    raise prefixed_exception from e
+httpx.ReadTimeout: chunk-2237c7721f7046be538ef3e049506681: 
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\lightrag.py", line 1600, in process_document
+    await entity_relation_task
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\lightrag.py", line 1825, in _process_extract_entities
+    raise e
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\lightrag.py", line 1810, in _process_extract_entities
+    chunk_results = await extract_entities(
+                    ^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\operate.py", line 2232, in extract_entities
+    raise prefixed_exception from first_exception
+httpx.ReadTimeout: C[5/48]: chunk-2237c7721f7046be538ef3e049506681: 
+
+2025-10-03 16:52:14 | ERROR    | lightrag             | process_document | Failed to extract document 1/1: _N6945025R0003.pdf
+2025-10-03 16:53:11 | ERROR    | lightrag             | worker          | LLM func: Error in decorated function for task 2372346673152_238032.8538759: 
+2025-10-03 16:53:46 | ERROR    | lightrag             | worker          | LLM func: Error in decorated function for task 2372346671744_238068.0264235: 
+2025-10-03 16:54:11 | ERROR    | lightrag             | worker          | LLM func: Error in decorated function for task 2372346671392_238092.2899953: 
+2025-10-03 21:26:00 | ERROR    | lightrag             | worker          | LLM func: Error in decorated function for task 2211081058656_248102.0823517: 
+2025-10-03 21:26:00 | ERROR    | lightrag             | _process_extract_entities | Failed to extract entities and relationships: C[16/48]: chunk-bd31599614fd67b7867680eb5695c49c: 
+2025-10-03 21:26:00 | ERROR    | lightrag             | process_document | Traceback (most recent call last):
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_transports\default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_transports\default.py", line 394, in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\connection_pool.py", line 256, in handle_async_request
+    raise exc from None
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\connection_pool.py", line 236, in handle_async_request
+    response = await connection.handle_async_request(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        pool_request.request
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\connection.py", line 103, in handle_async_request
+    return await self._connection.handle_async_request(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\http11.py", line 136, in handle_async_request
+    raise exc
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\http11.py", line 106, in handle_async_request
+    ) = await self._receive_response_headers(**kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\http11.py", line 177, in _receive_response_headers
+    event = await self._receive_event(timeout=timeout)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\http11.py", line 217, in _receive_event
+    data = await self._network_stream.read(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.READ_NUM_BYTES, timeout=timeout
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_backends\anyio.py", line 32, in read
+    with map_exceptions(exc_map):
+         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\benma\AppData\Roaming\uv\python\cpython-3.13.7-windows-x86_64-none\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.ReadTimeout
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\operate.py", line 2186, in _process_with_semaphore
+    return await _process_single_content(chunk)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\operate.py", line 2079, in _process_single_content
+    final_result, timestamp = await use_llm_func_with_cache(
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\utils.py", line 1687, in use_llm_func_with_cache
+    res: str = await use_llm_func(
+               ^^^^^^^^^^^^^^^^^^^
+        safe_user_prompt, system_prompt=safe_system_prompt, **kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\utils.py", line 835, in wait_func
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\utils.py", line 539, in worker
+    result = await asyncio.wait_for(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+        func(*args, **kwargs), timeout=max_execution_timeout
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\benma\AppData\Roaming\uv\python\cpython-3.13.7-windows-x86_64-none\Lib\asyncio\tasks.py", line 507, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\llm\ollama.py", line 140, in ollama_model_complete
+    return await _ollama_model_if_cache(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\tenacity\asyncio\__init__.py", line 189, in async_wrapped
+    return await copy(fn, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\tenacity\asyncio\__init__.py", line 111, in __call__
+    do = await self.iter(retry_state=retry_state)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\tenacity\asyncio\__init__.py", line 153, in iter
+    result = await action(retry_state)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\tenacity\_utils.py", line 99, in inner
+    return call(*args, **kwargs)
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\tenacity\__init__.py", line 400, in <lambda>
+    self._add_action_func(lambda rs: rs.outcome.result())
+                                     ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\benma\AppData\Roaming\uv\python\cpython-3.13.7-windows-x86_64-none\Lib\concurrent\futures\_base.py", line 449, in result
+    return self.__get_result()
+           ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\benma\AppData\Roaming\uv\python\cpython-3.13.7-windows-x86_64-none\Lib\concurrent\futures\_base.py", line 401, in __get_result
+    raise self._exception
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\tenacity\asyncio\__init__.py", line 114, in __call__
+    result = await fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\llm\ollama.py", line 114, in _ollama_model_if_cache
+    raise e
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\llm\ollama.py", line 77, in _ollama_model_if_cache
+    response = await ollama_client.chat(model=model, messages=messages, **kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\ollama\_client.py", line 953, in chat
+    return await self._request(
+           ^^^^^^^^^^^^^^^^^^^^
+    ...<14 lines>...
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\ollama\_client.py", line 751, in _request
+    return cls(**(await self._request_raw(*args, **kwargs)).json())
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\ollama\_client.py", line 691, in _request_raw
+    r = await self._client.request(*args, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_client.py", line 1540, in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_client.py", line 1629, in send
+    response = await self._send_handling_auth(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_client.py", line 1657, in _send_handling_auth
+    response = await self._send_handling_redirects(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_client.py", line 1694, in _send_handling_redirects
+    response = await self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_client.py", line 1730, in _send_single_request
+    response = await transport.handle_async_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_transports\default.py", line 393, in handle_async_request
+    with map_httpcore_exceptions():
+         ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\benma\AppData\Roaming\uv\python\cpython-3.13.7-windows-x86_64-none\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_transports\default.py", line 118, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ReadTimeout
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\operate.py", line 2190, in _process_with_semaphore
+    raise prefixed_exception from e
+httpx.ReadTimeout: chunk-bd31599614fd67b7867680eb5695c49c: 
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\lightrag.py", line 1600, in process_document
+    await entity_relation_task
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\lightrag.py", line 1825, in _process_extract_entities
+    raise e
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\lightrag.py", line 1810, in _process_extract_entities
+    chunk_results = await extract_entities(
+                    ^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\operate.py", line 2232, in extract_entities
+    raise prefixed_exception from first_exception
+httpx.ReadTimeout: C[16/48]: chunk-bd31599614fd67b7867680eb5695c49c: 
+
+2025-10-03 21:26:00 | ERROR    | lightrag             | process_document | Failed to extract document 1/1: _N6945025R0003.pdf
+2025-10-04 07:39:54 | ERROR    | lightrag             | worker          | LLM func: Error in decorated function for task 2707695160672_35645.0184221: 
+2025-10-04 07:39:54 | ERROR    | lightrag             | _process_extract_entities | Failed to extract entities and relationships: C[25/48]: chunk-ce59df938c13615832f97546747a6de5: 
+2025-10-04 07:39:54 | ERROR    | lightrag             | process_document | Traceback (most recent call last):
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_transports\default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_transports\default.py", line 394, in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\connection_pool.py", line 256, in handle_async_request
+    raise exc from None
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\connection_pool.py", line 236, in handle_async_request
+    response = await connection.handle_async_request(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        pool_request.request
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\connection.py", line 103, in handle_async_request
+    return await self._connection.handle_async_request(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\http11.py", line 136, in handle_async_request
+    raise exc
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\http11.py", line 106, in handle_async_request
+    ) = await self._receive_response_headers(**kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\http11.py", line 177, in _receive_response_headers
+    event = await self._receive_event(timeout=timeout)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\http11.py", line 217, in _receive_event
+    data = await self._network_stream.read(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.READ_NUM_BYTES, timeout=timeout
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_backends\anyio.py", line 32, in read
+    with map_exceptions(exc_map):
+         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\benma\AppData\Roaming\uv\python\cpython-3.13.7-windows-x86_64-none\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.ReadTimeout
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\operate.py", line 2186, in _process_with_semaphore
+    return await _process_single_content(chunk)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\operate.py", line 2079, in _process_single_content
+    final_result, timestamp = await use_llm_func_with_cache(
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\utils.py", line 1687, in use_llm_func_with_cache
+    res: str = await use_llm_func(
+               ^^^^^^^^^^^^^^^^^^^
+        safe_user_prompt, system_prompt=safe_system_prompt, **kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\utils.py", line 835, in wait_func
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\utils.py", line 539, in worker
+    result = await asyncio.wait_for(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+        func(*args, **kwargs), timeout=max_execution_timeout
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\benma\AppData\Roaming\uv\python\cpython-3.13.7-windows-x86_64-none\Lib\asyncio\tasks.py", line 507, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\llm\ollama.py", line 140, in ollama_model_complete
+    return await _ollama_model_if_cache(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\tenacity\asyncio\__init__.py", line 189, in async_wrapped
+    return await copy(fn, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\tenacity\asyncio\__init__.py", line 111, in __call__
+    do = await self.iter(retry_state=retry_state)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\tenacity\asyncio\__init__.py", line 153, in iter
+    result = await action(retry_state)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\tenacity\_utils.py", line 99, in inner
+    return call(*args, **kwargs)
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\tenacity\__init__.py", line 400, in <lambda>
+    self._add_action_func(lambda rs: rs.outcome.result())
+                                     ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\benma\AppData\Roaming\uv\python\cpython-3.13.7-windows-x86_64-none\Lib\concurrent\futures\_base.py", line 449, in result
+    return self.__get_result()
+           ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\benma\AppData\Roaming\uv\python\cpython-3.13.7-windows-x86_64-none\Lib\concurrent\futures\_base.py", line 401, in __get_result
+    raise self._exception
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\tenacity\asyncio\__init__.py", line 114, in __call__
+    result = await fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\llm\ollama.py", line 114, in _ollama_model_if_cache
+    raise e
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\llm\ollama.py", line 77, in _ollama_model_if_cache
+    response = await ollama_client.chat(model=model, messages=messages, **kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\ollama\_client.py", line 953, in chat
+    return await self._request(
+           ^^^^^^^^^^^^^^^^^^^^
+    ...<14 lines>...
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\ollama\_client.py", line 751, in _request
+    return cls(**(await self._request_raw(*args, **kwargs)).json())
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\ollama\_client.py", line 691, in _request_raw
+    r = await self._client.request(*args, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_client.py", line 1540, in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_client.py", line 1629, in send
+    response = await self._send_handling_auth(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_client.py", line 1657, in _send_handling_auth
+    response = await self._send_handling_redirects(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_client.py", line 1694, in _send_handling_redirects
+    response = await self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_client.py", line 1730, in _send_single_request
+    response = await transport.handle_async_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_transports\default.py", line 393, in handle_async_request
+    with map_httpcore_exceptions():
+         ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\benma\AppData\Roaming\uv\python\cpython-3.13.7-windows-x86_64-none\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_transports\default.py", line 118, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ReadTimeout
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\operate.py", line 2190, in _process_with_semaphore
+    raise prefixed_exception from e
+httpx.ReadTimeout: chunk-ce59df938c13615832f97546747a6de5: 
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\lightrag.py", line 1600, in process_document
+    await entity_relation_task
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\lightrag.py", line 1825, in _process_extract_entities
+    raise e
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\lightrag.py", line 1810, in _process_extract_entities
+    chunk_results = await extract_entities(
+                    ^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\operate.py", line 2232, in extract_entities
+    raise prefixed_exception from first_exception
+httpx.ReadTimeout: C[25/48]: chunk-ce59df938c13615832f97546747a6de5: 
+
+2025-10-04 07:39:54 | ERROR    | lightrag             | process_document | Failed to extract document 1/1: _N6945025R0003.pdf
+2025-10-04 08:25:42 | ERROR    | lightrag             | worker          | LLM func: Error in decorated function for task 2707695225152_38393.2400167: 
+2025-10-04 08:25:42 | ERROR    | lightrag             | _process_extract_entities | Failed to extract entities and relationships: C[28/48]: chunk-24236706dbd2f426925e0a7fa1c01a8e: 
+2025-10-04 08:25:42 | ERROR    | lightrag             | process_document | Traceback (most recent call last):
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_transports\default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_transports\default.py", line 394, in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\connection_pool.py", line 256, in handle_async_request
+    raise exc from None
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\connection_pool.py", line 236, in handle_async_request
+    response = await connection.handle_async_request(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        pool_request.request
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\connection.py", line 103, in handle_async_request
+    return await self._connection.handle_async_request(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\http11.py", line 136, in handle_async_request
+    raise exc
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\http11.py", line 106, in handle_async_request
+    ) = await self._receive_response_headers(**kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\http11.py", line 177, in _receive_response_headers
+    event = await self._receive_event(timeout=timeout)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\http11.py", line 217, in _receive_event
+    data = await self._network_stream.read(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.READ_NUM_BYTES, timeout=timeout
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_backends\anyio.py", line 32, in read
+    with map_exceptions(exc_map):
+         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\benma\AppData\Roaming\uv\python\cpython-3.13.7-windows-x86_64-none\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.ReadTimeout
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\operate.py", line 2186, in _process_with_semaphore
+    return await _process_single_content(chunk)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\operate.py", line 2079, in _process_single_content
+    final_result, timestamp = await use_llm_func_with_cache(
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\utils.py", line 1687, in use_llm_func_with_cache
+    res: str = await use_llm_func(
+               ^^^^^^^^^^^^^^^^^^^
+        safe_user_prompt, system_prompt=safe_system_prompt, **kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\utils.py", line 835, in wait_func
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\utils.py", line 539, in worker
+    result = await asyncio.wait_for(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+        func(*args, **kwargs), timeout=max_execution_timeout
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\benma\AppData\Roaming\uv\python\cpython-3.13.7-windows-x86_64-none\Lib\asyncio\tasks.py", line 507, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\llm\ollama.py", line 140, in ollama_model_complete
+    return await _ollama_model_if_cache(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\tenacity\asyncio\__init__.py", line 189, in async_wrapped
+    return await copy(fn, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\tenacity\asyncio\__init__.py", line 111, in __call__
+    do = await self.iter(retry_state=retry_state)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\tenacity\asyncio\__init__.py", line 153, in iter
+    result = await action(retry_state)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\tenacity\_utils.py", line 99, in inner
+    return call(*args, **kwargs)
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\tenacity\__init__.py", line 400, in <lambda>
+    self._add_action_func(lambda rs: rs.outcome.result())
+                                     ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\benma\AppData\Roaming\uv\python\cpython-3.13.7-windows-x86_64-none\Lib\concurrent\futures\_base.py", line 449, in result
+    return self.__get_result()
+           ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\benma\AppData\Roaming\uv\python\cpython-3.13.7-windows-x86_64-none\Lib\concurrent\futures\_base.py", line 401, in __get_result
+    raise self._exception
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\tenacity\asyncio\__init__.py", line 114, in __call__
+    result = await fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\llm\ollama.py", line 114, in _ollama_model_if_cache
+    raise e
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\llm\ollama.py", line 77, in _ollama_model_if_cache
+    response = await ollama_client.chat(model=model, messages=messages, **kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\ollama\_client.py", line 953, in chat
+    return await self._request(
+           ^^^^^^^^^^^^^^^^^^^^
+    ...<14 lines>...
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\ollama\_client.py", line 751, in _request
+    return cls(**(await self._request_raw(*args, **kwargs)).json())
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\ollama\_client.py", line 691, in _request_raw
+    r = await self._client.request(*args, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_client.py", line 1540, in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_client.py", line 1629, in send
+    response = await self._send_handling_auth(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_client.py", line 1657, in _send_handling_auth
+    response = await self._send_handling_redirects(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_client.py", line 1694, in _send_handling_redirects
+    response = await self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_client.py", line 1730, in _send_single_request
+    response = await transport.handle_async_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_transports\default.py", line 393, in handle_async_request
+    with map_httpcore_exceptions():
+         ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\benma\AppData\Roaming\uv\python\cpython-3.13.7-windows-x86_64-none\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_transports\default.py", line 118, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ReadTimeout
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\operate.py", line 2190, in _process_with_semaphore
+    raise prefixed_exception from e
+httpx.ReadTimeout: chunk-24236706dbd2f426925e0a7fa1c01a8e: 
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\lightrag.py", line 1600, in process_document
+    await entity_relation_task
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\lightrag.py", line 1825, in _process_extract_entities
+    raise e
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\lightrag.py", line 1810, in _process_extract_entities
+    chunk_results = await extract_entities(
+                    ^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\operate.py", line 2232, in extract_entities
+    raise prefixed_exception from first_exception
+httpx.ReadTimeout: C[28/48]: chunk-24236706dbd2f426925e0a7fa1c01a8e: 
+
+2025-10-04 08:25:42 | ERROR    | lightrag             | process_document | Failed to extract document 1/1: _N6945025R0003.pdf
+2025-10-04 10:02:55 | ERROR    | lightrag             | worker          | LLM func: Error in decorated function for task 2086280726496_42426.7906149: 
+2025-10-04 10:02:55 | ERROR    | lightrag             | _process_extract_entities | Failed to extract entities and relationships: C[37/48]: chunk-fb51eafe17d13b3384be33257f424ab7: 
+2025-10-04 10:02:55 | ERROR    | lightrag             | process_document | Traceback (most recent call last):
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_transports\default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_transports\default.py", line 394, in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\connection_pool.py", line 256, in handle_async_request
+    raise exc from None
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\connection_pool.py", line 236, in handle_async_request
+    response = await connection.handle_async_request(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        pool_request.request
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\connection.py", line 103, in handle_async_request
+    return await self._connection.handle_async_request(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\http11.py", line 136, in handle_async_request
+    raise exc
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\http11.py", line 106, in handle_async_request
+    ) = await self._receive_response_headers(**kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\http11.py", line 177, in _receive_response_headers
+    event = await self._receive_event(timeout=timeout)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_async\http11.py", line 217, in _receive_event
+    data = await self._network_stream.read(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.READ_NUM_BYTES, timeout=timeout
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_backends\anyio.py", line 32, in read
+    with map_exceptions(exc_map):
+         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\benma\AppData\Roaming\uv\python\cpython-3.13.7-windows-x86_64-none\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpcore\_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.ReadTimeout
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\operate.py", line 2186, in _process_with_semaphore
+    return await _process_single_content(chunk)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\operate.py", line 2079, in _process_single_content
+    final_result, timestamp = await use_llm_func_with_cache(
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\utils.py", line 1687, in use_llm_func_with_cache
+    res: str = await use_llm_func(
+               ^^^^^^^^^^^^^^^^^^^
+        safe_user_prompt, system_prompt=safe_system_prompt, **kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\utils.py", line 835, in wait_func
+    return await future
+           ^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\utils.py", line 539, in worker
+    result = await asyncio.wait_for(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+        func(*args, **kwargs), timeout=max_execution_timeout
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\benma\AppData\Roaming\uv\python\cpython-3.13.7-windows-x86_64-none\Lib\asyncio\tasks.py", line 507, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\llm\ollama.py", line 140, in ollama_model_complete
+    return await _ollama_model_if_cache(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\tenacity\asyncio\__init__.py", line 189, in async_wrapped
+    return await copy(fn, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\tenacity\asyncio\__init__.py", line 111, in __call__
+    do = await self.iter(retry_state=retry_state)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\tenacity\asyncio\__init__.py", line 153, in iter
+    result = await action(retry_state)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\tenacity\_utils.py", line 99, in inner
+    return call(*args, **kwargs)
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\tenacity\__init__.py", line 400, in <lambda>
+    self._add_action_func(lambda rs: rs.outcome.result())
+                                     ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\benma\AppData\Roaming\uv\python\cpython-3.13.7-windows-x86_64-none\Lib\concurrent\futures\_base.py", line 449, in result
+    return self.__get_result()
+           ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\benma\AppData\Roaming\uv\python\cpython-3.13.7-windows-x86_64-none\Lib\concurrent\futures\_base.py", line 401, in __get_result
+    raise self._exception
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\tenacity\asyncio\__init__.py", line 114, in __call__
+    result = await fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\llm\ollama.py", line 114, in _ollama_model_if_cache
+    raise e
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\llm\ollama.py", line 77, in _ollama_model_if_cache
+    response = await ollama_client.chat(model=model, messages=messages, **kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\ollama\_client.py", line 953, in chat
+    return await self._request(
+           ^^^^^^^^^^^^^^^^^^^^
+    ...<14 lines>...
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\ollama\_client.py", line 751, in _request
+    return cls(**(await self._request_raw(*args, **kwargs)).json())
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\ollama\_client.py", line 691, in _request_raw
+    r = await self._client.request(*args, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_client.py", line 1540, in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_client.py", line 1629, in send
+    response = await self._send_handling_auth(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_client.py", line 1657, in _send_handling_auth
+    response = await self._send_handling_redirects(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_client.py", line 1694, in _send_handling_redirects
+    response = await self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_client.py", line 1730, in _send_single_request
+    response = await transport.handle_async_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_transports\default.py", line 393, in handle_async_request
+    with map_httpcore_exceptions():
+         ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\benma\AppData\Roaming\uv\python\cpython-3.13.7-windows-x86_64-none\Lib\contextlib.py", line 162, in __exit__
+    self.gen.throw(value)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\httpx\_transports\default.py", line 118, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ReadTimeout
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\operate.py", line 2190, in _process_with_semaphore
+    raise prefixed_exception from e
+httpx.ReadTimeout: chunk-fb51eafe17d13b3384be33257f424ab7: 
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\lightrag.py", line 1600, in process_document
+    await entity_relation_task
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\lightrag.py", line 1825, in _process_extract_entities
+    raise e
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\lightrag.py", line 1810, in _process_extract_entities
+    chunk_results = await extract_entities(
+                    ^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+    )
+    ^
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\operate.py", line 2232, in extract_entities
+    raise prefixed_exception from first_exception
+httpx.ReadTimeout: C[37/48]: chunk-fb51eafe17d13b3384be33257f424ab7: 
+
+2025-10-04 10:02:55 | ERROR    | lightrag             | process_document | Failed to extract document 1/1: _N6945025R0003.pdf
+2025-10-04 10:03:20 | ERROR    | lightrag             | worker          | LLM func: Error in decorated function for task 2086280726672_42451.4204471: 
+2025-10-04 10:04:19 | ERROR    | lightrag             | worker          | LLM func: Error in decorated function for task 2086280726848_42510.0057747: 

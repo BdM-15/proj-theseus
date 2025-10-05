@@ -29,18 +29,85 @@ Generic LightRAG cannot understand government contracting concepts:
 - **Domain-specific extraction** - CLINs, FAR clauses, evaluation factors (not generic entities)
 - **Cross-section relationship preservation** (C-H-J-L-M interdependencies)
 - **Government contracting intelligence** vs generic text extraction
-- **Zero external dependencies** - fully local processing with Ollama
-- **Production speed roadmap** - 3-5x faster processing via fine-tuning (see [FINE_TUNING_ROADMAP.md](FINE_TUNING_ROADMAP.md))
+- **Hybrid cloud/local architecture** - xAI Grok for fast public RFP processing, local models for proprietary queries
+- **Enterprise-grade privacy** - Sensitive proposal data never leaves local infrastructure
 
-This approach delivers immediate value by teaching LightRAG government contracting concepts while building toward production-speed performance through domain-specialized fine-tuning.
+**🚀 Architecture Evolution:**
+
+- **Branch 002 (Local Foundation)**: Fully local processing with Ollama (slower but 100% private)
+- **Branch 003 (Cloud Enhancement)**: Hybrid xAI Grok for public RFP extraction + local for proprietary queries
+- **Best of Both Worlds**: Fast cloud processing for public documents, secure local processing for sensitive proposals
+
+This approach delivers immediate value by teaching LightRAG government contracting concepts while enabling production-speed performance through cloud acceleration for public data and maintaining security for proprietary content.
+
+## 🌿 **Branch Strategy & Development Path**
+
+### **Current Status: Branch 002 Cleanup Phase**
+
+We maintain **two primary architectures** as separate Git branches, with **main branch reserved for production-ready releases only**:
+
+#### **Branch 002: `002-local-llm-architecture`** ✅ **STABLE**
+
+- **Purpose**: Fully local processing baseline with 100% privacy
+- **Status**: Working, completing codebase cleanup on `002-01-code-cleanup`
+- **LLM**: Ollama with Mistral-Nemo 12B (local inference)
+- **Speed**: 6-8 hours for large RFPs (slower but zero cost)
+- **Privacy**: 100% local, zero cloud exposure
+- **Use Cases**:
+  - Baseline architecture validation
+  - Proprietary proposal analysis (never cloud)
+  - Air-gapped environments
+  - Cost-sensitive deployments
+
+**Workflow**: Complete cleanup → Merge to `002` branch → Keep as working baseline (**do NOT merge to main**)
+
+#### **Branch 003: `003-ontology-lightrag-cloud`** 📋 **NEXT**
+
+- **Purpose**: Hybrid cloud+local for speed with enterprise privacy
+- **Status**: Planning phase (will fork from cleaned Branch 002)
+- **LLM Strategy**:
+  - **Public RFPs**: xAI Grok cloud models (20-30x faster)
+  - **Proprietary Queries**: Ollama local models (100% private)
+- **Speed**: 30-60 minutes for large public RFPs
+- **Cost**: $0.03-$0.10 per public RFP
+- **Privacy**: Security boundary - public data → cloud, proprietary → local
+- **Use Cases**:
+  - Fast public RFP extraction (Navy MBOS, Marine Corps, etc.)
+  - Proposal development (stays 100% local)
+  - Production capture teams needing speed + security
+
+**Workflow**: Fork from `002` → Add xAI integration → Test hybrid workflow → Merge to main when production-ready
+
+### **Why Two Branches?**
+
+1. **Branch 002 is the foundation**: Proves architecture with zero dependencies
+2. **Branch 003 adds optional acceleration**: Users can choose speed vs zero-cost
+3. **Both share same codebase**: Only `.env` configuration differs
+4. **Production flexibility**: Deploy Branch 002 for air-gapped, Branch 003 for speed
+
+### **What's Next?**
+
+1. ✅ **Now**: Finish Branch 002 codebase cleanup (`002-01-code-cleanup`)
+2. ✅ **Next**: Commit cleaned code to `002-local-llm-architecture`
+3. ✅ **Then**: Fork Branch 003 and implement xAI Grok integration
+4. ✅ **Finally**: Merge Branch 003 to main when production-ready
+
+---
 
 ## ⚠️ **CRITICAL: Ontology-Modified LightRAG Approach**
 
 ### **Primary Library**
 
-**Package**: `lightrag-hku==1.4.9` (installed via `uv` in `.venv/Lib/site-packages/lightrag/`)
+**Package**: Forked LightRAG at `src/lightrag/` (based on lightrag-hku v1.4.9)
 
 **Core Philosophy**: **Modify LightRAG's extraction engine with domain ontology, don't rely on generic processing.**
+
+**Why Forked?**
+
+- **Worker Refresh Patch**: Prevents Ollama memory leaks during long processing runs
+- **Ontology Integration**: Government contracting entity types and relationship constraints
+- **Custom Modifications**: RFP-specific enhancements that can't be done via configuration alone
+- **Zero Pip Dependencies**: Forked library lives in project structure, no external package confusion
 
 ### **Why Generic LightRAG Fails for Government Contracting**
 
@@ -78,7 +145,7 @@ This approach delivers immediate value by teaching LightRAG government contracti
 
 ### **Key LightRAG Modification Points**
 
-**1. Entity Type Injection** (`.venv/Lib/site-packages/lightrag/lightrag.py` line 362):
+**1. Entity Type Injection** (`src/lightrag/lightrag.py` line 362):
 
 ```python
 # MODIFY LightRAG's entity extraction by injecting ontology types
@@ -93,14 +160,14 @@ addon_params: dict[str, Any] = field(
 )
 ```
 
-**This injection happens at** `.venv/Lib/site-packages/lightrag/operate.py` line 2024:
+**This injection happens at** `src/lightrag/operate.py` line 2024:
 
 ```python
 entity_types = global_config["addon_params"].get("entity_types", DEFAULT_ENTITY_TYPES)
 # ↑ Our ontology types get injected into extraction prompt here
 ```
 
-**2. Prompt Customization** (`.venv/Lib/site-packages/lightrag/prompt.py`):
+**2. Prompt Customization** (`src/lightrag/prompt.py`):
 
 ```python
 # MODIFY extraction prompts with government contracting examples
@@ -119,11 +186,12 @@ PROMPTS["entity_extraction_examples"]        # Replace generic examples with RFP
  "SECTION|REQUIREMENT|DEADLINE")
 ```
 
-**3. Extraction Process Flow** (`.venv/Lib/site-packages/lightrag/operate.py` line 2028+):
+**3. Extraction Process Flow** (`src/lightrag/operate.py` line 2028+):
 
 - Line 2024: **Our ontology entity types** injected from `addon_params`
 - Line 2069: Prompts formatted with **our government contracting entity types**
 - Line 2080: LLM called with **modified prompts** (not generic ones)
+- Line 2287-2315: **🔄 Worker refresh** after every N chunks (prevents Ollama memory leaks)
 - Post-processing: **Validate against ontology** to ensure domain accuracy
 
 ### **How to Modify LightRAG Correctly**
@@ -195,14 +263,15 @@ rag = LightRAG(
 
 ### **Referencing LightRAG Source**
 
-When implementing ontology integration, always reference the installed library:
+When implementing ontology integration, always reference the **forked library**:
 
-- **Prompt structure**: `.venv/Lib/site-packages/lightrag/prompt.py`
-- **Entity extraction**: `.venv/Lib/site-packages/lightrag/operate.py` (lines 2020-2170)
-- **LightRAG class**: `.venv/Lib/site-packages/lightrag/lightrag.py` (lines 100-450)
-- **Constants**: `.venv/Lib/site-packages/lightrag/constants.py`
+- **Prompt structure**: `src/lightrag/prompt.py`
+- **Entity extraction**: `src/lightrag/operate.py` (lines 2020-2170, includes worker refresh patch)
+- **LightRAG class**: `src/lightrag/lightrag.py` (lines 100-450)
+- **Constants**: `src/lightrag/constants.py`
+- **Ontology integration**: `src/lightrag/govcon/ontology_integration.py`
 
-Use `uv pip list` to verify package version, not `pip list`.
+**NO pip package needed** - all LightRAG functionality comes from `src/lightrag/` fork.
 
 ---
 
@@ -233,18 +302,49 @@ def custom_regex_chunker(text):
 
 ### **Source Code References**
 
-When implementing ontology integration, always reference the installed library:
+When implementing ontology integration, always reference the **forked library**:
 
-- **Prompt structure**: `.venv/Lib/site-packages/lightrag/prompt.py`
-- **Entity extraction**: `.venv/Lib/site-packages/lightrag/operate.py` (lines 2020-2170)
-- **LightRAG class**: `.venv/Lib/site-packages/lightrag/lightrag.py` (lines 100-450)
-- **Constants**: `.venv/Lib/site-packages/lightrag/constants.py`
+- **Prompt structure**: `src/lightrag/prompt.py`
+- **Entity extraction**: `src/lightrag/operate.py` (lines 2020-2170, includes worker refresh patch)
+- **LightRAG class**: `src/lightrag/lightrag.py` (lines 100-450)
+- **Constants**: `src/lightrag/constants.py`
+- **Ontology integration**: `src/lightrag/govcon/ontology_integration.py`
 
-Use `uv pip list` to verify package version, not `pip list`.
+**NO pip package needed** - all LightRAG functionality comes from `src/lightrag/` fork.
 
 ---
 
 ## 🏗️ **System Architecture**
+
+### **✨ Architecture Evolution (October 5, 2025)**
+
+**Branch Strategy:**
+
+- **Branch 002 (Local Foundation)**: Fully local architecture with Ollama (current)
+- **Branch 003 (Cloud-Enhanced)**: Hybrid xAI Grok + local Ollama (next phase)
+- **Main Branch**: Reserved for production-ready releases only
+
+**Critical Change**: We now use a **forked LightRAG library** at `src/lightrag/` instead of the pip-installed `lightrag-hku` package.
+
+**Why Fork?**
+
+1. **Worker Refresh Patch**: Prevents Ollama memory leaks during long processing runs (lines 2287-2315 in `operate.py`)
+2. **Ontology Integration**: Government contracting entity types injected directly into extraction prompts
+3. **Custom Modifications**: RFP-specific enhancements that require source code changes
+4. **Zero External Dependencies**: No pip package conflicts, all code in project structure
+
+**Import Structure**:
+
+```python
+# Server imports from forked library
+from lightrag.lightrag import LightRAG
+from lightrag.govcon.ontology_integration import OntologyInjector
+
+# Python path configured: sys.path.insert(0, "src")
+# So "lightrag" resolves to src/lightrag/, NOT .venv/Lib/site-packages/lightrag/
+```
+
+**Verification**: Server logs show `lightrag.govcon.ontology_integration` module loaded - this **only exists** in our forked library!
 
 Our **Ontology-Based RAG** system implements a sophisticated understanding of government contracting through structured components:
 
@@ -529,18 +629,33 @@ JSON array where each item looks like:
 
 - **Python**: 3.13+ with LightRAG for text-based RFP processing
 - **Document Processing**: LightRAG native document processing for text-based RFPs (Phase 1-3), enhanced with RAG-Anything for multimodal documents (Phase 4-6)
-- **AI Agents**: Custom FastAPI routes for structured requirement extraction with fine-tuned Ollama models (Phase 7: Unsloth fine-tuning for domain specialization)
-- **LLM/Embeddings**: Ollama (local) with 7-8B models (e.g., qwen2.5-coder:7b, bge-m3) for efficiency
-- **UI**: Professional React WebUI (LightRAG's official interface) replacing Streamlit
+- **AI Agents**: Custom FastAPI routes for structured requirement extraction
+- **LLM/Embeddings**: Hybrid architecture for optimal performance
+  - **Branch 002 (Local)**: Ollama with Mistral-Nemo 12B (fully private, slower)
+  - **Branch 003 (Hybrid)**: xAI Grok models for public RFPs + local for proprietary queries
+- **UI**: Professional React WebUI (LightRAG's official interface)
 - **Env Setup**: uv/uvx (faster alternative to plain pip)
 - **Dev Tools**: VS Code, GitHub Copilot/PowerShell for scripting
 
-### **Hardware Constraints**
+### **Hybrid Architecture Strategy**
 
-- **Optimized for**: Lenovo LEGION 5i (i9-14900HX, RTX 4060, 64GB RAM)—CPU/GPU for Ollama, avoid heavy deps
-- **All open-source, local-run**: No cloud/internet required post-setup
-- **Memory Usage**: Process PDFs in <5 minutes with <4GB memory usage
-- **Model Size**: 7-8B parameters optimal for hardware balance
+**Branch 003 (Cloud-Enhanced) - Coming Soon:**
+
+- **Public RFP Processing**: xAI Grok models (20-30x faster, $0.03-$0.10 per RFP)
+  - Navy MBOS: 10-15 minutes vs 8 hours local
+  - Marine Corps (495 pages): 30-40 minutes vs 16 hours local
+  - No privacy concerns (already public government documents)
+- **Proprietary Query Processing**: Local Ollama models (100% private)
+  - Proposal comparison and compliance checking
+  - Competitive intelligence and gap analysis
+  - Zero cloud leakage of sensitive business data
+
+**Branch 002 (Local Foundation) - Current:**
+
+- **Optimized for**: Lenovo LEGION 5i (i9-14900HX, RTX 4060, 64GB RAM)
+- **Fully Local**: No cloud/internet required post-setup (100% private)
+- **Memory Usage**: Process PDFs with <4GB memory usage
+- **Model**: Mistral-Nemo 12B (128K context, excellent entity extraction)
 
 ### **Current Capabilities (Phase 2 Implementation)** ✅ **COMPLETE**
 
@@ -612,47 +727,67 @@ JSON array where each item looks like:
 - **Architecture Refactoring**: Clean modular design with core/, agents/, models/, api/, utils/
 - **Golden Dataset Pipeline**: Training data export established (15% complete - 75/500 examples)
 
-### **Phase 5: Model Fine-Tuning for Production Speed** 🔄 **IN PROGRESS**
+### **Phase 5: Cloud Acceleration (Branch 003)** � **NEXT**
 
-**Status**: Data collection phase (75/500 examples collected)  
-**Timeline**: October 2025 - April 2026  
-**Goal**: 3-5x faster processing with 90%+ accuracy retention
+**Status**: Planning phase (Branch 002 cleanup in progress)  
+**Timeline**: October 2025  
+**Goal**: 20-30x faster RFP processing with enterprise-grade privacy
 
-**Current Activities:**
+**Implementation Strategy:**
 
-- 📊 **Golden Dataset Creation**: Collecting 500-1000 validated RFP chunk-entity-relationship examples
-- 🎯 **Baseline Benchmarking**: Mistral Nemo 12B performance metrics documented
-- 🔬 **Model Evaluation**: Testing Qwen 2.5 7B, Mistral 7B, Llama 3.1 8B candidates
+- � **xAI Grok Integration**: Use grok-4-fast-reasoning for public RFP extraction
+  - OpenAI-compatible API (LightRAG already supports)
+  - Navy MBOS: 10-15 minutes vs 8 hours local ($0.03)
+  - Marine Corps (495 pages): 30-40 minutes vs 16 hours local ($0.10)
+- 🔒 **Privacy Boundary**: Local Ollama for ALL proprietary content
+  - Proposal comparison and compliance checking
+  - Competitive intelligence and gap analysis
+  - Knowledge graph queries stay 100% local
+- ⚙️ **Dual Configuration**: Environment-based model selection
+  - `.env.grok`: Cloud processing for public RFPs
+  - `.env.local`: Local processing for proprietary queries
 
 **Expected Outcomes:**
 
-- ⏱️ **Processing Speed**: 500-page RFP in 60-90 minutes (vs 2-4 hours currently)
-- 📊 **Reliability**: < 2% timeout rate (vs 10-15% currently)
-- 💾 **Efficiency**: 4-5GB model size (vs 7.1GB currently)
-- 🎯 **Accuracy**: Maintain 90%+ entity extraction quality
+- ⏱️ **Processing Speed**: 500-page public RFP in 30-60 minutes (vs 8-16 hours)
+- 💰 **Cost**: $0.03-$0.10 per public RFP (vs free but 20-30x slower)
+- � **Security**: Zero cloud leakage of proprietary proposal content
+- 🎯 **Quality**: Superior extraction vs 12B local model
 
-📖 **Complete Strategy**: See [FINE_TUNING_ROADMAP.md](FINE_TUNING_ROADMAP.md) for detailed plan, milestones, and technical specifications
+### **Phase 6: Model Fine-Tuning (Optional)** � **PLANNED**
 
-### **Phase 6: Advanced Analysis** � **NEXT**
+**Status**: Deferred (cloud provides sufficient speed)  
+**Timeline**: TBD based on long-term needs  
+**Goal**: Custom domain model if processing 100+ RFPs/year
 
-- **Enhanced Cross-Section Mapping**: Complex dependency analysis across C-H-J-L-M sections
-- **Conflict Detection**: Automated identification of inconsistencies between main RFP and PWS attachments
-- **Evaluation Criteria Analysis**: Automatic scoring weight identification and effort allocation optimization
-- **Win Theme Engine**: Gap analysis and competitive advantage identification
+**Future Considerations:**
 
-### **Phase 6: Proposal Automation** � **NEXT**
+- 📊 **Golden Dataset**: Use accumulated xAI Grok outputs as training data
+- 🎯 **Fine-tuning Target**: Smaller local model (7-8B) with Grok-level quality
+- 💾 **Use Case**: Reduce costs if processing volume justifies investment
 
-- **Automated Proposal Outlines**: Structure optimization based on evaluation criteria and page limits
+📖 **Complete Strategy**: See [FINE_TUNING_ROADMAP.md](FINE_TUNING_ROADMAP.md) for detailed plan if fine-tuning becomes necessary
+
+### **Phase 7: Advanced Analysis (Cloud-Enhanced)** 📋 **PLANNED**
+
+- **Enhanced Cross-Section Mapping**: Complex dependency analysis using xAI Grok acceleration
+- **Conflict Detection**: Rapid inconsistency identification (minutes vs hours)
+- **Evaluation Criteria Analysis**: Fast scoring weight identification across large RFPs
+- **Win Theme Engine**: Real-time gap analysis and competitive positioning
+
+### **Phase 8: Proposal Automation** 📋 **PLANNED**
+
+- **Automated Proposal Outlines**: Structure optimization based on evaluation criteria
 - **Compliance Checking**: Draft content validation against extracted requirements
-- **Content Recommendation**: AI-driven proposal content suggestions based on requirement analysis
-- **Integration APIs**: Connections to existing proposal development tools (Shipley, Pragmatic)
+- **Content Recommendation**: AI-driven proposal suggestions (local for proprietary content)
+- **Integration APIs**: Connections to existing proposal tools (Shipley, Pragmatic)
 
-### **Phase 7: Enterprise Intelligence** 📋 **PLANNED**
+### **Phase 9: Enterprise Intelligence** 📋 **PLANNED**
 
 - **Multi-RFP Analysis**: Pattern recognition across historical solicitations
 - **Competitive Intelligence**: Evaluation criteria trends and agency preferences
-- **Institutional Learning**: Knowledge base building for repeated customer engagement
-- **Advanced Analytics**: Predictive insights for proposal success optimization
+- **Institutional Learning**: Knowledge base building for repeated customers
+- **Advanced Analytics**: PostgreSQL-backed predictive insights
 
 ## 💡 **Business Value Proposition**
 
@@ -667,12 +802,20 @@ JSON array where each item looks like:
 
 **Ontology-Based RAG Process:**
 
-- 2-4 hours automated processing + 4-8 hours expert review
+- **Branch 002 (Local)**: 2-4 hours automated processing + 4-8 hours expert review
+- **Branch 003 (Cloud)**: 30-60 minutes automated processing + 4-8 hours expert review
 - <2% missed requirements with structured validation
 - Early conflict detection and resolution
 - Data-driven proposal optimization
 
 **ROI: 300-500% improvement** in analysis efficiency with dramatically higher quality outcomes.
+
+**Branch 003 Additional Benefits:**
+
+- **10-20x faster** RFP processing with xAI Grok cloud models
+- **Enterprise privacy**: Proprietary proposal data never sent to cloud
+- **Cost-effective**: $0.03-$0.10 per public RFP vs 8-16 hours local compute time
+- **Best of both worlds**: Speed for public documents, security for proprietary content
 
 ### **Critical Use Cases**
 
@@ -682,24 +825,52 @@ JSON array where each item looks like:
 4. **Proposal Optimization**: Effort allocation based on evaluation criteria and page limits
 5. **Win Theme Development**: Competitive gap analysis and differentiation opportunities
 
-## ⚙️ **Optimized Configuration**
+## ⚙️ **Configuration**
 
-### **Performance Settings**
+### **Branch 002: Local Configuration (.env)**
 
 ```powershell
 # Optimized for reliability and efficiency
-# OLLAMA_LLM_NUM_CTX=64000      # Context window (half of model capacity)
-# CHUNK_SIZE=2000               # Optimized chunk size (50% reduction)
-# CHUNK_OVERLAP_SIZE=200        # Proportional overlap reduction
-# MAX_ASYNC=2                   # Controlled parallel processing
+OLLAMA_LLM_NUM_CTX=32768        # Context window (optimized for ontology prompts)
+CHUNK_SIZE=800                  # Optimized chunk size
+LLM_TIMEOUT=1800                # 30-minute timeout for complex extractions
+MAX_ASYNC=3                     # Controlled parallel processing
+OLLAMA_REFRESH_INTERVAL=3       # Worker refresh to prevent memory leaks
+
+# Model Configuration
+LLM_BINDING=ollama
+LLM_MODEL=mistral-nemo:latest
+EMBEDDING_BINDING=ollama
+EMBEDDING_MODEL=bge-m3:latest
 ```
 
-### **Model Configuration**
+### **Branch 003: Cloud Configuration (.env.grok)** - Coming Soon
 
-- **LLM**: Mistral Nemo 12B (7.1GB) - Government contracting optimized
-- **Embeddings**: bge-m3:latest (1024-dimensional, multilingual)
-- **Hardware**: RTX 4060 with 90% utilization during processing
-- **Processing**: 30 chunks vs previous 48 (37.5% optimization)
+```powershell
+# xAI Grok for public RFP processing
+LLM_BINDING=openai              # OpenAI-compatible API
+LLM_BINDING_HOST=https://api.x.ai/v1
+LLM_MODEL=grok-4-fast-reasoning
+LLM_BINDING_API_KEY=xai-your-key-here
+
+# Still use local embeddings (faster, free)
+EMBEDDING_BINDING=ollama
+EMBEDDING_MODEL=bge-m3:latest
+
+# Processing Configuration
+CHUNK_SIZE=800                  # Same chunking strategy
+LLM_TIMEOUT=300                 # 5 minutes (cloud is much faster)
+MAX_ASYNC=5                     # Higher parallelism with cloud
+```
+
+### **Model Performance Comparison**
+
+| Configuration          | Processing Time | Cost        | Privacy          | Use Case                      |
+| ---------------------- | --------------- | ----------- | ---------------- | ----------------------------- |
+| **Branch 002 (Local)** | 6-8 hours       | Free        | 100% Private     | Baseline, proprietary queries |
+| **Branch 003 (Cloud)** | 30-60 min       | $0.03-$0.10 | Public RFPs only | Fast public RFP extraction    |
+
+**Hardware:** RTX 4060 with 90% utilization during local processing
 
 ## 🚀 **Quick Start**
 
@@ -720,15 +891,29 @@ winget install --id=astral-sh.uv -e
 git clone https://github.com/BdM-15/govcon-capture-vibe.git
 cd govcon-capture-vibe
 
-# 3. Install dependencies
+# 3. Checkout appropriate branch
+# Branch 002: Fully local processing
+git checkout 002-local-llm-architecture
+
+# Branch 003: Cloud-enhanced hybrid (coming soon)
+# git checkout 003-ontology-lightrag-cloud
+
+# 4. Install dependencies
 uv sync
 
-# 4. Setup Ollama models
+# 5. Setup models
+# Branch 002: Local Ollama models
 ollama pull mistral-nemo:latest    # 7.1GB - Main LLM
 ollama pull bge-m3:latest          # 1.2GB - Embeddings
 
-# 5. Start the server
-uv run python app.py
+# Branch 003: Get xAI API key from https://console.x.ai
+# Add to .env.grok: LLM_BINDING_API_KEY=xai-your-key-here
+
+# 6. Activate virtual environment
+.venv\Scripts\Activate.ps1
+
+# 7. Start the server (uses forked lightrag at src/lightrag/)
+python app.py
 ```
 
 ### **Usage**
@@ -909,11 +1094,11 @@ python app.py
 
 ## 📚 Architecture
 
-### **Current Architecture (Phase 2)**
+### **Branch 002: Local Foundation Architecture (Current)**
 
 ```
 ┌─────────────────────────────────────────┐
-│           Your Local Machine           │
+│      Branch 002 - Fully Local         │
 ├─────────────────────────────────────────┤
 │  🌐 React WebUI (localhost:9621)       │
 │     ├─ Document Manager               │
@@ -922,23 +1107,72 @@ python app.py
 │     └─ Compliance Matrix Tools        │
 ├─────────────────────────────────────────┤
 │  🖥️  Extended FastAPI Server           │
-│     ├─ LightRAG Core Routes           │
+│     ├─ docs/src/server.py (main)      │
+│     ├─ 🔥 Forked LightRAG (src/lightrag/) │
+│     │   ├─ Worker refresh patch       │
+│     │   ├─ Ontology integration       │
+│     │   └─ Government contracting mods│
 │     ├─ Custom RFP Analysis APIs       │
 │     ├─ Shipley Methodology Engine     │
 │     └─ Document Processing Pipeline   │
 ├─────────────────────────────────────────┤
 │  🤖 Ollama (localhost:11434)           │
-│     ├─ qwen2.5-coder:7b (LLM)          │
+│     ├─ mistral-nemo:latest (12B LLM)  │
 │     └─ bge-m3:latest (Embeddings)      │
 ├─────────────────────────────────────────┤
 │  💾 Local Storage                      │
 │     ├─ ./rag_storage (knowledge graphs)│
 │     ├─ ./inputs (RFP documents)        │
-│     └─ ./prompts (Shipley templates)   │
+│     ├─ ./prompts (Shipley templates)   │
+│     └─ .venv (NO lightrag pip package) │
 └─────────────────────────────────────────┘
+
+✅ Benefits: 100% private, zero API costs
+⏱️  Trade-off: Slower (6-8 hours per large RFP)
 ```
 
-### **Future Architecture (Phase 7+)**
+### **Branch 003: Cloud-Enhanced Hybrid Architecture (Next Phase)**
+
+```
+┌─────────────────────────────────────────────────────────┐
+│        Branch 003 - Hybrid Cloud + Local              │
+├─────────────────────────────────────────────────────────┤
+│  🌐 Same React WebUI (localhost:9621)                  │
+├─────────────────────────────────────────────────────────┤
+│  🖥️  Dual-Mode FastAPI Server                          │
+│     ├─ Public RFP Mode: xAI Grok Cloud              │
+│     │   ├─ grok-4-fast-reasoning                      │
+│     │   ├─ $0.10/1M input, $0.50/1M output           │
+│     │   └─ 20-30x faster than local                  │
+│     │                                                  │
+│     └─ Proprietary Query Mode: Local Ollama          │
+│         ├─ mistral-nemo:latest (12B)                 │
+│         ├─ Proposal comparison & gap analysis        │
+│         └─ 100% private (no cloud leakage)           │
+├─────────────────────────────────────────────────────────┤
+│  ☁️  xAI Cloud (api.x.ai/v1) - Public RFPs Only       │
+│     ├─ Document ingestion & chunking                  │
+│     ├─ Entity extraction & relationships              │
+│     ├─ Knowledge graph construction                   │
+│     └─ Compliance matrix generation                   │
+├─────────────────────────────────────────────────────────┤
+│  🤖 Ollama (localhost:11434) - Proprietary Data Only  │
+│     ├─ mistral-nemo:latest (query engine)            │
+│     ├─ bge-m3:latest (embeddings)                     │
+│     └─ Proposal analysis & comparison                 │
+├─────────────────────────────────────────────────────────┤
+│  💾 Same Local Storage                                 │
+│     ├─ ./rag_storage (knowledge graphs)               │
+│     ├─ ./inputs (RFP documents)                       │
+│     └─ ./proposals (NEVER sent to cloud)             │
+└─────────────────────────────────────────────────────────┘
+
+🚀 Benefits: 20-30x faster RFP processing, enterprise-grade privacy
+💰 Cost: ~$0.03-$0.10 per RFP (public documents only)
+🔒 Security: Proprietary data never leaves local infrastructure
+```
+
+### **Future Architecture (Phase 7+ - Enterprise)**
 
 ```
 ┌─────────────────────────────────────────┐
@@ -956,10 +1190,10 @@ python app.py
 │     ├─ Custom Fine-tuned Models       │
 │     └─ PostgreSQL Integration         │
 ├─────────────────────────────────────────┤
-│  🤖 Advanced AI Stack                  │
-│     ├─ Fine-tuned Domain Models       │
-│     ├─ Multimodal Processing          │
-│     └─ Pattern Recognition ML         │
+│  🤖 Multi-Model AI Stack               │
+│     ├─ xAI Grok (public documents)    │
+│     ├─ Local Models (proprietary)     │
+│     └─ Multimodal Processing          │
 ├─────────────────────────────────────────┤
 │  🗄️  PostgreSQL Knowledge Base         │
 │     ├─ Cross-RFP Analysis             │
@@ -1032,12 +1266,57 @@ python app.py
 
 ## 🏗️ Development
 
+### **Branching Strategy**
+
+```
+main (production-ready releases only)
+│
+├── 002-local-llm-architecture (Branch 002 - Current)
+│   ├── 002-01-code-cleanup (Active: Codebase cleanup before commit)
+│   └── [Future 002-XX branches as needed]
+│
+└── 003-ontology-lightrag-cloud (Branch 003 - Next Phase)
+    ├── Hybrid xAI Grok + local Ollama architecture
+    ├── Public RFP processing with cloud acceleration
+    └── Proprietary query processing stays 100% local
+```
+
+**Workflow:**
+
+1. **Branch 002**: Fully local architecture (baseline)
+
+   - Complete codebase cleanup on `002-01-code-cleanup`
+   - Merge cleanup to `002-local-llm-architecture`
+   - Keep `002` branch as working local baseline (do NOT merge to main)
+
+2. **Branch 003**: Cloud-enhanced hybrid architecture
+   - Fork from cleaned `002` branch
+   - Add xAI Grok integration for public RFP processing
+   - Preserve local processing for proprietary queries
+   - Merge to main when production-ready
+
 ### **Project Structure**
 
 ```
 govcon-capture-vibe/
-├── app.py                          # Main server startup script
-├── src/
+├── docs/
+│   └── src/
+│       ├── server.py               # Main server (imports from lightrag/)
+│       ├── lightrag/               # 🔥 FORKED LightRAG (NOT pip package)
+│       │   ├── lightrag.py         # Core LightRAG class
+│       │   ├── operate.py          # Entity extraction + worker refresh (lines 2287-2315)
+│       │   ├── prompt.py           # Extraction prompts
+│       │   ├── govcon/             # Government contracting extensions
+│       │   │   └── ontology_integration.py  # Ontology injection
+│       │   ├── api/                # LightRAG server API
+│       │   └── llm/                # LLM integrations (Ollama, OpenAI-compatible)
+│       ├── core/                   # Project-specific core
+│       │   ├── ontology.py         # Entity types & relationship constraints
+│       │   └── lightrag_chunking.py # Section-aware chunking
+│       ├── models/                 # Pydantic models (Shipley enums)
+│       ├── agents/                 # PydanticAI agents
+│       └── utils/                  # Logging, monitoring
+├── src/                            # Legacy structure (to be cleaned)
 │   ├── api/
 │   │   ├── __init__.py
 │   │   └── rfp_routes.py           # Custom RFP analysis routes
@@ -1059,7 +1338,9 @@ govcon-capture-vibe/
 │   └── Proposal Development Worksheet Populated Example.pdf
 ├── rag_storage/                    # LightRAG knowledge graphs
 ├── inputs/                         # RFP document inputs
-├── .env                           # Environment configuration
+├── .env                           # Environment configuration (Branch 002: local)
+├── .env.example                   # Template for configuration
+├── .env.grok                      # Branch 003: xAI Grok configuration
 ├── pyproject.toml                 # Python dependencies
 ├── FINE_TUNING_ROADMAP.md         # Model optimization strategy & timeline
 └── README.md                      # This documentation
@@ -1351,12 +1632,15 @@ uv run python app.py
 
 ---
 
-**Last Updated**: October 1, 2025  
-**Version**: 2.0.0 - Ontology-Based Architecture  
-**Status**: Production Ready with Optimized Configuration  
-**Architecture**: Modular codebase with core/, agents/, models/, api/, utils/ separation
+**Last Updated**: October 5, 2025  
+**Version**: 3.0.0 - Hybrid Cloud+Local Architecture  
+**Branch**: `002-01-code-cleanup` → `002-local-llm-architecture` (cleanup in progress)  
+**Status**: Branch 002 stable, Branch 003 planned  
+**Architecture**: Dual-branch strategy (fully local + cloud-enhanced hybrid)
 
-**🎯 Next Milestone**: Advanced cross-section analysis and automated proposal outline generation for complete proposal development automation in government contracting.
+**🎯 Current Milestone**: Complete Branch 002 codebase cleanup, then fork Branch 003 for xAI Grok cloud integration
+
+**🚀 Next Phase**: Branch 003 hybrid architecture - xAI Grok for public RFP extraction (20-30x faster), local Ollama for proprietary proposal queries (100% private)
 
 ````
 
@@ -1470,7 +1754,7 @@ Our ontology-modified LightRAG approach integrates insights from these projects:
 
 ---
 
-**Last updated**: September 30, 2025 - **MILESTONE ACHIEVED**: Successfully processed 71-page Base Operating Services RFP with optimized mistral-nemo model (172 entities, 63 relationships extracted). Enhanced LightRAG server with comprehensive RFP analysis capabilities following detailed roadmap in `RFP_ANALYZER_ROADMAP.md`.
+**Last updated**: October 5, 2025 - **ARCHITECTURE EVOLUTION**: Branch 002 (fully local) established as stable baseline. Branch 003 (hybrid cloud+local) planned with xAI Grok for 20-30x faster public RFP processing while maintaining 100% local processing for proprietary proposal queries.
 
 ## 📋 Recent Updates
 
@@ -1523,6 +1807,41 @@ Invoke-RestMethod -Uri "http://localhost:9621/query" `
 ---
 
 ## 🔍 Troubleshooting
+
+### **Forked Library Issues**
+
+#### **Import Errors After Setup**
+
+```powershell
+# Problem: ModuleNotFoundError: No module named 'lightrag'
+# Solution: Server must add docs/src to sys.path BEFORE importing
+
+# Correct pattern in server.py:
+sys.path.insert(0, str(Path(__file__).parent))  # Points to docs/src/
+from lightrag.lightrag import LightRAG
+```
+
+#### **Verifying Forked Library is Used**
+
+```powershell
+# Check server logs for this line:
+# "lightrag.govcon.ontology_integration | __init__ | Ontology injector initialized with 12 entity types"
+
+# This module ONLY exists in forked library, NOT pip package
+# If you don't see this, server is using wrong library!
+```
+
+#### **Worker Refresh Not Appearing**
+
+```powershell
+# Check logs/lightrag.log for:
+# "🔄 Ollama worker refreshed after 4 chunks (total processed: 4)"
+
+# If missing:
+# 1. Confirm using forked library (see above)
+# 2. Check OLLAMA_REFRESH_INTERVAL=4 in .env
+# 3. Verify operate.py has refresh code (lines 2287-2315)
+```
 
 ### **Current Issues**
 
@@ -1588,4 +1907,10 @@ Invoke-RestMethod -Uri "http://localhost:9621/documents" -Method GET
 Invoke-RestMethod -Uri "http://localhost:9621/kg" -Method GET
 ````
 
-**Last updated**: September 30, 2025 - **MILESTONE ACHIEVED**: Enhanced retrieval system with direct content access confirmed working. MBOS RFP content (N6945025R0003) successfully processed and accessible via optimized endpoints.
+---
+
+**Last updated**: October 5, 2025  
+**Milestone**: Dual-branch architecture strategy finalized  
+**Branch 002**: Fully local processing (stable baseline)  
+**Branch 003**: Hybrid xAI Grok + local Ollama (next phase)  
+**Status**: Completing codebase cleanup before Branch 003 fork

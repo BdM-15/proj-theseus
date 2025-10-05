@@ -6,6 +6,7 @@ Contains the core components for ontology-modified LightRAG integration:
 - Ontology-guided prompts for LightRAG extraction
 - Post-processing validation for knowledge graphs
 - LightRAG integration with ontology injection
+- Simple chunking function (Path B approach)
 
 Phase 1 (archived): ShipleyRFPChunker removed - Path A archived
 Phase 2: Ontology injection via addon_params, prompt override, validation
@@ -40,6 +41,9 @@ from .lightrag_integration import (
     validate_lightrag_extraction,
 )
 
+# Import chunking
+from .lightrag_chunking import simple_chunking_func
+
 __all__ = [
     # Ontology
     'EntityType',
@@ -60,4 +64,7 @@ __all__ = [
     # Integration
     'create_ontology_modified_lightrag',
     'validate_lightrag_extraction',
+    
+    # Chunking
+    'simple_chunking_func',
 ]

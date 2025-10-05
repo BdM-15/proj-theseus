@@ -33,6 +33,19 @@ REQUIRED OUTPUT FORMAT (return ONLY valid JSON):
     "contract_clauses": {"content": "", "source_snippet": "", "page_number": 0, "section_title": ""},
     "representations": {"content": "", "source_snippet": "", "page_number": 0, "section_title": ""}
   },
+  "evaluation_factors": [
+    {
+      "factor_id": "",
+      "factor_name": "",
+      "section": "M",
+      "relative_importance": "",
+      "subfactors": [],
+      "section_l_reference": "",
+      "page_limits": "",
+      "description": "",
+      "snippet": ""
+    }
+  ],
   "requirements": [
     {
       "rfp_ref": "",
@@ -41,6 +54,7 @@ REQUIRED OUTPUT FORMAT (return ONLY valid JSON):
       "description": "",
       "sub_factors": [],
       "compliance_type": "",
+      "evaluated_by": [],
       "snippet": ""
     }
   ],
@@ -60,7 +74,31 @@ EXTRACTION RULES:
 
 1. STRUCTURED ATTRIBUTES: For each field, find the EXACT text from the RFP that matches the attribute type. Copy the complete relevant sentence/paragraph. If not found, use "Not specified".
 
-2. REQUIREMENTS: Find EVERY requirement in the text. Look for these patterns:
+2. EVALUATION FACTORS (CRITICAL - Section M + Section L): Find ALL evaluation factors that determine contract award:
+   
+   Look in Section M for:
+   - Evaluation factors (Technical Approach, Past Performance, Cost/Price, Management, etc.)
+   - Sub-factors under each main factor
+   - Relative importance statements ("significantly more important than", "equal weight", etc.)
+   - Tradeoff methodology (Best Value, Lowest Price Technically Acceptable, etc.)
+   
+   Look in Section L for:
+   - Page limits for each volume that corresponds to Section M factors
+   - Format requirements (margins, font, structure)
+   - Submission instructions that map to evaluation factors
+   
+   For each evaluation factor:
+   - factor_id: "M1", "M2", "M1.1", "M1.2" (matches Section M numbering)
+   - factor_name: "Technical Approach", "Past Performance", etc.
+   - section: "M" (always M for evaluation factors)
+   - relative_importance: "Most Important", "Significantly More Important than Price", "Equal to X", etc.
+   - subfactors: Array of sub-factor names if hierarchical
+   - section_l_reference: Which Section L subsection provides submission instructions
+   - page_limits: "25 pages", "10 pages", "Not to exceed X pages"
+   - description: COMPLETE text describing the factor and how it will be evaluated
+   - snippet: Same as description
+
+3. REQUIREMENTS: Find EVERY requirement in the text. Look for these patterns:
    - "shall" (contractor shall, offeror shall, offerors shall)
    - "must"
    - "will" (when indicating requirement)
@@ -75,9 +113,10 @@ EXTRACTION RULES:
    - description: The COMPLETE exact sentence/paragraph containing the requirement
    - sub_factors: Any sub-requirements within that paragraph
    - compliance_type: "mandatory", "desirable", or "informational"
+   - evaluated_by: Array of factor_ids from evaluation_factors that will assess this requirement (e.g., ["M1", "M2.1"])
    - snippet: Same as description
 
-3. CRITICAL SUMMARY: Identify 3-5 top themes from the requirements, with their importance level and key requirement IDs.
+4. CRITICAL SUMMARY: Identify 3-5 top themes from the requirements, with their importance level and key requirement IDs.
 
 4. SEARCH THE ENTIRE TEXT - do not miss sections or pages.
 

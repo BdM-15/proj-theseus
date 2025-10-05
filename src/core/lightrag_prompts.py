@@ -26,7 +26,7 @@ References:
 """
 
 from typing import List, Dict, Any
-from src.core.ontology import (
+from core.ontology import (
     EntityType,
     RelationshipType,
     VALID_RELATIONSHIPS,

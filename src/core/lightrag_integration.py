@@ -30,12 +30,12 @@ from lightrag import LightRAG, QueryParam
 from lightrag.prompt import PROMPTS
 
 # Import ontology integration components
-from src.core.lightrag_prompts import (
+from core.lightrag_prompts import (
     get_ontology_addon_params,
     get_ontology_prompts,
     get_rfp_entity_extraction_examples,
 )
-from src.core.ontology_validation import (
+from core.ontology_validation import (
     filter_knowledge_graph,
     KnowledgeGraphValidationReport,
 )

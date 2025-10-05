@@ -7,7 +7,7 @@ subsection_id, page_number, requirements_count) for performance tracking and
 optimization.
 
 Usage:
-    from src.utils.chunk_progress_logger import ChunkProgressLogger
+    from utils.chunk_progress_logger import ChunkProgressLogger
     
     logger = ChunkProgressLogger()
     logger.log_chunk_start(chunk_index, total_chunks, chunk_metadata)

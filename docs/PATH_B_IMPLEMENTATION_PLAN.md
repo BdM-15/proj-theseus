@@ -623,4 +623,195 @@ MAX_PARALLEL_INSERT=2
 
 ---
 
-**Ready to implement Path B correctly. Let's build ontology-guided RAG the right way!** 🚀
+---
+
+## Phase 4: Agency-Specific Enhancements (Future)
+
+### Overview
+
+**Current State**: Path B handles agency structure variations through semantic extraction. Federal agencies don't follow templates perfectly → Semantic extraction handles variations automatically.
+
+**Phase 4 Goals**: Add metadata enrichment and specialized handling for agency-specific patterns while maintaining Path B's agnostic architecture.
+
+### Agency Structure Patterns
+
+**Navy/Army (Attachment-Heavy)**:
+
+- Base RFP: 70-90 pages
+- PWS/Specifications: Attachment J-1, J-2, J-3 (200-400 pages)
+- Total: 300-500 pages
+- **Path B handles**: Semantic extraction works regardless of attachment location
+
+**Marine Corps (Integrated)**:
+
+- Section C: 400+ pages (PWS integrated directly)
+- Fewer attachments
+- Total: 495+ pages
+- **Path B handles**: Same extraction quality, different chunk distribution
+
+**Air Force/Space Force (Hybrid)**:
+
+- Mix of attachments and integrated sections
+- Technical specifications often in Section J attachments
+- **Path B handles**: Agnostic to structure variations
+
+### Regulation-Specific Metadata
+
+**Current Approach** (works out-of-box):
+
+```python
+# LLM recognizes patterns semantically
+"DFARS 252.204-7012" → CLAUSE entity
+"AFARS 5152.225-9000" → CLAUSE entity
+"NMCARS 5252.232-9240" → CLAUSE entity
+```
+
+**Phase 4 Enhancement** (metadata enrichment):
+
+```python
+{
+  "entity_name": "DFARS 252.204-7012",
+  "entity_type": "CLAUSE",
+  "metadata": {
+    "agency": "DoD",
+    "regulation_type": "DFARS",
+    "clause_number": "252.204-7012",
+    "title": "Safeguarding Covered Defense Information",
+    "category": "Cybersecurity"
+  }
+}
+```
+
+**Implementation**: Add post-processing enrichment step that looks up clause metadata from reference database.
+
+### Nested Requirement Handling
+
+**Challenge**: Federal paragraphs with multiple embedded requirements.
+
+**Path B Advantage**: 64K context window processes entire paragraph + surrounding context simultaneously.
+
+**Example Extraction** from convoluted paragraph:
+
+- DELIVERABLE: "weekly status reports"
+- REQUIREMENT: "Format: SF-1234"
+- CONCEPT: "CLIN 0001-0003"
+- SECTION: "Section C.3.2", "Section H.8"
+- CLAUSE: "FAR 52.232-5"
+- EVENT: "5:00 PM EST each Friday"
+- PERSON: "COR", "alternate COR"
+- Relationships: All cross-references preserved
+
+**Phase 4**: Add requirement dependency graph visualization.
+
+### Table & Structured Data
+
+**Current Status**: ⚠️ Partial coverage
+
+- Text-based tables: Extracted by PDF parser → LLM processes as text
+- CLIN tables, pricing tables: Entities extracted correctly
+- Complex evaluation matrices: Limited
+
+**Phase 4 Enhancements**:
+
+- **LightRAG "RAG Everything"**: Multi-modal extraction (images, tables, diagrams)
+- **Structured data parser**: Direct Excel/CSV processing for pricing attachments
+- **Table-aware chunking**: Preserve table structure during chunking
+
+### Multi-Volume RFP Processing
+
+**Challenge**: Large RFPs split across multiple PDFs (Volume I: Technical, Volume II: Pricing, Volume III: Past Performance).
+
+**Current**: Process each volume separately, merge graphs.
+
+**Phase 4 Enhancements**:
+
+- **Cross-volume relationship detection**: Link requirements in Vol I to pricing in Vol II
+- **Unified knowledge graph**: Single graph spanning all volumes
+- **Volume-aware queries**: "Show all Vol I requirements related to Vol II CLINs"
+
+### Amendment & Modification Tracking
+
+**Challenge**: RFPs get amended (Amendment 001, Amendment 002), need to track changes.
+
+**Phase 4 Approach**:
+
+- **Versioned knowledge graphs**: Separate graph per amendment
+- **Change detection**: Compare graphs to identify additions/deletions/modifications
+- **Relationship preservation**: Track which entities changed across amendments
+
+### Agency-Specific Ontology Extensions
+
+**Current**: 11 EntityTypes cover 80% of federal RFPs.
+
+**Phase 4 Agency Modules**:
+
+**DoD Module**:
+
+- SECURITY_REQUIREMENT (separate from generic REQUIREMENT)
+- TECHNICAL_DATA_RIGHTS (DFARS-specific)
+- CDRL (Contract Data Requirements List)
+
+**Civilian Module**:
+
+- SOCIOECONOMIC_REQUIREMENT (Small Business, 8(a), HUBZone)
+- SUSTAINABILITY_REQUIREMENT (Green initiatives)
+- ACCESSIBILITY_REQUIREMENT (Section 508)
+
+**Implementation**: Load agency module based on RFP agency detection, extend base ontology dynamically.
+
+### Query Enhancements
+
+**Current**: Basic semantic search over knowledge graph.
+
+**Phase 4 Query Types**:
+
+- **Agency-aware**: "Show all DFARS clauses" (filter by agency metadata)
+- **Cross-section**: "Find all Section M factors evaluated by Section L instructions"
+- **Compliance-focused**: "List must/shall requirements not addressed in proposal"
+- **Comparative**: "Compare Navy RFP structure to Marine Corps patterns"
+
+### Performance Optimization
+
+**Phase 4 Fine-Tuning**:
+
+- Extract golden dataset from validated Path B extractions
+- Fine-tune mistral-nemo on government contracting corpus
+- Target: 3-5x faster processing (see `FINE_TUNING_ROADMAP.md`)
+
+### Success Metrics (Phase 4)
+
+- ✅ Agency detection accuracy >95%
+- ✅ Regulation-specific clause metadata enrichment
+- ✅ Multi-volume RFPs processed with unified graph
+- ✅ Amendment tracking with change detection
+- ✅ Table extraction accuracy >90%
+- ✅ Cross-volume relationship detection
+- ✅ Agency-specific ontology modules loaded dynamically
+
+### Implementation Priority
+
+**High Priority** (near-term):
+
+1. Regulation metadata enrichment (DFARS/AFARS lookup)
+2. Multi-volume processing
+3. Enhanced table handling
+
+**Medium Priority** (6 months):
+
+1. Amendment tracking
+2. Agency-specific ontology modules
+3. Advanced query types
+
+**Low Priority** (future):
+
+1. Fine-tuning for performance
+2. "RAG Everything" multi-modal
+3. Real-time collaboration features
+
+---
+
+**Path B foundation is agnostic and scalable. Phase 4 adds specialized enhancements while preserving semantic flexibility.** 🚀
+
+```
+
+```
