@@ -91,6 +91,7 @@ We maintain **two primary architectures** as separate Git branches, with **main 
 ### **Configuration Management**
 
 **`.env.example`** - Configuration template for both branches:
+
 - **Branch 002 Configuration**: Fully local Ollama setup (uncomment local config section)
 - **Branch 003 Configuration**: xAI Grok cloud setup (active by default, requires API key)
 - **Usage**: Copy to `.env` and configure based on your deployment choice
@@ -1642,9 +1643,120 @@ uv run python app.py
 
 - **[LightRAG](https://github.com/HKUDS/LightRAG)**: Core knowledge graph foundation
 - **[RAG-Anything](https://github.com/HKUDS/RAG-Anything)**: Multimodal document processing
-- **[RAG-Anything Context Aware Configuration](https://github.com/HKUDS/RAG-Anything/blob/main/docs/context_aware_processing.md)**: Enhanced Accuracy: Context helps AI understand the purpose and meaning of multimodal content
+- **[RAG-Anything Context-Aware Processing](https://github.com/HKUDS/RAG-Anything/blob/main/docs/context_aware_processing.md)**: Advanced context extraction for multimodal content
 - **[Shipley Associates](https://shipley.com/)**: Official Shipley methodology source
 - **[Federal Acquisition Regulation](https://www.acquisition.gov/far/)**: Government contracting regulations
+
+### **RAG-Anything Context-Aware Processing**
+
+**Phase 4-6 Enhancement: Multimodal Document Intelligence**
+
+RAG-Anything's context-aware processing feature will enable our system to automatically extract and provide surrounding text content as context when processing multimodal RFP content (tables, images, diagrams). This is critical for government contracting documents where visual elements like compliance matrices, organizational charts, and technical diagrams must be understood within their document structure.
+
+**Key Benefits for GovCon RFPs:**
+
+- **Enhanced Accuracy**: Context helps AI understand the purpose of Section M evaluation matrices, org charts, and technical diagrams
+- **Semantic Coherence**: Generated descriptions align with RFP terminology (CLINs, PWS, SOW, evaluation factors)
+- **Automated Integration**: Context extraction automatically enabled during document processing
+- **Section-Aware Analysis**: Understands relationships between text sections and embedded tables/images
+
+**Configuration for Government Contracting:**
+
+```python
+from raganything import RAGAnything, RAGAnythingConfig
+
+# Configure for RFP multimodal processing
+config = RAGAnythingConfig(
+    context_window=2,                    # 2 pages before/after for RFP structure
+    context_mode="page",                 # Page-based (aligns with RFP pagination)
+    max_context_tokens=3000,             # Sufficient for complex evaluation criteria
+    include_headers=True,                # Preserve section headers (A-M sections)
+    include_captions=True,               # Include table/figure captions
+    context_filter_content_types=["text", "table", "image"],
+    content_format="minerU"              # MinerU parsing for high-fidelity extraction
+)
+
+# Integrate with our forked LightRAG instance
+rag_anything = RAGAnything(
+    lightrag=govcon_rag,                 # Pass our ontology-modified instance
+    vision_model_func=xai_grok_vision,   # xAI Grok Vision for image analysis
+    config=config
+)
+
+# Process RFP with automatic context extraction
+await rag_anything.process_document_complete("navy_rfp.pdf")
+```
+
+**RFP-Specific Use Cases:**
+
+1. **Section M Evaluation Matrices**:
+   - Context: Surrounding evaluation criteria text
+   - Extracted: Factor weights, scoring methodology, submission requirements
+   - Entity Type: `EVALUATION_FACTOR` with relationships to `REQUIREMENT`
+
+2. **Organizational Charts (Section J)**:
+   - Context: Management approach requirements, key personnel sections
+   - Extracted: Reporting relationships, role definitions, clearance requirements
+   - Entity Type: `ORGANIZATION` with `PERSON` relationships
+
+3. **Technical Architecture Diagrams**:
+   - Context: Technical approach requirements, system specifications
+   - Extracted: Component descriptions, data flows, interface requirements
+   - Entity Type: `TECHNOLOGY` with `REQUIREMENT` dependencies
+
+4. **CLIN Pricing Tables (Section B)**:
+   - Context: Statement of Work tasks, deliverables
+   - Extracted: Line item descriptions, quantities, periods of performance
+   - Entity Type: `DELIVERABLE` with `CONCEPT` (pricing) relationships
+
+**Context Modes for RFP Processing:**
+
+- **Page-Based Context** (`context_mode="page"`): Default for structured RFP documents
+  - Uses `page_idx` field from content items
+  - Example: Include text from 2 pages before/after Section M evaluation matrix
+  - Suitable for: Multi-page technical specifications, lengthy SOW sections
+
+- **Chunk-Based Context** (`context_mode="chunk"`): Fine-grained control for complex sections
+  - Uses sequential position in content list
+  - Example: Include 5 content items before/after embedded compliance matrix
+  - Suitable for: Dense sections with many tables (pricing, deliverables)
+
+**Advanced Features:**
+
+- **Context Truncation**: Automatically truncates to fit LLM token limits with sentence boundary preservation
+- **Header Formatting**: Markdown-style headers preserve RFP section hierarchy (# Section M, ## Factor 1)
+- **Caption Integration**: Image/table captions included with `[Table: Section M Evaluation Matrix]` formatting
+- **Smart Boundary Preservation**: Maintains semantic integrity when truncating large context blocks
+
+**Integration with Branch 003 Implementation:**
+
+This context-aware processing feature is documented in `docs/BRANCH_003_IMPLEMENTATION.md` under the "GovCon Ontology Integration with RAG-Anything" section. Our custom modal processors (`GovConComplianceMatrixProcessor`, `ShipleyRequirementProcessor`, `DeliverableTableProcessor`) leverage this context system to:
+
+1. Extract surrounding requirement text when processing evaluation matrices
+2. Preserve Section L↔M relationships (page limits mapped to evaluation criteria)
+3. Link technical diagrams to their corresponding SOW/PWS requirements
+4. Map CLIN pricing tables to deliverable schedules and performance periods
+
+**Performance Optimization:**
+
+- **Accurate Token Control**: Uses real tokenizer for precise counting (prevents LLM limit overruns)
+- **Caching**: Context extraction results reused across multimodal items
+- **Flexible Filtering**: `context_filter_content_types` reduces noise from irrelevant content
+
+**Best Practices for RFP Processing:**
+
+1. **Token Limits**: Set `max_context_tokens=3000` for complex evaluation sections (avoids truncation)
+2. **Window Size**: Use `context_window=2` for RFPs (captures cross-section relationships)
+3. **Content Filtering**: Include `["text", "table", "image"]` for comprehensive RFP analysis
+4. **Header Inclusion**: Always `include_headers=True` to preserve A-M section structure
+5. **Caption Processing**: `include_captions=True` for figure/table titles referenced in evaluation criteria
+
+**Reference Documentation:**
+
+- **Full API Reference**: [RAG-Anything Context-Aware Processing Guide](https://github.com/HKUDS/RAG-Anything/blob/main/docs/context_aware_processing.md)
+- **Implementation Plan**: `docs/BRANCH_003_IMPLEMENTATION.md` - Phase 1-3 tasks
+- **Custom Processors**: Code examples in implementation journal (~300 lines)
+- **Configuration**: See `.env.example` for Branch 003 multimodal settings
 
 ### **Hardware Optimization**
 
