@@ -42,14 +42,14 @@ This approach delivers immediate value by teaching LightRAG government contracti
 
 ## 🌿 **Branch Strategy & Development Path**
 
-### **Current Status: Branch 002 Cleanup Phase**
+### **Current Status: Branch 003 Cloud Enhancement** 🚀
 
 We maintain **two primary architectures** as separate Git branches, with **main branch reserved for production-ready releases only**:
 
-#### **Branch 002: `002-local-llm-architecture`** ✅ **STABLE**
+#### **Branch 002: `002-lighRAG-govcon-ontology`** ✅ **STABLE BASELINE**
 
 - **Purpose**: Fully local processing baseline with 100% privacy
-- **Status**: Working, completing codebase cleanup on `002-01-code-cleanup`
+- **Status**: Complete - Codebase cleaned and optimized
 - **LLM**: Ollama with Mistral-Nemo 12B (local inference)
 - **Speed**: 6-8 hours for large RFPs (slower but zero cost)
 - **Privacy**: 100% local, zero cloud exposure
@@ -58,39 +58,59 @@ We maintain **two primary architectures** as separate Git branches, with **main 
   - Proprietary proposal analysis (never cloud)
   - Air-gapped environments
   - Cost-sensitive deployments
+- **Documentation**: All architectural decisions preserved in `docs/ARCHITECTURE_DECISION_RECORDS.md`
 
-**Workflow**: Complete cleanup → Merge to `002` branch → Keep as working baseline (**do NOT merge to main**)
+**Status**: Stable baseline - available as fallback for Branch 003
 
-#### **Branch 003: `003-ontology-lightrag-cloud`** 📋 **NEXT**
+#### **Branch 003: `003-ontology-lightrag-cloud`** � **IN PROGRESS**
 
 - **Purpose**: Hybrid cloud+local for speed with enterprise privacy
-- **Status**: Planning phase (will fork from cleaned Branch 002)
+- **Status**: Active development (forked October 5, 2025)
+- **Implementation Journal**: See `docs/BRANCH_003_IMPLEMENTATION.md` for detailed roadmap
 - **LLM Strategy**:
   - **Public RFPs**: xAI Grok cloud models (20-30x faster)
   - **Proprietary Queries**: Ollama local models (100% private)
-- **Speed**: 30-60 minutes for large public RFPs
-- **Cost**: $0.03-$0.10 per public RFP
+- **Speed**: 30-60 minutes for large public RFPs (target)
+- **Cost**: $0.03-$0.10 per public RFP (projected)
 - **Privacy**: Security boundary - public data → cloud, proprietary → local
 - **Use Cases**:
   - Fast public RFP extraction (Navy MBOS, Marine Corps, etc.)
   - Proposal development (stays 100% local)
   - Production capture teams needing speed + security
 
-**Workflow**: Fork from `002` → Add xAI integration → Test hybrid workflow → Merge to main when production-ready
+**Current Phase**: Phase 1 - xAI Grok Integration (Week 1)  
+**Workflow**: xAI setup → Quality validation → Hybrid routing → Production testing → Merge to main
 
 ### **Why Two Branches?**
 
 1. **Branch 002 is the foundation**: Proves architecture with zero dependencies
 2. **Branch 003 adds optional acceleration**: Users can choose speed vs zero-cost
-3. **Both share same codebase**: Only `.env` configuration differs
+3. **Both share same codebase**: Only `.env` configuration differs (see `.env.example`)
 4. **Production flexibility**: Deploy Branch 002 for air-gapped, Branch 003 for speed
 
-### **What's Next?**
+### **Configuration Management**
 
-1. ✅ **Now**: Finish Branch 002 codebase cleanup (`002-01-code-cleanup`)
-2. ✅ **Next**: Commit cleaned code to `002-local-llm-architecture`
-3. ✅ **Then**: Fork Branch 003 and implement xAI Grok integration
-4. ✅ **Finally**: Merge Branch 003 to main when production-ready
+**`.env.example`** - Configuration template for both branches:
+- **Branch 002 Configuration**: Fully local Ollama setup (uncomment local config section)
+- **Branch 003 Configuration**: xAI Grok cloud setup (active by default, requires API key)
+- **Usage**: Copy to `.env` and configure based on your deployment choice
+
+```powershell
+# Copy template and add your configuration
+cp .env.example .env
+
+# For Branch 002 (Local): Uncomment Ollama config, comment cloud config
+# For Branch 003 (Cloud): Add your xAI API key to LLM_BINDING_API_KEY
+```
+
+See `.env.example` for detailed configuration options and security guidelines.
+
+### **Progress Tracking**
+
+- ✅ **Branch 002**: Codebase cleanup complete, documentation consolidated
+- 🚀 **Branch 003**: In progress - Phase 1 (xAI Grok integration)
+- 📋 **Implementation Journal**: `docs/BRANCH_003_IMPLEMENTATION.md` tracks all phases
+- 🎯 **Target**: Merge Branch 003 to main when production-ready (4-week timeline)
 
 ---
 
@@ -1622,6 +1642,7 @@ uv run python app.py
 
 - **[LightRAG](https://github.com/HKUDS/LightRAG)**: Core knowledge graph foundation
 - **[RAG-Anything](https://github.com/HKUDS/RAG-Anything)**: Multimodal document processing
+- **[RAG-Anything Context Aware Configuration](https://github.com/HKUDS/RAG-Anything/blob/main/docs/context_aware_processing.md)**: Enhanced Accuracy: Context helps AI understand the purpose and meaning of multimodal content
 - **[Shipley Associates](https://shipley.com/)**: Official Shipley methodology source
 - **[Federal Acquisition Regulation](https://www.acquisition.gov/far/)**: Government contracting regulations
 
