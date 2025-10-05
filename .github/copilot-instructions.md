@@ -1,93 +1,48 @@
-# Copilot Instructions for GovCon-Capture-Vibe Project
+# Copilot Instructions for GovCon-Capture-Vibe
 
-## ⚠️ ABSOLUTE REQUIREMENT: Virtual Environment Activation
+## CRITICAL RULES
 
-**BEFORE running ANY terminal command that uses Python, uv, or project dependencies, you MUST activate the virtual environment:**
+### Rule 1: Virtual Environment Required for Python Execution
+
+**Before running Python, uv, or any project command**, you MUST activate the virtual environment as a separate command:
 
 ```powershell
-# FIRST: Activate venv as standalone command
 .venv\Scripts\Activate.ps1
-
-# THEN: Run your command in the activated environment
-<your command here>
 ```
 
-**NO EXCEPTIONS.** Activate venv as a **separate command**, then run subsequent commands. Do NOT chain with semicolons. See "CRITICAL: Virtual Environment Activation" section below for details.
+**Then** run your command:
 
-## ⚠️ ABSOLUTE REQUIREMENT: Use Workspace Tools, Not PowerShell
+```powershell
+python app.py
+# or
+uv pip list
+# or
+python -m pytest
+```
 
-**ALWAYS prioritize workspace tools over PowerShell commands for file operations:**
+**Never** run Python commands without first activating `.venv` in a separate step.
 
-**DO** (Use Workspace Tools):
+### Rule 2: Use Workspace Tools for File Operations
 
-- ✅ **Read files**: Use `read_file` tool, NOT `Get-Content` or `cat` in PowerShell
-- ✅ **Create files**: Use `create_file` tool, NOT `New-Item` or `echo` in PowerShell
-- ✅ **Edit files**: Use `replace_string_in_file` tool, NOT `(Get-Content).Replace()` in PowerShell
-- ✅ **Search content**: Use `grep_search` or `semantic_search` tools, NOT `Select-String` in PowerShell
-- ✅ **List directories**: Use `list_dir` tool, NOT `Get-ChildItem` in PowerShell
+**NEVER use PowerShell for file operations.** Always use workspace tools:
 
-**ONLY use PowerShell when**:
+| Operation      | ✅ USE THIS                      | ❌ NOT THIS               |
+| -------------- | -------------------------------- | ------------------------- |
+| Read file      | `read_file`                      | `Get-Content`, `cat`      |
+| Create file    | `create_file`                    | `New-Item`, `echo >`      |
+| Edit file      | `replace_string_in_file`         | `(Get-Content).Replace()` |
+| Search content | `grep_search`, `semantic_search` | `Select-String`           |
+| List directory | `list_dir`                       | `Get-ChildItem`, `ls`     |
 
-- Running Python scripts or applications (`python app.py`)
-- Using `uv` commands (`uv pip list`, `uv sync`)
-- Git operations (`git status`, `git commit`)
-- System commands that have no workspace equivalent
+**Only use PowerShell for**:
 
-**Why This Matters**:
+- Running Python scripts: `python app.py`
+- Package management: `uv pip list`, `uv sync`
+- Git commands: `git status`, `git commit`
 
-- Workspace tools provide better context to the agent
-- Reduces unnecessary terminal command calls
-- Prevents context loss from truncated terminal output
-- More reliable for file operations in the conversation history
+## Project Context
 
-## ⚠️ CRITICAL: Ontology-Modified LightRAG Approach
-
-### Primary Library
-
-**Package**: `lightrag-hku==1.4.9` (installed in `/src/lightrag_govcon/`)
-
-**Core Philosophy**: **Modify LightRAG's extraction engine with domain ontology, don't rely on generic processing.**
-
-### Why Generic LightRAG Fails for Government Contracting
-
-**Generic LightRAG cannot**:
-
-- Distinguish CLIN (Contract Line Item Number) from generic line items
-- Recognize Section L↔M evaluation relationships
-- Identify "shall" vs "should" requirement classifications (Shipley methodology)
-- Extract FAR/DFARS clause applicability
-- Map SOW requirements to deliverables and evaluation criteria
-- Understand Uniform Contract Format (A-M sections, J attachments)
-
-**Our Ontology-Modified Approach**:
-
-- **Injects government contracting entity types** into LightRAG's extraction prompts
-- **Constrains relationships** to valid government contracting patterns (L↔M, requirement→evaluation)
-- **Teaches domain terminology** through custom examples (PWS, SOW, CLIN, Section M factors)
-- **Validates extractions** against ontology to ensure domain accuracy
-
-**DO** (Modify LightRAG's Processing):
-
-- ✅ **Inject ontology into `addon_params["entity_types"]`** - This modifies what LightRAG extracts
-- ✅ **Customize extraction prompts** via `PROMPTS` dictionary with government contracting examples
-- ✅ **Add domain-specific few-shot examples** showing RFP entity patterns
-- ✅ **Post-process with ontology validation** to ensure domain accuracy
-- ✅ **Constrain relationships** to valid government contracting patterns
-
-**DO NOT** (Don't Bypass the Framework):
-
-- ❌ Create custom preprocessing that bypasses LightRAG's semantic understanding
-- ❌ Build parallel extraction mechanisms outside the framework
-- ❌ Use deterministic regex for entity/section identification
-- ❌ Modify LightRAG source files directly
-- ❌ Assume generic LightRAG will "just figure out" government contracting concepts
-
-### Package Management
-Use `uv pip list` to verify package version, not `pip list`.
-
-## Development Workflow
-
-### **Critical Reference Artifacts**
+### Reference Resources
 
 When brainstorming enhancements or refining ontology, leverage these key resources alongside project artifacts:
 

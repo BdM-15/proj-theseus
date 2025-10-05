@@ -22,8 +22,9 @@ import asyncio
 import sys
 from pathlib import Path
 
-# Add src to Python path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+# Add src to Python path for server import
+src_path = Path(__file__).parent / "src"
+sys.path.insert(0, str(src_path))
 
 # Import our extended server
 from server import main
