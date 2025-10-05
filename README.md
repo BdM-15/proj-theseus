@@ -1690,16 +1690,19 @@ await rag_anything.process_document_complete("navy_rfp.pdf")
 **RFP-Specific Use Cases:**
 
 1. **Section M Evaluation Matrices**:
+
    - Context: Surrounding evaluation criteria text
    - Extracted: Factor weights, scoring methodology, submission requirements
    - Entity Type: `EVALUATION_FACTOR` with relationships to `REQUIREMENT`
 
 2. **Organizational Charts (Section J)**:
+
    - Context: Management approach requirements, key personnel sections
    - Extracted: Reporting relationships, role definitions, clearance requirements
    - Entity Type: `ORGANIZATION` with `PERSON` relationships
 
 3. **Technical Architecture Diagrams**:
+
    - Context: Technical approach requirements, system specifications
    - Extracted: Component descriptions, data flows, interface requirements
    - Entity Type: `TECHNOLOGY` with `REQUIREMENT` dependencies
@@ -1712,6 +1715,7 @@ await rag_anything.process_document_complete("navy_rfp.pdf")
 **Context Modes for RFP Processing:**
 
 - **Page-Based Context** (`context_mode="page"`): Default for structured RFP documents
+
   - Uses `page_idx` field from content items
   - Example: Include text from 2 pages before/after Section M evaluation matrix
   - Suitable for: Multi-page technical specifications, lengthy SOW sections

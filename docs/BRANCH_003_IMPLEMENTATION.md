@@ -18,7 +18,8 @@ Branch 003 implements **hybrid cloud+local architecture with multimodal capabili
 - **Enterprise-grade security boundary** preventing proprietary data leakage
 - **Preserved govcon ontology** (12 entity types) through non-invasive integration
 
-**Strategic Context**: 
+**Strategic Context**:
+
 - Fine-tuning deferred (see `FINE_TUNING_ROADMAP.md`) - cloud acceleration provides superior ROI with 6-month shorter timeline
 - **RAG-Anything integration** provides multimodal parsing WITHOUT forking their library - we use it as a wrapper around our existing LightRAG fork
 - Our govcon-specific ontology (ORGANIZATION, CONCEPT, REQUIREMENT, DELIVERABLE, EVALUATION_FACTOR, etc.) is preserved and enhanced with multimodal content
@@ -32,21 +33,22 @@ Branch 003 implements **hybrid cloud+local architecture with multimodal capabili
 **Goal**: Connect to xAI API, integrate RAG-Anything multimodal parsing, and validate entity extraction quality matches local baseline.
 
 **Tasks**:
+
 - [ ] **Task 1.1**: Set up xAI API account and RAG-Anything installation
   - Register at https://console.x.ai
   - Generate API key with appropriate permissions
   - Add to `.env`: `LLM_BINDING_API_KEY=xai-...`
   - Install RAG-Anything: `pip install raganything[all]`
   - Verify LibreOffice installed for Office doc parsing
-  
 - [ ] **Task 1.2**: Configure RAG-Anything with existing LightRAG instance
   - **NON-INVASIVE INTEGRATION**: Use RAG-Anything as library, NOT fork
   - Pass our existing LightRAG fork instance to RAG-Anything
   - Configure multimodal processors:
+
     ```python
     from src.lightrag import LightRAG  # OUR fork with govcon ontology
     from raganything import RAGAnything, RAGAnythingConfig
-    
+
     # Initialize OUR LightRAG with govcon ontology
     govcon_rag = LightRAG(
         working_dir="./rag_storage",
@@ -54,7 +56,7 @@ Branch 003 implements **hybrid cloud+local architecture with multimodal capabili
         llm_model_func=xai_grok_func,  # Cloud LLM
         embedding_func=ollama_embed_func  # Local embeddings
     )
-    
+
     # Wrap with RAG-Anything for multimodal parsing
     multimodal_rag = RAGAnything(
         lightrag=govcon_rag,  # Pass OUR instance
@@ -68,8 +70,8 @@ Branch 003 implements **hybrid cloud+local architecture with multimodal capabili
         )
     )
     ```
+
   - Test that our 12 entity types are preserved in multimodal content
-  
 - [ ] **Task 1.3**: Baseline quality validation with multimodal parsing
   - Process Navy MBOS RFP (71 pages) with xAI Grok + RAG-Anything
   - Verify multimodal content extraction:
@@ -85,7 +87,6 @@ Branch 003 implements **hybrid cloud+local architecture with multimodal capabili
     - Tables → CONCEPT (CLIN pricing) or EVALUATION_FACTOR (Section M matrices)
     - Images → ORGANIZATION (org charts) or CONCEPT (technical diagrams)
   - Document any quality differences
-  
 - [ ] **Task 1.4**: Performance benchmarking with multimodal pipeline
   - Measure processing time for Navy MBOS RFP (with full multimodal parsing)
   - Target: 10-15 minutes including table/image extraction (vs 8 hours local)
@@ -94,12 +95,14 @@ Branch 003 implements **hybrid cloud+local architecture with multimodal capabili
   - Compare multimodal vs text-only processing costs
 
 **Success Criteria**:
+
 - ✅ xAI Grok processes Navy MBOS in <20 minutes
 - ✅ Entity extraction quality matches Branch 002 (±10%)
 - ✅ Cost per RFP <$0.15
 - ✅ Zero errors in cloud API integration
 
 **Risks**:
+
 - ⚠️ API rate limits or throttling
 - ⚠️ Different prompt interpretation vs Ollama
 - ⚠️ Unexpected cost overruns
@@ -111,21 +114,21 @@ Branch 003 implements **hybrid cloud+local architecture with multimodal capabili
 **Goal**: Implement intelligent routing between cloud (public) and local (proprietary), and create govcon-specific modal processors.
 
 **Tasks**:
+
 - [ ] **Task 2.1**: Document type detection
   - Create document classifier (public vs proprietary)
   - Implement user prompt for document sensitivity
   - Add logging to track routing decisions
-  
 - [ ] **Task 2.2**: Dual configuration management
   - Create `.env.cloud` and `.env.local` profiles
   - Implement environment switching logic
   - Test seamless transition between configurations
-  
 - [ ] **Task 2.3**: Custom govcon modal processors (NON-INVASIVE)
   - Create custom processors WITHOUT forking RAG-Anything:
+
     ```python
     from raganything.modalprocessors import GenericModalProcessor
-    
+
     class GovConComplianceMatrixProcessor(GenericModalProcessor):
         """Extract compliance matrices as EVALUATION_FACTOR entities"""
         async def process_multimodal_content(self, modal_content, content_type, file_path, entity_name):
@@ -136,7 +139,7 @@ Branch 003 implements **hybrid cloud+local architecture with multimodal capabili
             enhanced_description = await self.analyze_compliance_matrix(modal_content)
             entity_info = self.create_govcon_entity(enhanced_description, "EVALUATION_FACTOR")
             return await self._create_entity_and_chunk(enhanced_description, entity_info, file_path)
-    
+
     class ShipleyRequirementProcessor(GenericModalProcessor):
         """Extract requirements with Shipley compliance levels"""
         async def process_multimodal_content(self, modal_content, content_type, file_path, entity_name):
@@ -145,16 +148,15 @@ Branch 003 implements **hybrid cloud+local architecture with multimodal capabili
             # Create REQUIREMENT entities with metadata
             # Link to Section L/M via EVALUATED_BY relationships
     ```
+
   - Integrate PydanticAI agents with modal processors for structured extraction
   - Test with Navy MBOS Section M evaluation criteria
-  
 - [ ] **Task 2.4**: Security boundary enforcement
   - Code audit: Ensure no proprietary data sent to cloud
   - Add safeguards against accidental cloud routing
   - Implement warning prompts for sensitive documents
   - Test knowledge graph queries stay 100% local
   - Verify multimodal content (tables with pricing, org charts) respects security boundary
-  
 - [ ] **Task 2.5**: Logging and monitoring
   - Add cloud vs local processing metrics
   - Track API costs per RFP (LLM + vision API separate tracking)
@@ -163,6 +165,7 @@ Branch 003 implements **hybrid cloud+local architecture with multimodal capabili
   - Create dashboard for hybrid usage analytics
 
 **Success Criteria**:
+
 - ✅ User can select public/proprietary processing mode
 - ✅ Proprietary queries never touch cloud infrastructure
 - ✅ Clear logging shows which LLM processed each document
@@ -172,6 +175,7 @@ Branch 003 implements **hybrid cloud+local architecture with multimodal capabili
 - ✅ Section L↔M relationships preserved with multimodal content
 
 **Risks**:
+
 - ⚠️ User accidentally routes proprietary to cloud (including sensitive tables/images)
 - ⚠️ Configuration management complexity
 - ⚠️ Dual LLM maintenance burden
@@ -185,6 +189,7 @@ Branch 003 implements **hybrid cloud+local architecture with multimodal capabili
 **Goal**: Comprehensive testing, production readiness, and govcon ontology enhancement with multimodal content.
 
 **Tasks**:
+
 - [ ] **Task 3.1**: Multi-RFP validation with multimodal content
   - Process 3-5 diverse public RFPs through cloud + multimodal pipeline
   - Test RFPs with rich multimodal content:
@@ -197,7 +202,6 @@ Branch 003 implements **hybrid cloud+local architecture with multimodal capabili
     - Multimodal entities properly typed (tables as EVALUATION_FACTOR or CONCEPT)
     - Section L↔M relationships captured including evaluation criteria tables
   - Compare quality vs Branch 002 baseline
-  
 - [ ] **Task 3.2**: Cost analysis (multimodal overhead)
   - Calculate actual $ per RFP across test cases:
     - LLM costs (text extraction)
@@ -206,7 +210,6 @@ Branch 003 implements **hybrid cloud+local architecture with multimodal capabili
   - Project monthly costs for different usage levels
   - Compare vs fine-tuning development cost (6 months)
   - Update ROI analysis: multimodal benefit vs cost overhead
-  
 - [ ] **Task 3.3**: Performance validation with multimodal pipeline
   - Confirm 20-30x speedup across multiple RFPs (including multimodal parsing)
   - Measure time savings for typical workflows
@@ -216,7 +219,6 @@ Branch 003 implements **hybrid cloud+local architecture with multimodal capabili
     - Table extraction accuracy vs speed tradeoff
   - Optimize chunk processing for cloud LLM
   - Test parallel processing of multimodal content
-  
 - [ ] **Task 3.4**: Ontology refinement with RAG-Anything insights
   - Review multimodal entity extraction patterns
   - Enhance `src/core/ontology.py` with lessons learned:
@@ -228,7 +230,6 @@ Branch 003 implements **hybrid cloud+local architecture with multimodal capabili
     - `ComplianceAssessment.visual_evidence: Optional[str]` (image paths)
     - `RFPSection.multimodal_content_types: List[str]`
   - Document RAG-Anything integration best practices for govcon domain
-  
 - [ ] **Task 3.5**: Documentation updates
   - Update README with actual performance results (text + multimodal)
   - Add Branch 003 usage guide with RAG-Anything integration examples
@@ -237,6 +238,7 @@ Branch 003 implements **hybrid cloud+local architecture with multimodal capabili
   - Add govcon ontology + RAG-Anything integration guide
 
 **Success Criteria**:
+
 - ✅ 5+ RFPs processed successfully with cloud LLM + multimodal parsing
 - ✅ Average processing time <1 hour for large RFPs (including multimodal content)
 - ✅ Cost per RFP matches projections (±20%, including vision API)
@@ -246,6 +248,7 @@ Branch 003 implements **hybrid cloud+local architecture with multimodal capabili
 - ✅ Documentation complete for production use (including RAG-Anything integration)
 
 **Risks**:
+
 - ⚠️ Unexpected quality degradation at scale with multimodal content
 - ⚠️ Cost overruns from inefficient prompting or excessive vision API calls
 - ⚠️ Cloud API reliability issues (xAI Grok or vision API downtime)
@@ -259,24 +262,22 @@ Branch 003 implements **hybrid cloud+local architecture with multimodal capabili
 **Goal**: Merge to main and enable production deployment.
 
 **Tasks**:
+
 - [ ] **Task 4.1**: Final testing
   - Complete regression testing suite
   - User acceptance testing with sample RFPs
   - Load testing for concurrent processing
   - Security audit final validation
-  
 - [ ] **Task 4.2**: Production preparation
   - Create deployment guide
   - Document environment setup for both branches
   - Prepare rollback procedures
   - Set up monitoring and alerts
-  
 - [ ] **Task 4.3**: Merge to main
   - Code review and approval
   - Resolve any merge conflicts
   - Update main branch documentation
   - Tag release: v1.0.0-branch003
-  
 - [ ] **Task 4.4**: Post-release support
   - Monitor initial production usage
   - Address any issues promptly
@@ -284,12 +285,14 @@ Branch 003 implements **hybrid cloud+local architecture with multimodal capabili
   - Plan future enhancements
 
 **Success Criteria**:
+
 - ✅ Branch 003 merged to main
 - ✅ Production deployment successful
 - ✅ Zero critical bugs in first week
 - ✅ User satisfaction with performance improvements
 
 **Risks**:
+
 - ⚠️ Production environment differences
 - ⚠️ User adoption challenges
 - ⚠️ Unexpected production issues
@@ -352,17 +355,17 @@ Document Type Detection (user prompt)
 
 ### **Security Boundary**
 
-| Data Type | Processing Location | Privacy Level | Notes |
-|-----------|-------------------|---------------|-------|
-| Public RFPs (text) | Cloud (xAI Grok) | Already public | Standard LLM processing |
-| Public RFP images | Cloud (xAI Grok Vision) | Already public | Org charts, diagrams from public RFPs |
-| Public RFP tables | Cloud (xAI Grok) → Local processing | Already public | Extracted then processed locally |
-| Proprietary Documents | Local (Ollama) | 100% private | NO cloud processing |
-| Proprietary Queries | Local (Ollama) | 100% private | Always local |
-| Knowledge Graph | Local Storage | 100% private | Never sent to cloud |
-| Proposal Content | Local (Ollama) | 100% private | Generated locally |
-| Compliance Matrices | Local Generation | 100% private | From local KG queries |
-| Multimodal Entities | Local Storage | 100% private | Extracted data stored locally only |
+| Data Type             | Processing Location                 | Privacy Level  | Notes                                 |
+| --------------------- | ----------------------------------- | -------------- | ------------------------------------- |
+| Public RFPs (text)    | Cloud (xAI Grok)                    | Already public | Standard LLM processing               |
+| Public RFP images     | Cloud (xAI Grok Vision)             | Already public | Org charts, diagrams from public RFPs |
+| Public RFP tables     | Cloud (xAI Grok) → Local processing | Already public | Extracted then processed locally      |
+| Proprietary Documents | Local (Ollama)                      | 100% private   | NO cloud processing                   |
+| Proprietary Queries   | Local (Ollama)                      | 100% private   | Always local                          |
+| Knowledge Graph       | Local Storage                       | 100% private   | Never sent to cloud                   |
+| Proposal Content      | Local (Ollama)                      | 100% private   | Generated locally                     |
+| Compliance Matrices   | Local Generation                    | 100% private   | From local KG queries                 |
+| Multimodal Entities   | Local Storage                       | 100% private   | Extracted data stored locally only    |
 
 ---
 
@@ -370,20 +373,20 @@ Document Type Detection (user prompt)
 
 ### **Processing Speed**
 
-| Document Size | Branch 002 (Local) | Branch 003 (Cloud) | Speedup |
-|--------------|-------------------|-------------------|---------|
-| 71 pages (Navy MBOS) | 8 hours | 10-15 min | 32-48x |
-| 495 pages (Marine Corps) | 16 hours | 30-40 min | 24-32x |
-| Average Large RFP | 6-8 hours | 30-60 min | 6-16x |
+| Document Size            | Branch 002 (Local) | Branch 003 (Cloud) | Speedup |
+| ------------------------ | ------------------ | ------------------ | ------- |
+| 71 pages (Navy MBOS)     | 8 hours            | 10-15 min          | 32-48x  |
+| 495 pages (Marine Corps) | 16 hours           | 30-40 min          | 24-32x  |
+| Average Large RFP        | 6-8 hours          | 30-60 min          | 6-16x   |
 
 ### **Cost Analysis**
 
-| Processing Type | Branch 002 | Branch 003 | Notes |
-|----------------|-----------|-----------|-------|
-| Public RFP Extraction | $0 | $0.03-$0.10 | One-time per document |
-| Knowledge Graph Queries | $0 | $0 | Always local (free) |
-| Monthly (10 RFPs) | $0 | $0.30-$1.00 | Minimal ongoing cost |
-| Fine-tuning (alternative) | $0 | N/A | Would take 6 months dev time |
+| Processing Type           | Branch 002 | Branch 003  | Notes                        |
+| ------------------------- | ---------- | ----------- | ---------------------------- |
+| Public RFP Extraction     | $0         | $0.03-$0.10 | One-time per document        |
+| Knowledge Graph Queries   | $0         | $0          | Always local (free)          |
+| Monthly (10 RFPs)         | $0         | $0.30-$1.00 | Minimal ongoing cost         |
+| Fine-tuning (alternative) | $0         | N/A         | Would take 6 months dev time |
 
 ### **Quality Targets**
 
@@ -404,6 +407,7 @@ Document Type Detection (user prompt)
 **Decision**: Use xAI Grok (grok-beta) via OpenAI-compatible API + grok-vision-beta for images.
 
 **Rationale**:
+
 - **OpenAI-compatible API** (LightRAG already supports via `LLM_BINDING=openai`)
 - **Competitive pricing** (~$0.03-$0.10 per RFP text + vision API for images)
   - grok-beta: $5/M input tokens, $15/M output tokens
@@ -413,11 +417,13 @@ Document Type Detection (user prompt)
 - **Vision model available** for multimodal content (org charts, diagrams)
 
 **Alternatives Considered**:
+
 - OpenAI GPT-4: More expensive, similar quality, has vision (gpt-4o)
 - Anthropic Claude: Different API structure, migration cost, has vision (claude-3-opus)
 - Azure OpenAI: Enterprise focus, higher cost, supports GPT-4V
 
 **Consequences**:
+
 - Single API key management (xAI for both text and vision)
 - xAI rate limits and availability dependencies
 - Vision API adds cost but enables multimodal parsing
@@ -432,6 +438,7 @@ Document Type Detection (user prompt)
 **Decision**: Use RAG-Anything as a **library wrapper** around our existing LightRAG fork, NOT as a replacement or fork.
 
 **Rationale**:
+
 - **Preserve ontology**: Our `src/core/ontology.py` (ORGANIZATION, CONCEPT, REQUIREMENT, DELIVERABLE, EVALUATION_FACTOR, etc.) remains intact
 - **Multimodal capabilities**: RAG-Anything provides MinerU parsing for tables/images/equations
 - **Non-invasive**: Pass our LightRAG instance to RAG-Anything via `lightrag=govcon_rag` parameter
@@ -440,6 +447,7 @@ Document Type Detection (user prompt)
 - **Lower complexity**: Maintain ONE fork (LightRAG) instead of TWO forks (LightRAG + RAG-Anything)
 
 **Implementation Pattern**:
+
 ```python
 # Use OUR LightRAG fork
 from src.lightrag import LightRAG
@@ -462,22 +470,22 @@ multimodal_rag = RAGAnything(
 ```
 
 **Alternatives Considered**:
-1. **Fork RAG-Anything**: 
+
+1. **Fork RAG-Anything**:
    - ❌ High maintenance burden (two forks to maintain)
    - ❌ Must reimplement govcon ontology in their codebase
    - ❌ Upstream merge conflicts
-   
 2. **Build custom multimodal parser**:
    - ❌ 2-3 months development time
    - ❌ Reinventing MinerU integration
    - ❌ Lower quality vs mature library
-   
 3. **Use RAG-Anything as-is without ontology**:
    - ❌ Lose govcon-specific entity types
    - ❌ No Shipley methodology compliance
    - ❌ Generic extraction unsuitable for government contracting
 
 **Consequences**:
+
 - **PRO**: Govcon ontology fully preserved
 - **PRO**: Multimodal parsing with minimal code changes
 - **PRO**: Easy updates via `pip install --upgrade`
@@ -496,16 +504,19 @@ multimodal_rag = RAGAnything(
 **Decision**: Hybrid cloud (public RFPs) + local (proprietary content).
 
 **Rationale**:
+
 - Public RFPs already in public domain (no privacy risk)
 - Proprietary proposal content must stay local (competitive advantage)
 - Knowledge graph queries always local (zero cloud exposure)
 - Best of both worlds: speed + security
 
 **Alternatives Considered**:
+
 - Full Cloud: Unacceptable for proprietary content
 - Full Local: Too slow for production capture teams (Branch 002 still available)
 
 **Consequences**:
+
 - User must classify documents (public vs proprietary)
 - Dual configuration management complexity
 - Clear security boundary documentation critical
@@ -539,16 +550,16 @@ class EntityType(str, Enum):
 
 RAG-Anything extracts multimodal content (tables, images, equations) which we **map to govcon entity types**:
 
-| Multimodal Content | RAG-Anything Type | Govcon Entity Type | Example |
-|-------------------|------------------|-------------------|---------|
-| Section M evaluation matrix | `table` | `EVALUATION_FACTOR` | Evaluation criteria table with weights |
-| CLIN pricing table | `table` | `CONCEPT` | Contract line item pricing breakdown |
-| Organizational chart | `image` | `ORGANIZATION` | Prime-sub relationships diagram |
-| Technical architecture diagram | `image` | `TECHNOLOGY` | System architecture visual |
-| Delivery schedule table | `table` | `EVENT` | Milestone dates and deliverables |
-| Requirements matrix | `table` | `REQUIREMENT` | Traceability matrix with compliance levels |
-| FAR clause reference | `text` | `CLAUSE` | Standard contract provisions |
-| Mathematical formula | `equation` | `CONCEPT` | Technical calculations or scoring formulas |
+| Multimodal Content             | RAG-Anything Type | Govcon Entity Type  | Example                                    |
+| ------------------------------ | ----------------- | ------------------- | ------------------------------------------ |
+| Section M evaluation matrix    | `table`           | `EVALUATION_FACTOR` | Evaluation criteria table with weights     |
+| CLIN pricing table             | `table`           | `CONCEPT`           | Contract line item pricing breakdown       |
+| Organizational chart           | `image`           | `ORGANIZATION`      | Prime-sub relationships diagram            |
+| Technical architecture diagram | `image`           | `TECHNOLOGY`        | System architecture visual                 |
+| Delivery schedule table        | `table`           | `EVENT`             | Milestone dates and deliverables           |
+| Requirements matrix            | `table`           | `REQUIREMENT`       | Traceability matrix with compliance levels |
+| FAR clause reference           | `text`            | `CLAUSE`            | Standard contract provisions               |
+| Mathematical formula           | `equation`        | `CONCEPT`           | Technical calculations or scoring formulas |
 
 ### **Custom Modal Processors for Govcon Domain**
 
@@ -568,10 +579,10 @@ class GovConComplianceMatrixProcessor(GenericModalProcessor):
         # Parse table structure
         table_data = modal_content.get("table_body")
         table_caption = modal_content.get("table_caption", [])
-        
+
         # Extract evaluation factors (Technical Approach, Past Performance, Cost)
         factors = self.parse_evaluation_factors(table_data)
-        
+
         # Create EVALUATION_FACTOR entities with metadata
         for factor in factors:
             entity_info = {
@@ -582,12 +593,12 @@ class GovConComplianceMatrixProcessor(GenericModalProcessor):
                 "section": "M",  # Section M defines evaluation
                 "summary": f"Evaluation factor: {factor['name']} ({factor.get('weight', 'N/A')})"
             }
-            
+
             # Create relationships
             # EVALUATION_FACTOR -> SECTION:M (DEFINED_IN)
             # EVALUATION_FACTOR -> SECTION:L (REFERENCES for submission instructions)
             # EVALUATION_FACTOR -> REQUIREMENT (EVALUATES)
-            
+
         enhanced_description = self.create_factor_description(factors)
         return await self._create_entity_and_chunk(enhanced_description, entity_info, file_path)
 
@@ -599,11 +610,11 @@ class ShipleyRequirementProcessor(GenericModalProcessor):
     async def process_multimodal_content(self, modal_content, content_type, file_path, entity_name):
         # Extract requirement text
         requirement_text = modal_content.get("text") or modal_content.get("table_body")
-        
+
         # Apply Shipley classification
         compliance_level = self.classify_shipley_level(requirement_text)  # Must/Should/May/Will
         requirement_type = self.classify_requirement_type(requirement_text)  # functional/performance/etc.
-        
+
         # Create REQUIREMENT entity with Shipley metadata
         entity_info = {
             "entity_name": entity_name,
@@ -613,12 +624,12 @@ class ShipleyRequirementProcessor(GenericModalProcessor):
             "section": self.extract_section_id(file_path),
             "summary": f"{compliance_level.value} requirement: {requirement_text[:100]}..."
         }
-        
+
         # Create relationships
         # REQUIREMENT -> SECTION (CONTAINED_IN)
         # REQUIREMENT -> EVALUATION_FACTOR (EVALUATED_BY for Section M)
         # REQUIREMENT -> DELIVERABLE (PRODUCES if Section F)
-        
+
         enhanced_description = self.create_requirement_description(requirement_text, entity_info)
         return await self._create_entity_and_chunk(enhanced_description, entity_info, file_path)
 
@@ -629,10 +640,10 @@ class DeliverableTableProcessor(GenericModalProcessor):
     async def process_multimodal_content(self, modal_content, content_type, file_path, entity_name):
         # Parse deliverable table
         table_data = modal_content.get("table_body")
-        
+
         # Extract deliverable details (CDRL number, format, due date, frequency)
         deliverables = self.parse_deliverable_table(table_data)
-        
+
         for deliverable in deliverables:
             entity_info = {
                 "entity_name": deliverable["name"],
@@ -644,12 +655,12 @@ class DeliverableTableProcessor(GenericModalProcessor):
                 "section": "F",
                 "summary": f"Deliverable: {deliverable['name']} (CDRL {deliverable.get('cdrl')})"
             }
-            
+
             # Create relationships
             # DELIVERABLE -> REQUIREMENT (SUPPORTS)
             # DELIVERABLE -> ORGANIZATION (DELIVERED_BY contractor)
             # DELIVERABLE -> EVENT (DUE_BY milestone)
-        
+
         enhanced_description = self.create_deliverable_description(deliverables)
         return await self._create_entity_and_chunk(enhanced_description, entity_info, file_path)
 ```
@@ -676,6 +687,7 @@ else:
 ```
 
 **Valid multimodal relationships from our ontology**:
+
 ```python
 # From VALID_RELATIONSHIPS in src/core/ontology.py
 ("EVALUATION_FACTOR", "EVALUATES"): ["REQUIREMENT", "CONCEPT", "DELIVERABLE"]
@@ -698,7 +710,7 @@ class RFPRequirement(BaseModel):
     section_id: str
     compliance_level: ComplianceLevel  # Shipley: Must/Should/May/Will
     requirement_type: RequirementType
-    
+
     # NEW: Multimodal support
     contains_table: bool = False  # Extracted from table
     contains_image: bool = False  # Referenced in diagram
@@ -709,7 +721,7 @@ class ComplianceAssessment(BaseModel):
     requirement_id: str
     compliance_status: ComplianceStatus
     proposal_evidence: Optional[str]
-    
+
     # NEW: Multimodal evidence
     visual_compliance_evidence: Optional[str] = None  # Image path showing compliance
     table_data_reference: Optional[str] = None  # Link to supporting table
@@ -719,6 +731,7 @@ class ComplianceAssessment(BaseModel):
 ### **Integration Workflow**
 
 1. **Document Ingestion**:
+
    ```python
    # User uploads public RFP
    await multimodal_rag.process_document_complete(
@@ -728,26 +741,31 @@ class ComplianceAssessment(BaseModel):
    ```
 
 2. **RAG-Anything Multimodal Parsing**:
+
    - MinerU extracts text, tables, images, equations
    - Content list generated with multimodal elements
 
 3. **Custom Processor Routing**:
+
    - Text → Standard text processing
    - Tables → `GovConComplianceMatrixProcessor` (if Section M) or `DeliverableTableProcessor` (if Section F)
    - Images → `vision_model_func` (xAI Grok Vision) → classified as ORGANIZATION/TECHNOLOGY
    - Equations → Standard equation processing
 
 4. **Entity Extraction (Govcon Ontology)**:
+
    - All entities typed with `EntityType` enum (12 types)
    - Metadata includes Shipley compliance levels, section IDs, multimodal source
    - Relationships validated against `VALID_RELATIONSHIPS` schema
 
 5. **Knowledge Graph Construction (Our LightRAG Fork)**:
+
    - Entities stored with govcon types
    - Relationships constrained by ontology (prevents O(n²) explosion)
    - Section L↔M connections prioritized (critical for winning proposals)
 
 6. **Query Processing**:
+
    ```python
    # Query multimodal knowledge graph
    result = await multimodal_rag.aquery(
@@ -755,7 +773,7 @@ class ComplianceAssessment(BaseModel):
        mode="hybrid"
    )
    # Returns: EVALUATION_FACTOR entities extracted from evaluation matrix table
-   
+
    # Multimodal query with specific content
    table_result = await multimodal_rag.aquery_with_multimodal(
        "How does this evaluation matrix align with Section L submission requirements?",
@@ -773,12 +791,14 @@ class ComplianceAssessment(BaseModel):
 As we process RFPs with multimodal content, we **refine the ontology**:
 
 **Phase 3 Enhancements** (from multimodal analysis):
+
 - Add `IMAGE_ILLUSTRATES` relationship type for diagrams supporting requirements
 - Add `TABLE_SPECIFIES` relationship for tables providing detailed specifications
 - Refine `EVALUATION_FACTOR` relationships based on Section M matrix patterns
 - Add multimodal metadata to all entity types (`extracted_from: "table" | "image" | "text"`)
 
 **Lessons Learned** (documented in Phase 3):
+
 - Evaluation matrices (tables) → EVALUATION_FACTOR entities with hierarchical relationships
 - Org charts (images) → ORGANIZATION entities with `REPORTS_TO` relationships
 - CLIN tables → CONCEPT entities with pricing metadata (not separate entity types)
@@ -811,18 +831,22 @@ As we process RFPs with multimodal content, we **refine the ontology**:
 ### **Identified Risks**
 
 1. **xAI API Rate Limits**
+
    - Mitigation: Implement exponential backoff and retry logic
    - Fallback: Switch to local processing if rate limited
 
 2. **Quality Degradation**
+
    - Mitigation: Continuous quality monitoring vs Branch 002 baseline
    - Threshold: If quality drops >10%, investigate and optimize prompts
 
 3. **Cost Overruns**
+
    - Mitigation: Real-time cost tracking with alerts
    - Budget: Set monthly spending limits
 
 4. **Proprietary Data Leakage**
+
    - Mitigation: Code audit, user warnings, security boundary enforcement
    - Testing: Comprehensive security testing before production
 
@@ -835,6 +859,7 @@ As we process RFPs with multimodal content, we **refine the ontology**:
 ## Next Steps
 
 **Immediate Actions**:
+
 1. ✅ Create Branch 003 from cleaned Branch 002
 2. ✅ Create `.env.example` with cloud configuration template
 3. ✅ Create this implementation journal
@@ -842,6 +867,7 @@ As we process RFPs with multimodal content, we **refine the ontology**:
 5. 📋 Commit and push initial Branch 003 setup
 
 **Phase 1 Kickoff** (Next Week):
+
 - Set up xAI API account
 - Configure cloud LLM connection
 - Run first Navy MBOS RFP benchmark
@@ -852,6 +878,7 @@ As we process RFPs with multimodal content, we **refine the ontology**:
 ## References
 
 ### **Internal Documentation**
+
 - **FINE_TUNING_ROADMAP.md**: Branch 003 cloud strategy and fine-tuning deferral rationale
 - **ARCHITECTURE_DECISION_RECORDS.md**: ADR-001 through ADR-005 (foundational decisions)
 - **ONTOLOGY_EVOLUTION.md**: Government contracting ontology development history (12 entity types)
@@ -860,6 +887,7 @@ As we process RFPs with multimodal content, we **refine the ontology**:
 - **src/models/rfp_models.py**: PydanticAI models (RFPRequirement, ComplianceAssessment, EVALUATION_FACTOR)
 
 ### **External Resources**
+
 - **xAI Grok Docs**: https://docs.x.ai (API reference, pricing, models)
   - grok-beta: Text model ($5/M input, $15/M output)
   - grok-vision-beta: Vision model ($5/M tokens)
@@ -870,6 +898,7 @@ As we process RFPs with multimodal content, we **refine the ontology**:
 - **MinerU**: https://github.com/opendatalab/MinerU (document parsing backend used by RAG-Anything)
 
 ### **Government Contracting Standards**
+
 - **Shipley Proposal Guide**: Requirements analysis (p.50-55), compliance matrices (p.53-55)
 - **FAR 15.210**: Uniform RFP format (Sections A-M standard structure)
 
