@@ -1,0 +1,2 @@
+# Keep inputs/__enqueued__/ directory in git
+# RFP files are ignored by .gitignore but directory structure is preserved
