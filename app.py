@@ -22,16 +22,22 @@ import asyncio
 import sys
 from pathlib import Path
 
-# Add src to Python path for server import
+# Import LightRAG and RAG-Anything from pip BEFORE adding src to path
+# This prevents any old fork from shadowing the pip package
+from raganything import RAGAnything
+from lightrag.api.lightrag_server import create_app as _verify_lightrag_import
+
+# NOW add src to Python path for our custom server module
 src_path = Path(__file__).parent / "src"
 sys.path.insert(0, str(src_path))
 
-# Import our extended server
-from server import main
+# Import our RAG-Anything server (RAG-Anything is built on top of LightRAG)
+from raganything_server import main
 
 if __name__ == "__main__":
-    print("🎯 Starting GovCon Capture Vibe...")
-    print("   Enhanced LightRAG server with RFP analysis capabilities")
+    print("🎯 Starting GovCon Capture Vibe with RAG-Anything...")
+    print("   RAG-Anything is built on top of LightRAG")
+    print("   Multimodal processing: images, tables, equations")
     print("   Grounded in Shipley methodology for government contracting\n")
     
     try:
