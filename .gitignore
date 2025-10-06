@@ -1,4 +1,6 @@
-﻿# Python
+﻿# ============================================================================
+# Python
+# ============================================================================
 __pycache__/
 *.py[cod]
 *$py.class
@@ -16,41 +18,207 @@ parts/
 sdist/
 var/
 wheels/
+pip-wheel-metadata/
+share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
 
-# Virtual Environment
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# ============================================================================
+# Virtual Environments
+# ============================================================================
 .env
+.env.local
+.env.*.local
 .venv/
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+pythonenv*/
 
-# IDEs
+# ============================================================================
+# IDEs and Editors
+# ============================================================================
+# VSCode
 .vscode/
+*.code-workspace
+
+# PyCharm / IntelliJ
 .idea/
+*.iml
+*.ipr
+*.iws
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
 *.swp
 *.swo
 *~
+.vim/
+.netrwhist
 
-# OS
+# Emacs
+*~
+\#*\#
+.\#*
+
+# ============================================================================
+# Operating Systems
+# ============================================================================
+# macOS
 .DS_Store
-Thumbs.db
+.AppleDouble
+.LSOverride
+._*
 
-# Project-specific
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.directory
+.Trash-*
+
+# ============================================================================
+# Project-Specific: RAG Storage and Processing
+# ============================================================================
+# Knowledge graph storage (regenerated from RFPs)
 rag_storage/
+rag_storage_*/
+
+# Log files (not used by current code, regenerated if needed)
 logs/*.log
+logs/*.log.*
+
+# Temporary processing files
+*.tmp
+*.temp
+*.bak
+*.swp
+*.cache
+
+# ============================================================================
+# Project-Specific: Input Documents
+# ============================================================================
+# Uploaded documents (should not be committed - may contain sensitive data)
 inputs/__enqueued__/*.pdf
 inputs/__enqueued__/*.docx
-*.tmp
-*.bak
+inputs/__enqueued__/*.doc
+inputs/__enqueued__/*.pptx
+inputs/__enqueued__/*.ppt
+inputs/__enqueued__/*.xlsx
+inputs/__enqueued__/*.xls
+inputs/__enqueued__/*.txt
+inputs/__enqueued__/*.rtf
+inputs/__enqueued__/*.odt
+inputs/__enqueued__/*.html
+inputs/__enqueued__/*.xml
+inputs/__enqueued__/*.json
 
-# Keep example files but not actual documents
+inputs/uploaded/**/*
+!inputs/uploaded/.gitkeep
+
+# Keep directory structure
 !inputs/__enqueued__/.gitkeep
 !logs/.gitkeep
+!rag_storage/.gitkeep
 
-# Jupyter
+# ============================================================================
+# Documentation and Examples
+# ============================================================================
+# Archived documentation (preserved in git)
+# docs/archive/* intentionally tracked
+
+# Jupyter Notebooks
 .ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ============================================================================
+# External Analysis (Navy MBOS baseline, etc.)
+# ============================================================================
+# User may save analysis results externally
+external_analysis/
+navy_mbos_baseline/
+rfp_analysis_*/
+
+# ============================================================================
+# API Keys and Secrets
+# ============================================================================
+# Environment files (CRITICAL - never commit)
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+.env.test
+
+# API key files
+*.key
+*.pem
+*.p12
+*.pfx
+secrets/
+credentials/
+
+# ============================================================================
+# Build and Distribution
+# ============================================================================
+# UV lock file (tracked, but may be regenerated)
+# uv.lock is tracked for reproducibility
+
+# Compiled Python
+*.pyc
+*.pyo
+*.pyd
+
+# C extensions
+*.so
+*.dll
+*.dylib
+
+# ============================================================================
+# Miscellaneous
+# ============================================================================
+# Large files that shouldn't be tracked
+*.zip
+*.tar.gz
+*.rar
+*.7z
+*.iso
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Memory dumps
+*.dmp
+*.dump
