@@ -5,6 +5,7 @@
 **Scope**: Ontology enhancement patterns for Phase 6 implementation - generic, non-proprietary framework applicable across federal contracting domain.
 
 **Sources**:
+
 - Industry capture management best practices (web research 2025)
 - Federal acquisition methodology patterns
 - Branch 002 prompt templates (prompts/ directory)
@@ -23,42 +24,49 @@
 **Classification Schema**:
 
 1. **Functional Requirements**
+
    - **Definition**: What the system, service, or solution must accomplish
    - **Examples**: "Shall provide 24/7 help desk support", "Must process transactions within 2 seconds"
    - **Compliance Strategy**: Demonstrate capability through past performance, technical approach
    - **Ontology Field**: `requirement_type = "FUNCTIONAL"`
 
 2. **Performance Requirements**
+
    - **Definition**: Measurable outcomes, service levels, or quality metrics
    - **Examples**: "99.9% uptime", "Response within 4 hours", "Process 1000 transactions/hour"
    - **Compliance Strategy**: Quantified commitments, SLA frameworks, monitoring plans
    - **Ontology Field**: `requirement_type = "PERFORMANCE"`
 
 3. **Interface Requirements**
+
    - **Definition**: System connections, data exchanges, interoperability standards
    - **Examples**: "Integrate with agency ERP system", "Support HTTPS/TLS 1.3", "API compatibility"
    - **Compliance Strategy**: Technical architecture diagrams, interface specifications
    - **Ontology Field**: `requirement_type = "INTERFACE"`
 
 4. **Design Requirements**
+
    - **Definition**: Specific design constraints, standards, or architectural mandates
    - **Examples**: "Follow Section 508 accessibility", "Use NIST 800-53 controls", "Comply with agency branding"
    - **Compliance Strategy**: Standards compliance statements, design documentation
    - **Ontology Field**: `requirement_type = "DESIGN"`
 
 5. **Security Requirements**
+
    - **Definition**: Cybersecurity, physical security, compliance, authorization needs
    - **Examples**: "FedRAMP Moderate authorization required", "FISMA compliance", "Background checks"
    - **Compliance Strategy**: Certification evidence, security plans, personnel clearances
    - **Ontology Field**: `requirement_type = "SECURITY"`
 
 6. **Technical Requirements**
+
    - **Definition**: Technology specifications, platforms, tools, infrastructure
    - **Examples**: "AWS GovCloud deployment", "Use Java 11 or higher", "PostgreSQL database"
    - **Compliance Strategy**: Technical stack descriptions, tool certifications
    - **Ontology Field**: `requirement_type = "TECHNICAL"`
 
 7. **Management Requirements**
+
    - **Definition**: Project management, reporting, governance, oversight
    - **Examples**: "Monthly status reports", "Use Agile/Scrum methodology", "PMI-certified PM"
    - **Compliance Strategy**: Management plans, reporting templates, personnel qualifications
@@ -71,6 +79,7 @@
    - **Ontology Field**: `requirement_type = "QUALITY"`
 
 **Implementation Strategy**:
+
 - Add `requirement_type` metadata field to REQUIREMENT entities
 - Parse requirement context during extraction to classify automatically
 - Enable filtering by type for compliance matrices and gap analysis
@@ -78,6 +87,7 @@
 
 **Real-World Application**:
 Federal agencies structure RFPs around these categories. Contractors who classify requirements systematically can:
+
 - Allocate proposal effort proportionally (high-weight factors get more resources)
 - Identify capability gaps early in capture phase
 - Structure technical volumes to mirror government evaluation criteria
@@ -94,17 +104,19 @@ Federal agencies structure RFPs around these categories. Contractors who classif
 **Criticality Schema**:
 
 1. **MANDATORY (Shall/Must)**
+
    - **Signal Words**: "shall", "must", "is required to", "will be required"
    - **Meaning**: Non-negotiable contractor obligations - failure to comply = non-responsive proposal
    - **Government Intent**: Minimum acceptable standard, evaluation threshold
    - **Compliance Strategy**: Full compliance mandatory, highlight with "We comply with..." statements
    - **Priority Score**: 100 (highest)
-   - **Examples**: 
+   - **Examples**:
      - "Contractor shall provide 24/7 on-site support"
      - "Offeror must have FedRAMP Moderate authorization"
    - **Ontology Field**: `criticality_level = "MANDATORY"`
 
 2. **IMPORTANT (Should)**
+
    - **Signal Words**: "should", "encouraged to", "desirable", "preferred"
    - **Meaning**: Strong government preference, likely evaluated for scoring advantages
    - **Government Intent**: Differentiation criteria, competitive advantage opportunities
@@ -116,6 +128,7 @@ Federal agencies structure RFPs around these categories. Contractors who classif
    - **Ontology Field**: `criticality_level = "IMPORTANT"`
 
 3. **OPTIONAL (May)**
+
    - **Signal Words**: "may", "can", "has the option to"
    - **Meaning**: Contractor choice, flexibility granted, potential value-add
    - **Government Intent**: Allow innovation, contractor-proposed enhancements
@@ -138,6 +151,7 @@ Federal agencies structure RFPs around these categories. Contractors who classif
    - **Ontology Field**: `criticality_level = "INFORMATIONAL"`
 
 **Implementation Strategy**:
+
 - Add `criticality_level` metadata to REQUIREMENT entities
 - Parse modal verbs during extraction (regex patterns: `\b(shall|must|should|may|will)\b`)
 - Subject-verb analysis: "Contractor shall" = MANDATORY, "Government will" = INFORMATIONAL
@@ -145,6 +159,7 @@ Federal agencies structure RFPs around these categories. Contractors who classif
 - Flag all MANDATORY requirements for compliance matrix review
 
 **Compliance Matrix Application**:
+
 ```
 Priority 1: MANDATORY items (criticality_level = MANDATORY, score = 100)
   - Must have explicit compliance statement in proposal
@@ -164,6 +179,7 @@ Ignore: INFORMATIONAL items (criticality_level = INFORMATIONAL)
 ```
 
 **Real-World Impact**:
+
 - **Disqualification Prevention**: Contractors who miss "shall" requirements face rejection for non-responsiveness
 - **Scoring Optimization**: "Should" items often tie to evaluation scoring - addressing these earns points
 - **Effort Allocation**: Avoid wasting proposal pages on "may" items when "shall" compliance gaps exist
@@ -180,19 +196,25 @@ Ignore: INFORMATIONAL items (criticality_level = INFORMATIONAL)
 **Section M: Evaluation Factors** (How Government Scores Proposals)
 
 **Factor Structure**:
+
 ```json
 {
   "factor_id": "M1",
   "factor_name": "Technical Approach",
   "section": "M",
   "relative_importance": "Most Important",
-  "subfactors": ["Staffing Approach", "Maintenance Execution", "Transition Plan"],
+  "subfactors": [
+    "Staffing Approach",
+    "Maintenance Execution",
+    "Transition Plan"
+  ],
   "description": "Government evaluates contractor's understanding of requirements...",
   "tradeoff_methodology": "Best Value"
 }
 ```
 
 **Importance Terminology** (Common Federal RFP Patterns):
+
 - **"Most Important"**: Highest weight factor, typically 40-50% of technical score
 - **"Significantly More Important than Price"**: Best Value tradeoff favoring technical merit
 - **"Significantly More Important than [Factor X]"**: Relative ranking (e.g., "Technical > Past Performance")
@@ -202,6 +224,7 @@ Ignore: INFORMATIONAL items (criticality_level = INFORMATIONAL)
 - **Adjectival Ratings**: "Exceptional, Good, Acceptable, Marginal, Unacceptable" (color teams)
 
 **Tradeoff Methodologies**:
+
 - **Best Value**: Government can pay more for superior technical solution
 - **Lowest Price Technically Acceptable (LPTA)**: Cheapest compliant proposal wins
 - **Cost/Technical Tradeoff**: Balanced analysis with specified weighting
@@ -209,6 +232,7 @@ Ignore: INFORMATIONAL items (criticality_level = INFORMATIONAL)
 **Section L: Proposal Submission Instructions** (What to Submit)
 
 **Instruction Patterns**:
+
 ```json
 {
   "section_l_reference": "L.3.1",
@@ -221,6 +245,7 @@ Ignore: INFORMATIONAL items (criticality_level = INFORMATIONAL)
 ```
 
 **L↔M Traceability**:
+
 ```
 Section L.3.1: "Submit Technical Volume (25 pages) addressing Section M.2"
     ↓
@@ -233,6 +258,7 @@ Proposal Strategy: Allocate 25 pages proportionally:
 ```
 
 **Strategic Mistakes Contractors Make**:
+
 1. ❌ **Ignoring Importance**: Spending 15 pages on low-weight factor, 5 pages on "Most Important" factor
 2. ❌ **Missing Subfactors**: Addressing "Technical Approach" but skipping "Transition Plan" subfactor = point loss
 3. ❌ **Page Limit Violations**: Exceeding L.3.1 "25 pages" = evaluators stop reading or disqualify
@@ -240,13 +266,18 @@ Proposal Strategy: Allocate 25 pages proportionally:
 5. ❌ **L↔M Misalignment**: Submitting Management Volume content in Technical Volume
 
 **Enhanced EVALUATION_FACTOR Schema**:
+
 ```json
 {
   "factor_id": "M2",
   "factor_name": "Technical Approach",
   "section": "M",
   "relative_importance": "Most Important",
-  "subfactors": ["M2.1 Staffing Approach", "M2.2 Maintenance Execution", "M2.3 Transition Plan"],
+  "subfactors": [
+    "M2.1 Staffing Approach",
+    "M2.2 Maintenance Execution",
+    "M2.3 Transition Plan"
+  ],
   "description": "Complete Section M text describing evaluation criteria",
   "tradeoff_methodology": "Best Value - Technical Merit significantly more important than Price",
   "section_l_reference": "L.3.1",
@@ -258,6 +289,7 @@ Proposal Strategy: Allocate 25 pages proportionally:
 ```
 
 **Implementation Strategy**:
+
 - Enhance EVALUATION_FACTOR entity with `relative_importance`, `subfactors`, `section_l_reference`, `page_limits`
 - Parse Section M for factor hierarchy (M1 → M1.1 → M1.1.1)
 - Parse Section L for submission instructions mapped to Section M factors
@@ -268,11 +300,13 @@ Proposal Strategy: Allocate 25 pages proportionally:
 **Real-World Capture Application**:
 
 **Capture Phase (Pre-RFP)**:
+
 - Analyze past awards from agency to identify typical factor patterns
 - Predict Section M structure based on agency evaluation history
 - Pre-position past performance references matching likely factors
 
 **Proposal Phase (Post-RFP Release)**:
+
 1. **Day 1**: Extract all Section M factors and Section L instructions
 2. **Day 2**: Create L↔M traceability matrix in compliance tool
 3. **Week 1**: Allocate page budget per factor importance
@@ -280,6 +314,7 @@ Proposal Strategy: Allocate 25 pages proportionally:
 5. **Final Review**: Verify subfactor coverage, page compliance, format adherence
 
 **Evaluation Intelligence Example** (Navy MBOS RFP Pattern):
+
 ```
 Section M.2: Technical Approach (Most Important)
   Subfactors:
@@ -311,7 +346,9 @@ Winning Strategy:
 **Capture Phase Positioning** (Pre-RFP):
 
 **Core Elements**:
+
 1. **Customer Hot Buttons**
+
    - **Definition**: Agency's critical pain points, priorities, mission pressures
    - **Discovery**: Stakeholder interviews, agency strategic plans, past debriefs
    - **Examples**: "Reduce maintenance backlog", "Improve readiness rates", "Modernize legacy systems"
@@ -319,6 +356,7 @@ Winning Strategy:
    - **Ontology Entity**: `STRATEGIC_THEME` with `theme_type = "CUSTOMER_HOT_BUTTON"`
 
 2. **Competitive Discriminators**
+
    - **Definition**: Unique capabilities, approaches, or advantages vs. competitors
    - **Types**:
      - **Capability Discriminators**: Proprietary tools, certified personnel, facility access
@@ -329,6 +367,7 @@ Winning Strategy:
    - **Ontology Entity**: `STRATEGIC_THEME` with `theme_type = "DISCRIMINATOR"`
 
 3. **Proof Points**
+
    - **Definition**: Evidence supporting competitive claims (past performance, metrics, references)
    - **Types**:
      - **Performance Metrics**: "99.8% uptime on similar contract", "40% cost savings delivered"
@@ -357,16 +396,18 @@ Winning Strategy:
 **Definition**: High-level strategic messages tying solution benefits to customer outcomes and evaluation factors.
 
 **Win Theme Structure**:
+
 ```
 THEME STATEMENT + DISCRIMINATOR + PROOF POINT + CUSTOMER BENEFIT
 
 Example:
-"Our HYBRID STAFFING MODEL [discriminator] delivers surge capacity within 48 hours 
-[proof: demonstrated on 3 Navy contracts] ensuring mission-critical maintenance 
+"Our HYBRID STAFFING MODEL [discriminator] delivers surge capacity within 48 hours
+[proof: demonstrated on 3 Navy contracts] ensuring mission-critical maintenance
 never delays fleet operations [customer benefit: readiness focus]."
 ```
 
 **Win Theme Categories**:
+
 1. **Technical Superiority**: Solution innovation, methodology, tools
 2. **Management Excellence**: Proven processes, risk mitigation, quality controls
 3. **Past Performance Strength**: Relevant experience, customer satisfaction, metrics
@@ -374,6 +415,7 @@ never delays fleet operations [customer benefit: readiness focus]."
 5. **Mission Understanding**: Agency familiarity, domain expertise, cultural fit
 
 **Win Theme → Requirement Mapping**:
+
 ```
 WIN_THEME: "Hybrid Staffing Model ensures surge capacity"
   ↓ SUPPORTS
@@ -387,6 +429,7 @@ PROOF_POINT: "Achieved 2.1-hour average response time on similar contract"
 ```
 
 **Implementation Strategy**:
+
 - Add `STRATEGIC_THEME` entity type with subtypes:
   - `theme_type = "CUSTOMER_HOT_BUTTON"`: Agency priorities
   - `theme_type = "DISCRIMINATOR"`: Competitive advantages
@@ -400,6 +443,7 @@ PROOF_POINT: "Achieved 2.1-hour average response time on similar contract"
   - `WIN_THEME → COMBINES → [DISCRIMINATOR + PROOF_POINT + CUSTOMER_HOT_BUTTON]`
 
 **Extraction Sources**:
+
 - Section L instructions: Often include "emphasize" or "describe approach" language (hot buttons)
 - Section M evaluation criteria: High-importance factors signal what government values
 - RFP background (Section B/C): Agency mission, challenges, goals
@@ -408,6 +452,7 @@ PROOF_POINT: "Achieved 2.1-hour average response time on similar contract"
 **Real-World Capture Application**:
 
 **Capture Planning** (6-12 months pre-RFP):
+
 ```
 1. Customer Hot Button Discovery:
    - Interview program manager: "What keeps you up at night?"
@@ -431,6 +476,7 @@ PROOF_POINT: "Achieved 2.1-hour average response time on similar contract"
 ```
 
 **Proposal Development** (Post-RFP):
+
 ```
 1. Win Theme Generation (Day 1-3):
    - Map hot buttons to evaluation factors
@@ -453,6 +499,7 @@ PROOF_POINT: "Achieved 2.1-hour average response time on similar contract"
 ```
 
 **Navy MBOS Example**:
+
 ```
 Hot Button (from agency interviews): "Maintenance backlog reducing fleet readiness"
 
@@ -460,8 +507,8 @@ Discriminator: "Hybrid staffing model (on-site + on-call surge team)"
 
 Proof Point: "Reduced backlog 60% in 6 months on current Navy contract (CPARS: Exceptional)"
 
-Win Theme: "Our proven hybrid staffing approach eliminates maintenance delays, ensuring 
-aircraft availability for critical missions—validated by 60% backlog reduction and 
+Win Theme: "Our proven hybrid staffing approach eliminates maintenance delays, ensuring
+aircraft availability for critical missions—validated by 60% backlog reduction and
 Exceptional CPARS ratings on 3 Navy facilities."
 
 Requirement Link: REQ-C045 "Contractor shall respond within 24 hours" (MANDATORY)
@@ -478,30 +525,33 @@ Evaluation Link: M.2.1 "Staffing Approach" (Most Important subfactor)
 
 **Coverage Scoring Scale** (Industry Standard):
 
-| Score | Rating | Definition | Compliance Status | Action Required |
-|-------|--------|------------|-------------------|-----------------|
-| **100** | **Exact** | Explicit compliance statement + sufficient context + proof point | Fully Compliant | None - maintain quality |
-| **95** | **Complete** | Clear compliance, minor clarity improvement possible (e.g., add proof point) | Compliant | Optional enhancement |
-| **85** | **Mostly Covered** | Addresses requirement but missing 1 substantive detail or proof | Compliant | Strengthen with detail/metric |
-| **70** | **Present** | Requirement addressed but structural weakness (over page limit, weak proof) | At Risk | Fix structural issue |
-| **50** | **Mention Only** | Requirement acknowledged without substantive response | Non-Compliant | Major rewrite needed |
-| **30** | **Indirect** | Implied or inferred compliance, not explicitly stated | Non-Compliant | Add explicit statement |
-| **10** | **Bare Hint** | Relevant term appears once, no actual coverage | Non-Compliant | Full response required |
-| **0** | **Missing** | Requirement not addressed anywhere in proposal | Non-Compliant | Critical gap - add content |
+| Score   | Rating             | Definition                                                                   | Compliance Status | Action Required               |
+| ------- | ------------------ | ---------------------------------------------------------------------------- | ----------------- | ----------------------------- |
+| **100** | **Exact**          | Explicit compliance statement + sufficient context + proof point             | Fully Compliant   | None - maintain quality       |
+| **95**  | **Complete**       | Clear compliance, minor clarity improvement possible (e.g., add proof point) | Compliant         | Optional enhancement          |
+| **85**  | **Mostly Covered** | Addresses requirement but missing 1 substantive detail or proof              | Compliant         | Strengthen with detail/metric |
+| **70**  | **Present**        | Requirement addressed but structural weakness (over page limit, weak proof)  | At Risk           | Fix structural issue          |
+| **50**  | **Mention Only**   | Requirement acknowledged without substantive response                        | Non-Compliant     | Major rewrite needed          |
+| **30**  | **Indirect**       | Implied or inferred compliance, not explicitly stated                        | Non-Compliant     | Add explicit statement        |
+| **10**  | **Bare Hint**      | Relevant term appears once, no actual coverage                               | Non-Compliant     | Full response required        |
+| **0**   | **Missing**        | Requirement not addressed anywhere in proposal                               | Non-Compliant     | Critical gap - add content    |
 
 **Scoring Application by Criticality**:
 
 **MANDATORY Requirements** (criticality_level = "MANDATORY"):
+
 - **Threshold**: 85+ required (anything below = high risk)
 - **Target**: 95-100 for all "shall/must" requirements
 - **Rationale**: Non-compliance with mandatory items = non-responsive proposal
 
 **IMPORTANT Requirements** (criticality_level = "IMPORTANT"):
+
 - **Threshold**: 70+ acceptable, 85+ competitive
 - **Target**: 95+ for high-weight evaluation factors
 - **Rationale**: "Should" requirements often scored - full coverage earns points
 
 **OPTIONAL Requirements** (criticality_level = "OPTIONAL"):
+
 - **Threshold**: 0-100 (propose if strategic advantage)
 - **Target**: 85+ if included (don't propose half-measures)
 - **Rationale**: Better to skip than propose weak optional approach
@@ -530,6 +580,7 @@ For requirements scoring <95, document:
 **Risk Assessment Framework**:
 
 **Risk Level Calculation**:
+
 ```
 risk_level = f(criticality, coverage_score, evaluation_weight, competitive_context)
 
@@ -551,6 +602,7 @@ LOW RISK:
 ```
 
 **Risk Factors**:
+
 1. **Technical Risk**: Unproven capability, immature technology, skill gaps
 2. **Schedule Risk**: Tight timeline, dependency on government, aggressive milestones
 3. **Cost Risk**: Unrealistic pricing, insufficient cost basis, hidden costs
@@ -594,6 +646,7 @@ After scoring all requirements, generate executive-level summary:
 ```
 
 **Implementation Strategy**:
+
 - Add metadata to REQUIREMENT entities:
   - `coverage_score`: 0-100 integer
   - `proposal_evidence`: String (quote from proposal with page ref)
@@ -608,16 +661,19 @@ After scoring all requirements, generate executive-level summary:
 **Proposal Review Process**:
 
 **Pink Team** (Early Draft - 60% Complete):
+
 - **Focus**: Concept validation, theme resonance, outline compliance
 - **Coverage Target**: 70+ average (concepts present, details emerging)
 - **Action**: Identify missing sections, validate L↔M mapping, confirm themes
 
 **Red Team** (Mature Draft - 90% Complete):
+
 - **Focus**: Compliance rigor, customer perspective, competitive positioning
 - **Coverage Target**: 85+ average, 95+ on MANDATORY requirements
 - **Action**: Score every requirement, document gaps, assign fix responsibilities
 
 **Gold Team** (Final Draft - 99% Complete):
+
 - **Focus**: Consistency, polish, format compliance, final quality check
 - **Coverage Target**: 95+ average, 100 on Section A admin items
 - **Action**: Verify gap fixes, confirm page limits, final proofread
@@ -625,6 +681,7 @@ After scoring all requirements, generate executive-level summary:
 **Real-World Application**:
 
 **Compliance Matrix Generation** (Red Team Output):
+
 ```
 Requirement: REQ-C045 "Contractor shall respond to urgent maintenance within 24 hours"
 Criticality: MANDATORY (shall)
@@ -643,10 +700,10 @@ Gaps:
 Risk Level: HIGH
 Risk Rationale: MANDATORY + Most Important factor + score < 85 = non-responsive risk
 
-Suggestion: 
-  "Revise Section 3.2.1 to include explicit commitment: 'We guarantee 24-hour response 
-  to urgent maintenance requests via our hybrid staffing model (6 on-site technicians + 
-  4 on-call surge team). Our proven approach delivered 2.1-hour average response time on 
+Suggestion:
+  "Revise Section 3.2.1 to include explicit commitment: 'We guarantee 24-hour response
+  to urgent maintenance requests via our hybrid staffing model (6 on-site technicians +
+  4 on-call surge team). Our proven approach delivered 2.1-hour average response time on
   similar Navy contract (CPARS: Exceptional).' Add to compliance matrix page 55."
 
 Estimated Fix Effort: 2 hours (rewrite paragraph, add proof point, update matrix)
@@ -655,6 +712,7 @@ Due Date: Red Team iteration close (3 days)
 ```
 
 **Post-Submission Application**:
+
 - Debriefs: Compare internal coverage scores to government evaluation feedback
 - Lessons Learned: Calibrate scoring methodology based on win/loss outcomes
 - Process Improvement: Adjust scoring thresholds for future proposals
@@ -666,9 +724,10 @@ Due Date: Red Team iteration close (3 days)
 ### Ontology Enhancements
 
 **1. REQUIREMENT Entity Enhancements**:
+
 ```python
 # Add metadata fields
-requirement_type: Literal["FUNCTIONAL", "PERFORMANCE", "INTERFACE", "DESIGN", 
+requirement_type: Literal["FUNCTIONAL", "PERFORMANCE", "INTERFACE", "DESIGN",
                           "SECURITY", "TECHNICAL", "MANAGEMENT", "QUALITY"]
 criticality_level: Literal["MANDATORY", "IMPORTANT", "OPTIONAL", "INFORMATIONAL"]
 priority_score: int  # 0-100 derived from criticality
@@ -681,6 +740,7 @@ suggestion: str  # Fix recommendation with effort estimate
 ```
 
 **2. EVALUATION_FACTOR Entity Enhancements**:
+
 ```python
 # Add structured fields
 factor_id: str  # "M1", "M2.1", etc.
@@ -694,6 +754,7 @@ evaluated_by_rating: str  # "Adjectival", "Point Score", "Pass/Fail"
 ```
 
 **3. STRATEGIC_THEME Entity (NEW)**:
+
 ```python
 # New entity type for competitive positioning
 entity_type = "STRATEGIC_THEME"
@@ -705,6 +766,7 @@ customer_benefit: str  # Mission outcome, agency value
 ```
 
 **4. Relationship Enhancements**:
+
 ```python
 # New relationships
 STRATEGIC_THEME → ADDRESSES → REQUIREMENT
@@ -719,6 +781,7 @@ REQUIREMENT → EVALUATED_BY → EVALUATION_FACTOR (with weight/importance)
 ### Extraction Prompt Updates
 
 **Requirements Extraction**:
+
 - Add requirement type classification logic (8 types)
 - Parse modal verbs for criticality levels (shall/should/may/will)
 - Calculate priority scores automatically
@@ -726,12 +789,14 @@ REQUIREMENT → EVALUATED_BY → EVALUATION_FACTOR (with weight/importance)
 - Map Section L instructions to Section M factors
 
 **Compliance Assessment**:
+
 - Implement 0-100 scoring scale with gradations
 - Generate gap analysis for coverage_score < 95
 - Calculate risk levels based on criticality + coverage + evaluation weight
 - Produce critical summary with factor coverage breakdown
 
 **Strategic Theme Extraction**:
+
 - Parse Section L/M for customer hot button language ("emphasize", "critical", "essential")
 - Identify evaluation factor importance statements as hot button signals
 - Extract RFP background (Section B/C) for mission priorities
@@ -743,6 +808,7 @@ REQUIREMENT → EVALUATED_BY → EVALUATION_FACTOR (with weight/importance)
 User preserved Navy MBOS knowledge graph externally (594 entities, 584 relationships) with noted gaps: "there were some gaps or data that should have been connected, but were not."
 
 **Phase 6 Validation**:
+
 1. Re-process Navy MBOS RFP with enhanced ontology
 2. Compare entity counts and relationship density vs. baseline
 3. Measure gap improvements:
@@ -754,6 +820,7 @@ User preserved Navy MBOS knowledge graph externally (594 entities, 584 relations
 5. Validate 417x speedup maintained (69 seconds target)
 
 **Success Criteria**:
+
 - ≥90% requirements classified by type
 - ≥95% criticality levels parsed correctly
 - 100% Section M factors mapped to Section L instructions
@@ -765,6 +832,7 @@ User preserved Navy MBOS knowledge graph externally (594 entities, 584 relations
 ## Terminology Reference
 
 **Industry-Standard Terms Used** (Non-Proprietary):
+
 - **Capture Management**: Pre-RFP strategic positioning, opportunity qualification
 - **Compliance Matrix**: Requirement-to-proposal traceability tool
 - **Coverage Assessment**: Proposal quality scoring methodology
@@ -780,6 +848,7 @@ User preserved Navy MBOS knowledge graph externally (594 entities, 584 relations
 - **Win Theme**: Strategic messaging tying solution to customer outcomes and evaluation factors
 
 **FAR-Based Terminology**:
+
 - **Best Value**: Tradeoff methodology allowing government to pay more for superior technical solution
 - **LPTA (Lowest Price Technically Acceptable)**: Tradeoff methodology where cheapest compliant proposal wins
 - **Section A-M**: Standard federal RFP structure (A: Solicitation Form, B: Supplies/Services, C: SOW/PWS, L: Instructions, M: Evaluation)
@@ -787,6 +856,7 @@ User preserved Navy MBOS knowledge graph externally (594 entities, 584 relations
 - **Tradeoff Methodology**: Government's approach to balancing technical merit vs. cost
 
 **Avoided Proprietary Terms**:
+
 - No vendor-specific methodology names referenced in code or ontology
 - All patterns described using generic industry-standard language
 - Documentation references methodology concepts, not trademarked frameworks
@@ -800,7 +870,7 @@ User preserved Navy MBOS knowledge graph externally (594 entities, 584 relations
 **Purpose**: Phase 5 extraction deliverable - Ontology enhancement patterns for Phase 6 implementation  
 **Sources**: Industry research, federal acquisition methodology, Branch 002 prompt artifacts  
 **Next Phase**: Implement enhancements in `src/raganything_server.py` ontology configuration  
-**Validation**: Re-process Navy MBOS RFP, measure gap improvements vs. baseline (594 entities, 584 relationships)  
+**Validation**: Re-process Navy MBOS RFP, measure gap improvements vs. baseline (594 entities, 584 relationships)
 
 ---
 
