@@ -737,3 +737,123 @@ TimeoutError: Embedding func: Worker execution timeout after 600s
 
 2025-10-05 14:53:19 | ERROR    | lightrag             | process_document | Failed to extract document 1/1: _N6945025R0003.pdf
 2025-10-05 15:02:07 | ERROR    | lightrag             | worker          | LLM func: Error in decorated function for task 1726840573456_147675.8892453: 
+2025-10-05 17:48:15 | ERROR    | lightrag             | process_document | Traceback (most recent call last):
+  File "C:\Users\benma\govcon-capture-vibe\src\lightrag\lightrag.py", line 1534, in process_document
+    for dp in self.chunking_func(
+              ~~~~~~~~~~~~~~~~~~^
+        self.tokenizer,
+        ^^^^^^^^^^^^^^^
+    ...<4 lines>...
+        self.chunk_token_size,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+TypeError: 'NoneType' object is not callable
+
+2025-10-05 17:48:15 | ERROR    | lightrag             | process_document | Failed to extract document 1/1: _N6945025R0003.pdf
+2025-10-05 17:48:15 | ERROR    | lightrag             | pipeline_index_file | Error indexing file _N6945025R0003.pdf: cannot access local variable 'processing_start_time' where it is not associated with a value
+2025-10-05 17:48:15 | ERROR    | lightrag             | pipeline_index_file | Traceback (most recent call last):
+  File "C:\Users\benma\govcon-capture-vibe\src\lightrag\lightrag.py", line 1534, in process_document
+    for dp in self.chunking_func(
+              ~~~~~~~~~~~~~~~~~~^
+        self.tokenizer,
+        ^^^^^^^^^^^^^^^
+    ...<4 lines>...
+        self.chunk_token_size,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+TypeError: 'NoneType' object is not callable
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\benma\govcon-capture-vibe\src\lightrag\api\routers\document_routes.py", line 1313, in pipeline_index_file
+    await rag.apipeline_process_enqueue_documents()
+  File "C:\Users\benma\govcon-capture-vibe\src\lightrag\lightrag.py", line 1767, in apipeline_process_enqueue_documents
+    await asyncio.gather(*doc_tasks)
+  File "C:\Users\benma\govcon-capture-vibe\src\lightrag\lightrag.py", line 1645, in process_document
+    "processing_start_time": processing_start_time,
+                             ^^^^^^^^^^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'processing_start_time' where it is not associated with a value
+
+2025-10-05 17:56:01 | ERROR    | lightrag             | process_document | Traceback (most recent call last):
+  File "C:\Users\benma\govcon-capture-vibe\src\lightrag\lightrag.py", line 1534, in process_document
+    for dp in self.chunking_func(
+              ~~~~~~~~~~~~~~~~~~^
+        self.tokenizer,
+        ^^^^^^^^^^^^^^^
+    ...<4 lines>...
+        self.chunk_token_size,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+TypeError: 'NoneType' object is not callable
+
+2025-10-05 17:56:01 | ERROR    | lightrag             | process_document | Failed to extract document 1/1: _N6945025R0003.pdf
+2025-10-05 17:56:01 | ERROR    | lightrag             | pipeline_index_file | Error indexing file _N6945025R0003.pdf: cannot access local variable 'processing_start_time' where it is not associated with a value
+2025-10-05 17:56:01 | ERROR    | lightrag             | pipeline_index_file | Traceback (most recent call last):
+  File "C:\Users\benma\govcon-capture-vibe\src\lightrag\lightrag.py", line 1534, in process_document
+    for dp in self.chunking_func(
+              ~~~~~~~~~~~~~~~~~~^
+        self.tokenizer,
+        ^^^^^^^^^^^^^^^
+    ...<4 lines>...
+        self.chunk_token_size,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+TypeError: 'NoneType' object is not callable
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\benma\govcon-capture-vibe\src\lightrag\api\routers\document_routes.py", line 1313, in pipeline_index_file
+    await rag.apipeline_process_enqueue_documents()
+  File "C:\Users\benma\govcon-capture-vibe\src\lightrag\lightrag.py", line 1767, in apipeline_process_enqueue_documents
+    await asyncio.gather(*doc_tasks)
+  File "C:\Users\benma\govcon-capture-vibe\src\lightrag\lightrag.py", line 1645, in process_document
+    "processing_start_time": processing_start_time,
+                             ^^^^^^^^^^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'processing_start_time' where it is not associated with a value
+
+2025-10-05 18:52:59 | ERROR    | lightrag             | process_document | Traceback (most recent call last):
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\lightrag.py", line 1534, in process_document
+    for dp in self.chunking_func(
+              ~~~~~~~~~~~~~~~~~~^
+        self.tokenizer,
+        ^^^^^^^^^^^^^^^
+    ...<4 lines>...
+        self.chunk_token_size,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+TypeError: 'NoneType' object is not callable
+
+2025-10-05 18:52:59 | ERROR    | lightrag             | process_document | Failed to extract document 1/1: _N6945025R0003.pdf
+2025-10-05 18:52:59 | ERROR    | lightrag             | pipeline_index_file | Error indexing file _N6945025R0003.pdf: cannot access local variable 'processing_start_time' where it is not associated with a value
+2025-10-05 18:52:59 | ERROR    | lightrag             | pipeline_index_file | Traceback (most recent call last):
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\lightrag.py", line 1534, in process_document
+    for dp in self.chunking_func(
+              ~~~~~~~~~~~~~~~~~~^
+        self.tokenizer,
+        ^^^^^^^^^^^^^^^
+    ...<4 lines>...
+        self.chunk_token_size,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+TypeError: 'NoneType' object is not callable
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\api\routers\document_routes.py", line 1313, in pipeline_index_file
+    await rag.apipeline_process_enqueue_documents()
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\lightrag.py", line 1767, in apipeline_process_enqueue_documents
+    await asyncio.gather(*doc_tasks)
+  File "C:\Users\benma\govcon-capture-vibe\.venv\Lib\site-packages\lightrag\lightrag.py", line 1645, in process_document
+    "processing_start_time": processing_start_time,
+                             ^^^^^^^^^^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'processing_start_time' where it is not associated with a value
+
