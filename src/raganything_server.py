@@ -114,6 +114,9 @@ def configure_raganything_args():
         "DELIVERABLE",
         "ANNEX",                    # NEW: Numbered attachments (J-######, Attachment #, Annex ##)
         
+        # Hierarchical program entities (NEW: Top-level containers)
+        "PROGRAM",                  # Major programs (MCPP II, Navy MBOS, etc.) - contains requirements/deliverables
+        
         # Evaluation entities (semantic detection, may be embedded in non-standard sections)
         "EVALUATION_FACTOR",        # Scoring criteria (Section M content)
         "SUBMISSION_INSTRUCTION",   # NEW: Format/page limits (Section L content, may be IN Section M)

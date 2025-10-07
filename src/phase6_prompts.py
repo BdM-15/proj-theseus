@@ -75,7 +75,35 @@ SEMANTIC-FIRST ENTITY DETECTION RULES:
      * priority_score: 0-100 (MANDATORY=100, IMPORTANT=75, OPTIONAL=25, INFORMATIONAL=0)
      * section_origin: Where it appeared (e.g., "Section C.3.1.2")
 
-4. STATEMENT_OF_WORK (includes SOW, PWS, SOO):
+4. PROGRAM:
+   - SEMANTIC PURPOSE: Top-level organizational container representing a major acquisition program, initiative, or system
+   - Content signals: Program names, major acquisition titles, portfolio-level initiatives
+   - Naming patterns:
+     * Full program names: "Marine Corps Prepositioning Program II", "Navy Mobile Bay Organic Support", "Air Force Logistics Modernization Initiative"
+     * Acronyms: "MCPP II", "Navy MBOS", "AFLMI"
+     * System names: "F-35 Lightning II Program", "Joint Strike Fighter Program"
+   
+   - Hierarchical position: Top-level container that CONTAINS requirements, deliverables, technologies, and other entities
+   - Relationship patterns:
+     * SECTION (C) → CONTAINS → PROGRAM (the section describes/contains the program)
+     * PROGRAM → CONTAINS → REQUIREMENT (program contains multiple requirements)
+     * PROGRAM → CONTAINS → TECHNOLOGY (program involves specific technologies)
+     * PROGRAM → CONTAINS → DELIVERABLE (program expects certain deliverables)
+   
+   - Detection criteria:
+     * Appears in document title, Section C header, or SOW introduction
+     * Often capitalized or emphasized as primary subject of solicitation
+     * Referenced throughout document as umbrella for all work
+     * Examples: "MCPP II Program", "Navy Organic Ground Support Equipment Maintenance", "Navy MBOS Program"
+   
+   - Metadata to extract:
+     * program_name: Official full name
+     * program_acronym: Common acronym (if exists)
+     * program_scope: Brief description of program mission/purpose
+     * parent_organization: Owning agency/command (e.g., "Marine Corps", "Navy")
+     * section_origin: Where first introduced (typically Section C or document title)
+
+5. STATEMENT_OF_WORK (includes SOW, PWS, SOO):
    - SEMANTIC EQUIVALENCE: The entity type "STATEMENT_OF_WORK" represents ANY of these three formats:
      * SOW (Statement of Work): Prescriptive, detailed instructions on HOW to perform work
      * PWS (Performance Work Statement): Performance-based, specifies WHAT outcomes required, gives offeror freedom on HOW
@@ -96,20 +124,20 @@ SEMANTIC-FIRST ENTITY DETECTION RULES:
      * PWS: "Contractor shall maintain grounds to standard X" (performance-based WHAT)
      * SOO: "Objective: Provide aesthetically pleasing grounds" (objective-based WHY)
 
-5. ANNEX / ATTACHMENT:
+6. ANNEX / ATTACHMENT:
    - Naming patterns: "J-######", "Attachment #", "Annex ##", "Appendix X", "X-######"
    - Link to parent section based on naming prefix patterns
    - Content determines subtype (could contain SOW, specs, maps, data sheets)
    - Metadata: Store original numbering for traceability
 
-6. CLAUSE:
+7. CLAUSE:
    - Patterns: FAR ##.###-##, DFARS ###.###-####, AFFARS ####.###-##, 
                NMCARS ####.###-##, HSAR, DOSAR, GSAM, VAAR, DEAR, NFS, etc.
    - Agency supplement recognition: 20+ patterns (FAR, DFARS, AFFARS, AFARS, NMCARS, etc.)
    - Should cluster by parent section (Section I clauses, Section K representations)
    - Group similar clauses even if scattered in document
 
-7. SECTION:
+8. SECTION:
    - Extract BOTH structural_label ("Section M.2.1") AND semantic_type ("EVALUATION_CRITERIA")
    - Map non-standard labels to semantic types:
      * "Selection Criteria" → EVALUATION_CRITERIA
@@ -122,7 +150,7 @@ SEMANTIC-FIRST ENTITY DETECTION RULES:
      * also_contains: List of additional content types
      * confidence: Detection confidence score
 
-8. STRATEGIC_THEME:
+9. STRATEGIC_THEME:
    - Type classification:
      * CUSTOMER_HOT_BUTTON: Agency priorities, pain points, mission pressures
        Signals: "critical", "essential", "priority", "emphasize", "significant concern"
@@ -164,41 +192,68 @@ SEMANTIC RELATIONSHIP INFERENCE RULES:
    - Pattern 4 (Content proximity): Requirements in SOW link to Technical Approach factor
    - Confidence: 0.95 explicit, 0.7 topic alignment, 0.8 criticality, 0.6 proximity
 
-3. CLAUSE → CHILD_OF → SECTION:
+3. SECTION → CONTAINS → PROGRAM:
+   - Pattern 1 (Explicit): Section C title includes program name "MCPP II Program"
+   - Pattern 2 (Introduction): Section C opens with program description
+   - Pattern 3 (Context): Section describes work scope for named program
+   - Direction: SECTION contains PROGRAM (program is child of section)
+   - Confidence: 0.95 explicit in title, 0.85 introduction, 0.75 contextual
+
+4. PROGRAM → CONTAINS → REQUIREMENT:
+   - Pattern 1 (Scope): Requirements describe work within program
+   - Pattern 2 (Attribution): "Under MCPP II Program, contractor shall..."
+   - Pattern 3 (Context): All requirements in Section C relate to program
+   - Direction: PROGRAM contains REQUIREMENT (requirement is child of program)
+   - Confidence: 0.9 explicit attribution, 0.8 structural containment
+
+5. PROGRAM → CONTAINS → TECHNOLOGY:
+   - Pattern 1 (Explicit): "SINCGARS radio systems for MCPP II"
+   - Pattern 2 (Context): Technology mentioned within program scope
+   - Pattern 3 (System hierarchy): Equipment/systems belong to program
+   - Direction: PROGRAM contains TECHNOLOGY (technology is child of program)
+   - Confidence: 0.9 explicit mention, 0.7 contextual, 0.8 system hierarchy
+
+6. PROGRAM → CONTAINS → DELIVERABLE:
+   - Pattern 1 (Attribution): "MCPP II deliverables include..."
+   - Pattern 2 (SOW structure): Deliverables listed under program SOW
+   - Direction: PROGRAM contains DELIVERABLE (deliverable is child of program)
+   - Confidence: 0.9 explicit, 0.8 structural
+
+7. CLAUSE → CHILD_OF → SECTION:
    - Pattern 1 (Numbering): FAR 52.###-# belongs to Section 52 parent
    - Pattern 2 (Attribution): Clause listed under "Section I" heading
    - Pattern 3 (Clustering): Group similar clauses (all FAR 52.2##-# together)
    - FRAGMENTATION FIX: Link scattered clauses to parent even if not adjacent
    - Confidence: 0.9 numbering, 0.8 attribution, 0.6 clustering
 
-4. ANNEX → CHILD_OF → SECTION:
+8. ANNEX → CHILD_OF → SECTION:
    - Pattern 1 (Explicit citation): "See Attachment X-1234567 for equipment list"
    - Pattern 2 (Naming convention): "J-1234567" belongs to "Section J"
    - Pattern 3 (Content alignment): Annex describes tools, requirement mentions tools
    - ISOLATION FIX: Link numbered attachments to parent sections based on prefix pattern
    - Confidence: 1.0 naming convention, 0.8 citation, 0.6 content alignment
 
-5. REQUIREMENT → COMPONENT_OF → STATEMENT_OF_WORK:
+9. REQUIREMENT → COMPONENT_OF → STATEMENT_OF_WORK:
    - SOW contains requirement (parent-child relationship)
    - Works regardless of SOW location (Section C vs. attachment)
    - Confidence: 0.9 hierarchical structure
 
-6. EVALUATION_FACTOR → REFERENCES → STATEMENT_OF_WORK:
+10. EVALUATION_FACTOR → REFERENCES → STATEMENT_OF_WORK:
    - Factor evaluates work described in SOW
    - Example: "Technical Approach" factor references tasks in PWS
    - Confidence: 0.7 semantic alignment
 
-7. STRATEGIC_THEME → SUPPORTS → EVALUATION_FACTOR:
+11. STRATEGIC_THEME → SUPPORTS → EVALUATION_FACTOR:
    - Hot button language in factor description signals theme opportunity
    - Example: Factor emphasizes "readiness" → theme "Mission Readiness Focus"
    - Confidence: 0.8 explicit, 0.6 inferred
 
-8. PROOF_POINT → VALIDATES → DISCRIMINATOR:
+12. PROOF_POINT → VALIDATES → DISCRIMINATOR:
    - Evidence supports competitive claim
    - Example: "98% first-time fix rate" validates "Superior maintenance capability" discriminator
    - Confidence: 0.9 direct evidence
 
-9. WIN_THEME → COMBINES → [DISCRIMINATOR + PROOF_POINT + CUSTOMER_HOT_BUTTON]:
+13. WIN_THEME → COMBINES → [DISCRIMINATOR + PROOF_POINT + CUSTOMER_HOT_BUTTON]:
    - Composite relationship linking strategic theme components
    - Confidence: 1.0 (explicit composition)
 """
@@ -282,6 +337,16 @@ STATEMENT_OF_WORK Entity Metadata:
   "work_type": str,              # "PWS", "SOW", "SOO"
   "location": str,               # "Section C", "Attachment", "Annex"
   "hierarchical_structure": bool # True if contains task hierarchy
+}
+
+PROGRAM Entity Metadata:
+{
+  "program_name": str,           # Official full name (e.g., "Marine Corps Prepositioning Program II")
+  "program_acronym": str,        # Common acronym (e.g., "MCPP II")
+  "program_scope": str,          # Brief mission/purpose description
+  "parent_organization": str,    # Owning agency/command (e.g., "Marine Corps", "Navy")
+  "section_origin": str,         # Where first introduced (typically Section C or document title)
+  "program_type": str,           # "Major Acquisition", "IT Modernization", "Facility Maintenance", etc.
 }
 """
 

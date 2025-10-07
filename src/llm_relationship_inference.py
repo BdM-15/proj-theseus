@@ -351,7 +351,7 @@ async def infer_all_relationships(
     
     # Batch 1: ANNEX → SECTION
     if 'annex' in grouped and 'section' in grouped:
-        logger.info(f"\n  [Batch 1/8] Inferring ANNEX → SECTION relationships...")
+        logger.info(f"\n  [Batch 1/10] Inferring ANNEX → SECTION relationships...")
         logger.info(f"    Source: {len(grouped['annex'])} annexes")
         logger.info(f"    Target: {len(grouped['section'])} sections")
         
@@ -372,7 +372,7 @@ PATTERNS:
     
     # Batch 2: CLAUSE → SECTION
     if 'clause' in grouped and 'section' in grouped:
-        logger.info(f"\n  [Batch 2/8] Inferring CLAUSE → SECTION relationships...")
+        logger.info(f"\n  [Batch 2/10] Inferring CLAUSE → SECTION relationships...")
         logger.info(f"    Source: {len(grouped['clause'])} clauses")
         logger.info(f"    Target: {len(grouped['section'])} sections")
         
@@ -393,7 +393,7 @@ PATTERNS:
     
     # Batch 3: SUBMISSION_INSTRUCTION ↔ EVALUATION_FACTOR
     if 'submission_instruction' in grouped and 'evaluation_factor' in grouped:
-        logger.info(f"\n  [Batch 3/8] Inferring SUBMISSION_INSTRUCTION ↔ EVALUATION_FACTOR relationships...")
+        logger.info(f"\n  [Batch 3/10] Inferring SUBMISSION_INSTRUCTION ↔ EVALUATION_FACTOR relationships...")
         logger.info(f"    Source: {len(grouped['submission_instruction'])} instructions")
         logger.info(f"    Target: {len(grouped['evaluation_factor'])} factors")
         
@@ -414,7 +414,7 @@ PATTERNS:
     
     # Batch 4: REQUIREMENT → EVALUATION_FACTOR
     if 'requirement' in grouped and 'evaluation_factor' in grouped:
-        logger.info(f"\n  [Batch 4/8] Inferring REQUIREMENT → EVALUATION_FACTOR relationships...")
+        logger.info(f"\n  [Batch 4/10] Inferring REQUIREMENT → EVALUATION_FACTOR relationships...")
         logger.info(f"    Source: {len(grouped['requirement'])} requirements")
         logger.info(f"    Target: {len(grouped['evaluation_factor'])} factors")
         
@@ -435,7 +435,7 @@ PATTERNS:
     
     # Batch 5: STATEMENT_OF_WORK → DELIVERABLE (includes SOW, PWS, SOO)
     if 'statement_of_work' in grouped and 'deliverable' in grouped:
-        logger.info(f"\n  [Batch 5/8] Inferring STATEMENT_OF_WORK → DELIVERABLE relationships...")
+        logger.info(f"\n  [Batch 5/10] Inferring STATEMENT_OF_WORK → DELIVERABLE relationships...")
         logger.info(f"    Source: {len(grouped['statement_of_work'])} work statements (SOW/PWS/SOO)")
         logger.info(f"    Target: {len(grouped['deliverable'])} deliverables")
         
@@ -470,7 +470,7 @@ PATTERNS:
     # Universal thematic clustering pattern - works for ALL RFP domains
     # Pattern: Parent theme/umbrella groups related child requirements
     if 'requirement' in grouped:
-        logger.info(f"\n  [Batch 6/8] Inferring REQUIREMENT_THEME → REQUIREMENT relationships...")
+        logger.info(f"\n  [Batch 6/10] Inferring REQUIREMENT_THEME → REQUIREMENT relationships...")
         logger.info(f"    Detecting thematic clusters across all domains (facilities, security, technical, management)...")
         logger.info(f"    Analyzing {len(grouped['requirement'])} requirements for parent-child patterns")
         
@@ -559,7 +559,7 @@ This enables hierarchical organization in knowledge graph regardless of RFP doma
                                                                    'Framework', 'Process', 'Program', 'Plan'])]
     
     if 'evaluation_factor' in grouped and methodology_entities:
-        logger.info(f"\n  [Batch 7/8] Inferring METHODOLOGY → EVALUATION_FACTOR relationships...")
+        logger.info(f"\n  [Batch 7/10] Inferring METHODOLOGY → EVALUATION_FACTOR relationships...")
         logger.info(f"    Source: {len(methodology_entities)} methodologies/approaches")
         logger.info(f"    Target: {len(grouped['evaluation_factor'])} evaluation factors")
         
@@ -588,7 +588,7 @@ EXAMPLES:
     # Batch 8: ANNEX → EVALUATION_FACTOR (ADDRESSES)
     # Pattern: "Annex 16 Utilities" → "Technical Approach"
     if 'annex' in grouped and 'evaluation_factor' in grouped:
-        logger.info(f"\n  [Batch 8/8] Inferring ANNEX → EVALUATION_FACTOR relationships...")
+        logger.info(f"\n  [Batch 8/10] Inferring ANNEX → EVALUATION_FACTOR relationships...")
         logger.info(f"    Source: {len(grouped['annex'])} annexes")
         logger.info(f"    Target: {len(grouped['evaluation_factor'])} evaluation factors")
         
@@ -612,6 +612,111 @@ EXAMPLES:
             llm_func=llm_func
         )
         all_new_relationships.extend(annex_factor_rels)
+    
+    # Batch 9: SECTION → PROGRAM (CONTAINS)
+    # Pattern: "Section C" → "MCPP II Program"
+    if 'section' in grouped and 'program' in grouped:
+        logger.info(f"\n  [Batch 9/10] Inferring SECTION → PROGRAM relationships...")
+        logger.info(f"    Source: {len(grouped['section'])} sections")
+        logger.info(f"    Target: {len(grouped['program'])} programs")
+        
+        section_program_rels = await infer_relationships_batch(
+            source_entities=grouped['section'],
+            target_entities=grouped['program'],
+            relationship_context="""
+RELATIONSHIP TYPE: SECTION → PROGRAM (CONTAINS)
+CONTEXT: Sections (especially Section C) contain and describe major acquisition programs.
+DIRECTION: SECTION contains PROGRAM (program is child of section in hierarchy).
+
+PATTERNS:
+1. **Title Match**: Section C title includes program name
+   - "Section C - MCPP II Program Description"
+   - "Section C - Marine Corps Prepositioning Program II Statement of Work"
+   
+2. **Introduction**: Section C opens with program overview
+   - First paragraph: "The Marine Corps Prepositioning Program II (MCPP II)..."
+   - Program name in first 100 words of Section C content
+   
+3. **Contextual Containment**: Section describes program scope
+   - Section C contains all work for named program
+   - Program mentioned throughout Section C content
+   - Requirements reference program by name
+
+HIERARCHICAL STRUCTURE:
+- DOCUMENT → SECTION C → PROGRAM → REQUIREMENTS/DELIVERABLES
+- Section is container, Program is top-level work entity within
+
+EXAMPLES:
+- "Section C" → "MCPP II Program" (CONTAINS)
+- "Section C" → "Navy MBOS Program" (CONTAINS)
+- "Section C - Statement of Work" → "Marine Corps Prepositioning Program II" (CONTAINS)
+
+CONFIDENCE SCORING:
+- HIGH (>0.9): Program name in section title or first paragraph
+- MEDIUM (0.7-0.9): Program name mentioned multiple times in section
+- LOW (0.5-0.7): Contextual inference from related entities
+""",
+            llm_func=llm_func
+        )
+        all_new_relationships.extend(section_program_rels)
+    
+    # Batch 10: PROGRAM → REQUIREMENT (CONTAINS)
+    # Pattern: "MCPP II Program" → "SINCGARS Requirements"
+    if 'program' in grouped and 'requirement' in grouped:
+        logger.info(f"\n  [Batch 10/10] Inferring PROGRAM → REQUIREMENT relationships...")
+        logger.info(f"    Source: {len(grouped['program'])} programs")
+        logger.info(f"    Target: {len(grouped['requirement'])} requirements")
+        
+        program_requirement_rels = await infer_relationships_batch(
+            source_entities=grouped['program'],
+            target_entities=grouped['requirement'],
+            relationship_context="""
+RELATIONSHIP TYPE: PROGRAM → REQUIREMENT (CONTAINS)
+CONTEXT: Major acquisition programs contain specific requirements that contractors must fulfill.
+DIRECTION: PROGRAM contains REQUIREMENT (requirement is child of program in hierarchy).
+
+PATTERNS:
+1. **Explicit Attribution**: Requirement explicitly references program
+   - "Under MCPP II Program, contractor shall maintain..."
+   - "For the Navy MBOS Program, the following requirements apply:"
+   - Requirement description mentions program name
+   
+2. **Contextual Scope**: Requirement appears in program SOW/PWS
+   - All requirements in Section C belong to program described in Section C
+   - Requirements describe work within program scope
+   - Requirement supports program objectives
+   
+3. **Technology/System Linkage**: Requirement involves program equipment/systems
+   - Program: "MCPP II Program" contains Requirement: "SINCGARS maintenance"
+   - Program involves specific technologies mentioned in requirements
+   
+4. **Deliverable Connection**: Requirement produces program deliverables
+   - Program deliverables created by requirements
+   - Requirements fulfill program objectives
+
+HIERARCHICAL STRUCTURE:
+- PROGRAM (top level) → REQUIREMENTS (detailed work)
+- PROGRAM (container) → TECHNOLOGY (involved systems)
+- PROGRAM (container) → DELIVERABLE (expected outputs)
+
+EXAMPLES:
+- "MCPP II Program" → "Equipment Maintenance Requirements" (CONTAINS)
+- "MCPP II Program" → "SINCGARS Radio System Requirements" (CONTAINS)
+- "Navy MBOS Program" → "Ground Support Equipment Maintenance" (CONTAINS)
+- "Marine Corps Prepositioning Program II" → "Technical Documentation Requirements" (CONTAINS)
+
+CONFIDENCE SCORING:
+- HIGH (>0.9): Program name explicitly in requirement text
+- MEDIUM (0.7-0.9): Requirement in program Section C, clear scope alignment
+- LOW (0.5-0.7): Contextual inference, all Section C requirements belong to program
+
+NOTE: This batch establishes the correct hierarchy:
+  Section C → MCPP II Program → SINCGARS (not SINCGARS → Section C directly)
+This fixes isolated node issues by linking entities to program context.
+""",
+            llm_func=llm_func
+        )
+        all_new_relationships.extend(program_requirement_rels)
     
     # Filter out duplicates with existing relationships
     new_relationships_filtered = []
