@@ -1,24 +1,33 @@
 """
 GovCon Capture Vibe - Ontology-Based RAG for Government Contracting
 
-A sophisticated RFP analysis system built on LightRAG with structured PydanticAI agents.
-Implements Shipley methodology for government contracting compliance analysis.
+Phase 2+3: Ontology-Modified LightRAG System
 
-Architecture:
-- core/: LightRAG integration with RFP-aware processing
-- agents/: PydanticAI structured agents for data validation  
-- models/: Pydantic models defining RFP ontology
+A sophisticated RFP analysis system built on LightRAG with ontology-guided extraction.
+Implements Shipley methodology through structured PydanticAI agents.
+
+Architecture (Phase 2+3):
+- core/: Ontology-modified LightRAG integration (Path B)
+  - ontology.py: Entity types and relationship constraints  
+  - lightrag_prompts.py: Ontology-guided extraction prompts
+  - ontology_validation.py: Post-processing validation
+  - lightrag_integration.py: Path B initialization
+- agents/: PydanticAI structured agents for Shipley methodology
+- models/: Pydantic models defining RFP data structures
 - api/: FastAPI routes for RFP analysis endpoints
 - utils/: Logging, performance monitoring, and utilities
 
-This system combines the power of knowledge graphs (LightRAG) with structured
-AI agents (PydanticAI) to provide comprehensive RFP analysis capabilities.
+This system injects government contracting ontology into LightRAG's extraction engine,
+combining knowledge graphs with structured AI agents for comprehensive RFP analysis.
 """
 
-# Core LightRAG integration
+# Core ontology components (Phase 2+3)
 from .core import (
-    ShipleyRFPChunker, rfp_aware_chunking_func,
-    ContextualChunk, RFPSection, RFPSubsection
+    EntityType,
+    RelationshipType,
+    VALID_RELATIONSHIPS,
+    create_ontology_modified_lightrag,
+    get_government_contracting_entity_types,
 )
 
 # Structured AI agents
@@ -33,15 +42,14 @@ from .models import (
 # Utilities
 from .utils import setup_logging, get_monitor
 
-__version__ = "2.0.0"
+__version__ = "3.0.0"  # Phase 3: DELIVERABLE entity added
 __all__ = [
-    # Core components
-    'RFPAwareLightRAG',
-    'ShipleyRFPChunker', 
-    'EnhancedRFPProcessor',
-    'ContextualChunk',
-    'RFPSection',
-    'RFPSubsection',
+    # Core ontology (Phase 2+3)
+    'EntityType',
+    'RelationshipType',
+    'VALID_RELATIONSHIPS',
+    'create_ontology_modified_lightrag',
+    'get_government_contracting_entity_types',
     
     # AI agents
     'RFPAnalysisAgents',

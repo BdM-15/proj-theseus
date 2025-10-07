@@ -1,25 +1,27 @@
 [project]
 name = "govcon-capture-vibe"
-version = "0.1.0"
-description = "RFP Analysis Tool using LightRAG and PydanticAI for structured requirement extraction"
+version = "0.3.0"
+description = "Cloud-optimized government contracting RFP analysis using RAG-Anything + LightRAG with xAI Grok"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "lightrag-hku[api]>=1.4.9",
-    "pydantic-ai>=0.0.14",
-    "ollama>=0.6.0",
-    "openpyxl>=3.1.5",
-    "pypdf2>=3.0.0",
-    "pypdf>=4.0.0",
-    "python-docx>=1.2.0",
-    "python-pptx>=0.6.0",
-    "streamlit>=1.50.0",
-    "python-dotenv>=1.0.0",
-    "pydantic>=2.0.0",
-    "pandas>=2.3.2",
-    "nest-asyncio>=1.6.0",
-    "tiktoken>=0.11.0",
-    "regex>=2025.9.18",
+    # Core RAG functionality (includes lightrag-hku, MinerU, and document parsers)
+    "raganything[all]>=1.2.8",
+    
+    # Cloud LLM access (xAI Grok via OpenAI-compatible API)
+    "openai>=1.0.0",
+    
+    # Server framework
     "fastapi>=0.118.0",
     "uvicorn>=0.37.0",
+    
+    # Configuration management
+    "python-dotenv>=1.0.0",
 ]
+
+# Note: raganything[all] bundles the following dependencies:
+# - lightrag-hku (knowledge graph + WebUI)
+# - MinerU (multimodal document parsing)
+# - pypdf, python-docx, python-pptx, openpyxl (document parsers)
+# - pydantic, tiktoken, nest-asyncio (utilities)
+# - ollama (local LLM support)
