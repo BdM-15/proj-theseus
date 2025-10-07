@@ -274,24 +274,65 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
         *   `entity_name`: The name of the entity. If the entity name is case-insensitive, capitalize the first letter of each significant word (title case). Ensure **consistent naming** across the entire extraction process.
         *   `entity_type`: Categorize the entity using one of the following types: `{entity_types}`. 
             
-            **CRITICAL - Entity Type Format Rules:**
-            ✅ CORRECT: Output ONLY the plain entity type name (e.g., "CONCEPT", "CLAUSE", "DOCUMENT")
-            ❌ WRONG: Do NOT add any special characters before or after the type
-            ❌ WRONG: "#/>CONCEPT" - NO hash or angle brackets
-            ❌ WRONG: "#>|DOCUMENT" - NO hash, angle bracket, or pipe
-            ❌ WRONG: "#|CLAUSE" - NO hash or pipe
-            ❌ WRONG: "<|CONCEPT|>" - NO angle brackets or pipes
-            ❌ WRONG: "concept" - Use UPPERCASE as specified in entity_types list
+            ═══════════════════════════════════════════════════════════════════════════════
+            ⚠️  CRITICAL - Entity Type Format Rules (READ CAREFULLY):
+            ═══════════════════════════════════════════════════════════════════════════════
             
-            **Valid Examples:** ANNEX, CLAUSE, REQUIREMENT, DOCUMENT, CONCEPT, SECTION
+            ✅ CORRECT FORMAT:
+               Output ONLY the plain entity type name exactly as shown in {entity_types}
+               Example: ANNEX
+               Example: CLAUSE
+               Example: REQUIREMENT
+               Example: DOCUMENT
+               Example: CONCEPT
+               Example: SECTION
+            
+            ❌ WRONG FORMATS (DO NOT USE ANY OF THESE):
+               ❌ "#/>CONCEPT"      → NEVER add hash (#) or angle brackets (< >)
+               ❌ "#>|DOCUMENT"     → NEVER add hash (#), angle bracket (>), or pipe (|)
+               ❌ "#|CLAUSE"        → NEVER add hash (#) or pipe (|) before type
+               ❌ "<|CONCEPT|>"     → NEVER add angle brackets or pipes around type
+               ❌ "CLAUSE#|"        → NEVER add special characters AFTER the type
+               ❌ " ANNEX "         → NEVER add spaces before or after the type
+               ❌ "concept"         → ALWAYS use UPPERCASE as specified in {entity_types}
+            
+            ═══════════════════════════════════════════════════════════════════════════════
+            ✅ CORRECT EXAMPLE (FULL LINE):
+            entity{tuple_delimiter}Annex 17 Transportation{tuple_delimiter}ANNEX{tuple_delimiter}Annex 17 Transportation addresses performance methodology for transportation.
+            
+            ❌ WRONG EXAMPLE (FULL LINE):
+            entity{tuple_delimiter}Veteran-Owned Small Business{tuple_delimiter}#/>CONCEPT{tuple_delimiter}A business owned by veterans.
+            
+            ✅ CORRECTED VERSION:
+            entity{tuple_delimiter}Veteran-Owned Small Business{tuple_delimiter}CONCEPT{tuple_delimiter}A business owned by veterans.
+            ═══════════════════════════════════════════════════════════════════════════════
             
             If none of the provided entity types apply, classify it as `OTHER`.
         *   `entity_description`: Provide a concise yet comprehensive description of the entity's attributes and activities, based *solely* on the information present in the input text.
     *   **Output Format - Entities:** Output a total of 4 fields for each entity, delimited by `{tuple_delimiter}`, on a single line. The first field *must* be the literal string `entity`.
-    *   Format: `entity{tuple_delimiter}entity_name{tuple_delimiter}entity_type{tuple_delimiter}entity_description`
-    *   **Correct Example:** `entity{tuple_delimiter}Annex 17 Transportation{tuple_delimiter}ANNEX{tuple_delimiter}Annex 17 Transportation addresses performance methodology for transportation.`
-    *   **WRONG Example:** `entity{tuple_delimiter}Veteran-Owned Small Business{tuple_delimiter}#/>CONCEPT{tuple_delimiter}A business owned by veterans.`
-    *   **Corrected:** `entity{tuple_delimiter}Veteran-Owned Small Business{tuple_delimiter}CONCEPT{tuple_delimiter}A business owned by veterans.`
+    
+    ═══════════════════════════════════════════════════════════════════════════════
+    📋 ENTITY OUTPUT FORMAT (EXACT TEMPLATE):
+    ═══════════════════════════════════════════════════════════════════════════════
+    
+    entity{tuple_delimiter}[ENTITY_NAME]{tuple_delimiter}[ENTITY_TYPE]{tuple_delimiter}[DESCRIPTION]
+    
+    Where:
+    - [ENTITY_NAME] = Name with consistent capitalization
+    - [ENTITY_TYPE] = PLAIN UPPERCASE TYPE from {entity_types} (NO special characters!)
+    - [DESCRIPTION] = Concise description from input text
+    
+    ✅ CORRECT EXAMPLES:
+    entity{tuple_delimiter}Annex 17 Transportation{tuple_delimiter}ANNEX{tuple_delimiter}Annex 17 Transportation addresses performance methodology for transportation.
+    entity{tuple_delimiter}Veteran-Owned Small Business{tuple_delimiter}CONCEPT{tuple_delimiter}A business owned by veterans.
+    entity{tuple_delimiter}FAR 52.212-1{tuple_delimiter}CLAUSE{tuple_delimiter}Instructions to Offerors—Commercial Products and Commercial Services.
+    
+    ❌ WRONG EXAMPLES (LEARN FROM THESE MISTAKES):
+    entity{tuple_delimiter}Veteran-Owned Small Business{tuple_delimiter}#/>CONCEPT{tuple_delimiter}A business owned by veterans.
+    entity{tuple_delimiter}FAR 52.212-1{tuple_delimiter}#>|CLAUSE{tuple_delimiter}Instructions to Offerors.
+    entity{tuple_delimiter}Section J{tuple_delimiter}#|SECTION{tuple_delimiter}List of attachments.
+    
+    ═══════════════════════════════════════════════════════════════════════════════
 
 2.  **Relationship Extraction & Output:**
     *   **Identification:** Identify direct, clearly stated, and meaningful relationships between previously extracted entities.
@@ -307,8 +348,21 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
 
 3.  **Delimiter Usage Protocol:**
     *   The `{tuple_delimiter}` is a complete, atomic marker and **must not be filled with content**. It serves strictly as a field separator.
-    *   **Incorrect Example:** `entity{tuple_delimiter}Tokyo<|location|>Tokyo is the capital of Japan.`
-    *   **Correct Example:** `entity{tuple_delimiter}Tokyo{tuple_delimiter}LOCATION{tuple_delimiter}Tokyo is the capital of Japan.`
+    
+    ═══════════════════════════════════════════════════════════════════════════════
+    🔧 DELIMITER RULES:
+    ═══════════════════════════════════════════════════════════════════════════════
+    
+    ✅ CORRECT: Use {tuple_delimiter} EXACTLY as shown, with NO modifications
+    ❌ WRONG: Do NOT add content inside the delimiter
+    ❌ WRONG: Do NOT modify the delimiter characters
+    ❌ WRONG: Do NOT use alternative delimiters
+    
+    Examples:
+    ❌ WRONG: entity{tuple_delimiter}Tokyo<|location|>Tokyo is the capital of Japan.
+    ✅ CORRECT: entity{tuple_delimiter}Tokyo{tuple_delimiter}LOCATION{tuple_delimiter}Tokyo is the capital of Japan.
+    
+    ═══════════════════════════════════════════════════════════════════════════════
 
 4.  **Relationship Direction & Duplication:**
     *   Treat all relationships as **undirected** unless explicitly stated otherwise. Swapping the source and target entities for an undirected relationship does not constitute a new relationship.

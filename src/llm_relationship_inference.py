@@ -176,17 +176,30 @@ Determine which source entities have meaningful relationships with which target 
    - MEDIUM (0.5-0.8): Strong semantic similarity or standard structure
    - LOW (0.3-0.5): Weak semantic overlap or tentative connection
 
-OUTPUT FORMAT:
+═══════════════════════════════════════════════════════════════════════════════
+📋 OUTPUT FORMAT (STRICT JSON - READ CAREFULLY):
+═══════════════════════════════════════════════════════════════════════════════
+
 Return a JSON array of relationship objects. Each relationship must have:
-- source_id: ID of source entity
-- target_id: ID of target entity
+- source_id: ID of source entity (string, exact match from SOURCE ENTITIES)
+- target_id: ID of target entity (string, exact match from TARGET ENTITIES)
 - relationship_type: One of [CHILD_OF, GUIDES, EVALUATED_BY, REFERENCES, CONTAINS, RELATED_TO]
 - confidence: Float 0.0-1.0 indicating relationship strength
 - reasoning: Brief explanation (1-2 sentences) of why this relationship exists
 
-**IMPORTANT**: Only output relationships with confidence >= 0.3. Omit weak or uncertain connections.
+**CRITICAL FORMATTING RULES:**
+✅ Output ONLY valid JSON - no markdown, no comments, no extra text
+✅ Use proper JSON string escaping for quotes and special characters
+✅ Ensure all keys are strings with double quotes
+✅ Only include relationships with confidence >= 0.3
+❌ Do NOT wrap output in markdown code blocks (```json ... ```)
+❌ Do NOT add explanatory text before or after the JSON
+❌ Do NOT use single quotes - JSON requires double quotes
+❌ Do NOT include relationships below 0.3 confidence threshold
 
-Example output:
+═══════════════════════════════════════════════════════════════════════════════
+✅ CORRECT EXAMPLE OUTPUT:
+═══════════════════════════════════════════════════════════════════════════════
 [
   {{
     "source_id": "node_123",
@@ -204,7 +217,7 @@ Example output:
   }}
 ]
 
-OUTPUT ONLY THE JSON ARRAY, NO OTHER TEXT:"""
+OUTPUT ONLY THE JSON ARRAY ABOVE, NO OTHER TEXT:"""
     
     return prompt
 
