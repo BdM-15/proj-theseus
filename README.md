@@ -618,9 +618,10 @@ JSON array where each item looks like:
 
 ### **Future Additions**
 
-- Read Excel for basis-of-estimate style data
-- Reuse library of past answers
-- Compare proposals against RFPs to flag misses
+- **Multi-User Authentication**: JWT-based login with role-based access (admin, user, guest) for team deployments and production security
+- **Read Excel for basis-of-estimate style data**
+- **Reuse library of past answers**
+- **Compare proposals against RFPs to flag misses**
 
 ## 📝 Prompt Templates & Examples
 
@@ -828,14 +829,32 @@ JSON array where each item looks like:
 - **Evaluation Criteria Analysis**: Fast scoring weight identification across large RFPs
 - **Win Theme Engine**: Real-time gap analysis and competitive positioning
 
-### **Phase 8: Proposal Automation** 📋 **PLANNED**
+### **Phase 8: Multi-User Authentication & Security** 📋 **PLANNED**
+
+- **JWT-Based Authentication**: Secure login with username/password credentials
+- **Role-Based Access Control**: Admin, user, and guest roles with different permissions
+- **Token Management**: Configurable expiration, automatic refresh, guest mode support
+- **Team Collaboration**: Multi-user support for capture teams and proposal centers
+- **Production Security**: Protect sensitive RFP analysis and proposal intelligence
+- **Simple Configuration**: Enable via `.env` with no code changes required
+
+**Use Cases:**
+
+- **Local Development**: Guest mode (current) - no authentication required
+- **Team Deployment**: Multiple analysts with shared knowledge base
+- **Client Delivery**: Secure access to RFP analysis for external stakeholders
+- **Production**: Enterprise-grade security for proprietary proposal data
+
+**Infrastructure**: Built on LightRAG's authentication module with PyJWT (already installed)
+
+### **Phase 9: Proposal Automation** 📋 **PLANNED**
 
 - **Automated Proposal Outlines**: Structure optimization based on evaluation criteria
 - **Compliance Checking**: Draft content validation against extracted requirements
 - **Content Recommendation**: AI-driven proposal suggestions (local for proprietary content)
 - **Integration APIs**: Connections to existing proposal tools (Shipley, Pragmatic)
 
-### **Phase 9: Enterprise Intelligence** 📋 **PLANNED**
+### **Phase 10: Enterprise Intelligence** 📋 **PLANNED**
 
 - **Multi-RFP Analysis**: Pattern recognition across historical solicitations
 - **Competitive Intelligence**: Evaluation criteria trends and agency preferences
@@ -985,12 +1004,14 @@ code .env .env.example
 ```
 
 **Why Manual Process?**
+
 - `.env` is gitignored (security best practice - contains real API keys)
 - `.env.example` is versioned (template with fake values)
 - When branches merge, `.env.example` updates but your `.env` doesn't
 - You must manually sync new variables to your `.env` file
 
 **Common Variables to Watch:**
+
 - `LLM_BINDING_API_KEY` - xAI Grok API key (Branch 003)
 - `EMBEDDING_BINDING_API_KEY` - OpenAI API key (Branch 003)
 - `CHUNK_SIZE` - May change between branches
