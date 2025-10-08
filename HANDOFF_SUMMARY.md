@@ -1,189 +1,82 @@
-# 🚀 Quick Handoff Summary - Branch 004 Code Optimization
+# 🚀 Quick Handoff Summary — Branch 004 (Performance-Based Refactoring)
 
-**Date**: October 7, 2025  
-**Current Branch**: `004-code-optimization`  
-**Status**: ✅ Planning complete, ready for implementation
-
----
-
-## 📋 What You Need to Know
-
-### **Mission**
-Refactor Branch 003's monolithic codebase (789-line and 881-line files) into clean modular architecture before PostgreSQL integration.
-
-### **Key Documents**
-1. **📖 Full Implementation Plan**: `docs/BRANCH_004_CODE_OPTIMIZATION.md` (832 lines)
-   - 8 phases with detailed tasks
-   - Target architecture diagrams
-   - File mapping (old → new structure)
-   - Success criteria and timeline
-
-2. **📊 Project Context**: `README.md`
-   - Overall project vision
-   - Branch history (001, 002, 003 complete)
-   - Technology stack
-
-3. **🎯 Copilot Instructions**: `.github/copilot-instructions.md`
-   - Virtual environment rules (activate before Python!)
-   - Workspace tools only (no PowerShell for files)
+Date: October 7, 2025
+Branch: 004-code-optimization
+Status: Planning complete (non‑prescriptive charter), ready for baseline + iterations
 
 ---
 
-## 🎯 Quick Start for New Conversation
+## What matters in this branch
 
-### **Step 1: Verify Branch**
+We will optimize the codebase under strict, non‑prescriptive constraints. No architecture is mandated in advance. The only source of truth for requirements is the charter:
+
+- Document: docs/BRANCH_004_CODE_OPTIMIZATION.md (Performance‑Based Refactoring Charter)
+- Principle: No code bloat, no vestige patterns, no uniqueness/complexity for its own sake
+- Behavior: Preserve external behavior; keep runtime non‑regression
+
+Rely on upstream libraries instead of reinventing:
+- LightRAG: https://github.com/HKUDS/LightRAG
+- RAG‑Anything: https://github.com/HKUDS/RAG-Anything/tree/main
+
+Do not introduce invasive changes that diverge from these libraries unless it clearly reduces net code and complexity and keeps behavior intact.
+
+---
+
+## Non‑prescriptive constraints (from the charter)
+
+- Net LOC (src/ + app entrypoint) ≤ baseline; target negative delta
+- No increases in startup time, steady‑state memory, or p95 latency on critical endpoints
+- No breaking API/output changes
+- Avoid new heavy dependencies unless they reduce net code and maintenance
+
+---
+
+## Quick start for the next conversation
+
+1) Verify branch
 ```powershell
-git branch  # Should show: * 004-code-optimization
+git branch  # should show: * 004-code-optimization
 ```
 
-### **Step 2: Read Planning Document**
-Open and read: `docs/BRANCH_004_CODE_OPTIMIZATION.md`
+2) Read the charter
+- Open docs/BRANCH_004_CODE_OPTIMIZATION.md
 
-### **Step 3: Start Phase 1**
-Ask: *"I'm ready to start Branch 004 Phase 1. Should I analyze `src/raganything_server.py` structure first?"*
+3) Establish a tiny baseline (keep it simple)
+- Count LOC for src/ and app entrypoint
+- Start the app; record time‑to‑ready and steady RSS
+- Hit /health and one representative query; record p95 (very small sample OK for baseline)
 
----
+4) Propose the first minimal change
+- Example: delete obvious dead code, collapse redundant helpers, remove unused imports
+- State expected effect (e.g., “-150 LOC, no runtime impact”)
 
-## 🗂️ Current State
+5) Implement → re‑measure → commit (atomic)
+- If any metric regresses, reduce scope or revert
 
-### **What's Done**
-- ✅ Branch 003 merged to main (PROGRAM entities, Phase 6.1 LLM inference)
-- ✅ Documentation cleanup completed
-- ✅ Branch 004 created from clean main
-- ✅ Comprehensive refactoring plan created
-- ✅ Planning document committed and pushed
-
-### **What's Next**
-- ⏳ Phase 1: Assessment (analyze current files)
-- ⏳ Phase 2: Core infrastructure (config, storage interface)
-- ⏳ Phase 3: Break up large files (789 + 881 lines)
-- ⏳ Phase 4-8: Models, API, utils, testing, documentation
+First question to ask in the new conversation:
+“Baseline captured. Here are the numbers (LOC/startup/p95/memory). Proposing the smallest change X with expected impact Y. Proceed?”
 
 ---
 
-## 🎯 Target Architecture (Quick View)
+## Critical rules
 
-```
-src/
-├── core/           # LightRAG config, ontology, storage interface
-├── extractors/     # UCF detector, program extractor, requirements
-├── inference/      # Relationship engine, L↔M mapper, validators
-├── prompts/        # Centralized prompt templates
-├── api/            # FastAPI app + route modules
-├── models/         # Pydantic data models
-└── utils/          # Logging, performance, validation
-```
-
-**Goal**: No file >400 lines, clear separation of concerns, PostgreSQL-ready.
-
----
-
-## 📊 Key Metrics
-
-### **Current (Branch 003)**
-- `src/raganything_server.py`: 789 lines ❌
-- `src/llm_relationship_inference.py`: 881 lines ❌
-- Flat structure, mixed responsibilities
-
-### **Target (Branch 004)**
-- Largest file: <400 lines ✅
-- Average module: <200 lines ✅
-- Clean layered architecture ✅
-- Storage abstraction ready ✅
-
----
-
-## 🚨 Critical Rules
-
-### **1. Virtual Environment**
-**ALWAYS activate before Python commands**:
+- Activate venv before Python commands
 ```powershell
 .venv\Scripts\Activate.ps1
 ```
 
-### **2. File Operations**
-**Use workspace tools, NOT PowerShell**:
-- ✅ `create_file`, `read_file`, `replace_string_in_file`
-- ❌ `New-Item`, `Get-Content`, `Set-Content`
-
-### **3. This Branch Scope**
-**DO**:
-- ✅ Refactor existing code
-- ✅ Break up large files
-- ✅ Add abstractions (storage interface)
-- ✅ Organize into modules
-
-**DO NOT**:
-- ❌ Implement PostgreSQL (that's Branch 005)
-- ❌ Add new features
-- ❌ Change functionality
+- Use workspace tools for file ops (not PowerShell)
+- Prefer deletion and simplification over new abstractions
+- Maximize reuse of LightRAG / RAG‑Anything; avoid uniqueness/complexity
 
 ---
 
-## 📞 Quick Reference Commands
+## Deliverables (lightweight)
 
-```powershell
-# Verify branch
-git branch
-
-# Check current state
-git status
-
-# List src/ files
-ls src/
-
-# Read planning document
-# Use read_file tool: docs/BRANCH_004_CODE_OPTIMIZATION.md
-
-# Start refactoring
-# Follow Phase 1 tasks in planning document
-```
+- Short commit messages with impact notes (e.g., “-220 LOC; same p95 /health”)
+- Optional tiny scripts for measurements (kept minimal)
+- Brief PR summary comparing baseline vs final metrics
 
 ---
 
-## 🎓 Estimated Timeline
-
-| Phase | Time | What |
-|-------|------|------|
-| Phase 1 | 30 min | Assessment & planning |
-| Phase 2 | 45 min | Core infrastructure |
-| Phase 3 | 60 min | Break up large files |
-| Phase 4 | 30 min | Data models |
-| Phase 5 | 45 min | API layer |
-| Phase 6 | 30 min | Utilities |
-| Phase 7 | 30 min | Testing |
-| Phase 8 | 30 min | Documentation |
-| **Total** | **4.5 hrs** | Full refactoring |
-
----
-
-## 🎯 Success Criteria
-
-- [ ] No file >400 lines
-- [ ] All modules <200 lines average
-- [ ] Clear separation: API ≠ Business Logic ≠ Data
-- [ ] Storage interface abstracted (PostgreSQL-ready)
-- [ ] All Branch 003 functionality preserved
-- [ ] Tests pass, server starts, endpoints work
-
----
-
-## 📚 After Branch 004 Completion
-
-1. Merge to main
-2. Create Branch 005: `005-postgresql-integration`
-3. Implement `PostgreSQLStorage` (already abstracted!)
-4. PostgreSQL integration becomes 2-hour task (vs 4+ without refactoring)
-
----
-
-## 💡 First Question to Ask
-
-*"I've read the handoff summary and Branch 004 planning document. I'm ready to start Phase 1 assessment. Should I begin by analyzing the structure of `src/raganything_server.py` to understand how to break it into route modules?"*
-
----
-
-**Branch**: `004-code-optimization`  
-**Document**: `docs/BRANCH_004_CODE_OPTIMIZATION.md` (full plan)  
-**Status**: Ready to start implementation  
-**Next**: Phase 1 - Assessment & Planning
+This summary intentionally avoids prescribing structure or modules. The implementing agent should choose the most effective minimal path to meet the charter’s constraints while leveraging upstream libraries and avoiding invasiveness.
