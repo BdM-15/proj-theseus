@@ -1286,6 +1286,78 @@ python app.py
 └─────────────────────────────────────────┘
 ```
 
+---
+
+## 📐 **Module Architecture & Dependencies** (Branch 004)
+
+### **Dependency Hierarchy**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                Module Dependency Flow (Bottom-Up)           │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Layer 1: core/ (Foundation)                                │
+│     └── prompt_loader.py - External prompt loading         │
+│                                                             │
+│  Layer 2: ingestion/ + inference/ (Processing)              │
+│     ├── ingestion/detector.py - UCF format detection       │
+│     ├── ingestion/processor.py - Section extraction        │
+│     ├── inference/graph_io.py - GraphML I/O                │
+│     └── inference/engine.py - LLM inference algorithms     │
+│     Dependencies: core/                                     │
+│                                                             │
+│  Layer 3: server/ (Orchestration)                           │
+│     ├── config.py - Environment configuration              │
+│     ├── initialization.py - RAGAnything setup              │
+│     └── routes.py - FastAPI endpoints                      │
+│     Dependencies: core/, ingestion/, inference/            │
+│                                                             │
+│  Layer 4: Entry Points                                      │
+│     └── app.py + raganything_server.py                     │
+│     Dependencies: server/                                   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+
+Visual Flow:
+
+    core (prompt loading, utilities)
+      ↓
+    ┌───────────┬────────────┐
+    ↓           ↓            ↓
+  ingestion  inference  (independent)
+    ↓           ↓
+    └───────────┴────────────┘
+              ↓
+            server (orchestration)
+              ↓
+    raganything_server + app (entry)
+```
+
+**Import Rules:**
+- ✅ **core** → imports nothing (foundation layer)
+- ✅ **ingestion/inference** → can import `core/`
+- ✅ **server** → can import `core/`, `ingestion/`, `inference/`
+- ❌ **NO circular imports** (enforced by structure)
+- ❌ **NO horizontal imports** (ingestion ↔ inference)
+
+**5 Core Inference Algorithms** (in `inference/engine.py`):
+1. **Document Hierarchy**: ANNEX/CLAUSE → SECTION (CHILD_OF)
+2. **Section L↔M Mapping**: SUBMISSION_INSTRUCTION → EVALUATION_FACTOR (GUIDES)
+3. **Attachment Linking**: ANNEX → SECTION (ATTACHMENT_OF)
+4. **Clause Clustering**: FAR/DFARS → SECTION (CHILD_OF)
+5. **Requirement Evaluation**: REQUIREMENT → EVALUATION_FACTOR (EVALUATED_BY)
+
+**Module Responsibilities:**
+- **core/**: Shared utilities (prompts, helpers)
+- **ingestion/**: UCF detection and section processing
+- **inference/**: LLM-powered knowledge graph enhancement
+- **server/**: Configuration, initialization, FastAPI routes
+
+_For complete architecture details, see `src/__init__.py` docstring_
+
+---
+
 ### **FUTURE RFP Analysis API Extensions**
 
 #### **Requirements Extraction** (`POST /rfp/extract-requirements`)
