@@ -15,6 +15,7 @@ We will optimize the codebase under strict, non‑prescriptive constraints. No a
 - Behavior: Preserve external behavior; keep runtime non‑regression
 
 Rely on upstream libraries instead of reinventing:
+
 - LightRAG: https://github.com/HKUDS/LightRAG
 - RAG‑Anything: https://github.com/HKUDS/RAG-Anything/tree/main
 
@@ -33,24 +34,29 @@ Do not introduce invasive changes that diverge from these libraries unless it cl
 
 ## Quick start for the next conversation
 
-1) Verify branch
+1. Verify branch
+
 ```powershell
 git branch  # should show: * 004-code-optimization
 ```
 
-2) Read the charter
+2. Read the charter
+
 - Open docs/BRANCH_004_CODE_OPTIMIZATION.md
 
-3) Establish a tiny baseline (keep it simple)
+3. Establish a tiny baseline (keep it simple)
+
 - Count LOC for src/ and app entrypoint
 - Start the app; record time‑to‑ready and steady RSS
 - Hit /health and one representative query; record p95 (very small sample OK for baseline)
 
-4) Propose the first minimal change
+4. Propose the first minimal change
+
 - Example: delete obvious dead code, collapse redundant helpers, remove unused imports
 - State expected effect (e.g., “-150 LOC, no runtime impact”)
 
-5) Implement → re‑measure → commit (atomic)
+5. Implement → re‑measure → commit (atomic)
+
 - If any metric regresses, reduce scope or revert
 
 First question to ask in the new conversation:
@@ -61,6 +67,7 @@ First question to ask in the new conversation:
 ## Critical rules
 
 - Activate venv before Python commands
+
 ```powershell
 .venv\Scripts\Activate.ps1
 ```
