@@ -25,7 +25,7 @@ from fastapi.responses import JSONResponse
 from lightrag.api.config import global_args
 
 from src.ingestion import detect_ucf_format, prepare_ucf_sections_for_llm
-from src.llm_relationship_inference import (
+from src.inference import (
     parse_graphml,
     infer_all_relationships,
     save_relationships_to_graphml,
