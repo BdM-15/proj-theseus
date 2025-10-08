@@ -24,8 +24,7 @@ from fastapi import UploadFile, File
 from fastapi.responses import JSONResponse
 from lightrag.api.config import global_args
 
-from src.ucf_detector import detect_ucf_format
-from src.ucf_section_processor import prepare_ucf_sections_for_llm
+from src.ingestion import detect_ucf_format, prepare_ucf_sections_for_llm
 from src.llm_relationship_inference import (
     parse_graphml,
     infer_all_relationships,

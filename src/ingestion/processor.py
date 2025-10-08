@@ -1,7 +1,7 @@
 """
-UCF Section-Aware LLM Extraction Processor
+UCF Section-Aware Processor
 
-This module enhances LLM extraction for Uniform Contract Format (UCF) documents by:
+Enhances LLM extraction for Uniform Contract Format (UCF) documents by:
 1. Using regex to detect section boundaries (Section L, M, C, etc.)
 2. Injecting section-aware context into LLM extraction prompts
 3. Letting LLM extract ALL entities (not regex) with better accuracy
@@ -18,20 +18,19 @@ Architecture:
     - LLM extracts from full document without section context
     - Same entity types, same metadata extraction
 
-Reference:
-- docs/CAPTURE_INTELLIGENCE_PATTERNS.md (8 requirement types, 4 criticality levels)
-- src/phase6_prompts.py (ENTITY_DETECTION_PATTERNS, full extraction guidance)
+Reference: docs/CAPTURE_INTELLIGENCE_PATTERNS.md
 """
 
 import re
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple
 from dataclasses import dataclass
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-# Section semantic type mapping (from phase6_prompts.py)
+# Section semantic type mapping
+# Maps UCF section names to semantic types and expected entities
 SECTION_SEMANTIC_MAPPING = {
     "Section A": {
         "semantic_type": "SOLICITATION_FORM",
@@ -83,23 +82,38 @@ Extract as STATEMENT_OF_WORK regardless of which format customer uses."""
 
 @dataclass
 class UCFSection:
-    """Section metadata for section-aware LLM extraction"""
-    section_name: str  # "Section L", "Section M", "Section C"
-    section_text: str  # Raw text content
-    char_start: int  # Character offset start
-    char_end: int  # Character offset end
-    semantic_type: str  # "SUBMISSION_INSTRUCTIONS", "EVALUATION_CRITERIA", etc.
-    expected_entities: List[str]  # Entity types likely in this section
-    extraction_context: str  # Enhanced prompt context for LLM
+    """Section metadata for section-aware LLM extraction
+    
+    Attributes:
+        section_name: Section identifier (e.g., "Section L", "Section M")
+        section_text: Raw text content of the section
+        char_start: Character offset start position
+        char_end: Character offset end position
+        semantic_type: Semantic classification (e.g., "SUBMISSION_INSTRUCTIONS")
+        expected_entities: Entity types likely found in this section
+        extraction_context: Enhanced prompt context for LLM guidance
+    """
+    section_name: str
+    section_text: str
+    char_start: int
+    char_end: int
+    semantic_type: str
+    expected_entities: List[str]
+    extraction_context: str
 
 
 def extract_section_boundaries(document_text: str) -> Dict[str, Tuple[int, int]]:
     """
     Use regex to detect section boundaries in UCF documents.
     
+    Searches for multiple section header patterns and determines
+    boundaries by finding the start of the next section.
+    
     Returns:
         Dict mapping section names to (start_char, end_char) tuples
-        Example: {"Section L": (5000, 8000), "Section M": (8001, 12000)}
+        
+    Example:
+        {"Section L": (5000, 8000), "Section M": (8001, 12000)}
     """
     # Standard UCF section patterns
     section_patterns = [
@@ -110,6 +124,7 @@ def extract_section_boundaries(document_text: str) -> Dict[str, Tuple[int, int]]
     
     section_markers = []
     
+    # Find all section markers
     for pattern, pattern_type in section_patterns:
         for match in re.finditer(pattern, document_text, re.IGNORECASE):
             section_letter = match.group(1).upper()
@@ -146,7 +161,16 @@ def extract_section_boundaries(document_text: str) -> Dict[str, Tuple[int, int]]
 
 
 def get_section_text(document_text: str, section_name: str, boundaries: Dict[str, Tuple[int, int]]) -> str:
-    """Extract text for a specific section"""
+    """Extract text for a specific section using pre-computed boundaries
+    
+    Args:
+        document_text: Full document text
+        section_name: Section to extract (e.g., "Section L")
+        boundaries: Pre-computed section boundaries from extract_section_boundaries()
+        
+    Returns:
+        Section text or empty string if not found
+    """
     if section_name not in boundaries:
         return ""
     
@@ -159,7 +183,16 @@ def prepare_section_for_llm(section_name: str, section_text: str, char_start: in
     Prepare a section with enhanced context for LLM extraction.
     
     This does NOT extract entities - it just prepares the context.
-    The LLM will do all entity extraction using phase6_prompts.py guidance.
+    The LLM will do all entity extraction using the full 12-type ontology.
+    
+    Args:
+        section_name: Section identifier
+        section_text: Raw section content
+        char_start: Start character offset
+        char_end: End character offset
+        
+    Returns:
+        UCFSection with extraction context for LLM guidance
     """
     section_info = SECTION_SEMANTIC_MAPPING.get(section_name, {
         "semantic_type": "UNKNOWN",
@@ -205,9 +238,14 @@ def prepare_ucf_sections_for_llm(document_text: str, detected_sections: List[str
     """
     Main function: Detect section boundaries and prepare sections for LLM extraction.
     
+    Workflow:
+    1. Use regex to detect section boundaries (ONLY structural detection)
+    2. For each detected section, extract text and prepare context
+    3. Return list of UCFSection objects with enhanced LLM guidance
+    
     Args:
         document_text: Full document text
-        detected_sections: List of section names from ucf_detector.py
+        detected_sections: List of section names from detector.py
     
     Returns:
         List of UCFSection objects ready for LLM extraction with enhanced context
@@ -238,6 +276,13 @@ def get_section_aware_extraction_prompt(section: UCFSection, base_prompt: str) -
     Enhance base extraction prompt with section-aware context.
     
     This is used to inject section context into LightRAG's extraction prompts.
+    
+    Args:
+        section: UCFSection with context metadata
+        base_prompt: Original LightRAG extraction prompt
+        
+    Returns:
+        Enhanced prompt with section-specific guidance
     """
     enhanced_prompt = f"""
 {section.extraction_context}
@@ -253,43 +298,3 @@ SECTION TEXT ({section.section_name}):
 """.strip()
     
     return enhanced_prompt
-
-
-# Example usage for integration
-if __name__ == "__main__":
-    # Example: Navy MBOS RFP processing
-    sample_text = """
-    Section L - Instructions to Offerors
-    
-    L.1 Proposal Format
-    Proposals shall be submitted in three volumes:
-    - Technical Volume: 25 pages maximum, 12pt Times New Roman
-    - Management Volume: 15 pages maximum
-    - Cost Volume: No page limit
-    
-    L.3.1 Technical Volume
-    Address all subfactors under Section M.2 Technical Approach.
-    
-    Section M - Evaluation Factors for Award
-    
-    M.1 Technical Approach (Most Important)
-    The Government will evaluate the offeror's understanding of requirements.
-    
-    M.1.1 Staffing Approach
-    Evaluate proposed staffing levels and qualifications.
-    
-    M.2 Past Performance (Significantly More Important than Price)
-    Relevant contract experience will be assessed.
-    """
-    
-    detected_sections = ["Section L", "Section M"]
-    sections = prepare_ucf_sections_for_llm(sample_text, detected_sections)
-    
-    for section in sections:
-        print(f"\n{'='*60}")
-        print(f"Section: {section.section_name}")
-        print(f"Semantic Type: {section.semantic_type}")
-        print(f"Expected Entities: {section.expected_entities}")
-        print(f"Chars: {section.char_start}-{section.char_end}")
-        print(f"\nExtraction Context Preview:")
-        print(section.extraction_context[:300] + "...")
