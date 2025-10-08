@@ -283,6 +283,171 @@ main (production only)
 
 ---
 
+## Code Simplification Vision (Post-MinerU)
+
+### The Ultimate Goal: Domain Knowledge Only
+
+**Current State**: ~1,190 lines total
+
+- 790 lines: Core domain logic (entity types, Phase 6.1 inference)
+- 400 lines: Document processing infrastructure (UCF detection, section extraction, chunking)
+
+**With MinerU Working**: ~790 lines (33% reduction)
+
+- **Keep**: Government contracting intelligence
+- **Remove**: Infrastructure that MinerU provides
+
+### What MinerU Makes Obsolete
+
+**1. UCF Detection (~200 lines)**
+
+```python
+# BEFORE: Manual regex pattern matching
+src/ingestion/detector.py
+- Pattern matching: "Section A", "Section B", etc.
+- Confidence scoring based on section count
+- Manual header/footer detection
+
+# AFTER: MinerU provides layout analysis
+parsed = mineru_output
+sections = parsed.layout.sections  # Computer vision detected!
+```
+
+**2. Section Extraction (~150 lines)**
+
+```python
+# BEFORE: Custom text parsing
+src/ingestion/processor.py
+- Manual section boundaries
+- Header preservation logic
+- Custom chunking by section
+
+# AFTER: MinerU JSON structure
+{
+  "sections": [
+    {"name": "Section A", "content": "...", "pages": [1, 2]},
+    {"name": "Section L", "content": "...", "pages": [45, 50]}
+  ]
+}
+```
+
+**3. Table Handling (~50 lines Phase 6.1 inference)**
+
+```python
+# BEFORE: Infer table relationships from text
+# Phase 6.1 uses LLM to guess table structure
+
+# AFTER: MinerU structured table data
+{
+  "tables": [
+    {
+      "cells": [[...], [...]],
+      "headers": [...],
+      "location": {"section": "Section M", "page": 48}
+    }
+  ]
+}
+# Direct mapping: Table → Section → Entity relationships!
+```
+
+### The Simplified Architecture
+
+**Future State** (after MinerU refactor):
+
+```
+User uploads RFP
+    ↓
+RAG-Anything (MinerU parser)
+    ├─ Layout detection (sections, headers, footers)
+    ├─ Table extraction (structured cells)
+    ├─ Image extraction (with captions)
+    └─ Equation parsing (LaTeX)
+    ↓
+Our Domain Logic (~790 lines):
+    ├─ Inject 12 government contracting entity types
+    ├─ Phase 6.1 semantic inference (L↔M, annex, clauses)
+    └─ xAI Grok cloud processing
+    ↓
+LightRAG Knowledge Graph
+```
+
+### Files That Can Be Removed
+
+**Conservative Estimate**: 400-500 lines
+
+- `src/ingestion/detector.py` - **DELETE** (MinerU does layout detection)
+- `src/ingestion/processor.py` - **DELETE** (MinerU provides structure)
+- Custom chunking logic - **SIMPLIFY** (use MinerU's page-aware chunks)
+- Table inference in Phase 6.1 - **REMOVE** (MinerU gives structured tables)
+
+**Keep All Domain Logic**:
+
+- ✅ 12 entity types (REQUIREMENT, CLAUSE, EVALUATION_FACTOR, etc.)
+- ✅ Phase 6.1 LLM relationship inference
+- ✅ Section L↔M mapping
+- ✅ Annex linkage (J-#### → parent sections)
+- ✅ Clause clustering (FAR/DFARS)
+- ✅ xAI Grok integration
+
+### Implementation Phases
+
+**Phase 1: Get MinerU Working** (Current sprint)
+
+- Download models
+- Validate extraction quality
+- Benchmark performance
+
+**Phase 2: Refactor to Use MinerU Output** (Next sprint)
+
+```python
+# New workflow:
+mineru_json = await rag_instance.parse(pdf_path)
+
+# MinerU already provides:
+sections = mineru_json["layout"]["sections"]  # No detection needed!
+tables = mineru_json["tables"]                # Structured data!
+images = mineru_json["images"]                # Extracted with captions!
+
+# We only add:
+entities = extract_govcon_entities(sections, tables)  # 12 entity types
+relationships = phase6_inference(entities)             # Semantic links
+```
+
+**Phase 3: Simplify Codebase** (Cleanup sprint)
+
+- Remove `src/ingestion/detector.py`
+- Remove `src/ingestion/processor.py`
+- Update Phase 6.1 to consume MinerU structure directly
+- Document ~400 line reduction
+
+### Success Metrics
+
+**Code Reduction**:
+
+- Current: ~1,190 lines
+- Target: ~790 lines (domain logic only)
+- Savings: 400 lines (33% reduction)
+
+**Quality Improvement**:
+
+- Before: Regex pattern matching (brittle, UCF-specific)
+- After: Computer vision layout analysis (robust, any format)
+
+**Maintainability**:
+
+- Before: Custom parsing logic for each document type
+- After: Leverage RAG-Anything's multimodal parsing, focus on domain intelligence
+
+### The Vision Statement
+
+> **"We should only write code that encodes government contracting knowledge. Everything else should come from libraries."**
+
+- ❌ Don't build: Document parsing, layout detection, table extraction
+- ✅ Do build: Entity types, relationship patterns, domain intelligence
+- 🎯 Result: Minimal, focused codebase that's 100% domain value
+
+---
+
 ## Outstanding Questions
 
 1. **HuggingFace Authentication**: Do MinerU models require auth token?
