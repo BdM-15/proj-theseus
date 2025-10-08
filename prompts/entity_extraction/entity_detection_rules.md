@@ -9,11 +9,13 @@
 ## Core Principle: Semantic-First Detection
 
 Traditional approach (FRAGILE):
+
 ```
 IF section_label == "Section L" → entity_type = "SECTION"
 ```
 
 Our approach (ADAPTIVE):
+
 ```
 IF contains_evaluation_criteria_language() → entity_type = "EVALUATION_FACTOR"
 section_origin = detect_section(context)  # Could be L, M, or custom
@@ -26,6 +28,7 @@ section_origin = detect_section(context)  # Could be L, M, or custom
 ## Entity Type 1: EVALUATION_FACTOR
 
 ### Content Signals
+
 - "will be evaluated"
 - "evaluation factor"
 - "adjectival rating"
@@ -34,22 +37,26 @@ section_origin = detect_section(context)  # Could be L, M, or custom
 - "significantly more important than price"
 
 ### Structural Patterns
+
 - **Hierarchy**: Factor 1 → Subfactor 1.1 → Subfactor 1.1.1
 - **Numbering**: M1, M2, M2.1, M2.1.1
 - **Ratings**: "Excellent", "Good", "Acceptable", "Marginal", "Unacceptable"
 
 ### Context Clues
+
 - Near relative importance statements
 - Point scores (100 points total)
 - Adjectival ratings
 - Tradeoff methodology descriptions
 
 ### Location
+
 - **Primary**: Section M (Evaluation Factors for Award)
 - **Alternate**: Section L (sometimes embedded)
 - **Non-standard**: "Selection Criteria", "Source Selection Plan"
 
 ### Metadata to Extract
+
 ```json
 {
   "factor_id": "M1" | "M2.1" | "M2.1.1",
@@ -69,11 +76,12 @@ section_origin = detect_section(context)  # Could be L, M, or custom
 ### Examples from Real RFPs
 
 **Example 1: Navy MBOS (Standard Format)**
+
 ```
 Factor 2: Maintenance Approach (Most Important)
 
-The Government will evaluate the offeror's understanding of and approach 
-to performing organic maintenance requirements. This factor has three 
+The Government will evaluate the offeror's understanding of and approach
+to performing organic maintenance requirements. This factor has three
 subfactors:
 
 2.1 Staffing Plan (Significantly More Important)
@@ -82,6 +90,7 @@ subfactors:
 ```
 
 **Extracted Entity**:
+
 ```json
 {
   "entity_name": "Factor 2: Maintenance Approach",
@@ -89,11 +98,16 @@ subfactors:
   "description": "Evaluation of offeror's maintenance approach including staffing, philosophy, and transition",
   "factor_id": "M2",
   "relative_importance": "Most Important",
-  "subfactors": ["M2.1 Staffing Plan", "M2.2 Maintenance Philosophy", "M2.3 Transition Plan"]
+  "subfactors": [
+    "M2.1 Staffing Plan",
+    "M2.2 Maintenance Philosophy",
+    "M2.3 Transition Plan"
+  ]
 }
 ```
 
 **Example 2: Task Order (Non-Standard Format)**
+
 ```
 Selection Criteria:
 
@@ -104,6 +118,7 @@ Technical Merit (100 points)
 ```
 
 **Extracted Entity**:
+
 ```json
 {
   "entity_name": "Technical Merit",
@@ -111,7 +126,11 @@ Technical Merit (100 points)
   "description": "Point-scored evaluation of technical solution quality",
   "factor_id": "TECH_MERIT",
   "evaluated_by_rating": "Point Score",
-  "subfactors": ["Understanding (40pt)", "Solution Quality (35pt)", "Risk Mitigation (25pt)"],
+  "subfactors": [
+    "Understanding (40pt)",
+    "Solution Quality (35pt)",
+    "Risk Mitigation (25pt)"
+  ],
   "section_origin": "Selection Criteria"
 }
 ```
@@ -121,6 +140,7 @@ Technical Merit (100 points)
 ## Entity Type 2: SUBMISSION_INSTRUCTION
 
 ### Content Signals
+
 - "page limit"
 - "font size", "margins"
 - "format requirements"
@@ -129,26 +149,31 @@ Technical Merit (100 points)
 - "management volume limited to"
 
 ### Structural Patterns
+
 - Maps to evaluation factors (e.g., "Technical Volume addresses Factor 2")
 - Submission deadlines
 - Electronic vs. hard copy requirements
 - Proposal organization (Volume I, Volume II)
 
 ### Context Clues
+
 - Near format specifications
 - PDF/Word file requirements
 - Email addresses for submission
 - Due dates/times
 
 ### Location
+
 - **Primary**: Section L (Instructions to Offerors)
 - **Alternate**: Embedded within Section M (NON-STANDARD but common!)
 - **Non-standard**: "Proposal Instructions", "Submission Requirements"
 
 ### CRITICAL: Embedded Instructions Pattern
+
 **Problem**: Some RFPs embed submission instructions WITHIN evaluation factor descriptions.
 
 **Example**:
+
 ```
 Factor 1: Technical Approach (Most Important)
 
@@ -160,11 +185,13 @@ in separate sections.
 ```
 
 **Solution**: Create SEPARATE `SUBMISSION_INSTRUCTION` entity and link to `EVALUATION_FACTOR`:
+
 ```
 SUBMISSION_INSTRUCTION "Technical Volume Format" → GUIDES → EVALUATION_FACTOR "Factor 1"
 ```
 
 ### Metadata to Extract
+
 ```json
 {
   "guides_factor": "M2" (which evaluation factor this instructs),
@@ -181,6 +208,7 @@ SUBMISSION_INSTRUCTION "Technical Volume Format" → GUIDES → EVALUATION_FACTO
 ### Examples from Real RFPs
 
 **Example 1: Standard Section L**
+
 ```
 L.3.1 Technical Volume
 
@@ -191,6 +219,7 @@ Contracting.Officer@navy.mil by March 15, 2025, 2:00 PM EST.
 ```
 
 **Extracted Entity**:
+
 ```json
 {
   "entity_name": "Technical Volume Submission Requirements",
@@ -205,6 +234,7 @@ Contracting.Officer@navy.mil by March 15, 2025, 2:00 PM EST.
 ```
 
 **Example 2: Embedded in Section M**
+
 ```
 Factor 2: Management Approach (Significantly More Important)
 
@@ -215,6 +245,7 @@ organizational chart, resumes for key personnel, and project schedule.
 ```
 
 **Extracted Entities** (TWO):
+
 1. `EVALUATION_FACTOR` "Factor 2: Management Approach"
 2. `SUBMISSION_INSTRUCTION` "Management Volume Format" (linked via GUIDES relationship)
 
@@ -227,6 +258,7 @@ organizational chart, resumes for key personnel, and project schedule.
 **CRITICAL RULE**: Check the SUBJECT of the sentence!
 
 #### MANDATORY (Priority Score: 100)
+
 - **Pattern**: "Contractor shall", "Offeror must", "The offeror shall"
 - **Subject**: Contractor/Offeror (external party)
 - **Examples**:
@@ -235,6 +267,7 @@ organizational chart, resumes for key personnel, and project schedule.
   - ✅ "The contractor shall maintain 99.9% uptime"
 
 #### INFORMATIONAL (Priority Score: 0)
+
 - **Pattern**: "Government will", "Agency shall", "The Government shall"
 - **Subject**: Government/Agency (NOT a requirement for contractor!)
 - **Examples**:
@@ -243,6 +276,7 @@ organizational chart, resumes for key personnel, and project schedule.
   - ❌ "The Government will pay within 30 days" (NOT a requirement)
 
 #### IMPORTANT (Priority Score: 75)
+
 - **Pattern**: "should", "encouraged to", "preferred", "desirable"
 - **Subject**: Contractor/Offeror
 - **Examples**:
@@ -251,6 +285,7 @@ organizational chart, resumes for key personnel, and project schedule.
   - "Preferred: ISO 27001 certification"
 
 #### OPTIONAL (Priority Score: 25)
+
 - **Pattern**: "may", "can", "has the option to"
 - **Subject**: Contractor/Offeror
 - **Examples**:
@@ -260,6 +295,7 @@ organizational chart, resumes for key personnel, and project schedule.
 ### Type Classification (Content-Based)
 
 #### FUNCTIONAL
+
 - **Pattern**: "provide", "deliver", "perform", "execute" + service/product
 - **Examples**:
   - "Contractor shall provide 24/7 help desk support"
@@ -267,6 +303,7 @@ organizational chart, resumes for key personnel, and project schedule.
   - "Deliver monthly status reports"
 
 #### PERFORMANCE
+
 - **Pattern**: SLA language, metrics, measurable outcomes
 - **Examples**:
   - "99.9% system uptime"
@@ -275,6 +312,7 @@ organizational chart, resumes for key personnel, and project schedule.
   - "First-time fix rate ≥ 95%"
 
 #### SECURITY
+
 - **Pattern**: NIST references, FedRAMP, clearance levels, cybersecurity
 - **Examples**:
   - "FedRAMP Moderate authorization required"
@@ -283,6 +321,7 @@ organizational chart, resumes for key personnel, and project schedule.
   - "Comply with CMMC Level 2"
 
 #### TECHNICAL
+
 - **Pattern**: Technology stack, platforms, software versions, infrastructure
 - **Examples**:
   - "Deploy on AWS GovCloud"
@@ -291,6 +330,7 @@ organizational chart, resumes for key personnel, and project schedule.
   - "Kubernetes orchestration"
 
 #### INTERFACE
+
 - **Pattern**: Integration points, data exchange, APIs, system connections
 - **Examples**:
   - "Integrate with agency ERP system"
@@ -299,6 +339,7 @@ organizational chart, resumes for key personnel, and project schedule.
   - "FHIR-compliant health data exchange"
 
 #### MANAGEMENT
+
 - **Pattern**: Reporting, governance, oversight, project management
 - **Examples**:
   - "Submit monthly status reports"
@@ -307,6 +348,7 @@ organizational chart, resumes for key personnel, and project schedule.
   - "Weekly progress meetings with COR"
 
 #### DESIGN
+
 - **Pattern**: Standards compliance, architectural mandates, design constraints
 - **Examples**:
   - "Section 508 accessibility compliance"
@@ -315,6 +357,7 @@ organizational chart, resumes for key personnel, and project schedule.
   - "Responsive web design"
 
 #### QUALITY
+
 - **Pattern**: QA processes, testing, verification, validation
 - **Examples**:
   - "Automated test coverage ≥ 80%"
@@ -323,6 +366,7 @@ organizational chart, resumes for key personnel, and project schedule.
   - "User acceptance testing (UAT)"
 
 ### Metadata to Extract
+
 ```json
 {
   "requirement_type": "FUNCTIONAL" | "PERFORMANCE" | "INTERFACE" | "DESIGN" | "SECURITY" | "TECHNICAL" | "MANAGEMENT" | "QUALITY",
@@ -338,6 +382,7 @@ organizational chart, resumes for key personnel, and project schedule.
 ### Examples from Real RFPs
 
 **Example 1: MANDATORY FUNCTIONAL**
+
 ```
 3.1.2 Help Desk Support
 
@@ -346,6 +391,7 @@ The Contractor shall provide Tier 1 and Tier 2 help desk support
 ```
 
 **Extracted Entity**:
+
 ```json
 {
   "entity_name": "24/7 Help Desk Support Requirement",
@@ -360,6 +406,7 @@ The Contractor shall provide Tier 1 and Tier 2 help desk support
 ```
 
 **Example 2: INFORMATIONAL (NOT A REQUIREMENT)**
+
 ```
 3.2.1 Government-Furnished Equipment
 
@@ -368,6 +415,7 @@ contractor personnel working on-site.
 ```
 
 **Extracted Entity**:
+
 ```json
 {
   "entity_name": "Government-Furnished Office Space",
@@ -382,6 +430,7 @@ contractor personnel working on-site.
 ```
 
 **Example 3: IMPORTANT PERFORMANCE**
+
 ```
 3.3.1 System Availability
 
@@ -390,6 +439,7 @@ The system should maintain 99.9% uptime during business hours
 ```
 
 **Extracted Entity**:
+
 ```json
 {
   "entity_name": "99.9% Uptime SLA",
@@ -408,21 +458,26 @@ The system should maintain 99.9% uptime during business hours
 ## Entity Type 4: PROGRAM
 
 ### Semantic Purpose
+
 Top-level organizational container representing a major acquisition program, initiative, or system.
 
 ### Content Signals
+
 - Program names in document title
 - Major acquisition titles
 - Portfolio-level initiatives
 - System names
 
 ### Naming Patterns
+
 - **Full names**: "Marine Corps Prepositioning Program II", "Navy Mobile Bay Organic Support"
 - **Acronyms**: "MCPP II", "Navy MBOS", "AFLMI"
 - **System names**: "F-35 Lightning II Program", "Joint Strike Fighter Program"
 
 ### Hierarchical Position
+
 **Top-level container** that CONTAINS:
+
 - Requirements
 - Deliverables
 - Technologies
@@ -430,6 +485,7 @@ Top-level organizational container representing a major acquisition program, ini
 - Sections
 
 ### Relationship Patterns
+
 ```
 SECTION (C) → CONTAINS → PROGRAM (section describes program)
 PROGRAM → CONTAINS → REQUIREMENT (program has requirements)
@@ -438,12 +494,14 @@ PROGRAM → CONTAINS → DELIVERABLE (program expects deliverables)
 ```
 
 ### Detection Criteria
+
 - Appears in document title
 - Section C header or SOW introduction
 - Capitalized or emphasized as primary subject
 - Referenced throughout document as umbrella
 
 ### Metadata to Extract
+
 ```json
 {
   "program_name": "Marine Corps Prepositioning Program II",
@@ -456,6 +514,7 @@ PROGRAM → CONTAINS → DELIVERABLE (program expects deliverables)
 ```
 
 ### Example from Navy MBOS RFP
+
 ```
 Title: "Navy Mobile Bay Organic Support (Navy MBOS) Contract"
 
@@ -468,6 +527,7 @@ maintenance for ground support equipment at Naval Air Station (NAS) locations...
 ```
 
 **Extracted Entity**:
+
 ```json
 {
   "entity_name": "Navy Mobile Bay Organic Support",
@@ -489,21 +549,25 @@ maintenance for ground support equipment at Naval Air Station (NAS) locations...
 The entity type `STATEMENT_OF_WORK` represents **ANY** of these three formats:
 
 #### SOW (Statement of Work)
+
 - **Style**: Prescriptive, detailed
 - **Focus**: **HOW** to perform work
 - **Example**: "Contractor shall mow grass weekly using rotary mower with 3-inch blade height"
 
 #### PWS (Performance Work Statement)
+
 - **Style**: Performance-based
 - **Focus**: **WHAT** outcomes required (contractor chooses HOW)
 - **Example**: "Contractor shall maintain grounds to standard X (50% green coverage, no weeds >6 inches)"
 
 #### SOO (Statement of Objectives)
+
 - **Style**: Objective-based
 - **Focus**: **WHY** / objectives (contractor creates PWS from SOO)
 - **Example**: "Objective: Provide aesthetically pleasing grounds consistent with Navy image"
 
 ### Content Signals
+
 - Task descriptions
 - Performance objectives
 - Deliverables
@@ -511,12 +575,14 @@ The entity type `STATEMENT_OF_WORK` represents **ANY** of these three formats:
 - Outcomes
 
 ### Structure
+
 - Often hierarchical:
   - **SOW**: Task 1 → Subtask 1.1 → Subtask 1.1.1
   - **PWS**: Objective 1 → Performance Standard 1.1 → Metric 1.1.1
   - **SOO**: Goal 1 → Objective 1.1 → Success Criterion 1.1.1
 
 ### Identifiers (any of these)
+
 - "PWS", "Performance Work Statement"
 - "SOW", "Statement of Work"
 - "SOO", "Statement of Objectives"
@@ -524,18 +590,22 @@ The entity type `STATEMENT_OF_WORK` represents **ANY** of these three formats:
 - "Attachment X - PWS"
 
 ### Location
+
 - **Primary**: Section C (Description/Specs/Data)
 - **Alternate**: Separate attachment (J-#### PWS)
 - **Embedded**: Within Section C as subsection
 
 ### Detection: CONTENT-BASED
+
 **Do NOT rely on labels alone!** Focus on:
+
 - Work scope/tasks/objectives/deliverables
 - Task hierarchy and numbering
 - Performance standards and metrics
 - Deliverable schedules
 
 ### Metadata to Extract
+
 ```json
 {
   "work_type": "PWS" | "SOW" | "SOO",
@@ -550,6 +620,7 @@ The entity type `STATEMENT_OF_WORK` represents **ANY** of these three formats:
 ### Examples from Real RFPs
 
 **Example 1: PWS (Performance-Based)**
+
 ```
 Attachment J-0200000-18: Performance Work Statement
 
@@ -565,6 +636,7 @@ Performance shall be measured monthly against these standards.
 ```
 
 **Extracted Entity**:
+
 ```json
 {
   "entity_name": "Maintenance Services PWS",
@@ -577,6 +649,7 @@ Performance shall be measured monthly against these standards.
 ```
 
 **Example 2: SOW (Prescriptive)**
+
 ```
 Section C: Statement of Work
 
@@ -588,6 +661,7 @@ Task 1: Software Development
 ```
 
 **Extracted Entity**:
+
 ```json
 {
   "entity_name": "Software Development SOW",
@@ -604,6 +678,7 @@ Task 1: Software Development
 ## Entity Type 6: ANNEX / ATTACHMENT
 
 ### Naming Patterns
+
 - `J-######`: "J-0200000-18 Equipment List"
 - `Attachment #`: "Attachment 5 - Site Map"
 - `Annex ##`: "Annex 17 Transportation"
@@ -611,14 +686,18 @@ Task 1: Software Development
 - `X-######`: "A-1234567 Specifications"
 
 ### Link to Parent Section
+
 Based on naming prefix patterns:
+
 - `J-####` → Section J (List of Attachments)
 - `Attachment #` → Usually Section J
 - `Annex ##` → Could be Section J or standalone
 - Prefix letter → Corresponding section (A-#### → Section A)
 
 ### Content Determines Subtype
+
 An annex/attachment can contain:
+
 - SOW/PWS (work statement)
 - Technical specifications
 - Maps and diagrams
@@ -627,6 +706,7 @@ An annex/attachment can contain:
 - Contract clauses
 
 ### Metadata to Extract
+
 ```json
 {
   "original_numbering": "J-0200000-18" | "Attachment 5" | "Annex 17",
@@ -638,6 +718,7 @@ An annex/attachment can contain:
 ```
 
 ### Example from Navy MBOS
+
 ```
 Section J: List of Attachments
 
@@ -649,6 +730,7 @@ J-0400000-05: Site Layout and Facility Maps
 ```
 
 **Extracted Entities** (3 annexes):
+
 ```json
 [
   {
@@ -683,6 +765,7 @@ J-0400000-05: Site Layout and Facility Maps
 ## Entity Type 7: CLAUSE
 
 ### Patterns (26+ Agency Supplements)
+
 - **FAR**: `FAR 52.###-##` (Federal Acquisition Regulation)
 - **DFARS**: `DFARS 252.###-####` (Defense FAR Supplement)
 - **AFFARS**: `AFFARS 5352.###-##` (Air Force FAR Supplement)
@@ -691,23 +774,30 @@ J-0400000-05: Site Layout and Facility Maps
 - **Plus**: DOSAR, GSAM, VAAR, DEAR, NFS, AIDAR, CAR, DIAR, DOLAR, EDAR, EPAAR, FEHBAR, HHSAR, HUDAR, IAAR, JAR, LIFAR, NRCAR, SOFARS, TAR
 
 ### Agency Supplement Recognition
+
 Extract the supplement name from the clause number:
+
 - `FAR 52.212-4` → supplement = "FAR"
 - `DFARS 252.204-7012` → supplement = "DFARS"
 - `AFFARS 5352.201-9001` → supplement = "AFFARS"
 
 ### Should Cluster by Parent Section
+
 Even if clauses are scattered throughout the document, link them to logical parent:
+
 - FAR 52.### clauses → Section I (Contract Clauses)
 - Representation clauses → Section K (Reps and Certs)
 
 ### Group Similar Clauses
+
 Even if not adjacent in document:
+
 - All FAR 52.2##-# (Supplies/Services) together
 - All FAR 52.3##-# (Delivery) together
 - All security clauses together
 
 ### Metadata to Extract
+
 ```json
 {
   "clause_number": "FAR 52.212-4" | "DFARS 252.204-7012",
@@ -720,6 +810,7 @@ Even if not adjacent in document:
 ```
 
 ### Example from Navy RFP
+
 ```
 Section I: Contract Clauses
 
@@ -735,6 +826,7 @@ Cyber Incident Reporting (DEC 2019)
 ```
 
 **Extracted Entities** (3 clauses):
+
 ```json
 [
   {
@@ -775,33 +867,37 @@ Cyber Incident Reporting (DEC 2019)
 **Semantic Type**: What it actually IS
 
 ### Standard UCF (Uniform Contract Format)
-| Section | Structural Label | Semantic Type |
-|---------|-----------------|---------------|
-| A | Section A | SOLICITATION_FORM |
-| B | Section B | SUPPLIES_SERVICES |
-| C | Section C | DESCRIPTION_SPECS |
-| H | Section H | SPECIAL_REQUIREMENTS |
-| I | Section I | CONTRACT_CLAUSES |
-| J | Section J | ATTACHMENTS |
-| K | Section K | REPRESENTATIONS |
-| L | Section L | SUBMISSION_INSTRUCTIONS |
-| M | Section M | EVALUATION_CRITERIA |
+
+| Section | Structural Label | Semantic Type           |
+| ------- | ---------------- | ----------------------- |
+| A       | Section A        | SOLICITATION_FORM       |
+| B       | Section B        | SUPPLIES_SERVICES       |
+| C       | Section C        | DESCRIPTION_SPECS       |
+| H       | Section H        | SPECIAL_REQUIREMENTS    |
+| I       | Section I        | CONTRACT_CLAUSES        |
+| J       | Section J        | ATTACHMENTS             |
+| K       | Section K        | REPRESENTATIONS         |
+| L       | Section L        | SUBMISSION_INSTRUCTIONS |
+| M       | Section M        | EVALUATION_CRITERIA     |
 
 ### Non-Standard Mapping
+
 Many RFPs use different labels:
 
-| Non-Standard Label | Maps To | Semantic Type |
-|--------------------|---------|---------------|
-| "Selection Criteria" | Section M | EVALUATION_CRITERIA |
-| "Technical Requirements" | Section C | DESCRIPTION_SPECS |
-| "Proposal Instructions" | Section L | SUBMISSION_INSTRUCTIONS |
-| "Request for Quote" | Section A | SOLICITATION_FORM |
-| "Statement of Work" | Section C | DESCRIPTION_SPECS |
+| Non-Standard Label       | Maps To   | Semantic Type           |
+| ------------------------ | --------- | ----------------------- |
+| "Selection Criteria"     | Section M | EVALUATION_CRITERIA     |
+| "Technical Requirements" | Section C | DESCRIPTION_SPECS       |
+| "Proposal Instructions"  | Section L | SUBMISSION_INSTRUCTIONS |
+| "Request for Quote"      | Section A | SOLICITATION_FORM       |
+| "Statement of Work"      | Section C | DESCRIPTION_SPECS       |
 
 ### Note Mixed Content
+
 Some sections contain multiple content types:
 
 **Example**: Section M that includes both evaluation criteria AND submission instructions
+
 ```json
 {
   "structural_label": "Section M",
@@ -812,6 +908,7 @@ Some sections contain multiple content types:
 ```
 
 ### Metadata to Extract
+
 ```json
 {
   "structural_label": "Section M.2.1" | "Selection Criteria",
@@ -830,42 +927,51 @@ Some sections contain multiple content types:
 ### Type Classification
 
 #### CUSTOMER_HOT_BUTTON
+
 Agency priorities, pain points, mission pressures
 
 **Signals**:
+
 - "critical", "essential", "priority"
 - "emphasize", "significant concern"
 - "mission-critical", "high-priority"
 
 **Examples**:
+
 - "Readiness is the Navy's top priority"
 - "Cybersecurity is a critical concern"
 - "Mission availability must be maintained"
 
 #### DISCRIMINATOR
+
 Competitive advantages, unique capabilities
 
 **Examples**:
+
 - "Only offeror with on-site repair facility"
 - "Proprietary predictive maintenance AI"
 - "Incumbent knowledge of legacy systems"
 - "Exclusive partnership with OEM"
 
 #### PROOF_POINT
+
 Evidence supporting competitive claims
 
 **Examples**:
+
 - "99.8% uptime on similar Navy contract"
 - "CPARS rating: Exceptional (all categories)"
 - "CMMI Level 3 certified organization"
 - "150 certified technicians on staff"
 
 #### WIN_THEME
+
 Strategic messaging combining discriminator + proof + customer benefit
 
 **Structure**: THEME + DISCRIMINATOR + PROOF POINT + CUSTOMER BENEFIT
 
 **Example**:
+
 ```
 THEME: "Mission Readiness Through Predictive Maintenance"
 DISCRIMINATOR: "Proprietary AI-powered failure prediction"
@@ -874,6 +980,7 @@ CUSTOMER BENEFIT: "Ensures aircraft availability for critical missions"
 ```
 
 ### Metadata to Extract
+
 ```json
 {
   "theme_type": "CUSTOMER_HOT_BUTTON" | "DISCRIMINATOR" | "PROOF_POINT" | "WIN_THEME",
@@ -890,57 +997,71 @@ CUSTOMER BENEFIT: "Ensures aircraft availability for critical missions"
 ## Entity Type 10-12: Standard Entities
 
 ### ORGANIZATION
+
 Companies, agencies, departments, commands
 
 **Examples**:
+
 - "Naval Air Systems Command (NAVAIR)"
 - "General Dynamics Information Technology"
 - "Small Business Administration"
 
 ### CONCEPT
+
 CLINs, budget items, technical concepts, definitions
 
 **Examples**:
+
 - "CLIN 0001 Base Year Services"
 - "Total Small Business Set-Aside"
 - "Agile Software Development"
 
 ### EVENT
+
 Milestones, delivery dates, reviews, meetings
 
 **Examples**:
+
 - "Kickoff Meeting (30 days after award)"
 - "Monthly Progress Review"
 - "Final Delivery: September 30, 2026"
 
 ### TECHNOLOGY
+
 Systems, tools, platforms, equipment
 
 **Examples**:
+
 - "SINCGARS Radio System"
 - "AWS GovCloud Platform"
 - "ServiceNow ITSM"
 
 ### PERSON
+
 POCs, contracting officers, key personnel
 
 **Examples**:
+
 - "Contracting Officer: Jane Smith"
 - "Program Manager: John Doe"
 - "COR: Technical Officer Name"
 
 ### LOCATION
+
 Performance locations, delivery sites, facilities
 
 **Examples**:
+
 - "Naval Air Station Pensacola, FL"
 - "Pentagon, Arlington, VA"
 - "CONUS (Continental United States)"
 
 ### DELIVERABLE
+
 Contract deliverables, work products, reports
 
 **Examples**:
+
 - "Monthly Status Report"
 - "System Design Document"
 - "Deployed Application"

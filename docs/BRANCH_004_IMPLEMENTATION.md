@@ -166,7 +166,7 @@ src/inference/graph_io.py       100  (from llm_relationship_inference.py)
    │   ├── attachment_section_linking.md (~550 lines) [NEW - split concern]
    │   ├── clause_clustering.md (~400 lines)
    │   ├── requirement_evaluation.md (~400 lines)
-   │   └── semantic_concept_linking.md (~600 lines) [NEW - optional]
+   │   └── semantic_concept_linking.md (~600 lines) [NEW - 5th core algorithm]
    └── user_queries/
        └── capture_manager_prompts.md (~900 lines) [NEW - future feature]
    ```
@@ -204,9 +204,10 @@ src/inference/graph_io.py       100  (from llm_relationship_inference.py)
 
 **New Capabilities** (beyond baseline):
 
-- ✅ **Semantic concept linking** (optional 5th algorithm): Pain point → Factor, Adjacent factor discovery, Proposal outline generation
+- ✅ **Semantic concept linking** (5th core algorithm - ALWAYS ON): Pain point → Factor, Adjacent factor discovery, Proposal outline generation, Win theme identification
 - ✅ **Capture manager query library**: 50+ pre-built queries for common capture tasks (Shipley methodology)
 - ✅ **Advanced visualization support**: Enables knowledge graph visualizations like initial demo (all relationships feed into proposal evaluation)
+- ✅ **Competitive differentiation**: Finds hidden relationships humans might miss (e.g., "Safety mentioned alongside Management Approach")
 
 **Measurement**:
 
@@ -400,15 +401,17 @@ src/inference/graph_io.py       100  (from llm_relationship_inference.py)
 1. Create `src/inference/engine.py` (150 lines):
 
    - Orchestration: `infer_all_relationships()`
-   - Coordinates 4 inference algorithms
+   - Coordinates 5 core inference algorithms (ALWAYS runs all 5)
    - Batching and LLM call management
 
 2. Create `src/inference/algorithms.py` (300 lines):
 
    - `infer_section_l_m_relationships()` using Pydantic
-   - `infer_annex_relationships()` using Pydantic
+   - `infer_document_hierarchy()` using Pydantic [RENAMED from annex]
+   - `infer_attachment_section_linking()` using Pydantic [NEW - split from annex]
    - `infer_clause_relationships()` using Pydantic
    - `infer_requirement_evaluation_relationships()` using Pydantic
+   - `infer_semantic_concepts()` using Pydantic [NEW - 5th core algorithm]
    - Load prompts via `load_prompt("relationship_inference/...")`
 
 3. Create `src/inference/graph_io.py` (100 lines):
@@ -430,15 +433,21 @@ src/inference/graph_io.py       100  (from llm_relationship_inference.py)
 **Validation**:
 
 - [ ] Process Navy MBOS RFP
-- [ ] Relationship counts match baseline (±5%): ~500 total
+- [ ] Relationship counts NEW BASELINE: ~550 total (includes semantic linking +50)
+  - Section L↔M: ~15 relationships
+  - Document hierarchy: ~73 relationships (100% annex coverage)
+  - Attachment→Section: ~15 relationships
+  - Clause clustering: ~120 relationships
+  - Requirement→Evaluation: ~60 relationships
+  - Semantic concepts: ~50 relationships (NEW - pain points, adjacent factors)
 - [ ] Pydantic catches malformed LLM responses
 - [ ] Log shows validation errors (if any)
 
 **Measurement**:
 
 - Code LOC: -332 (882 → 550)
-- Processing time: No increase (same LLM calls)
-- Cost: Same ($0.007 for post-processing)
+- Processing time: +10-15 seconds (semantic linking adds 5th LLM pass)
+- Cost: +$0.01 (semantic inference), total ~$0.052 per RFP
 
 ---
 

@@ -15,6 +15,7 @@ SUBMISSION_INSTRUCTION --GUIDES--> EVALUATION_FACTOR
 **Meaning**: This submission instruction guides how to respond to this evaluation factor
 
 **Example**:
+
 ```
 SUBMISSION_INSTRUCTION "Technical Volume Format" (25 pages, 12pt font)
   --GUIDES-->
@@ -30,11 +31,13 @@ EVALUATION_FACTOR "Factor 1: Technical Approach"
 **Signal**: Direct mention of factor in instruction
 
 **Examples**:
+
 - "Technical Volume addresses Factor 2"
 - "Management proposal (L.3.2) responds to Factors 3-4"
 - "Volume I shall address evaluation criteria M1-M3"
 
 **Extraction**:
+
 ```json
 {
   "source_id": "submission_instruction_tech_volume",
@@ -50,6 +53,7 @@ EVALUATION_FACTOR "Factor 1: Technical Approach"
 **Signal**: Page limit mentioned near factor description (same paragraph/section)
 
 **Example**:
+
 ```
 M.2 Management Approach (Most Important)
 
@@ -59,12 +63,13 @@ The Management Volume shall not exceed 15 pages.
 ```
 
 **Extraction**:
+
 ```json
 {
   "source_id": "submission_instruction_mgmt_volume",
   "target_id": "evaluation_factor_m2",
   "relationship_type": "GUIDES",
-  "confidence": 0.80,
+  "confidence": 0.8,
   "reasoning": "Submission instruction embedded within Factor M.2 description"
 }
 ```
@@ -74,6 +79,7 @@ The Management Volume shall not exceed 15 pages.
 **Signal**: Instruction topic matches factor topic
 
 **Example**:
+
 ```
 Section L.3.1: Technical Volume
 - Describe your technical approach...
@@ -84,12 +90,13 @@ Section M.1: Technical Approach
 ```
 
 **Extraction**:
+
 ```json
 {
   "source_id": "submission_instruction_tech_volume",
   "target_id": "evaluation_factor_m1",
   "relationship_type": "GUIDES",
-  "confidence": 0.70,
+  "confidence": 0.7,
   "reasoning": "Topic alignment: both reference 'technical approach' and 'system architecture'"
 }
 ```
@@ -101,7 +108,7 @@ Section M.1: Technical Approach
 Use this prompt structure when calling LLM for L↔M inference:
 
 ```
-You are analyzing submission instructions (Section L) and evaluation factors (Section M) 
+You are analyzing submission instructions (Section L) and evaluation factors (Section M)
 to determine which instructions guide which factors.
 
 SUBMISSION INSTRUCTIONS (Section L):
@@ -116,7 +123,7 @@ For each submission instruction, determine which evaluation factor(s) it guides 
 1. EXPLICIT CROSS-REFERENCES (Confidence 0.95):
    - Direct mentions: "Volume addresses Factor X"
    - Factor IDs in text: "M1", "M2.1"
-   
+
 2. IMPLICIT CO-LOCATION (Confidence 0.80):
    - Instructions embedded within factor description
    - Same paragraph or section
@@ -146,23 +153,26 @@ Return JSON array of relationships with confidence ≥ 0.70:
 ### Case 1: One Instruction → Multiple Factors
 
 **Example**:
+
 ```
 L.3.1 Technical Volume (50 pages)
 - Address Factors 1-3
 ```
 
 **Solution**: Create 3 separate relationships
+
 ```json
 [
-  {"source": "tech_volume", "target": "factor_1", "confidence": 0.95},
-  {"source": "tech_volume", "target": "factor_2", "confidence": 0.95},
-  {"source": "tech_volume", "target": "factor_3", "confidence": 0.95}
+  { "source": "tech_volume", "target": "factor_1", "confidence": 0.95 },
+  { "source": "tech_volume", "target": "factor_2", "confidence": 0.95 },
+  { "source": "tech_volume", "target": "factor_3", "confidence": 0.95 }
 ]
 ```
 
 ### Case 2: Embedded Instructions (Section M)
 
 **Example**:
+
 ```
 M.2 Management Approach
 
@@ -172,6 +182,7 @@ The Management Volume shall be limited to 15 pages...
 ```
 
 **Solution**:
+
 1. Extract SUBMISSION_INSTRUCTION entity "Management Volume Format"
 2. Create GUIDES relationship to Factor M.2
 3. Mark section M.2 with `contains_submission_instructions: true`
@@ -183,6 +194,7 @@ The Management Volume shall be limited to 15 pages...
 **Solution**: Do NOT create relationship (better to have no link than wrong link)
 
 **Example**:
+
 ```
 L.2.1 Proposal Delivery
 - Submit via email to contracting.officer@navy.mil
@@ -206,6 +218,7 @@ L.2.1 Proposal Delivery
 ### Expected Relationship Counts (Baseline)
 
 **Navy MBOS (71-page RFP)**:
+
 - Submission instructions: ~10 entities
 - Evaluation factors: ~8 entities (including subfactors)
 - Expected L↔M relationships: ~15 (some instructions guide multiple factors)
@@ -217,15 +230,17 @@ L.2.1 Proposal Delivery
 ## Examples from Navy MBOS RFP
 
 ### Example 1: Explicit Mapping
+
 ```
 L.3.1 Technical Volume
 
-The Technical Volume shall address Evaluation Factors 1 and 2 
-(Technical Approach and Maintenance Approach) and shall not exceed 
+The Technical Volume shall address Evaluation Factors 1 and 2
+(Technical Approach and Maintenance Approach) and shall not exceed
 25 pages.
 ```
 
 **Extracted Relationships**:
+
 ```json
 [
   {
@@ -246,6 +261,7 @@ The Technical Volume shall address Evaluation Factors 1 and 2
 ```
 
 ### Example 2: Embedded Instructions
+
 ```
 M.2 Management Approach (Significantly More Important)
 
@@ -258,6 +274,7 @@ Offerors shall limit the Management Volume to 15 pages, 12-point font.
 ```
 
 **Extraction**:
+
 1. Create EVALUATION_FACTOR "Factor M.2: Management Approach"
 2. Create SUBMISSION_INSTRUCTION "Management Volume Format"
 3. Create relationship:
@@ -267,12 +284,13 @@ Offerors shall limit the Management Volume to 15 pages, 12-point font.
   "source_id": "submission_instruction_mgmt_volume",
   "target_id": "evaluation_factor_m2_management",
   "relationship_type": "GUIDES",
-  "confidence": 0.80,
+  "confidence": 0.8,
   "reasoning": "Embedded instruction within Factor M.2 description paragraph"
 }
 ```
 
 ### Example 3: Topic Alignment
+
 ```
 Section L.3.3: Past Performance Volume
 - Provide 3 relevant contracts from last 5 years
@@ -283,12 +301,13 @@ Section M.3: Past Performance
 ```
 
 **Extracted Relationship**:
+
 ```json
 {
   "source_id": "submission_instruction_past_perf_volume",
   "target_id": "evaluation_factor_m3_past_perf",
   "relationship_type": "GUIDES",
-  "confidence": 0.70,
+  "confidence": 0.7,
   "reasoning": "Topic alignment: both sections reference 'past performance' and 'relevant contracts'"
 }
 ```
@@ -298,25 +317,31 @@ Section M.3: Past Performance
 ## Error Patterns to Avoid
 
 ### ❌ Error 1: Linking Administrative Instructions
+
 ```
 WRONG:
 L.2.1 Proposal Delivery --GUIDES--> M.1 Technical Approach
 ```
+
 Delivery instructions don't guide technical evaluation
 
 ### ❌ Error 2: Linking Unrelated Topics
+
 ```
 WRONG:
 L.3.1 Cost Volume --GUIDES--> M.2 Technical Approach
 ```
+
 Cost instructions don't guide technical factor
 
 ### ❌ Error 3: Creating Duplicate Relationships
+
 ```
 WRONG:
 Tech_Volume --GUIDES--> Factor_1 (confidence: 0.95)
 Tech_Volume --GUIDES--> Factor_1 (confidence: 0.70)
 ```
+
 Only keep highest-confidence relationship
 
 ---

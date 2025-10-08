@@ -10,6 +10,7 @@
 ## Category 1: Evaluation Factor Analysis
 
 ### Query 1.1: Factor Breakdown with Elements
+
 ```
 What are the factor elements for [FACTOR NAME]?
 
@@ -17,6 +18,7 @@ Example: "What are the factor elements for past performance?"
 ```
 
 **Expected Output**:
+
 - Sub-factors or evaluation criteria
 - Relative importance/weights
 - Requirements that map to each element
@@ -27,6 +29,7 @@ Example: "What are the factor elements for past performance?"
 ---
 
 ### Query 1.2: Cross-Factor Relationships
+
 ```
 What are the evaluation factors regarding [TOPIC]?
 
@@ -34,6 +37,7 @@ Example: "What are the evaluation factors regarding management?"
 ```
 
 **Expected Output**:
+
 - Primary factors (direct match)
 - Adjacent factors (mentioned nearby in Section M)
 - Hidden relationships with notes
@@ -44,11 +48,13 @@ Example: "What are the evaluation factors regarding management?"
 ---
 
 ### Query 1.3: Factor Weight Distribution
+
 ```
 Show me all evaluation factors ordered by weight, with page limits and requirements count.
 ```
 
 **Expected Output**:
+
 ```
 1. Technical Approach - 40% (10 pages, 18 requirements)
 2. Management Approach - 30% (8 pages, 12 requirements)
@@ -63,11 +69,13 @@ Show me all evaluation factors ordered by weight, with page limits and requireme
 ## Category 2: Pain Point & Win Theme Analysis
 
 ### Query 2.1: Customer Pain Points
+
 ```
 What are the main pain points of the customer and how would we effectively address them in a proposal? Which evaluation factors would we address them?
 ```
 
 **Expected Output**:
+
 - Identified pain points from Section C (SOW)
 - Affected evaluation factors
 - Required capabilities to address
@@ -78,11 +86,13 @@ What are the main pain points of the customer and how would we effectively addre
 ---
 
 ### Query 2.2: Win Theme Identification
+
 ```
 Based on mandatory requirements, high-weight factors, and customer pain points, what are the top 5 win themes for this proposal?
 ```
 
 **Expected Output**:
+
 ```
 WIN_THEME_001: Zero-Downtime Migration
 - Factor: Technical Approach (40%)
@@ -97,11 +107,13 @@ WIN_THEME_001: Zero-Downtime Migration
 ---
 
 ### Query 2.3: Competitive Analysis Gap
+
 ```
 What capabilities or past performance do we need to demonstrate that aren't explicitly required but would strengthen our position?
 ```
 
 **Expected Output**:
+
 - Implicit requirements (should-haves, not must-haves)
 - Industry best practices mentioned in Section C
 - Adjacent capabilities that score higher
@@ -114,11 +126,13 @@ What capabilities or past performance do we need to demonstrate that aren't expl
 ## Category 3: Proposal Outline & Structure
 
 ### Query 3.1: Complete Proposal Outline
+
 ```
 Based on the proposal instructions, provide me a bulletized proposal outline and specifics on the content I should address the customer pain points and identify solutioning opportunities that may gain me more favor in the award decision.
 ```
 
 **Expected Output**:
+
 ```
 VOLUME I: TECHNICAL PROPOSAL
 
@@ -144,6 +158,7 @@ VOLUME I: TECHNICAL PROPOSAL
 ---
 
 ### Query 3.2: Compliance Matrix Generation
+
 ```
 Generate a compliance matrix showing all requirements mapped to proposal sections and evaluation factors.
 ```
@@ -159,11 +174,13 @@ Generate a compliance matrix showing all requirements mapped to proposal section
 ---
 
 ### Query 3.3: Page Allocation by Factor Weight
+
 ```
 How should I allocate my [X] pages across evaluation factors to maximize scoring potential?
 ```
 
 **Expected Output**:
+
 ```
 Total Pages: 30 (Technical Volume)
 
@@ -185,11 +202,13 @@ Adjustments:
 ## Category 4: Compliance & Risk Analysis
 
 ### Query 4.1: Mandatory Requirement Check
+
 ```
 List all MANDATORY requirements and confirm our compliance posture. Flag any gaps.
 ```
 
 **Expected Output**:
+
 ```
 COMPLIANT (18 of 20 requirements):
 ✅ REQ-012: Cloud integration - AWS GovCloud certified
@@ -211,11 +230,13 @@ GAP ANALYSIS (2 requirements):
 ---
 
 ### Query 4.2: Section L vs. Section M Cross-Check
+
 ```
 Are there any submission instructions (Section L) that don't map to an evaluation factor (Section M)? Flag orphaned instructions.
 ```
 
 **Expected Output**:
+
 ```
 PROPERLY MAPPED (12 of 14 instructions):
 ✅ "10-page limit for Technical Approach" → Factor 1: Technical Approach
@@ -236,6 +257,7 @@ ORPHANED INSTRUCTIONS (2):
 ---
 
 ### Query 4.3: Clause Interpretation
+
 ```
 Explain the impact of [CLAUSE NUMBER] on our proposal and what we must demonstrate.
 
@@ -243,6 +265,7 @@ Example: "Explain the impact of DFARS 252.204-7012 on our proposal."
 ```
 
 **Expected Output**:
+
 ```
 DFARS 252.204-7012: Safeguarding Covered Defense Information
 
@@ -274,11 +297,13 @@ PROPOSAL DEMONSTRATION:
 ## Category 5: Section-Specific Analysis
 
 ### Query 5.1: Section C (SOW) Deep Dive
+
 ```
 What are the key performance objectives in the SOW and how do they map to evaluation factors?
 ```
 
 **Expected Output**:
+
 - Performance objectives extracted from Section C
 - Linked evaluation factors (typically Section M Factor 1 or 2)
 - Deliverables tied to each objective
@@ -287,11 +312,13 @@ What are the key performance objectives in the SOW and how do they map to evalua
 ---
 
 ### Query 5.2: Section H (Special Requirements) Impact
+
 ```
 What special requirements in Section H affect our proposal approach?
 ```
 
 **Expected Output**:
+
 ```
 H-1: Key Personnel Requirements
 - Impact: Must propose named individuals with resumes
@@ -307,11 +334,13 @@ H-3: Security Clearances
 ---
 
 ### Query 5.3: Section J (Attachments) Navigation
+
 ```
 Show me all Section J attachments in hierarchical order with their purpose.
 ```
 
 **Expected Output**:
+
 ```
 Section J: List of Attachments
 
@@ -332,11 +361,13 @@ J-04000000: Contract Data Requirements List (CDRL)
 ## Category 6: Past Performance Strategy
 
 ### Query 6.1: Relevant Past Performance Identification
+
 ```
 Which of our past contracts are most relevant to this RFP based on scope, contract value, and recency?
 ```
 
 **Expected Output**:
+
 ```
 HIGHLY RELEVANT (3 contracts):
 1. Contract ABC-2021 (Navy IT Modernization)
@@ -359,11 +390,13 @@ HIGHLY RELEVANT (3 contracts):
 ---
 
 ### Query 6.2: Past Performance Confidence Prediction
+
 ```
 Based on our proposed past performance references, predict the government's confidence assessment rating.
 ```
 
 **Expected Output**:
+
 ```
 PREDICTED CONFIDENCE: SUBSTANTIAL CONFIDENCE
 
@@ -391,11 +424,13 @@ Mitigation:
 ## Category 7: Questions for Government (Q&A Strategy)
 
 ### Query 7.1: Ambiguity Detection
+
 ```
 Identify ambiguous or conflicting requirements that should be clarified in a Q&A submission.
 ```
 
 **Expected Output**:
+
 ```
 AMBIGUITY_001:
 - Issue: Section L states "10-page limit" for Technical Approach
@@ -415,11 +450,13 @@ AMBIGUITY_002:
 ---
 
 ### Query 7.2: Generate Q&A Submission
+
 ```
 Generate a list of high-impact questions for government clarification based on RFP analysis.
 ```
 
 **Expected Output** (Max 7 questions per Shipley best practices):
+
 ```
 QUESTION 1 (Page Limits):
 Does the 10-page limit for Technical Approach include diagrams and appendices, or is it limited to the main narrative text?
@@ -441,11 +478,13 @@ Reference: Section H, page 28
 ## Category 8: Shipley Methodology Application
 
 ### Query 8.1: Action Caption Check
+
 ```
 Review Section C and identify opportunities for action captions in our proposal.
 ```
 
 **Expected Output**:
+
 ```
 ACTION CAPTION OPPORTUNITIES (15 identified):
 
@@ -465,11 +504,13 @@ ACTION CAPTION OPPORTUNITIES (15 identified):
 ---
 
 ### Query 8.2: Pink Team Readiness Check
+
 ```
 Based on the RFP analysis, what are the critical review items for our Pink Team review?
 ```
 
 **Expected Output**:
+
 ```
 PINK TEAM REVIEW CHECKLIST:
 
@@ -497,11 +538,13 @@ PINK TEAM REVIEW CHECKLIST:
 ---
 
 ### Query 8.3: Shipley Compliance Scale Assessment
+
 ```
 Assess our proposal's compliance level using Shipley's 4-level scale.
 ```
 
 **Expected Output**:
+
 ```
 SHIPLEY COMPLIANCE ASSESSMENT:
 
@@ -535,11 +578,13 @@ Recommendation: Strengthen REQ-055 mitigation (ISO 9001) before submission
 ## Category 9: Cost/Price Strategy
 
 ### Query 9.1: Cost Realism Preparation
+
 ```
 What requirements will drive cost realism analysis and how should we justify our pricing?
 ```
 
 **Expected Output**:
+
 ```
 COST REALISM FACTORS (Section M analysis):
 
@@ -567,11 +612,13 @@ COST REALISM FACTORS (Section M analysis):
 ---
 
 ### Query 9.2: Price-to-Win Analysis
+
 ```
 Based on government budget and incumbent pricing, what is our competitive price target?
 ```
 
 **Expected Output**:
+
 ```
 PRICE-TO-WIN ANALYSIS:
 
@@ -603,11 +650,13 @@ Risk:
 ## Category 10: Teaming & Subcontracting
 
 ### Query 10.1: Capability Gap Analysis
+
 ```
 What capabilities do we lack that require teaming partners or subcontractors?
 ```
 
 **Expected Output**:
+
 ```
 CAPABILITY GAPS (3 identified):
 
@@ -642,6 +691,7 @@ GAP_003: Physical Presence in Jacksonville, FL
 4. **Iterate**: Refine query based on initial results
 
 **Pro Tip**: Combine multiple queries for comprehensive analysis
+
 ```
 Example: Run Query 2.1 (Pain Points) → Query 3.1 (Proposal Outline) → Query 8.2 (Pink Team Checklist)
 ```

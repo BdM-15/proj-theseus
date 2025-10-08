@@ -9,6 +9,7 @@
 ## REQUIREMENT Entity Metadata
 
 ### Schema
+
 ```json
 {
   "requirement_type": string,       // One of 8 types (FUNCTIONAL, PERFORMANCE, etc.)
@@ -24,6 +25,7 @@
 ### Extraction Rules
 
 #### requirement_type
+
 **Purpose**: Classify by content domain  
 **Method**: Keyword pattern matching
 
@@ -37,6 +39,7 @@
 - **QUALITY**: QA, testing, verification, validation, certification
 
 #### criticality_level
+
 **Purpose**: Determine obligation strength  
 **Method**: Parse modal verb AND subject
 
@@ -53,6 +56,7 @@ elif modal_verb in ["may", "can", "option"]:
 ```
 
 #### priority_score
+
 **Purpose**: Numerical ranking for sorting  
 **Method**: Auto-calculate from criticality
 
@@ -66,10 +70,12 @@ CRITICALITY_SCORES = {
 ```
 
 #### section_origin
+
 **Purpose**: Traceability to source location  
 **Method**: Extract hierarchical section reference
 
 **Patterns**:
+
 - "Section C.3.1.2" (full hierarchy)
 - "PWS Task 1.2.3" (SOW task number)
 - "Attachment J-1234567, Para 3.1" (annex + paragraph)
@@ -77,21 +83,25 @@ CRITICALITY_SCORES = {
 **Quality Check**: Must be verifiable page reference
 
 #### semantic_context
+
 **Purpose**: Describe what this requirement IS (not just what it says)  
 **Method**: Summarize in plain English
 
 **Examples**:
+
 - "Performance requirement within maintenance SOW"
 - "Security clearance requirement for key personnel"
 - "Reporting requirement for monthly status updates"
 
 #### modal_verb
+
 **Purpose**: Extract the obligation verb  
 **Method**: Find primary modal verb in sentence
 
 **Valid Values**: "shall", "should", "may", "must", "will", "can", "encouraged"
 
 **Extraction Pattern**:
+
 ```
 "The Contractor shall provide..." → modal_verb = "shall"
 "Offeror should submit..." → modal_verb = "should"
@@ -99,12 +109,14 @@ CRITICALITY_SCORES = {
 ```
 
 #### subject
+
 **Purpose**: Identify who has the obligation  
 **Method**: Parse sentence subject
 
 **Valid Values**: "Contractor", "Offeror", "Government", "Agency", "COR"
 
 **CRITICAL**: This determines if it's a real requirement!
+
 - "Contractor shall" → MANDATORY requirement
 - "Government shall" → INFORMATIONAL (NOT a requirement for contractor)
 
@@ -113,6 +125,7 @@ CRITICALITY_SCORES = {
 ## EVALUATION_FACTOR Entity Metadata
 
 ### Schema
+
 ```json
 {
   "factor_id": string,              // "M1", "M2.1", "M2.1.1"
@@ -132,10 +145,12 @@ CRITICALITY_SCORES = {
 ### Extraction Rules
 
 #### factor_id
+
 **Purpose**: Unique identifier for factor hierarchy  
 **Method**: Extract numbering scheme
 
 **Patterns**:
+
 - "M1", "M2", "M3" (top-level)
 - "M2.1", "M2.2" (subfactors)
 - "M2.1.1", "M2.1.2" (sub-subfactors)
@@ -143,10 +158,12 @@ CRITICALITY_SCORES = {
 - "TECH_MERIT" (custom, if no numbering)
 
 #### relative_importance
+
 **Purpose**: Capture evaluation weight language  
 **Method**: Extract exact phrase from document
 
 **Standard Phrases** (FAR 15.304):
+
 - "Most Important"
 - "Significantly More Important"
 - "More Important"
@@ -155,15 +172,18 @@ CRITICALITY_SCORES = {
 - "Significantly Less Important"
 
 **Non-Standard Phrases**:
+
 - "40% weight" → "Weighted 40%"
 - "100 points" → "Point-scored: 100 points"
 - "Pass/Fail" → "Pass/Fail (no weight)"
 
 #### subfactors
+
 **Purpose**: Capture factor hierarchy  
 **Method**: Extract nested factor list
 
 **Example**:
+
 ```
 Factor 2: Maintenance Approach
   2.1 Staffing Plan
@@ -172,27 +192,36 @@ Factor 2: Maintenance Approach
 ```
 
 **Extracted**:
+
 ```json
 {
   "factor_id": "M2",
-  "subfactors": ["M2.1 Staffing Plan", "M2.2 Maintenance Philosophy", "M2.3 Transition Plan"]
+  "subfactors": [
+    "M2.1 Staffing Plan",
+    "M2.2 Maintenance Philosophy",
+    "M2.3 Transition Plan"
+  ]
 }
 ```
 
 #### section_l_reference
+
 **Purpose**: Link to corresponding submission instruction  
 **Method**: Search for cross-references
 
 **Patterns**:
+
 - "Technical Volume (see Section L.3.1)"
 - "Address Factor 2 as specified in L.3.2"
 - Implicit: Factor 2 → L.3.2 (by convention)
 
 #### page_limits
+
 **Purpose**: Extract page limit from Section L  
 **Method**: Cross-reference or direct mention
 
 **Patterns**:
+
 - "25 pages"
 - "50 pages maximum"
 - "No page limit"
@@ -201,31 +230,37 @@ Factor 2: Maintenance Approach
 **Source**: May come from Section L or embedded in Section M
 
 #### format_requirements
+
 **Purpose**: Extract formatting rules  
 **Method**: Parse font, margins, spacing
 
 **Example**: "12pt Times New Roman, 1-inch margins, single-spaced"
 
 #### tradeoff_methodology
+
 **Purpose**: Identify source selection approach  
 **Method**: Extract methodology statement
 
 **Values**:
+
 - "Best Value" (FAR 15.101-1)
 - "LPTA" or "Lowest Price Technically Acceptable" (FAR 15.101-2)
 - "Cost/Technical Tradeoff"
 
 #### evaluated_by_rating
+
 **Purpose**: Identify rating scale  
 **Method**: Extract rating methodology
 
 **Values**:
+
 - "Adjectival" (Excellent, Good, Acceptable, Marginal, Unacceptable)
 - "Point Score" (0-100 points)
 - "Pass/Fail"
 - "Color Rating" (Blue, Purple, Red, Yellow, Green)
 
 #### contains_submission_instructions
+
 **Purpose**: Flag embedded instructions  
 **Method**: Detect format requirements within evaluation section
 
@@ -236,6 +271,7 @@ Factor 2: Maintenance Approach
 ## SUBMISSION_INSTRUCTION Entity Metadata
 
 ### Schema
+
 ```json
 {
   "guides_factor": string,          // Which evaluation factor this instructs
@@ -252,28 +288,34 @@ Factor 2: Maintenance Approach
 ### Extraction Rules
 
 #### guides_factor
+
 **Purpose**: Link instruction to evaluation factor  
 **Method**: Parse cross-reference or content alignment
 
 **Patterns**:
+
 - Explicit: "Technical Volume addresses Factor 2"
 - Implicit: Technical Volume → Technical Approach factor (by name alignment)
 
 #### volume_name
+
 **Purpose**: Identify proposal volume  
 **Method**: Extract volume designation
 
 **Common Values**:
+
 - "Technical Volume"
 - "Management Volume"
 - "Cost Volume"
 - "Past Performance Volume"
 
 #### deadline
+
 **Purpose**: Extract submission due date/time  
 **Method**: Parse datetime and convert to ISO 8601
 
 **Example**:
+
 - Input: "March 15, 2025, 2:00 PM EST"
 - Output: "2025-03-15T14:00:00-05:00"
 
@@ -282,6 +324,7 @@ Factor 2: Maintenance Approach
 ## SECTION Entity Metadata
 
 ### Schema
+
 ```json
 {
   "structural_label": string,       // What document calls it
@@ -296,19 +339,23 @@ Factor 2: Maintenance Approach
 ### Extraction Rules
 
 #### structural_label
+
 **Purpose**: Preserve original document labeling  
 **Method**: Extract exact label from document
 
 **Examples**:
+
 - "Section M.2.1"
 - "Selection Criteria"
 - "Proposal Instructions"
 
 #### semantic_type
+
 **Purpose**: Classify by content type  
 **Method**: Map to standard UCF type
 
 **Standard Types**:
+
 - SOLICITATION_FORM
 - SUPPLIES_SERVICES
 - DESCRIPTION_SPECS
@@ -320,10 +367,12 @@ Factor 2: Maintenance Approach
 - EVALUATION_CRITERIA
 
 #### also_contains
+
 **Purpose**: Flag mixed-content sections  
 **Method**: Detect multiple content types in one section
 
 **Example**: Section M with embedded submission instructions
+
 ```json
 {
   "structural_label": "Section M",
@@ -337,6 +386,7 @@ Factor 2: Maintenance Approach
 ## STRATEGIC_THEME Entity Metadata
 
 ### Schema
+
 ```json
 {
   "theme_type": string,             // CUSTOMER_HOT_BUTTON | DISCRIMINATOR | PROOF_POINT | WIN_THEME
@@ -351,20 +401,24 @@ Factor 2: Maintenance Approach
 ### Extraction Rules
 
 #### theme_type
+
 **Purpose**: Classify strategic theme  
 **Method**: Pattern matching on content
 
 **Types**:
+
 - **CUSTOMER_HOT_BUTTON**: Agency priorities ("critical", "essential", "priority")
 - **DISCRIMINATOR**: Competitive advantages ("unique", "only", "proprietary")
 - **PROOF_POINT**: Evidence ("99.8% uptime", "CPARS Exceptional")
 - **WIN_THEME**: Combined theme + discriminator + proof + benefit
 
 #### competitive_context
+
 **Purpose**: Assess competitive positioning  
 **Method**: Analyze incumbent/new entrant status
 
 **Values**:
+
 - "Incumbent advantage" (current contractor knowledge)
 - "New entrant gap" (no incumbent knowledge)
 - "Competitive parity" (equal footing)
@@ -374,6 +428,7 @@ Factor 2: Maintenance Approach
 ## ANNEX Entity Metadata
 
 ### Schema
+
 ```json
 {
   "original_numbering": string,     // "J-1234567", "Attachment 5"
@@ -387,10 +442,12 @@ Factor 2: Maintenance Approach
 ### Extraction Rules
 
 #### prefix_pattern
+
 **Purpose**: Extract prefix for parent section linking  
 **Method**: Regex pattern matching
 
 **Patterns**:
+
 ```python
 PATTERNS = {
     r'^([A-Z]-\d+)': 'Letter-Number',      # "J-1234567"
@@ -405,6 +462,7 @@ PATTERNS = {
 ## CLAUSE Entity Metadata
 
 ### Schema
+
 ```json
 {
   "clause_number": string,          // "FAR 52.212-4"
@@ -419,10 +477,12 @@ PATTERNS = {
 ### Extraction Rules
 
 #### agency_supplement
+
 **Purpose**: Identify regulatory source  
 **Method**: Extract from clause number
 
 **Patterns**:
+
 - `FAR 52.###-##` → "FAR"
 - `DFARS 252.###-####` → "DFARS"
 - `AFFARS 5352.###-##` → "AFFARS"
@@ -434,6 +494,7 @@ PATTERNS = {
 ## STATEMENT_OF_WORK Entity Metadata
 
 ### Schema
+
 ```json
 {
   "work_type": string,              // "PWS", "SOW", "SOO"
@@ -448,10 +509,12 @@ PATTERNS = {
 ### Extraction Rules
 
 #### work_type
+
 **Purpose**: Identify SOW format  
 **Method**: Content analysis + label detection
 
 **Detection**:
+
 - **SOW**: Prescriptive language ("shall use", "shall perform with")
 - **PWS**: Performance standards ("achieve 95%", "maintain uptime")
 - **SOO**: Objective language ("objective: provide", "goal:")
@@ -461,6 +524,7 @@ PATTERNS = {
 ## PROGRAM Entity Metadata
 
 ### Schema
+
 ```json
 {
   "program_name": string,           // "Marine Corps Prepositioning Program II"

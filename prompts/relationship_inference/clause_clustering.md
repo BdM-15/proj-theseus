@@ -15,6 +15,7 @@ CLAUSE --CHILD_OF--> SECTION
 **Meaning**: This contract clause belongs to this parent section
 
 **Example**:
+
 ```
 CLAUSE "FAR 52.212-4 Contract Terms and Conditions"
   --CHILD_OF-->
@@ -30,18 +31,20 @@ SECTION "Section I: Contract Clauses"
 **Signal**: Clause number belongs to section numbering scheme
 
 **Example**:
+
 ```
 FAR 52.212-4 → FAR Section 52 series → Section I (Contract Clauses)
 DFARS 252.204-7012 → DFARS Section 252 series → Section I
 ```
 
 **Extraction**:
+
 ```json
 {
   "source_id": "clause_far_52_212_4",
   "target_id": "section_i",
   "relationship_type": "CHILD_OF",
-  "confidence": 0.90,
+  "confidence": 0.9,
   "reasoning": "Numbering pattern: FAR 52.### series typically in Section I"
 }
 ```
@@ -51,6 +54,7 @@ DFARS 252.204-7012 → DFARS Section 252 series → Section I
 **Signal**: Clause listed under section heading
 
 **Example**:
+
 ```
 Section I: Contract Clauses
 
@@ -60,6 +64,7 @@ Section I: Contract Clauses
 ```
 
 **Extraction**:
+
 ```json
 {
   "source_id": "clause_far_52_212_4",
@@ -75,6 +80,7 @@ Section I: Contract Clauses
 **Signal**: Similar clauses grouped together (even if scattered)
 
 **Example**:
+
 ```
 FAR 52.212-1 (page 15)
 FAR 52.212-4 (page 18)
@@ -84,11 +90,12 @@ FAR 52.212-5 (page 22)
 All are FAR 52.2## series → Group together → Section I
 
 **Extraction**:
+
 ```json
 [
-  {"source": "clause_far_52_212_1", "target": "section_i", "confidence": 0.70},
-  {"source": "clause_far_52_212_4", "target": "section_i", "confidence": 0.70},
-  {"source": "clause_far_52_212_5", "target": "section_i", "confidence": 0.70}
+  { "source": "clause_far_52_212_1", "target": "section_i", "confidence": 0.7 },
+  { "source": "clause_far_52_212_4", "target": "section_i", "confidence": 0.7 },
+  { "source": "clause_far_52_212_5", "target": "section_i", "confidence": 0.7 }
 ]
 ```
 
@@ -99,12 +106,14 @@ All are FAR 52.2## series → Group together → Section I
 LLM understands ALL federal agency supplements semantically:
 
 ### Primary Supplements
+
 - **FAR**: Federal Acquisition Regulation (52.###-##)
 - **DFARS**: Defense FAR Supplement (252.###-####)
 - **AFFARS**: Air Force FAR Supplement (5352.###-##)
 - **NMCARS**: Navy/Marine Corps (5252.###-####)
 
 ### Additional Supplements (22 more)
+
 - HSAR (Homeland Security)
 - DOSAR (State Department)
 - GSAM (General Services Administration)
@@ -188,6 +197,7 @@ OUTPUT FORMAT:
 **Rule**: FAR 52.2##-## series are typically REPRESENTATIONS (Section K), not contract clauses
 
 **Example**:
+
 ```
 FAR 52.212-3 Offeror Representations and Certifications → Section K
 FAR 52.212-4 Contract Terms and Conditions → Section I
@@ -198,6 +208,7 @@ FAR 52.212-4 Contract Terms and Conditions → Section I
 **Problem**: Clauses spread across multiple pages
 
 **Example**:
+
 ```
 Page 15: FAR 52.212-1
 Page 18: FAR 52.212-4
@@ -212,6 +223,7 @@ Page 35: DFARS 252.204-7012
 **Pattern**: Some clauses are SPECIAL_REQUIREMENTS (Section H), not standard clauses
 
 **Example**:
+
 ```
 H-1: Key Personnel Requirements
 H-2: Security Clearances
@@ -219,6 +231,7 @@ H-3: Facility Access Badges
 ```
 
 **Extraction**:
+
 ```json
 {
   "source_id": "clause_h1_key_personnel",
@@ -243,6 +256,7 @@ H-3: Facility Access Badges
 ### Expected Relationship Counts (Baseline)
 
 **Navy MBOS (71-page RFP)**:
+
 - Clauses: ~120 entities
 - Expected CHILD_OF relationships: ~120 (100% coverage)
 - Section I (Contract Clauses): ~80 clauses
@@ -254,6 +268,7 @@ H-3: Facility Access Badges
 ## Examples from Real RFPs
 
 ### Example 1: Navy MBOS (Section I)
+
 ```
 Section I: Contract Clauses
 
@@ -268,6 +283,7 @@ Cyber Incident Reporting (DEC 2019)
 ```
 
 **Extracted Relationships** (3):
+
 ```json
 [
   {
@@ -295,6 +311,7 @@ Cyber Incident Reporting (DEC 2019)
 ```
 
 ### Example 2: Section K (Representations)
+
 ```
 Section K: Representations, Certifications, and Other Statements
 
@@ -305,6 +322,7 @@ Products and Commercial Services (JAN 2024)
 ```
 
 **Extracted Relationships** (2):
+
 ```json
 [
   {
@@ -329,6 +347,7 @@ Products and Commercial Services (JAN 2024)
 ## Error Patterns to Avoid
 
 ### ❌ Error 1: Misclassifying Representations as Contract Clauses
+
 ```
 WRONG:
 FAR 52.212-3 Representations → Section I (Contract Clauses)
@@ -337,6 +356,7 @@ FAR 52.212-3 Representations → Section I (Contract Clauses)
 **Correct**: FAR 52.212-3 → Section K (Representations)
 
 ### ❌ Error 2: Creating Multiple Parents
+
 ```
 WRONG:
 Clause_X → Section I
@@ -346,6 +366,7 @@ Clause_X → Section K
 **Correct**: One clause, one primary parent
 
 ### ❌ Error 3: Ignoring Fragmentation
+
 ```
 WRONG:
 FAR 52.212-1 (page 15) → Section I

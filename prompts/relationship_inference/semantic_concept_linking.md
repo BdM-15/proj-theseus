@@ -2,13 +2,15 @@
 
 **Purpose**: Infer implicit relationships between concepts that inform proposal evaluation  
 **Why This Matters**: Reveals hidden connections (e.g., "Safety Factor mentioned alongside Management Approach")  
-**Method**: LLM-powered semantic inference across CONCEPT, STRATEGIC_THEME, EVALUATION_FACTOR entities
+**Method**: LLM-powered semantic inference across CONCEPT, STRATEGIC_THEME, EVALUATION_FACTOR entities  
+**Status**: CORE ALGORITHM (always enabled) - Required for advanced queries and knowledge graph visualization
 
 ---
 
 ## Core Relationship Patterns
 
 ### Pattern 1: INFORMS (Concept → Evaluation Factor)
+
 ```
 CONCEPT/STRATEGIC_THEME --INFORMS--> EVALUATION_FACTOR
 ```
@@ -16,6 +18,7 @@ CONCEPT/STRATEGIC_THEME --INFORMS--> EVALUATION_FACTOR
 **Meaning**: This concept contributes to evaluation under this factor
 
 **Examples**:
+
 ```
 "past performance" --INFORMS--> "Proposal Evaluation"
 "technical approach themes" --INFORMS--> "Technical Approach Factor"
@@ -26,6 +29,7 @@ CONCEPT/STRATEGIC_THEME --INFORMS--> EVALUATION_FACTOR
 ---
 
 ### Pattern 2: IMPACTS (Weakness/Strength → Rating)
+
 ```
 CONCEPT --IMPACTS--> CONCEPT (rating-related)
 ```
@@ -33,6 +37,7 @@ CONCEPT --IMPACTS--> CONCEPT (rating-related)
 **Meaning**: This quality affects scoring outcome
 
 **Examples**:
+
 ```
 "significant weakness" --REDUCES--> "overall rating"
 "significant strength" --INCREASES--> "factor score"
@@ -43,6 +48,7 @@ CONCEPT --IMPACTS--> CONCEPT (rating-related)
 ---
 
 ### Pattern 3: DETERMINES (Factor → Award)
+
 ```
 EVALUATION_FACTOR --DETERMINES--> EVENT (award decision)
 ```
@@ -50,6 +56,7 @@ EVALUATION_FACTOR --DETERMINES--> EVENT (award decision)
 **Meaning**: This factor influences contract award outcome
 
 **Examples**:
+
 ```
 "Proposal Evaluation" --DETERMINES--> "award"
 "overall rating" --DETERMINES--> "selection decision"
@@ -59,6 +66,7 @@ EVALUATION_FACTOR --DETERMINES--> EVENT (award decision)
 ---
 
 ### Pattern 4: GUIDES (Requirements → Evaluation)
+
 ```
 CONCEPT --GUIDES--> EVALUATION_FACTOR
 ```
@@ -66,6 +74,7 @@ CONCEPT --GUIDES--> EVALUATION_FACTOR
 **Meaning**: Solicitation requirements guide evaluation approach
 
 **Examples**:
+
 ```
 "solicitation requirements" --GUIDES--> "Proposal Evaluation"
 "technical factors" --GUIDES--> "Technical Approach scoring"
@@ -83,6 +92,7 @@ CONCEPT --GUIDES--> EVALUATION_FACTOR
 **Example Query**: "What are the main pain points of the customer and how would we effectively address them in a proposal? Which evaluation factors would we address them?"
 
 **Inference Logic**:
+
 ```
 IF STRATEGIC_THEME mentions "pain point" or "challenge"
 AND EVALUATION_FACTOR addresses related topic
@@ -90,6 +100,7 @@ THEN create: STRATEGIC_THEME --ADDRESSED_BY--> EVALUATION_FACTOR
 ```
 
 **Real Example**:
+
 ```
 STRATEGIC_THEME: "Outdated IT infrastructure causing downtime"
   --ADDRESSED_BY-->
@@ -97,6 +108,7 @@ EVALUATION_FACTOR: "Technical Approach - System Modernization" (40% weight)
 ```
 
 **LLM Prompt Snippet**:
+
 ```
 Identify customer pain points from:
 - Section C (SOW) problem statements
@@ -117,6 +129,7 @@ Link each pain point to:
 **Example Query**: "What are the factor elements for past performance?"
 
 **Inference Logic**:
+
 ```
 IF EVALUATION_FACTOR has sub-factors or subfactors mentioned
 THEN create: EVALUATION_FACTOR (sub) --CHILD_OF--> EVALUATION_FACTOR (parent)
@@ -124,6 +137,7 @@ AND: CONCEPT (element) --INFORMS--> EVALUATION_FACTOR (sub)
 ```
 
 **Real Example**:
+
 ```
 EVALUATION_FACTOR: "Factor 3 - Past Performance" (20% weight)
   ├── CONCEPT: "relevant contracts" --INFORMS--> Past Performance
@@ -134,6 +148,7 @@ EVALUATION_FACTOR: "Factor 3 - Past Performance" (20% weight)
 ```
 
 **From Navy MBOS Section M**:
+
 ```
 Factor 2 - Management Approach (30%)
   ├── management approach demonstration
@@ -157,6 +172,7 @@ Factor 2 - Management Approach (30%)
 **Insight Generated**: "Safety Factor (from RFP Section M) - Although not directly related to management approach, safety is mentioned alongside factor 2 and could be considered during evaluation"
 
 **Inference Logic**:
+
 ```
 IF EVALUATION_FACTOR_A and EVALUATION_FACTOR_B appear within N lines/paragraphs
 AND they are NOT explicitly linked by Section L
@@ -165,6 +181,7 @@ WITH note: "Mentioned adjacently in Section M"
 ```
 
 **Real Example**:
+
 ```
 EVALUATION_FACTOR: "Factor 2 - Management Approach" (Section M, para 3)
 EVALUATION_FACTOR: "Factor 3 - Safety" (Section M, para 4)
@@ -184,6 +201,7 @@ Reasoning: "Adjacent factors in Section M may share evaluation criteria"
 **Example Query**: "Based on the proposal instructions provide me a bulletized proposal outline and specifics on the content I should address the customer pain points and identify solutioning opportunities that may gain me more favor in the award decision."
 
 **Inference Logic**:
+
 ```
 FOR each EVALUATION_FACTOR (ordered by weight DESC):
   1. Find all REQUIREMENT --EVALUATED_BY--> FACTOR
@@ -194,6 +212,7 @@ FOR each EVALUATION_FACTOR (ordered by weight DESC):
 ```
 
 **Output Structure**:
+
 ```
 Proposal Outline (Technical Volume)
 
@@ -225,6 +244,7 @@ Proposal Outline (Technical Volume)
 **Purpose**: Identify high-value opportunities for competitive differentiation
 
 **Inference Logic**:
+
 ```
 FOR each EVALUATION_FACTOR:
   IF factor.weight >= 0.30 (high weight)
@@ -234,6 +254,7 @@ FOR each EVALUATION_FACTOR:
 ```
 
 **Example Output**:
+
 ```
 OPPORTUNITY_001:
   Factor: Technical Approach (40% weight)
@@ -314,6 +335,7 @@ OUTPUT FORMAT:
 **Problem**: Pain point affects multiple evaluation factors
 
 **Example**:
+
 ```
 STRATEGIC_THEME: "Cybersecurity vulnerabilities in legacy systems"
 
@@ -332,6 +354,7 @@ Maps to:
 **Problem**: Section M mentions factor briefly, details scattered elsewhere
 
 **Example**:
+
 ```
 Section M: "Factor 3 - Safety (although not directly related to management...)"
 
@@ -350,6 +373,7 @@ This IMPLIES:
 **Problem**: Identify discriminators that win proposals (Shipley methodology)
 
 **Inference**:
+
 ```
 IF REQUIREMENT.criticality == "MANDATORY"
 AND EVALUATION_FACTOR.weight >= 0.25
@@ -358,6 +382,7 @@ THEN: High-value win theme opportunity
 ```
 
 **Example**:
+
 ```
 WIN_THEME_001:
   Title: "Zero-Downtime Migration"
@@ -375,16 +400,19 @@ WIN_THEME_001:
 ### Complements (Not Replaces)
 
 **Existing Prompts** (structural relationships):
+
 - `document_hierarchy.md`: J-02000000-10 → J-02000000
 - `requirement_evaluation.md`: REQ-043 → Management Approach
 - `section_l_m_linking.md`: Page limit → Technical Approach
 
 **Semantic Linking** (this prompt - conceptual relationships):
+
 - "past performance" → Proposal Evaluation
 - "significant weakness" → overall rating
 - "safety factor" → management approach (adjacent)
 
 **Combined Query Power**:
+
 ```
 Query: "What impacts my Management Approach score?"
 
@@ -414,12 +442,14 @@ Semantic:
 ### Expected Relationship Counts (Baseline)
 
 **Navy MBOS (71-page RFP)**:
+
 - Evaluation factors: 5 entities
 - Concepts: ~30 entities
 - Strategic themes: ~10 entities
 - Expected semantic relationships: ~40-50 (8-10 per factor)
 
 **Breakdown**:
+
 - Pain point → Factor: ~10 relationships
 - Factor elements (INFORMS): ~20 relationships
 - Adjacent factors (RELATED_TO): ~5 relationships
@@ -438,7 +468,10 @@ A successful semantic concept linking run should:
 
 ---
 
-**Last Updated**: January 2025 (Branch 004 - Phase 1 Extension)  
+**Last Updated**: January 2025 (Branch 004 - Phase 1)  
 **Version**: 1.0 (New - Semantic inference for proposal intelligence)  
-**Optional**: Can be disabled without affecting baseline metrics (Phase 8 validation)  
-**Impact**: Enables advanced queries: pain point mapping, proposal outlines, competitive analysis, factor decomposition
+**Status**: CORE ALGORITHM - Always enabled (not optional)  
+**Impact**: Enables advanced queries: pain point mapping, proposal outlines, competitive analysis, factor decomposition, adjacent factor discovery  
+**Cost**: ~$0.01 per RFP (5,000-token context to Grok-beta)  
+**Time**: +10-15 seconds processing (15% increase over baseline)  
+**Value**: Competitive differentiation - finds relationships humans might miss

@@ -15,6 +15,7 @@ REQUIREMENT --EVALUATED_BY--> EVALUATION_FACTOR
 **Meaning**: This requirement is scored under this evaluation factor
 
 **Example**:
+
 ```
 REQUIREMENT "Weekly status reports" (criticality: MANDATORY)
   --EVALUATED_BY-->
@@ -32,6 +33,7 @@ EVALUATION_FACTOR "Management Approach" (weight: 30%)
 **Signal**: Requirement topic matches evaluation factor topic
 
 **Example**:
+
 ```
 REQUIREMENT: "The contractor shall provide 24/7 help desk support"
 EVALUATION_FACTOR: "Technical Approach - Help Desk Operations"
@@ -40,12 +42,13 @@ EVALUATION_FACTOR: "Technical Approach - Help Desk Operations"
 **Topic Match**: "help desk support" ↔ "Help Desk Operations"
 
 **Extraction**:
+
 ```json
 {
   "source_id": "requirement_helpdesk_247",
   "target_id": "factor_technical_helpdesk",
   "relationship_type": "EVALUATED_BY",
-  "confidence": 0.80,
+  "confidence": 0.8,
   "reasoning": "Topic alignment: help desk requirement → help desk factor"
 }
 ```
@@ -55,6 +58,7 @@ EVALUATION_FACTOR: "Technical Approach - Help Desk Operations"
 **Signal**: MANDATORY requirements → high-weight factors
 
 **Example**:
+
 ```
 REQUIREMENT: "shall provide weekly status reports" (criticality: MANDATORY)
 EVALUATION_FACTOR: "Management Approach" (weight: 30%)
@@ -63,6 +67,7 @@ EVALUATION_FACTOR: "Management Approach" (weight: 30%)
 **Logic**: Management requirements typically scored under Management Approach
 
 **Extraction**:
+
 ```json
 {
   "source_id": "requirement_status_reports",
@@ -78,6 +83,7 @@ EVALUATION_FACTOR: "Management Approach" (weight: 30%)
 **Signal**: Requirement and factor appear near each other in document
 
 **Example**:
+
 ```
 Section M: Evaluation Factor 2 - Technical Approach (40%)
 
@@ -88,12 +94,13 @@ compliant with NIST 800-171.
 **Proximity**: Cybersecurity requirement discussed near Technical Approach factor
 
 **Extraction**:
+
 ```json
 {
   "source_id": "requirement_cybersecurity_nist",
   "target_id": "factor_technical_approach",
   "relationship_type": "EVALUATED_BY",
-  "confidence": 0.70,
+  "confidence": 0.7,
   "reasoning": "Content proximity: Cybersecurity requirement referenced near Technical Approach factor"
 }
 ```
@@ -103,12 +110,14 @@ compliant with NIST 800-171.
 **Signal**: Requirement explicitly mentions evaluation factor
 
 **Example**:
+
 ```
 "The contractor shall provide a quality assurance plan (see Section M,
 Factor 3: Quality Control)"
 ```
 
 **Extraction**:
+
 ```json
 {
   "source_id": "requirement_qa_plan",
@@ -124,13 +133,16 @@ Factor 3: Quality Control)"
 ## Topic Alignment Categories
 
 ### Category 1: Technical Requirements
+
 **Typical Factors**:
+
 - Technical Approach
 - Technical Capability
 - System Architecture
 - Technology Solution
 
 **Examples**:
+
 ```
 "shall integrate with existing IT systems" → Technical Approach
 "shall support 99.9% uptime" → Technical Capability
@@ -138,13 +150,16 @@ Factor 3: Quality Control)"
 ```
 
 ### Category 2: Management Requirements
+
 **Typical Factors**:
+
 - Management Approach
 - Program Management
 - Project Management Plan
 - Risk Management
 
 **Examples**:
+
 ```
 "shall provide weekly status reports" → Management Approach
 "shall maintain project schedule" → Program Management
@@ -152,52 +167,64 @@ Factor 3: Quality Control)"
 ```
 
 ### Category 3: Performance Requirements
+
 **Typical Factors**:
+
 - Past Performance
 - Demonstrated Experience
 - Relevant Experience
 - Corporate Experience
 
 **Examples**:
+
 ```
 "Contractor must have 5 years experience" → Past Performance
 "Similar contracts within last 3 years" → Demonstrated Experience
 ```
 
 ### Category 4: Personnel Requirements
+
 **Typical Factors**:
+
 - Key Personnel
 - Staffing Approach
 - Personnel Qualifications
 - Team Composition
 
 **Examples**:
+
 ```
 "Program Manager shall have PMP certification" → Key Personnel
 "shall provide resumes for all proposed staff" → Personnel Qualifications
 ```
 
 ### Category 5: Quality Requirements
+
 **Typical Factors**:
+
 - Quality Control
 - Quality Assurance Plan
 - Quality Management
 - Performance Standards
 
 **Examples**:
+
 ```
 "shall maintain ISO 9001 certification" → Quality Control
 "shall conduct quarterly quality audits" → Quality Assurance Plan
 ```
 
 ### Category 6: Transition Requirements
+
 **Typical Factors**:
+
 - Transition Plan
 - Transition Approach
 - Phase-In Plan
 - Continuity of Operations
 
 **Examples**:
+
 ```
 "shall complete transition within 90 days" → Transition Plan
 "shall ensure zero downtime during transition" → Continuity of Operations
@@ -273,15 +300,18 @@ OUTPUT FORMAT:
 ### Case 1: One Requirement → Multiple Factors
 
 **Example**:
+
 ```
 REQUIREMENT: "The contractor shall implement NIST 800-171 cybersecurity controls"
 ```
 
 **Maps to**:
+
 1. Factor 2: Technical Approach (cybersecurity implementation)
 2. Factor 4: Security Compliance (NIST 800-171 compliance)
 
 **Extraction**:
+
 ```json
 [
   {
@@ -306,6 +336,7 @@ REQUIREMENT: "The contractor shall implement NIST 800-171 cybersecurity controls
 **Rule**: Government obligations (Government shall) do NOT map to evaluation factors
 
 **Example**:
+
 ```
 REQUIREMENT: "The Government shall provide GFE within 30 days"
 (criticality: INFORMATIONAL, priority_score: 0)
@@ -318,6 +349,7 @@ REQUIREMENT: "The Government shall provide GFE within 30 days"
 **Rule**: If no semantic match found, check if requirement is truly INFORMATIONAL
 
 **Example**:
+
 ```
 REQUIREMENT: "Contract period: 5 years with 5 option years"
 (criticality: INFORMATIONAL)
@@ -330,6 +362,7 @@ REQUIREMENT: "Contract period: 5 years with 5 option years"
 **Rule**: Use requirement_type field for high-confidence mappings
 
 **Example**:
+
 ```
 REQUIREMENT: "shall conduct risk assessments quarterly"
 requirement_type: MANAGEMENT
@@ -339,6 +372,7 @@ requirement_classification: MANAGEMENT
 **Override**: Even though "risk" might match Security factor, MANAGEMENT type → Management Approach
 
 **Extraction**:
+
 ```json
 {
   "source_id": "requirement_risk_assessments",
@@ -363,6 +397,7 @@ requirement_classification: MANAGEMENT
 ### Expected Relationship Counts (Baseline)
 
 **Navy MBOS (71-page RFP)**:
+
 - Requirements: ~80 entities (REQUIREMENT type)
 - MANDATORY requirements: ~50 (criticality_level ≥ 0.80)
 - Evaluation factors: 5 factors (Section M)
@@ -377,6 +412,7 @@ requirement_classification: MANAGEMENT
 ### Example 1: Navy MBOS - Management Requirements
 
 **Requirement**:
+
 ```
 REQUIREMENT_043: "The Contractor shall provide weekly status reports
 to the COR (Contracting Officer's Representative)."
@@ -387,6 +423,7 @@ to the COR (Contracting Officer's Representative)."
 ```
 
 **Factor**:
+
 ```
 EVALUATION_FACTOR_M2: "Factor 2: Management Approach (30%)"
 - Description: "The Government will evaluate the offeror's understanding
@@ -394,6 +431,7 @@ EVALUATION_FACTOR_M2: "Factor 2: Management Approach (30%)"
 ```
 
 **Extracted Relationship**:
+
 ```json
 {
   "source_id": "requirement_043",
@@ -407,6 +445,7 @@ EVALUATION_FACTOR_M2: "Factor 2: Management Approach (30%)"
 ### Example 2: Navy MBOS - Technical Requirements
 
 **Requirement**:
+
 ```
 REQUIREMENT_012: "The Contractor shall integrate the solution with
 the Navy's existing Enterprise Resource Planning (ERP) system."
@@ -417,6 +456,7 @@ the Navy's existing Enterprise Resource Planning (ERP) system."
 ```
 
 **Factor**:
+
 ```
 EVALUATION_FACTOR_M1: "Factor 1: Technical Approach (40%)"
 - Description: "The Government will evaluate the offeror's understanding
@@ -424,12 +464,13 @@ EVALUATION_FACTOR_M1: "Factor 1: Technical Approach (40%)"
 ```
 
 **Extracted Relationship**:
+
 ```json
 {
   "source_id": "requirement_012",
   "target_id": "evaluation_factor_m1",
   "relationship_type": "EVALUATED_BY",
-  "confidence": 0.90,
+  "confidence": 0.9,
   "reasoning": "Topic alignment: system integration requirement → Technical Approach factor (integration subcategory)"
 }
 ```
@@ -437,6 +478,7 @@ EVALUATION_FACTOR_M1: "Factor 1: Technical Approach (40%)"
 ### Example 3: Navy MBOS - Multiple Factor Mapping
 
 **Requirement**:
+
 ```
 REQUIREMENT_027: "The Contractor shall implement NIST 800-171 cybersecurity
 controls and provide quarterly compliance reports to the Government."
@@ -447,12 +489,14 @@ controls and provide quarterly compliance reports to the Government."
 ```
 
 **Factors**:
+
 ```
 EVALUATION_FACTOR_M1: "Factor 1: Technical Approach (40%)"
 EVALUATION_FACTOR_M2: "Factor 2: Management Approach (30%)"
 ```
 
 **Extracted Relationships** (2):
+
 ```json
 [
   {
@@ -477,6 +521,7 @@ EVALUATION_FACTOR_M2: "Factor 2: Management Approach (30%)"
 ## Error Patterns to Avoid
 
 ### ❌ Error 1: Mapping INFORMATIONAL Requirements
+
 ```
 WRONG:
 "Government shall provide GFE" → Technical Approach factor
@@ -485,6 +530,7 @@ WRONG:
 **Correct**: Skip INFORMATIONAL requirements (government obligations)
 
 ### ❌ Error 2: Ignoring Requirement Type
+
 ```
 WRONG:
 "shall conduct risk assessments" → Security factor (because "risk" keyword)
@@ -493,6 +539,7 @@ WRONG:
 **Correct**: requirement_type: MANAGEMENT → Management Approach factor
 
 ### ❌ Error 3: Low Confidence Guessing
+
 ```
 WRONG:
 "The contractor shall..." → Technical Approach (confidence: 0.50)
@@ -501,6 +548,7 @@ WRONG:
 **Correct**: Only create relationship if confidence ≥0.70
 
 ### ❌ Error 4: Missing Multiple Factor Mappings
+
 ```
 WRONG:
 "implement NIST 800-171 cybersecurity controls" → Technical Approach only
@@ -517,6 +565,7 @@ WRONG:
 **Query**: "How much effort should we allocate to Management Approach?"
 
 **Logic**:
+
 1. Count EVALUATED_BY relationships to Management Approach factor
 2. Weight by requirement criticality_level
 3. Multiply by factor weight (30%)
@@ -528,6 +577,7 @@ WRONG:
 **Query**: "What requirements must be addressed in Technical Approach section?"
 
 **Logic**:
+
 1. Find all requirements with EVALUATED_BY → Technical Approach
 2. Group by requirement_classification (FUNCTIONAL, PERFORMANCE, INTERFACE, etc.)
 3. Order by criticality_level (MANDATORY first)
@@ -539,6 +589,7 @@ WRONG:
 **Query**: "Generate compliance matrix for Section M evaluation"
 
 **Logic**:
+
 1. For each evaluation factor, list all EVALUATED_BY requirements
 2. Include requirement criticality, requirement_id, description
 3. Add proposal page reference (to be filled by proposal team)

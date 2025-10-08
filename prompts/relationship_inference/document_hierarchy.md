@@ -1,38 +1,26 @@
 # Document Hierarchy Rules# Annex Linking Rules
 
+**Purpose**: Build hierarchical relationships between parent and child documents **Purpose**: Link numbered attachments (J-####, Annex ##) to parent sections
 
-
-**Purpose**: Build hierarchical relationships between parent and child documents  **Purpose**: Link numbered attachments (J-####, Annex ##) to parent sections  
-
-**Why This Matters**: Prevents orphaned sub-documents (J-02000000-10 isolated from J-02000000)  **Why This Matters**: 100% annex coverage (vs 84.6% with regex patterns)  
+**Why This Matters**: Prevents orphaned sub-documents (J-02000000-10 isolated from J-02000000) **Why This Matters**: 100% annex coverage (vs 84.6% with regex patterns)
 
 **Method**: LLM-powered pattern detection across DOCUMENT, CLAUSE, and ANNEX entity types**Method**: LLM-powered semantic inference (agency-agnostic)
 
-
-
-------
-
-
+---
 
 ## Core Relationship Pattern## Core Relationship Pattern
 
-
-
-``````
+```
 
 DOCUMENT/CLAUSE/ANNEX --CHILD_OF--> DOCUMENT/CLAUSE/ANNEXANNEX --ATTACHMENT_OF--> SECTION
 
-``````
-
-
+```
 
 **Meaning**: This document/standard/clause is a subsection or part of a parent document**Meaning**: This annex/attachment belongs to this parent section
 
-
-
 **Examples**:**Example**:
 
-``````
+````
 
 J-02000000-10 (Technical Requirements) --CHILD_OF--> J-02000000 (PWS)ANNEX "J-0200000-18 Performance Work Statement"
 
@@ -134,9 +122,7 @@ PWS-001             (parent: performance requirement)J-0200000-18: Performance W
 
 PWS-001-A           (child: adds -A)J-0300000-12: Equipment List and Specifications
 
-``````
-
-
+````
 
 **Detection Logic**:**Extraction**:
 
@@ -144,29 +130,25 @@ PWS-001-A           (child: adds -A)J-0300000-12: Equipment List and Specificati
 
 - Check if prefix matches another entity's full ID{
 
-- If match: Create CHILD_OF relationship  "source_id": "annex_j0200000_18",
+- If match: Create CHILD_OF relationship "source_id": "annex_j0200000_18",
 
   "target_id": "section_j",
 
-**Confidence**: 0.95 (unambiguous pattern)  "relationship_type": "ATTACHMENT_OF",
+**Confidence**: 0.95 (unambiguous pattern) "relationship_type": "ATTACHMENT_OF",
 
-  "confidence": 0.95,
+"confidence": 0.95,
 
----  "reasoning": "Explicit citation: Listed under 'Section J: List of Attachments'"
+--- "reasoning": "Explicit citation: Listed under 'Section J: List of Attachments'"
 
 }
 
 ### Pattern 2: Standard + Subsection (Technical Specs)```
 
-
-
 **Signal**: Standard name followed by section/task/control number### Pattern 3: Content Alignment (Confidence: 0.70)
-
-
 
 **Examples**:**Signal**: Annex content matches section topic
 
-```
+````
 
 MIL-STD-882E                    (parent: standard)**Example**:
 
@@ -214,11 +196,9 @@ CMMI-DEV v2.0 PA 1.1            (child: practice area)  "target_id": "section_c"
 
 ---
 
-```
+````
 
 ### Pattern 3: Clause + Paragraph (FAR/DFARS)You are analyzing annexes/attachments and sections to determine parent-child relationships.
-
-
 
 **Signal**: Clause number followed by paragraph notation (a), (b)(1), etc.ANNEXES/ATTACHMENTS:
 
@@ -250,21 +230,19 @@ DFARS 252.204-7012(b)(2)(ii)(A) (grandchild: letter A)   - Letter prefix: "X-###
 
 2. EXPLICIT CITATION (Confidence 0.95):
 
-**Detection Logic**:   - Listed under section heading
+**Detection Logic**: - Listed under section heading
 
-- Extract base clause number (before parentheses)   - "The following documents are incorporated..."
+- Extract base clause number (before parentheses) - "The following documents are incorporated..."
 
 - Check if base clause matches another entity
 
 - If match: Create CHILD_OF relationship3. CONTENT ALIGNMENT (Confidence 0.70):
 
-   - Referenced in section text
+  - Referenced in section text
 
-**Confidence**: 0.95 (unambiguous pattern)   - Annex content topic matches section topic
+**Confidence**: 0.95 (unambiguous pattern) - Annex content topic matches section topic
 
-
-
----SPECIAL RULE: 
+---SPECIAL RULE:
 
 Works for ANY naming convention - not just Navy patterns!
 
@@ -302,9 +280,7 @@ Specification 5000              (parent: spec)  }
 
 Specification 5000.1            (child: sub-spec)]
 
-``````
-
-
+```
 
 **Detection Logic**:---
 
@@ -328,7 +304,7 @@ J-0200000-18 → Section J
 
 ### General Services Administration (GSA)
 
-``````
+```
 
 You are analyzing document references to build hierarchical relationships (parent-child structure).Exhibit A → Section J
 
@@ -337,8 +313,6 @@ Appendix 1 → Section J
 ENTITIES:Attachment I → Section J
 
 {json_list_of_documents_clauses_annexes}```
-
-
 
 TASK:### Department of Energy (DOE)
 
@@ -362,8 +336,6 @@ Annex 1 → Section J
 
    - "ISO 9001:2015 8.2.3" is child of "ISO 9001:2015"```
 
-
-
 3. CLAUSE + PARAGRAPH (Confidence 0.95):### Department of State
 
    - "FAR 52.212-4(a)" is child of "FAR 52.212-4"```
@@ -378,8 +350,6 @@ Appendix A → Section J
 
    - "Section 3.1.2" is child of "Section 3.1"**Key Insight**: LLM understands ALL these patterns semantically, not via hardcoded regex!
 
-
-
 HIERARCHICAL RULES:---
 
 - A document can have MULTIPLE children (1-to-many)
@@ -390,8 +360,6 @@ HIERARCHICAL RULES:---
 
 - Confidence threshold: ≥0.70### Case 1: Section C References J Annex
 
-
-
 ENTITY TYPES:**Example**:
 
 - ANNEX: RFP attachments (J-02000000, Exhibit A, Annex XVII)```
@@ -400,7 +368,7 @@ ENTITY TYPES:**Example**:
 
 - CLAUSE: FAR/DFARS clauses with paragraph citationsSee Attachment J-0200000-18 for Performance Work Statement.
 
-```
+````
 
 OUTPUT FORMAT:
 
@@ -440,11 +408,11 @@ OUTPUT FORMAT:
 
 **Problem**: Three-level hierarchy (parent → child → grandchild)]
 
-```
+````
 
 **Example**:
 
-```### Case 2: Standalone Annex (No Clear Section)
+````### Case 2: Standalone Annex (No Clear Section)
 
 J-02000000              (parent: PWS)
 
@@ -494,15 +462,15 @@ J-02000000-10-A         (grandchild: Hardware Requirements)
 
 **Result**: Full tree navigation via transitive relationships**Example**:
 
-```
+````
 
 ---J-0200000-18: PWS
 
-  - Sub-Annex J-0200000-18-A: Equipment List
+- Sub-Annex J-0200000-18-A: Equipment List
 
-### Case 2: Version Numbers vs. Subsections  - Sub-Annex J-0200000-18-B: Site Map
+### Case 2: Version Numbers vs. Subsections - Sub-Annex J-0200000-18-B: Site Map
 
-```
+````
 
 **Problem**: Decimal notation can be version OR hierarchy
 
@@ -558,7 +526,7 @@ NIST 800-53 Rev 5 AC-1  (control AC-1, IS hierarchy)    "source": "sub_annex_j02
 
 **Example**:### Validation Rules
 
-```
+````
 
 NOT RELATED:1. ✅ **100% coverage**: Every annex must link to at least one section
 
@@ -567,8 +535,6 @@ MIL-STD-882E (System Safety)2. ✅ **Confidence threshold**: ≥0.60 minimum
 MIL-STD-881D (Work Breakdown Structure)3. ✅ **Naming convention preferred**: Use prefix pattern when available (confidence 1.0)
 
 → Similar prefix but different standards (NOT parent-child)4. ✅ **No orphans**: Every annex has ATTACHMENT_OF relationship
-
-
 
 FAR 52.212-4 (Contract Terms)### Expected Relationship Counts (Baseline)
 
@@ -582,7 +548,7 @@ FAR 52.212-5 (Required Statutes)
 
 **Detection Rule**:
 
-- Full parent ID must be PREFIX of child ID**Branch 002 Baseline (Regex)**: 84.6% coverage (74/88 linked)  
+- Full parent ID must be PREFIX of child ID**Branch 002 Baseline (Regex)**: 84.6% coverage (74/88 linked)
 
 - NOT just similar or overlapping text**Branch 003 Goal (LLM)**: 100% coverage (88/88 linked) ✅
 
@@ -602,7 +568,7 @@ FAR 52.212-5 (Required Statutes)
 
 **Example**:Section J: List of Attachments
 
-```
+````
 
 J-02000000 "PWS - Cybersecurity Requirements per NIST 800-171"J-0200000-18: Performance Work Statement
 
@@ -610,7 +576,7 @@ NIST 800-171 3.1.1 (specific control)J-0300000-12: Equipment List
 
 ```J-0400000-05: Site Layout Maps
 
-```
+````
 
 **Question**: Is NIST 800-171 3.1.1 a child of J-02000000?
 
@@ -618,7 +584,7 @@ NIST 800-171 3.1.1 (specific control)J-0300000-12: Equipment List
 
 **Answer**: NO - Use REFERENCES relationship instead```json
 
-```[
+````[
 
 J-02000000 --REFERENCES--> NIST 800-171  {
 
@@ -684,11 +650,11 @@ Attachment I: Sample Invoice
 
 **Example**:```
 
-```
+````
 
 FAR 52.212-4 --CHILD_OF--> Section I**Extracted Relationships** (3):
 
-``````json
+````json
 
 [
 
@@ -824,9 +790,9 @@ ANNEX_006: J-03000000-10 "Performance Standards"4. ✅ **Zero orphans**: No unli
 
 **Extracted Relationships** (5):
 
-```json**Last Updated**: January 2025 (Branch 004)  
+```json**Last Updated**: January 2025 (Branch 004)
 
-[**Version**: 2.0 (LLM semantic inference replaces regex patterns)  
+[**Version**: 2.0 (LLM semantic inference replaces regex patterns)
 
   {**Achievement**: 100% coverage (vs 84.6% regex baseline)
 
@@ -1001,7 +967,8 @@ A successful document hierarchy run should:
 
 ---
 
-**Last Updated**: January 2025 (Branch 004 - Phase 1 Refactor)  
-**Version**: 2.0 (Generalized from annex-specific to document-wide hierarchy)  
-**Key Improvement**: Handles DOCUMENT, CLAUSE, ANNEX entity types with 4 universal patterns (not just Navy J-annexes)  
+**Last Updated**: January 2025 (Branch 004 - Phase 1 Refactor)
+**Version**: 2.0 (Generalized from annex-specific to document-wide hierarchy)
+**Key Improvement**: Handles DOCUMENT, CLAUSE, ANNEX entity types with 4 universal patterns (not just Navy J-annexes)
 **Impact**: Solves orphaned sub-documents across all RFP types and document families
+````

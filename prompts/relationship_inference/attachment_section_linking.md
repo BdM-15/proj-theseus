@@ -15,6 +15,7 @@ ANNEX/DOCUMENT --ATTACHMENT_OF--> SECTION
 **Meaning**: This attachment/document is listed under this parent section
 
 **Example**:
+
 ```
 ANNEX "J-02000000 Performance Work Statement"
   --ATTACHMENT_OF-->
@@ -22,6 +23,7 @@ SECTION "Section J: List of Attachments"
 ```
 
 **Note**: This is DIFFERENT from document hierarchy (CHILD_OF)
+
 - ATTACHMENT_OF: Top-level annex → RFP section (J-02000000 → Section J)
 - CHILD_OF: Sub-annex → Parent annex (J-02000000-10 → J-02000000)
 
@@ -34,6 +36,7 @@ SECTION "Section J: List of Attachments"
 **Signal**: Prefix matches section letter
 
 **Patterns**:
+
 ```
 J-######        → Section J (List of Attachments)
 A-######        → Section A (Solicitation/Contract Form)
@@ -44,6 +47,7 @@ Exhibit X       → Section J (default for DoD) OR Section B (GSA pricing)
 ```
 
 **Examples**:
+
 ```
 "J-02000000 PWS" → prefix "J-" → Section J (confidence: 1.0)
 "Attachment 5" → default Section J (confidence: 1.0)
@@ -52,6 +56,7 @@ Exhibit X       → Section J (default for DoD) OR Section B (GSA pricing)
 ```
 
 **Extraction**:
+
 ```json
 {
   "source_id": "annex_j_02000000",
@@ -69,6 +74,7 @@ Exhibit X       → Section J (default for DoD) OR Section B (GSA pricing)
 **Signal**: Attachment listed under section heading in document
 
 **Example**:
+
 ```
 Section J: List of Attachments
 
@@ -79,6 +85,7 @@ The following documents are attached:
 ```
 
 **Extraction**:
+
 ```json
 [
   {
@@ -105,6 +112,7 @@ The following documents are attached:
 **Signal**: Attachment content matches section purpose
 
 **Example**:
+
 ```
 Exhibit A: Pricing Schedule
 Section B: Supplies or Services and Prices/Costs
@@ -113,17 +121,19 @@ Section B: Supplies or Services and Prices/Costs
 **Logic**: Pricing-related attachment → Section B (pricing section)
 
 **Extraction**:
+
 ```json
 {
   "source_id": "annex_exhibit_a_pricing",
   "target_id": "section_b",
   "relationship_type": "ATTACHMENT_OF",
-  "confidence": 0.70,
+  "confidence": 0.7,
   "reasoning": "Content alignment: Pricing schedule → Section B (Supplies/Prices)"
 }
 ```
 
 **Common Content Alignments**:
+
 - Pricing/Cost → Section B
 - PWS/SOW/SOO → Section C (or Section J if attached)
 - Key Personnel → Section H
@@ -274,6 +284,7 @@ OUTPUT FORMAT:
 **Rule**: Only TOP-LEVEL attachments get ATTACHMENT_OF relationship
 
 **Example**:
+
 ```
 CORRECT:
 J-02000000 --ATTACHMENT_OF--> Section J ✅
@@ -292,6 +303,7 @@ J-02000000-10 --ATTACHMENT_OF--> Section J ❌ (use CHILD_OF instead)
 **Problem**: PWS/SOW can be in Section C (inline) OR Section J (attached)
 
 **Detection**:
+
 ```
 IF PWS has J-prefix → Section J (attached)
 IF PWS labeled "Section C" → Section C (inline)
@@ -299,6 +311,7 @@ IF unclear → Check page location (Section J typically page 40+)
 ```
 
 **Example**:
+
 ```
 "J-02000000 Performance Work Statement" → Section J ✅
 "Section C: Statement of Work" → Section C ✅
@@ -311,6 +324,7 @@ IF unclear → Check page location (Section J typically page 40+)
 **Problem**: GSA uses "Exhibit" for both pricing and technical
 
 **Detection Rule**:
+
 ```
 IF Exhibit name contains "Pricing", "Cost", "Price Schedule", "Financial"
   → Section B (Supplies/Prices)
@@ -319,6 +333,7 @@ ELSE
 ```
 
 **Examples**:
+
 ```
 "Exhibit A - Pricing Schedule" → Section B ✅
 "Exhibit B - Technical Approach" → Section J ✅
@@ -331,6 +346,7 @@ ELSE
 **Problem**: Document cited but not physically attached to RFP
 
 **Example**:
+
 ```
 "Comply with MIL-STD-882E" (cited in Section C, not attached)
 ```
@@ -338,6 +354,7 @@ ELSE
 **Rule**: Do NOT create ATTACHMENT_OF relationship
 
 **Alternative**: Create REFERENCES relationship instead
+
 ```
 Section C --REFERENCES--> MIL-STD-882E (not ATTACHMENT_OF)
 ```
@@ -349,11 +366,13 @@ Section C --REFERENCES--> MIL-STD-882E (not ATTACHMENT_OF)
 ### Two Complementary Relationships
 
 **ATTACHMENT_OF** (this prompt):
+
 ```
 J-02000000 --ATTACHMENT_OF--> Section J
 ```
 
 **CHILD_OF** (document_hierarchy.md):
+
 ```
 J-02000000-10 --CHILD_OF--> J-02000000
 J-02000000-20 --CHILD_OF--> J-02000000
@@ -372,6 +391,7 @@ Section J
 ```
 
 **Navigation Queries**:
+
 - "Show all Section J attachments" → Follow ATTACHMENT_OF relationships
 - "Show sub-attachments of J-02000000" → Follow CHILD_OF relationships
 
@@ -389,6 +409,7 @@ Section J
 ### Expected Relationship Counts (Baseline)
 
 **Navy MBOS (71-page RFP)**:
+
 - Annexes: ~88 entities (ANNEX type)
 - Top-level annexes: ~15 (J-02000000, J-03000000, etc.)
 - Expected ATTACHMENT_OF relationships: ~15 (one per top-level annex)
@@ -402,6 +423,7 @@ Section J
 ### Example 1: Navy MBOS - Section J Attachments
 
 **Entities**:
+
 ```
 SECTION_J: "Section J: List of Attachments"
 ANNEX_001: J-02000000 "Performance Work Statement (PWS)"
@@ -410,6 +432,7 @@ ANNEX_010: J-04000000 "Contract Data Requirements List (CDRL)"
 ```
 
 **Extracted Relationships** (3):
+
 ```json
 [
   {
@@ -441,6 +464,7 @@ ANNEX_010: J-04000000 "Contract Data Requirements List (CDRL)"
 ### Example 2: GSA Schedule - Exhibits
 
 **Entities**:
+
 ```
 SECTION_B: "Section B: Supplies or Services and Prices/Costs"
 SECTION_J: "Section J: List of Attachments"
@@ -449,6 +473,7 @@ ANNEX_021: "Exhibit B - Technical Capabilities"
 ```
 
 **Extracted Relationships** (2):
+
 ```json
 [
   {
@@ -462,7 +487,7 @@ ANNEX_021: "Exhibit B - Technical Capabilities"
     "source_id": "annex_021",
     "target_id": "section_j",
     "relationship_type": "ATTACHMENT_OF",
-    "confidence": 0.70,
+    "confidence": 0.7,
     "reasoning": "Content alignment: Technical document → Section J (GSA default)"
   }
 ]
@@ -473,12 +498,14 @@ ANNEX_021: "Exhibit B - Technical Capabilities"
 ## Error Patterns to Avoid
 
 ### ❌ Error 1: Sub-Attachments Using ATTACHMENT_OF
+
 ```
 WRONG:
 J-02000000-10 --ATTACHMENT_OF--> Section J
 ```
 
 **Correct**: Sub-attachments use CHILD_OF
+
 ```
 J-02000000-10 --CHILD_OF--> J-02000000
 J-02000000 --ATTACHMENT_OF--> Section J
@@ -487,12 +514,14 @@ J-02000000 --ATTACHMENT_OF--> Section J
 ---
 
 ### ❌ Error 2: Referenced Documents as Attachments
+
 ```
 WRONG:
 MIL-STD-882E --ATTACHMENT_OF--> Section J (not attached, just cited)
 ```
 
 **Correct**: Use REFERENCES for citations
+
 ```
 Section C --REFERENCES--> MIL-STD-882E
 ```
@@ -500,6 +529,7 @@ Section C --REFERENCES--> MIL-STD-882E
 ---
 
 ### ❌ Error 3: Multiple Section Linkages
+
 ```
 WRONG:
 J-02000000 --ATTACHMENT_OF--> Section J
@@ -507,6 +537,7 @@ J-02000000 --ATTACHMENT_OF--> Section C (duplicate!)
 ```
 
 **Correct**: One attachment, one section
+
 ```
 J-02000000 --ATTACHMENT_OF--> Section J ✅
 ```
