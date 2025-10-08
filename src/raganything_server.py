@@ -45,7 +45,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Phase 6.1: LLM-powered relationship inference
-from llm_relationship_inference import (
+from src.llm_relationship_inference import (
     parse_graphml,
     infer_all_relationships,
     save_relationships_to_graphml,
@@ -53,8 +53,8 @@ from llm_relationship_inference import (
 )
 
 # UCF Detection and Section-Aware Processing
-from ucf_detector import detect_ucf_format
-from ucf_section_processor import prepare_ucf_sections_for_llm, get_section_aware_extraction_prompt
+from src.ucf_detector import detect_ucf_format
+from src.ucf_section_processor import prepare_ucf_sections_for_llm, get_section_aware_extraction_prompt
 
 # Global RAG-Anything instance
 _rag_anything: RAGAnything = None

@@ -28,18 +28,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Import relationship patterns (optional - graceful fallback if not available)
-try:
-    from phase6_prompts import (
-        RELATIONSHIP_INFERENCE_PATTERNS,
-        SECTION_NORMALIZATION_MAPPING
-    )
-except ImportError:
-    # Fallback if phase6_prompts not available
-    logger.warning("phase6_prompts not found - using default patterns")
-    RELATIONSHIP_INFERENCE_PATTERNS = {}
-    SECTION_NORMALIZATION_MAPPING = {}
-
 
 def parse_graphml(graphml_path: Path) -> Tuple[List[Dict], List[Dict]]:
     """
