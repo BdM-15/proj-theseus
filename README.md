@@ -1335,6 +1335,7 @@ Visual Flow:
 ```
 
 **Import Rules:**
+
 - ✅ **core** → imports nothing (foundation layer)
 - ✅ **ingestion/inference** → can import `core/`
 - ✅ **server** → can import `core/`, `ingestion/`, `inference/`
@@ -1342,6 +1343,7 @@ Visual Flow:
 - ❌ **NO horizontal imports** (ingestion ↔ inference)
 
 **5 Core Inference Algorithms** (in `inference/engine.py`):
+
 1. **Document Hierarchy**: ANNEX/CLAUSE → SECTION (CHILD_OF)
 2. **Section L↔M Mapping**: SUBMISSION_INSTRUCTION → EVALUATION_FACTOR (GUIDES)
 3. **Attachment Linking**: ANNEX → SECTION (ATTACHMENT_OF)
@@ -1349,6 +1351,7 @@ Visual Flow:
 5. **Requirement Evaluation**: REQUIREMENT → EVALUATION_FACTOR (EVALUATED_BY)
 
 **Module Responsibilities:**
+
 - **core/**: Shared utilities (prompts, helpers)
 - **ingestion/**: UCF detection and section processing
 - **inference/**: LLM-powered knowledge graph enhancement

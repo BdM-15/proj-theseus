@@ -80,6 +80,7 @@ async def process_document_with_ucf_detection(file_path: str, file_name: str, ra
             await rag_instance.process_document_complete_lightrag_api(
                 file_path=file_path,
                 output_dir=global_args.working_dir,
+                # Parser from config: mineru
                 parse_method="auto"
             )
             
@@ -120,6 +121,7 @@ async def process_document_with_ucf_detection(file_path: str, file_name: str, ra
     await rag_instance.process_document_complete_lightrag_api(
         file_path=file_path,
         output_dir=global_args.working_dir,
+        # Parser from config: mineru
         parse_method="auto"
     )
     
