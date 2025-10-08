@@ -15,6 +15,7 @@
 ## Current State
 
 ### What's Working (PyPDF2)
+
 - Text extraction from RFPs
 - Basic chunking and entity extraction
 - Phase 6.1 LLM post-processing
@@ -22,6 +23,7 @@
 - xAI Grok semantic reasoning
 
 ### What's Missing (MinerU Not Configured)
+
 - No multimodal content extraction
 - Tables rendered as text (loses structure)
 - Images completely ignored
@@ -40,6 +42,7 @@
 6. **User sees success, unaware of fallback**
 
 **Evidence from logs**:
+
 ```
 INFO:   Parser: mineru  ← Configuration says MinerU
 ERROR: [File Extraction]Error processing PDF: No module named 'PyPDF2'  ← Fallback failed
@@ -78,11 +81,13 @@ Knowledge graph construction
 ### Model Dependencies
 
 **Primary Models** (auto-downloaded from HuggingFace):
+
 - `opendatalab/PDF-Extract-Kit` - Layout analysis
 - Vision models for table/image understanding
 - OCR models for text extraction
 
 **Storage Location**:
+
 - Windows: `%USERPROFILE%\.cache\huggingface\hub`
 - Linux/Mac: `~/.cache/huggingface/hub`
 
@@ -93,11 +98,13 @@ Knowledge graph construction
 ### Prerequisites
 
 ✅ **Already Installed**:
+
 - Python 3.13.7
 - MinerU v2.5.4 (via `raganything[all]`)
 - PyPDF2 3.0.1 (temporary fallback)
 
 ⚠️ **Need to Configure**:
+
 - HuggingFace model cache
 - First-run model download
 - Subprocess environment variables
@@ -119,6 +126,7 @@ mineru --help
 ### Step 2: Test Manual Model Download
 
 **Option A: Let MinerU auto-download on first PDF**
+
 ```powershell
 # Create test directory
 mkdir -p ./test_mineru_output
@@ -135,6 +143,7 @@ mineru -p "inputs/__enqueued__/M6700425R0007 MCPP II DRAFT RFP 23 MAY 25.pdf" `
 ```
 
 **Option B: Pre-download models with Python**
+
 ```python
 # Pre-cache models before processing
 from huggingface_hub import snapshot_download
@@ -173,6 +182,7 @@ python app.py
 ```
 
 **Expected Success Logs**:
+
 ```
 INFO: [MinerU] Starting PDF parsing...
 INFO: [MinerU] Loading models from cache...
@@ -183,6 +193,7 @@ INFO: File processed successfully: M6700425R0007 MCPP II DRAFT RFP 23 MAY 25.pdf
 ```
 
 **Failure Indicators**:
+
 ```
 ERROR: [File Extraction]Error processing PDF: No module named 'PyPDF2'  ← Still falling back
 2025-10-08 - pipmaster - INFO - Executing: pip install --upgrade pypdf2  ← Fallback triggered
@@ -195,11 +206,13 @@ ERROR: [File Extraction]Error processing PDF: No module named 'PyPDF2'  ← Stil
 **Symptom**: No `[MinerU]` logs, immediate PyPDF2 fallback
 
 **Causes**:
+
 - Model download taking too long (large files)
 - Network issues during download
 - Subprocess timeout too short
 
 **Solutions**:
+
 1. Pre-download models (Option B above)
 2. Increase network timeout
 3. Use faster internet connection for first download
@@ -209,10 +222,12 @@ ERROR: [File Extraction]Error processing PDF: No module named 'PyPDF2'  ← Stil
 **Symptom**: `[MinerU] PermissionError: [Errno 13]`
 
 **Causes**:
+
 - HuggingFace cache directory not writable
 - Subprocess lacks permissions
 
 **Solutions**:
+
 ```powershell
 # Check cache directory permissions
 Test-Path "$env:USERPROFILE\.cache\huggingface" -PathType Container
@@ -230,10 +245,12 @@ Remove-Item "$env:USERPROFILE\.cache\huggingface\test.txt"
 **Symptom**: `[MinerU] 403 Forbidden` or authentication errors
 
 **Causes**:
+
 - Model requires HuggingFace account
 - No access token configured
 
 **Solutions**:
+
 ```powershell
 # Get HuggingFace token from: https://huggingface.co/settings/tokens
 # Add to .env file:
@@ -248,10 +265,12 @@ $env:HF_TOKEN="hf_your_token_here"
 **Symptom**: Models downloaded but MinerU still fails
 
 **Causes**:
+
 - Incomplete download
 - Corrupted cache files
 
 **Solutions**:
+
 ```powershell
 # Clear HuggingFace cache
 Remove-Item -Recurse -Force "$env:USERPROFILE\.cache\huggingface\hub\models--opendatalab--*"
@@ -275,12 +294,14 @@ After setup, verify MinerU is working:
 ## Performance Expectations
 
 ### First Upload (With Model Download)
+
 - **Time**: 10-30 minutes
 - **Network**: ~2-5GB download
 - **Disk**: ~5GB cache space required
 - **Status**: One-time setup cost
 
 ### Subsequent Uploads (Models Cached)
+
 - **Time**: 2-5 minutes per 100 pages
 - **Network**: None (offline after setup)
 - **Disk**: Minimal (output only)
@@ -293,16 +314,19 @@ After setup, verify MinerU is working:
 Once MinerU is configured, enable:
 
 1. **Context-Aware Processing**
+
    - 2-page context window around tables/images
    - Section header preservation
    - Cross-reference resolution
 
 2. **Vision Model Integration**
+
    - xAI Grok Vision for image analysis
    - Organizational chart understanding
    - Technical diagram extraction
 
 3. **Table Intelligence**
+
    - Compliance matrix parsing
    - Pricing table extraction
    - Evaluation criteria structuring

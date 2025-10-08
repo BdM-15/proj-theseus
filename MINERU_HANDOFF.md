@@ -13,12 +13,14 @@
 **The system has NEVER used MinerU** - it's been running on basic PyPDF2 text extraction since inception.
 
 **Timeline**:
+
 - **Yesterday**: Processed 9 RFPs successfully using PyPDF2 fallback (unknowingly)
 - **Today 11:33 AM**: Venv corruption from repeated `uv sync` during branch switching
 - **Today ~12:00 PM**: Recreated fresh venv → PyPDF2 not in lock file → Error exposed
 - **Today 12:39 PM**: Discovered MinerU subprocess failing silently, PyPDF2 doing all work
 
 **Root Cause**:
+
 1. MinerU requires ~2-5GB of computer vision models from HuggingFace
 2. Models never downloaded → MinerU subprocess fails immediately
 3. RAG-Anything silently falls back to PyPDF2
@@ -26,6 +28,7 @@
 5. Today: Fresh venv without PyPDF2 → Fallback failed → Error visible
 
 **Why This Matters**:
+
 - ✅ Current text extraction works (good baseline)
 - ❌ Missing tables, images, equations, structure (MinerU's value)
 - 🎯 Enabling MinerU = **full multimodal RAG** for complex RFPs
@@ -35,6 +38,7 @@
 ## Current Environment State
 
 ### Branch Structure
+
 ```
 main (stable)
 └── 004-code-optimization (performance work)
@@ -42,6 +46,7 @@ main (stable)
 ```
 
 ### Package Status
+
 ```powershell
 Python: 3.13.7
 Environment: .venv (fresh, recreated today)
@@ -57,6 +62,7 @@ Key Packages:
 ```
 
 ### Server Status
+
 - ✅ Server starts successfully
 - ✅ WebUI accessible at http://localhost:9621/
 - ✅ Configuration correct: `parser="mineru"`, `parse_method="auto"`
@@ -66,16 +72,19 @@ Key Packages:
 ### Files Modified This Session
 
 **Documentation**:
+
 - `README.md` - Added architecture stack, MinerU setup warning
 - `.github/copilot-instructions.md` - Added MinerU GitHub to critical references
 - `docs/MINERU_SETUP_GUIDE.md` - **NEW** - Comprehensive setup guide
 - `MINERU_HANDOFF.md` - **THIS FILE**
 
 **Dependencies**:
+
 - `pyproject.toml` - Added PyPDF2>=3.0.0 (temporary fallback)
 - `uv.lock` - Updated with PyPDF2
 
 **Configuration**:
+
 - `.env.example` - (User may have edited, check for HF_TOKEN)
 - `src/raganything_server.py` - (User may have edited, verify config)
 
@@ -111,15 +120,18 @@ mineru -p "inputs/__enqueued__/M6700425R0007 MCPP II DRAFT RFP 23 MAY 25.pdf" `
 ```
 
 **Expected Behavior**:
+
 - **First run**: 10-30 minutes (model download)
 - **Subsequent runs**: 2-5 minutes per 100 pages
 
 **Success Indicators**:
+
 - ✅ Models downloaded to `%USERPROFILE%\.cache\huggingface\hub`
 - ✅ Output directory contains JSON files and extracted images
 - ✅ No errors in terminal output
 
 **Troubleshooting** (if download fails):
+
 - Check internet connection (large files)
 - May need HuggingFace token: https://huggingface.co/settings/tokens
 - Add to .env: `HF_TOKEN=hf_your_token_here`
@@ -146,6 +158,7 @@ python app.py
 ```
 
 **Success Logs**:
+
 ```
 INFO: [MinerU] Starting PDF parsing...
 INFO: [MinerU] Loading models from cache...
@@ -156,6 +169,7 @@ INFO: File processed successfully: M6700425R0007 MCPP II DRAFT RFP 23 MAY 25.pdf
 ```
 
 **Failure Logs** (still using PyPDF2):
+
 ```
 ERROR: [File Extraction]Error processing PDF: No module named 'PyPDF2'
 pipmaster attempting: pip install --upgrade pypdf2
@@ -166,6 +180,7 @@ pipmaster attempting: pip install --upgrade pypdf2
 **Goal**: Compare MinerU vs PyPDF2 extraction quality
 
 **Test Queries** (after upload completes):
+
 ```
 1. "Show me all tables extracted from the RFP"
 2. "What evaluation factors are in Section M?"
@@ -174,10 +189,12 @@ pipmaster attempting: pip install --upgrade pypdf2
 ```
 
 **What to Look For**:
+
 - **With MinerU**: Structured table data, image references, equations
 - **With PyPDF2**: Plain text only, tables as unstructured lines
 
 **Document Findings**:
+
 - Screenshot comparison of knowledge graph (MinerU vs PyPDF2)
 - Entity count comparison
 - Relationship quality (especially table→requirement linkages)
@@ -220,17 +237,20 @@ git merge 004-mineru-multimodal
 ## Key Files Reference
 
 ### Documentation
+
 - `docs/MINERU_SETUP_GUIDE.md` - Complete troubleshooting guide
 - `README.md` - Updated with architecture stack
 - `.github/copilot-instructions.md` - Added MinerU to critical refs
 - `MINERU_HANDOFF.md` - **THIS FILE**
 
 ### Configuration
+
 - `.env.example` - Check if HF_TOKEN added
 - `src/raganything_server.py` - Verify parser="mineru"
 - `pyproject.toml` - PyPDF2 added as fallback
 
 ### Test Data
+
 - `inputs/__enqueued__/M6700425R0007 MCPP II DRAFT RFP 23 MAY 25.pdf` - Marine Corps RFP (245 pages)
 
 ---
@@ -238,18 +258,21 @@ git merge 004-mineru-multimodal
 ## Critical Reminders
 
 ### User Constraints
+
 1. **Never run server** - User handles all `python app.py` operations
 2. **Minimal dependencies** - "Work with what the libraries have"
 3. **No code in main branch** - Only production-ready releases
 4. **Always use workspace tools** - Never PowerShell for file operations
 
 ### Technical Facts
+
 - MinerU models: One-time 2-5GB download from HuggingFace
 - xAI/OpenAI models: NOT used by MinerU (separate systems)
 - PyPDF2: Temporary fallback until MinerU configured
 - Current results: Good with text-only, better with multimodal
 
 ### Branch Strategy
+
 ```
 004-mineru-multimodal (test MinerU)
     ↓ (merge after validation)
@@ -263,14 +286,17 @@ main (production only)
 ## Outstanding Questions
 
 1. **HuggingFace Authentication**: Do MinerU models require auth token?
+
    - Test: Try manual download without token
    - If fails: Get token from https://huggingface.co/settings/tokens
 
 2. **Model Storage Location**: Confirm cache directory writable
+
    - Path: `%USERPROFILE%\.cache\huggingface\hub`
    - Test: Manual file write to directory
 
 3. **Subprocess Environment**: Does RAG-Anything pass env vars to MinerU?
+
    - Check: HF_TOKEN inheritance
    - Verify: PATH includes mineru executable
 
@@ -303,6 +329,7 @@ Before merging `004-mineru-multimodal` → `004-code-optimization`:
 **RAG-Anything**: https://github.com/HKUDS/RAG-Anything
 
 **Critical References**:
+
 - MinerU GitHub issues: https://github.com/opendatalab/MinerU/issues
 - HuggingFace token: https://huggingface.co/settings/tokens
 - PDF-Extract-Kit models: https://huggingface.co/opendatalab/PDF-Extract-Kit
@@ -326,7 +353,7 @@ Please review MINERU_HANDOFF.md for context, then help me:
 3. Test RAG-Anything integration
 4. Document quality comparison
 
-The goal is to enable full multimodal extraction (tables, images, equations) 
+The goal is to enable full multimodal extraction (tables, images, equations)
 instead of basic text-only processing.
 ```
 
@@ -334,6 +361,6 @@ instead of basic text-only processing.
 
 **End of Handoff Document**
 
-*Generated: October 8, 2025*  
-*Session Duration: ~4 hours*  
-*Key Achievement: Discovered MinerU never configured, established testing path*
+_Generated: October 8, 2025_  
+_Session Duration: ~4 hours_  
+_Key Achievement: Discovered MinerU never configured, established testing path_
