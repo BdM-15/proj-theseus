@@ -1468,7 +1468,7 @@ Build systematic training data collection for Phase 7 Unsloth fine-tuning and en
 - **Native Support**: LightRAG natively supports PostgreSQL as enterprise storage backend
 - **Unified Storage**: Provides unified KV, Vector (pgvector), and Graph (Apache AGE) storage
 - **Document Tracking**: Built-in document status tracking and workspace isolation
-- **Recommended Version**: PostgreSQL 16.6+
+- **Recommended Version**: PostgreSQL 16.6+ (Use v. 18 which was recently released)
 
 ### **Implementation Plan**
 
