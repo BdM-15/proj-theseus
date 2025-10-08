@@ -969,6 +969,34 @@ ollama pull bge-m3:latest          # 1.2GB - Embeddings
 python app.py
 ```
 
+### **Environment Configuration After Branch Updates**
+
+**IMPORTANT**: After pulling changes or switching branches, always check if `.env.example` has been updated:
+
+```powershell
+# Check if .env.example changed since your last pull
+git diff HEAD@{1} HEAD -- .env.example
+
+# If changes exist, compare with your .env file
+code .env .env.example
+
+# Manually copy any new variables from .env.example to .env
+# Fill in your actual API keys where placeholders exist
+```
+
+**Why Manual Process?**
+- `.env` is gitignored (security best practice - contains real API keys)
+- `.env.example` is versioned (template with fake values)
+- When branches merge, `.env.example` updates but your `.env` doesn't
+- You must manually sync new variables to your `.env` file
+
+**Common Variables to Watch:**
+- `LLM_BINDING_API_KEY` - xAI Grok API key (Branch 003)
+- `EMBEDDING_BINDING_API_KEY` - OpenAI API key (Branch 003)
+- `CHUNK_SIZE` - May change between branches
+- `MAX_ASYNC` - Concurrency settings
+- `LLM_MODEL` - Model selection differences
+
 ### **Usage**
 
 ````powershell
