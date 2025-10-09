@@ -31,6 +31,7 @@ from src.inference import (
     save_relationships_to_graphml,
     save_relationships_to_kv_store
 )
+from src.utils.entity_cleanup import clean_entities_batch, analyze_corruption_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -191,15 +192,44 @@ async def post_process_knowledge_graph(rag_storage_path: str, llm_func) -> dict:
     
     try:
         # Step 1: Parse GraphML to extract entities and relationships
-        logger.info(f"  [1/3] Parsing GraphML: {graphml_path.name}")
+        logger.info(f"  [1/4] Parsing GraphML: {graphml_path.name}")
         nodes, existing_edges = parse_graphml(graphml_path)
         
         if not nodes:
             logger.warning(f"No entities found in GraphML, skipping post-processing")
             return {"status": "skipped", "reason": "no_entities"}
         
+        # Step 1.5: Clean entity types (fix LLM corruption patterns)
+        logger.info(f"  [1.5/4] Cleaning entity types (format error fix)...")
+        
+        # Get valid entity types from config
+        from src.server.config import configure_raganything_args
+        from lightrag.api.config import global_args
+        # Ensure config loaded
+        if not hasattr(global_args, 'entity_types') or not global_args.entity_types:
+            configure_raganything_args()
+        valid_entity_types = global_args.entity_types
+        
+        # Analyze corruption patterns before cleanup
+        corruption_stats = analyze_corruption_patterns(nodes)
+        if corruption_stats:
+            logger.info(f"  📊 Corruption patterns detected: {corruption_stats}")
+        
+        # Clean entity types
+        cleaned_nodes, correction_count = clean_entities_batch(nodes, valid_entity_types)
+        
+        if correction_count > 0:
+            logger.info(f"  ✅ Entity type cleanup: {correction_count} entities corrected")
+            # Update nodes with cleaned versions
+            nodes = cleaned_nodes
+            # Save cleaned entities back to GraphML
+            logger.info(f"  💾 Saving cleaned entities to GraphML...")
+            save_relationships_to_graphml(graphml_path, [], nodes)  # Empty relationships to just update nodes
+        else:
+            logger.info(f"  ✅ Entity type cleanup: All entities already valid")
+        
         # Step 2: Use LLM to infer missing relationships
-        logger.info(f"  [2/3] Calling Grok LLM for semantic relationship inference...")
+        logger.info(f"  [2/4] Calling Grok LLM for semantic relationship inference...")
         
         new_relationships = await infer_all_relationships(
             nodes=nodes,
@@ -217,15 +247,19 @@ async def post_process_knowledge_graph(rag_storage_path: str, llm_func) -> dict:
             }
         
         # Step 3: Save new relationships to both GraphML and kv_store
-        logger.info(f"  [3/3] Saving {len(new_relationships)} new relationships...")
+        logger.info(f"  [3/4] Saving {len(new_relationships)} new relationships...")
         
         save_relationships_to_graphml(graphml_path, new_relationships, nodes)
         save_relationships_to_kv_store(rag_storage, new_relationships, nodes)
         
+        # Step 4: Final validation
+        logger.info(f"  [4/4] Phase 6.1 complete")
+        
         logger.info("=" * 80)
         logger.info(f"🎯 Phase 6.1 LLM-Powered Post-Processing Complete")
+        logger.info(f"  Entity type cleanup: {correction_count} corrections")
         logger.info(f"  Total new relationships: {len(new_relationships)}")
-        logger.info(f"  Method: Grok LLM semantic understanding")
+        logger.info(f"  Method: Grok LLM semantic understanding + format cleanup")
         logger.info(f"  Cost: ~$0.03 (5 LLM batches)")
         logger.info(f"  Processing time: ~15 seconds")
         logger.info("=" * 80)
@@ -234,7 +268,8 @@ async def post_process_knowledge_graph(rag_storage_path: str, llm_func) -> dict:
             "status": "success",
             "relationships_added": len(new_relationships),
             "total_relationships_added": len(new_relationships),  # For background monitor compatibility
-            "method": "llm_powered",
+            "entities_corrected": correction_count,
+            "method": "llm_powered_with_cleanup",
             "batches_processed": 5,
             "estimated_cost_usd": 0.03
         }
