@@ -8,11 +8,11 @@ An **Ontology-Modified LightRAG system** for government contracting RFP analysis
 
 ### Architecture Stack
 
-- **[MinerU](https://github.com/opendatalab/MinerU)** - Multimodal PDF parser extracting tables, images, equations, and charts
+- **[MinerU](https://github.com/opendatalab/MinerU)** ✅ - Multimodal PDF parser extracting tables, images, equations, and charts (configured & tested October 2025)
 - **[RAG-Anything](https://github.com/HKUDS/RAG-Anything)** - Document processing orchestration (MinerU + LightRAG integration)
 - **[LightRAG](https://github.com/HKUDS/LightRAG)** - Knowledge graph construction with WebUI
-- **xAI Grok** - Fast semantic reasoning for public RFP analysis
-- **OpenAI Embeddings** - Vector similarity (text-embedding-3-large)
+- **xAI Grok** - Fast semantic reasoning for public RFP analysis (grok-4-fast-reasoning)
+- **OpenAI Embeddings** - Vector similarity (text-embedding-3-large, 3072-dim)
 
 **Why Modify LightRAG?**
 

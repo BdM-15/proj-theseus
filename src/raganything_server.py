@@ -32,7 +32,7 @@ import uvicorn
 # Import Phase 4 modular components
 from src.server.config import configure_raganything_args
 from src.server.initialization import initialize_raganything, get_rag_instance
-from src.server.routes import create_insert_endpoint, phase6_auto_processor
+from src.server.routes import create_insert_endpoint, create_documents_upload_endpoint, phase6_auto_processor
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -71,23 +71,31 @@ async def main():
     # Step 3: Create LightRAG server (WebUI + query endpoints)
     app = create_app(global_args)
     
-    # Step 4: Override /insert endpoint to add Phase 6.1 post-processing
-    # Remove original LightRAG /insert route
+    # Step 4: Override endpoints to use RAG-Anything + Phase 6.1
+    # Remove original LightRAG endpoints
     new_routes = []
-    found_original = False
+    found_insert = False
+    found_upload = False
     for route in app.router.routes:
         # Skip the original /insert POST endpoint
         if hasattr(route, 'path') and route.path == '/insert' and hasattr(route, 'methods') and 'POST' in route.methods:
-            found_original = True
+            found_insert = True
+            continue
+        # Skip the original /documents/upload POST endpoint (WebUI uses this!)
+        if hasattr(route, 'path') and route.path == '/documents/upload' and hasattr(route, 'methods') and 'POST' in route.methods:
+            found_upload = True
             continue
         new_routes.append(route)
     app.router.routes = new_routes
     
-    if found_original:
-        print("   ✅ Overriding /insert endpoint with Phase 6.1 integration")
+    if found_insert:
+        print("   ✅ Overriding /insert endpoint with RAG-Anything + Phase 6.1")
+    if found_upload:
+        print("   ✅ Overriding /documents/upload endpoint with RAG-Anything + Phase 6.1")
     
-    # Add our custom /insert endpoint with Phase 6.1
+    # Add our custom endpoints with RAG-Anything multimodal processing
     create_insert_endpoint(app, rag_instance)
+    create_documents_upload_endpoint(app, rag_instance)
     
     # Step 5: Start background monitoring task for auto Phase 6.1
     asyncio.create_task(phase6_auto_processor(rag_instance))
@@ -98,7 +106,8 @@ async def main():
     print(f"   ├─ Port: {port}")
     print(f"   ├─ WebUI: http://{host}:{port}/")
     print(f"   ├─ API Docs: http://{host}:{port}/docs")
-    print(f"   ├─ /insert endpoint: Phase 6.1 auto-enabled ✅")
+    print(f"   ├─ /insert endpoint: RAG-Anything + Phase 6.1 ✅")
+    print(f"   ├─ /documents/upload endpoint: RAG-Anything + Phase 6.1 ✅ (WebUI uses this!)")
     print(f"   ├─ Background Monitor: Auto-detects WebUI uploads ✅")
     print(f"   └─ Architecture: RAG-Anything (ingestion) + LightRAG (queries) + Phase 6.1 (semantic)\n")
     print(f"\n✨ Phase 6.1 Features:")
