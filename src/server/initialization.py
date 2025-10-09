@@ -202,6 +202,10 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
     entity{tuple_delimiter}Annex 17 Transportation{tuple_delimiter}ANNEX{tuple_delimiter}Annex 17 Transportation addresses performance methodology for transportation.
     entity{tuple_delimiter}Veteran-Owned Small Business{tuple_delimiter}CONCEPT{tuple_delimiter}A business owned by veterans.
     entity{tuple_delimiter}FAR 52.212-1{tuple_delimiter}CLAUSE{tuple_delimiter}Instructions to Offerors—Commercial Products and Commercial Services.
+    entity{tuple_delimiter}Concorde RG-24 Battery{tuple_delimiter}EQUIPMENT{tuple_delimiter}12-volt battery used for starting aircraft generators and ground support equipment.
+    entity{tuple_delimiter}6200 Tennant Floor Sweeper{tuple_delimiter}EQUIPMENT{tuple_delimiter}Commercial floor cleaning equipment used for warehouse maintenance operations.
+    entity{tuple_delimiter}Public Law 99-234{tuple_delimiter}REGULATION{tuple_delimiter}Federal statute requiring the submission of certified cost or pricing data.
+    entity{tuple_delimiter}5 U.S.C. 5332{tuple_delimiter}REGULATION{tuple_delimiter}United States Code section governing position classification and General Schedule pay rates.
     
     ❌ WRONG EXAMPLES (LEARN FROM THESE MISTAKES):
     entity{tuple_delimiter}Veteran-Owned Small Business{tuple_delimiter}#/>CONCEPT{tuple_delimiter}A business owned by veterans.

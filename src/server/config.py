@@ -73,6 +73,12 @@ def configure_raganything_args():
         # Hierarchical program entities (NEW: Top-level containers)
         "PROGRAM",                  # Major programs (MCPP II, Navy MBOS, etc.) - contains requirements/deliverables
         
+        # Physical assets and equipment
+        "EQUIPMENT",                # Physical assets: MHE, generators, batteries, GSE, CESE, watercraft, vehicles
+        
+        # Legal and regulatory citations
+        "REGULATION",               # Legal citations: Public Law, USC, CFR, Executive Orders, DFARS/FAR references
+        
         # Evaluation entities (semantic detection, may be embedded in non-standard sections)
         "EVALUATION_FACTOR",        # Scoring criteria (Section M content)
         "SUBMISSION_INSTRUCTION",   # NEW: Format/page limits (Section L content, may be IN Section M)
