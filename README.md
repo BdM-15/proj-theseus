@@ -6,6 +6,14 @@
 
 An **Ontology-Modified LightRAG system** for government contracting RFP analysis. We **actively modify LightRAG's extraction capabilities** by injecting domain-specific government contracting ontology into its processing pipeline, transforming generic document processing into specialized federal procurement intelligence.
 
+### Architecture Stack
+
+- **[MinerU](https://github.com/opendatalab/MinerU)** ✅ - Multimodal PDF parser extracting tables, images, equations, and charts (configured & tested October 2025)
+- **[RAG-Anything](https://github.com/HKUDS/RAG-Anything)** - Document processing orchestration (MinerU + LightRAG integration)
+- **[LightRAG](https://github.com/HKUDS/LightRAG)** - Knowledge graph construction with WebUI
+- **xAI Grok** - Fast semantic reasoning for public RFP analysis (grok-4-fast-reasoning)
+- **OpenAI Embeddings** - Vector similarity (text-embedding-3-large, 3072-dim)
+
 **Why Modify LightRAG?**
 
 Generic LightRAG cannot understand government contracting concepts:
@@ -1736,7 +1744,22 @@ cd govcon-capture-vibe
 uv sync
 ollama pull mistral-nemo:latest && ollama pull bge-m3:latest
 uv run python app.py
-````
+```
+
+**⚠️ CRITICAL: MinerU Model Setup Required**
+
+The system uses **[MinerU](https://github.com/opendatalab/MinerU)** for multimodal PDF extraction (tables, images, equations). On first use, MinerU will download computer vision models (~2-5GB) from HuggingFace:
+
+```powershell
+# Test MinerU installation
+mineru --version  # Should show v2.5.4+
+
+# First PDF upload will trigger model download
+# Models cached in: %USERPROFILE%\.cache\huggingface\hub
+# This only happens once - subsequent uploads use cached models
+```
+
+**Without MinerU models**, the system falls back to basic PyPDF2 text extraction (no tables, images, or structure preservation). For full multimodal capabilities, ensure first upload completes successfully.`
 
 ### **2. Upload Your First RFP**
 
@@ -1907,10 +1930,10 @@ This context-aware processing feature is documented in `docs/BRANCH_003_IMPLEMEN
 
 ---
 
-**Last Updated**: October 5, 2025  
-**Version**: 3.0.0 - Hybrid Cloud+Local Architecture  
-**Branch**: `002-01-code-cleanup` → `002-local-llm-architecture` (cleanup in progress)  
-**Status**: Branch 002 stable, Branch 003 planned  
+**Last Updated**: October 5, 2025
+**Version**: 3.0.0 - Hybrid Cloud+Local Architecture
+**Branch**: `002-01-code-cleanup` → `002-local-llm-architecture` (cleanup in progress)
+**Status**: Branch 002 stable, Branch 003 planned
 **Architecture**: Dual-branch strategy (fully local + cloud-enhanced hybrid)
 
 **🎯 Current Milestone**: Complete Branch 002 codebase cleanup, then fork Branch 003 for xAI Grok cloud integration
@@ -1930,7 +1953,7 @@ python --version
 
 # Check dependencies
 uv sync --verbose
-````
+```
 
 #### **Document Processing Issues**
 

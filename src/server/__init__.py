@@ -17,6 +17,7 @@ __all__ = [
     "initialize_raganything",
     "get_rag_instance",
     "create_insert_endpoint",
+    "create_documents_upload_endpoint",
     "phase6_auto_processor",
     "process_document_with_ucf_detection",
     "post_process_knowledge_graph",

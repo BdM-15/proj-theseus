@@ -17,11 +17,31 @@ dependencies = [
     
     # Configuration management
     "python-dotenv>=1.0.0",
+    
+    # ============================================================================
+    # GPU Acceleration for MinerU (CRITICAL for performance)
+    # ============================================================================
+    # PyTorch with CUDA 12.4+ support (compatible with CUDA 12.8 drivers)
+    # MUST be installed from PyTorch index for GPU acceleration:
+    #   uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
+    # 
+    # Without CUDA-enabled PyTorch, MinerU falls back to CPU-only processing:
+    #   - CPU-only: ~5-10 minutes for 425-page RFP (SLOW)
+    #   - GPU-accelerated: ~30-60 seconds for same document (2-10x faster)
+    # 
+    # Verify GPU is enabled after installation:
+    #   python -c "import torch; print('CUDA:', torch.cuda.is_available())"
+    # 
+    # Note: PyPI only distributes CPU-only PyTorch by default. The torch/torchvision
+    # dependencies in raganything[all] will install CPU versions. You MUST manually
+    # reinstall with --index-url flag for GPU support.
+    # ============================================================================
 ]
 
 # Note: raganything[all] bundles the following dependencies:
 # - lightrag-hku (knowledge graph + WebUI)
-# - MinerU (multimodal document parsing)
+# - MinerU (multimodal document parsing with GPU acceleration via PyTorch)
 # - pypdf, python-docx, python-pptx, openpyxl (document parsers)
 # - pydantic, tiktoken, nest-asyncio (utilities)
 # - ollama (local LLM support)
+# - torch, torchvision (WARNING: CPU-only versions from PyPI, see GPU section above)

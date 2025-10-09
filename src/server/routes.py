@@ -77,7 +77,10 @@ async def process_document_with_ucf_detection(file_path: str, file_name: str, ra
             
             # Step 3: Process with RAG-Anything (full document processing)
             # Note: Section metadata will be used by Phase 6.1 for enhanced extraction
-            await rag_instance.process_document_complete_lightrag_api(
+            # CRITICAL: Use process_document_complete() NOT process_document_complete_lightrag_api()
+            # The _lightrag_api version is for external server integration and expects
+            # LightRAG to accept multimodal_content param in ainsert(), which it doesn't
+            await rag_instance.process_document_complete(
                 file_path=file_path,
                 output_dir=global_args.working_dir,
                 # Parser from config: mineru
@@ -263,7 +266,7 @@ def create_insert_endpoint(app, rag_instance):
         """
         Standard LightRAG insert endpoint with Phase 6.1 post-processing
         
-        WebUI uploads use this endpoint, so post-processing is transparent.
+        API clients use this endpoint directly.
         """
         try:
             # Save uploaded file to temp location
@@ -302,6 +305,67 @@ def create_insert_endpoint(app, rag_instance):
             
         except Exception as e:
             logger.error(f"❌ Error processing document: {e}")
+            return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+
+def create_documents_upload_endpoint(app, rag_instance):
+    """
+    Override LightRAG's WebUI /documents/upload endpoint to use RAG-Anything
+    
+    CRITICAL FIX: WebUI uses /documents/upload (not /insert), which was bypassing
+    RAG-Anything's multimodal processing. This override ensures MinerU parser runs.
+    
+    Args:
+        app: FastAPI application instance
+        rag_instance: Initialized RAGAnything instance
+    """
+    @app.post("/documents/upload")
+    async def documents_upload_with_raganything(file: UploadFile = File(...)):
+        """
+        WebUI document upload endpoint - routes through RAG-Anything for MinerU processing
+        
+        This is the endpoint the WebUI actually uses (discovered via server logs).
+        """
+        try:
+            # Save uploaded file to temp location
+            with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as tmp:
+                shutil.copyfileobj(file.file, tmp)
+                tmp_path = tmp.name
+            
+            logger.info(f"📄 Processing {file.filename} via WebUI /documents/upload endpoint")
+            logger.info(f"   🔧 Routing through RAG-Anything for MinerU multimodal parsing...")
+            
+            # Dual-path processing: UCF detection → section-aware OR standard extraction
+            processing_result = await process_document_with_ucf_detection(tmp_path, file.filename, rag_instance)
+            
+            logger.info(f"✅ RAG-Anything processing complete for {file.filename}")
+            logger.info(f"   Path: {processing_result['path']}, Confidence: {processing_result['confidence']:.2f}")
+            
+            # Phase 6.1: Run post-processing layer to infer semantic relationships
+            logger.info(f"🤖 Phase 6.1: LLM-Powered Post-Processing")
+            logger.info(f"   Replacing regex patterns with semantic understanding...")
+            post_process_result = await post_process_knowledge_graph(
+                global_args.working_dir,
+                rag_instance.llm_model_func
+            )
+            
+            # Clean up temp file
+            os.unlink(tmp_path)
+            
+            return JSONResponse({
+                "status": "success",
+                "message": f"Document {file.filename} processed successfully with MinerU",
+                "processing_path": processing_result["path"],
+                "ucf_confidence": processing_result["confidence"],
+                "ucf_sections": processing_result["sections"],
+                "phase6_relationships_added": post_process_result.get("total_relationships_added", 0),
+                "method": "RAG-Anything (MinerU multimodal) + Phase 6.1 LLM inference"
+            })
+            
+        except Exception as e:
+            logger.error(f"❌ Error processing document: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 

@@ -37,6 +37,8 @@ async def initialize_raganything():
     """
     global _rag_anything
     
+    print("🔍 DEBUG: initialize_raganything() called - starting initialization...")
+    
     # Get API credentials (using RAG-Anything official variable names)
     xai_api_key = os.getenv("LLM_BINDING_API_KEY")
     xai_base_url = os.getenv("LLM_BINDING_HOST", "https://api.x.ai/v1")
@@ -70,14 +72,24 @@ async def initialize_raganything():
         "STATEMENT_OF_WORK",        # PWS/SOW/SOO content (may be Section C or attachment)
     ]
     
+    # MinerU configuration from environment variables
+    parser = os.getenv("PARSER", "mineru")
+    parse_method = os.getenv("PARSE_METHOD", "auto")
+    enable_image = os.getenv("ENABLE_IMAGE_PROCESSING", "true").lower() == "true"
+    enable_table = os.getenv("ENABLE_TABLE_PROCESSING", "true").lower() == "true"
+    enable_equation = os.getenv("ENABLE_EQUATION_PROCESSING", "true").lower() == "true"
+    
+    # Note: HF_TOKEN and HF_HUB_DISABLE_SYMLINKS_WARNING are automatically
+    # inherited by MinerU subprocess if set in environment
+    
     # Create RAG-Anything configuration
     config = RAGAnythingConfig(
         working_dir=working_dir,
-        parser="mineru",  # Multimodal parser
-        parse_method="auto",
-        enable_image_processing=True,
-        enable_table_processing=True,
-        enable_equation_processing=True,
+        parser=parser,
+        parse_method=parse_method,
+        enable_image_processing=enable_image,
+        enable_table_processing=enable_table,
+        enable_equation_processing=enable_equation,
     )
     
     # Define LLM function (xAI Grok wrapper)
@@ -123,6 +135,7 @@ async def initialize_raganything():
         max_token_size=8192,
         func=lambda texts: openai_embed(texts, model="text-embedding-3-large", api_key=openai_api_key),
     )
+    logger.info(f"✅ Created embedding_func with embedding_dim={embedding_func.embedding_dim}")
     
     # Custom extraction prompt to fix entity type format issues
     # Problem: LightRAG sometimes outputs "#/>CONCEPT" instead of "CONCEPT"
@@ -274,11 +287,47 @@ Text:
         },
     )
     
-    logger.info("✅ RAG-Anything initialized")
-    logger.info(f"   Working dir: {working_dir}")
-    logger.info(f"   Parser: MinerU (multimodal)")
-    logger.info(f"   Entity types: {len(entity_types)} govcon types (Phase 6 enhanced)")
-    logger.info(f"   Custom extraction prompt: Enabled (clean entity type format)")
+    # CRITICAL: Ensure LightRAG is initialized BEFORE any document processing
+    # This is required because process_document_complete_lightrag_api() accesses
+    # self.lightrag.doc_status BEFORE calling _ensure_lightrag_initialized()
+    print("🔧 Initializing LightRAG storages...")
+    result = await _rag_anything._ensure_lightrag_initialized()
+    if not result.get("success", False):
+        error_msg = result.get("error", "Unknown error")
+        logger.error(f"Failed to initialize LightRAG: {error_msg}")
+        raise RuntimeError(f"LightRAG initialization failed: {error_msg}")
+    
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # COMPATIBILITY FIX: RAG-Anything + LightRAG doc_status schema
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Issue: RAG-Anything writes 'multimodal_processed' field to doc_status after
+    #        multimodal content processing, but LightRAG's DocProcessingStatus
+    #        dataclass doesn't accept this field (causes 500 error in WebUI).
+    #
+    # Official Workaround (from RAG-Anything examples/lmstudio_integration_example.py):
+    #   "Compatibility: avoid writing unknown field 'multimodal_processed' to 
+    #    LightRAG doc_status. Older LightRAG versions may not accept this extra 
+    #    field in DocProcessingStatus"
+    #
+    # Solution: Replace _mark_multimodal_processing_complete() with no-op function
+    #           to prevent writing the incompatible field.
+    # ═══════════════════════════════════════════════════════════════════════════════
+    async def _noop_mark_multimodal(doc_id: str):
+        """No-op replacement to prevent writing multimodal_processed field."""
+        return None
+    
+    _rag_anything._mark_multimodal_processing_complete = _noop_mark_multimodal
+    # ═══════════════════════════════════════════════════════════════════════════════
+    
+    # Use print() instead of logger to ensure output visibility during startup
+    print("✅ RAG-Anything initialized")
+    print(f"   Working dir: {working_dir}")
+    print(f"   Parser: {parser} (method: {parse_method})")
+    print(f"   Multimodal: images={enable_image}, tables={enable_table}, equations={enable_equation}")
+    print(f"   Entity types: {len(entity_types)} govcon types (Phase 6 enhanced)")
+    print(f"   Custom extraction prompt: Enabled (clean entity type format)")
+    print(f"   LightRAG: Storages initialized ✅")
+    print(f"   Compatibility fix: Disabled multimodal_processed field writing ✅")
     
     return _rag_anything
 
