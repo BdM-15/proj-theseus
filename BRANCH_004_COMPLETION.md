@@ -14,22 +14,23 @@ Successfully completed Branch 004 with **33.6% LOC reduction** (3,577 → 2,375 
 
 ## 📊 Final Metrics
 
-| Metric | Before | After | Change |
-|--------|--------|-------|--------|
-| **Total LOC** | 3,577 | 2,375 | **-1,202 (-33.6%)** ✅ |
-| **Entity Types** | 12 | 18 | +6 (EQUIPMENT, REGULATION, +clarifications) |
-| **Processing Time** | 69s | 69s | No change ✅ |
-| **Cost per RFP** | $0.042 | $0.042 | No change ✅ |
-| **Memory (RSS)** | ~450MB | ~450MB | No change ✅ |
-| **Startup Time** | ~3s | ~3s | No change ✅ |
-| **Entities Extracted** | 3,792 | 4,302 | +510 (+13.5%) ✅ |
-| **Relationships** | 5,179 | 5,715 | +536 (+10.4%) ✅ |
+| Metric                 | Before | After  | Change                                      |
+| ---------------------- | ------ | ------ | ------------------------------------------- |
+| **Total LOC**          | 3,577  | 2,375  | **-1,202 (-33.6%)** ✅                      |
+| **Entity Types**       | 12     | 18     | +6 (EQUIPMENT, REGULATION, +clarifications) |
+| **Processing Time**    | 69s    | 69s    | No change ✅                                |
+| **Cost per RFP**       | $0.042 | $0.042 | No change ✅                                |
+| **Memory (RSS)**       | ~450MB | ~450MB | No change ✅                                |
+| **Startup Time**       | ~3s    | ~3s    | No change ✅                                |
+| **Entities Extracted** | 3,792  | 4,302  | +510 (+13.5%) ✅                            |
+| **Relationships**      | 5,179  | 5,715  | +536 (+10.4%) ✅                            |
 
 ---
 
 ## 🚀 MinerU Multimodal Validation (October 8-9, 2025)
 
 ### Extraction Performance
+
 - **Tables extracted**: 42 tables with structure preserved
 - **Images extracted**: 3 images
 - **Entity contribution**: **29% from tables/images** (1,245 out of 4,302 entities)
@@ -37,9 +38,11 @@ Successfully completed Branch 004 with **33.6% LOC reduction** (3,577 → 2,375 
 - **GraphML size**: 5.55MB
 
 ### Query Quality Validation
+
 **Test Query**: "What are the evaluation factors in Section M and their weights?"
 
 **Result**: ✅ **EXCELLENT** - Comprehensive response including:
+
 - All 6 evaluation factors (A-F) with descriptions
 - Hierarchical importance: A/B/C > D > F > E
 - Page limits for each factor
@@ -53,10 +56,12 @@ Successfully completed Branch 004 with **33.6% LOC reduction** (3,577 → 2,375 
 ## 🔧 Enhancements (October 9, 2025)
 
 ### 1. Format Error Cleanup (Commit f43df7c)
+
 **Problem**: Entity types occasionally corrupted during extraction  
 **Solution**: Created `src/utils/entity_cleanup.py` (257 lines)
 
 **Features**:
+
 - Automatic detection and repair of 5 corruption patterns:
   - `#/>` prefix (e.g., `#/>REQUIREMENT` → `REQUIREMENT`)
   - `#>|` prefix
@@ -71,11 +76,14 @@ Successfully completed Branch 004 with **33.6% LOC reduction** (3,577 → 2,375 
 ---
 
 ### 2. New Entity Types (Commit 3f30497)
+
 Added 2 new specialized entity types:
 
 #### EQUIPMENT
+
 **Description**: Physical assets, machinery, vehicles, equipment systems  
 **Examples**:
+
 - Concorde RG-24 Battery (material)
 - 6200 Tennant Floor Sweeper (equipment)
 - Material Handling Equipment (MHE)
@@ -83,8 +91,10 @@ Added 2 new specialized entity types:
 - Construction Equipment Support Equipment (CESE)
 
 #### REGULATION
+
 **Description**: Legal citations, statutes, regulations, executive orders  
 **Examples**:
+
 - Public Law 99-234 (statute)
 - 5 U.S.C. 5332 (United States Code)
 - 5 CFR 531.203 (Code of Federal Regulations)
@@ -95,11 +105,13 @@ Added 2 new specialized entity types:
 ---
 
 ### 3. PROGRAM Entity Clarification (Commit 95c42ad)
+
 **Problem**: User noted "instructions in ontology may not be clear enough for LLM to discern...in extremely dense complicated RFPs"
 
 **Solution**: Enhanced PROGRAM definition with concrete examples
 
 **Added Examples**:
+
 1. **MCPP II** (Marine Corps Prepositioning Program II)
 2. **Navy MBOS** (Maritime Based Organic Support)
 3. **Defense Enterprise Infrastructure Program** (DEIP)
@@ -107,6 +119,7 @@ Added 2 new specialized entity types:
 **Enhanced Description**: "proper named program with scope/budget/timeline, NOT generic concept"
 
 **Distinction Clarification**:
+
 - ✅ PROGRAM: MCPP II (has scope, budget, timeline)
 - ❌ ORGANIZATION: United States Navy (entity)
 - ❌ CONCEPT: prepositioning logistics (idea)
@@ -115,11 +128,13 @@ Added 2 new specialized entity types:
 ---
 
 ### 4. Production Terminology Polish (Commit 80d7f38)
+
 **Problem**: Development terminology ("Phase 6", "Phase 6.1") leaked into production code
 
 **Solution**: Systematic replacement across 9 files
 
 **Changes**:
+
 - Terminology: "Phase 6/Phase 6.1" → "Semantic Post-Processing"
 - Entity counts: "12 entity types" → "18 specialized types"
 - Algorithm counts: "5 core algorithms" → "6 inference algorithms"
@@ -129,6 +144,7 @@ Added 2 new specialized entity types:
 - API fields: `phase6_relationships_added` → `relationships_inferred`
 
 **Files Updated**:
+
 - `app.py` (entry point)
 - `src/raganything_server.py` (main server)
 - `src/server/config.py` (configuration)
@@ -142,6 +158,7 @@ Added 2 new specialized entity types:
 ---
 
 ### 5. Streamlined Startup Logs (Commit 97aaeb7)
+
 **Problem**: User feedback "server startup log has vestige logs and is pretty verbose"
 
 **Solution**: 77% reduction (65 lines → 15 lines)
@@ -149,7 +166,9 @@ Added 2 new specialized entity types:
 **Changes by File**:
 
 #### app.py
+
 **BEFORE** (4 lines):
+
 ```
 🚀 Starting GovCon Capture Vibe with RAG-Anything...
    - RAG-Anything is built on top of LightRAG
@@ -158,13 +177,16 @@ Added 2 new specialized entity types:
 ```
 
 **AFTER** (1 line):
+
 ```
 🚀 Starting GovCon Capture Vibe Server...
 ```
 
 #### raganything_server.py
+
 **BEFORE** (19 lines with detailed architecture)  
 **AFTER** (4 lines):
+
 ```
 ✅ Server Ready:
    📍 WebUI: http://localhost:9621/
@@ -174,11 +196,13 @@ Added 2 new specialized entity types:
 ```
 
 #### config.py
+
 **BEFORE** (38 lines with detailed metrics)  
 **AFTER** (8 lines):
+
 ```
 ⚙️  CONFIGURATION SUMMARY
-   
+
    🤖 LLM: grok-beta (2M context)
    🔢 Embeddings: text-embedding-3-large (3072-dim)
    📝 Chunking: 2048 tokens (overlap: 256)
@@ -189,8 +213,10 @@ Added 2 new specialized entity types:
 ```
 
 #### initialization.py
+
 **BEFORE** (8 lines with detailed configuration)  
 **AFTER** (5 lines):
+
 ```
 ✅ RAG-Anything initialized
    🔍 Parser: MinerU (auto) - multimodal enabled
@@ -242,22 +268,27 @@ app.py                 49 lines (startup script)
 ## 🎓 Key Lessons
 
 ### 1. Multimodal Extraction Quality
+
 **Finding**: 29% of entities extracted from tables/images (1,245 out of 4,302)  
 **Lesson**: MinerU's structure preservation is critical for government RFPs where evaluation matrices, deliverable lists, and organizational charts are often in table format
 
 ### 2. Format Corruption Patterns
+
 **Finding**: 0.7% of entities had format corruption from extraction  
 **Lesson**: LLM-generated entity types can include markdown artifacts (#, >, |). Automatic cleanup improves data quality without manual intervention.
 
 ### 3. Entity Type Specificity
+
 **Finding**: Dense RFPs benefit from explicit examples in extraction prompts  
 **Lesson**: Adding 3 concrete PROGRAM examples helped LLM distinguish from ORGANIZATION/CONCEPT/DELIVERABLE. Domain-specific examples > generic descriptions.
 
 ### 4. Terminology Consistency
+
 **Finding**: Development labels ("Phase 6") persisted in production code  
 **Lesson**: Systematic terminology audit before merge ensures professional codebase. Function renames required no external API changes (internal only).
 
 ### 5. Logging Balance
+
 **Finding**: 77% log reduction with zero information loss  
 **Lesson**: Essential info = URLs + features + counts + fixes. Remove redundancy, vestige terminology, and verbose metrics.
 
@@ -265,14 +296,14 @@ app.py                 49 lines (startup script)
 
 ## ✅ Charter Compliance
 
-| Constraint | Target | Result | Status |
-|------------|--------|--------|--------|
-| Net LOC ≤ baseline | ≤3,577 | 2,375 | ✅ PASS (-33.6%) |
-| No startup regression | ≤3s | ~3s | ✅ PASS |
-| No memory regression | ≤450MB | ~450MB | ✅ PASS |
-| No performance regression | 69s, $0.042 | 69s, $0.042 | ✅ PASS |
-| No API breaking changes | None | None | ✅ PASS |
-| Improved quality | Baseline | +13.5% entities, +10.4% relationships | ✅ PASS |
+| Constraint                | Target      | Result                                | Status           |
+| ------------------------- | ----------- | ------------------------------------- | ---------------- |
+| Net LOC ≤ baseline        | ≤3,577      | 2,375                                 | ✅ PASS (-33.6%) |
+| No startup regression     | ≤3s         | ~3s                                   | ✅ PASS          |
+| No memory regression      | ≤450MB      | ~450MB                                | ✅ PASS          |
+| No performance regression | 69s, $0.042 | 69s, $0.042                           | ✅ PASS          |
+| No API breaking changes   | None        | None                                  | ✅ PASS          |
+| Improved quality          | Baseline    | +13.5% entities, +10.4% relationships | ✅ PASS          |
 
 **All constraints met** ✅
 
@@ -280,19 +311,20 @@ app.py                 49 lines (startup script)
 
 ## 📦 Commits Summary
 
-| Commit | Description | Impact |
-|--------|-------------|--------|
-| `f43df7c` | Format error cleanup | +257 LOC, +0.7% data quality |
-| `3f30497` | EQUIPMENT & REGULATION entity types | +2 entity types |
-| `95c42ad` | PROGRAM clarification | +3 examples |
-| `80d7f38` | Production terminology polish | 9 files, 0 LOC |
-| `97aaeb7` | Streamlined startup logs | -50 log lines (77%) |
+| Commit    | Description                         | Impact                       |
+| --------- | ----------------------------------- | ---------------------------- |
+| `f43df7c` | Format error cleanup                | +257 LOC, +0.7% data quality |
+| `3f30497` | EQUIPMENT & REGULATION entity types | +2 entity types              |
+| `95c42ad` | PROGRAM clarification               | +3 examples                  |
+| `80d7f38` | Production terminology polish       | 9 files, 0 LOC               |
+| `97aaeb7` | Streamlined startup logs            | -50 log lines (77%)          |
 
 ---
 
 ## 🚀 Ready for Main Merge
 
 **Pre-Merge Checklist**:
+
 - ✅ All tests passing (query validation successful)
 - ✅ No performance regression (69s, $0.042 maintained)
 - ✅ No memory regression (~450MB maintained)
@@ -303,6 +335,7 @@ app.py                 49 lines (startup script)
 - ✅ Documentation complete (this file)
 
 **Merge Command**:
+
 ```powershell
 git checkout main
 git merge 004-code-optimization
@@ -316,12 +349,14 @@ git push origin main
 **Hypothesis**: UCF detection system (971 lines, 40% of codebase) may be redundant now that MinerU is working.
 
 **Evidence**:
+
 - 29% of entities from tables/images (MinerU extracts structure)
 - 42 tables with structure preserved
 - Comprehensive query responses (hierarchical relationships maintained)
 - Evaluation matrices captured without explicit UCF labels
 
 **Proposed Experiment** (30 minutes):
+
 1. Temporarily disable UCF detection
 2. Re-upload Navy MBOS (baseline: 4,302 entities, 42 tables)
 3. Compare metrics:
@@ -331,14 +366,17 @@ git push origin main
    - Semantic post-processing (L↔M relationships)
 
 **Decision Tree**:
+
 - **IF comparable**: Delete 971 LOC (40% reduction), add 4 table entity types (TABLE, FIGURE, CHART, MATRIX)
 - **IF degraded**: Keep UCF, still add 4 table entity types
 
 **Potential Outcomes**:
+
 - **Best case**: -971 LOC (40% reduction), simpler architecture (5 stages → 3)
 - **Worst case**: +0 LOC, +4 entity types (leverage MinerU strength)
 
 **Branch Creation**:
+
 ```powershell
 git checkout main
 git pull origin main
