@@ -71,7 +71,7 @@ def configure_raganything_args():
         "ANNEX",                    # NEW: Numbered attachments (J-######, Attachment #, Annex ##)
         
         # Hierarchical program entities (NEW: Top-level containers)
-        "PROGRAM",                  # Major programs (MCPP II, Navy MBOS, etc.) - contains requirements/deliverables
+        "PROGRAM",                  # Major named programs/initiatives (MCPP II, Navy MBOS, DEIP) - NOT generic concepts, must be a proper named program with scope/budget/timeline
         
         # Physical assets and equipment
         "EQUIPMENT",                # Physical assets: MHE, generators, batteries, GSE, CESE, watercraft, vehicles

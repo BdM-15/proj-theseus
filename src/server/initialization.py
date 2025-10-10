@@ -202,6 +202,9 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
     entity{tuple_delimiter}Annex 17 Transportation{tuple_delimiter}ANNEX{tuple_delimiter}Annex 17 Transportation addresses performance methodology for transportation.
     entity{tuple_delimiter}Veteran-Owned Small Business{tuple_delimiter}CONCEPT{tuple_delimiter}A business owned by veterans.
     entity{tuple_delimiter}FAR 52.212-1{tuple_delimiter}CLAUSE{tuple_delimiter}Instructions to Offerors—Commercial Products and Commercial Services.
+    entity{tuple_delimiter}MCPP II{tuple_delimiter}PROGRAM{tuple_delimiter}Marine Corps Prepositioning Program II - a major DoD logistics program for prepositioned equipment.
+    entity{tuple_delimiter}Navy MBOS{tuple_delimiter}PROGRAM{tuple_delimiter}Navy Maintenance Base Operating Support program providing facilities maintenance and base operations services.
+    entity{tuple_delimiter}Defense Enterprise Infrastructure Program{tuple_delimiter}PROGRAM{tuple_delimiter}DoD-wide infrastructure modernization program covering IT systems, facilities, and equipment.
     entity{tuple_delimiter}Concorde RG-24 Battery{tuple_delimiter}EQUIPMENT{tuple_delimiter}12-volt battery used for starting aircraft generators and ground support equipment.
     entity{tuple_delimiter}6200 Tennant Floor Sweeper{tuple_delimiter}EQUIPMENT{tuple_delimiter}Commercial floor cleaning equipment used for warehouse maintenance operations.
     entity{tuple_delimiter}Public Law 99-234{tuple_delimiter}REGULATION{tuple_delimiter}Federal statute requiring the submission of certified cost or pricing data.
