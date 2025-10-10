@@ -140,17 +140,19 @@ WARNING:src.utils.entity_cleanup:Skipping invalid entity 'Navy Technical Methodo
 **DECISION**: Remove entity_cleanup.py and simplify prompts (hybrid of prevention + rollback)
 
 **Rationale**:
+
 1. **Timeline Analysis** revealed the root cause:
+
    - Branch 004 MinerU multimodal (commit d93e344, Oct 9 @ 3:41 PM): **Working perfectly** - 4,302 entities, minimal warnings
    - Entity cleanup added (commit f43df7c, Oct 9 @ 6:04 PM): 257 lines of defensive code that **masked prompt issues**
    - New entity types added (commit 3f30497): EQUIPMENT and REGULATION
    - **Result**: 90+ warnings during MCPP RFP processing
 
 2. **Fundamental Flaw**: Entity cleanup ran AFTER validation rejection, making it useless for recovery
-   
 3. **Anti-Pattern Identified**: The "❌ WRONG EXAMPLES" section in the prompt was **teaching the LLM bad patterns** instead of preventing them
 
 **Solution Applied**:
+
 - ✅ Deleted `src/utils/entity_cleanup.py` (257 lines)
 - ✅ Removed Step 1.5 cleanup logic from `src/server/routes.py` (29 lines removed)
 - ✅ Removed entity_cleanup imports from `src/utils/__init__.py`
@@ -291,16 +293,19 @@ WARNING:src.utils.entity_cleanup:Skipping invalid entity 'Navy Technical Methodo
 ### Changes Applied
 
 1. **Deleted `src/utils/entity_cleanup.py`** (257 lines)
+
    - Removed defensive cleanup that ran AFTER validation rejection
    - Eliminated 5 functions: `clean_entity_type()`, `validate_entity_type()`, `clean_entities_batch()`, `analyze_corruption_patterns()`
 
 2. **Removed entity_cleanup integration from `src/server/routes.py`** (29 lines removed)
+
    - Deleted Step 1.5 cleanup logic
    - Removed import statement for entity_cleanup functions
    - Removed corruption analysis and entity correction code
    - Cleaned up logging and return values
 
 3. **Cleaned up `src/utils/__init__.py`** (12 lines removed)
+
    - Removed entity_cleanup imports and exports
    - Simplified module structure
 
@@ -318,6 +323,7 @@ WARNING:src.utils.entity_cleanup:Skipping invalid entity 'Navy Technical Methodo
 - **Decision**: Fix AFTER Branch 005 entity type fix stability confirmed (don't add variables during testing)
 
 **Rationale**: Prompt modularization fits naturally with the broader MinerU optimization work, which includes:
+
 - UCF redundancy experiments
 - Prompt engineering improvements
 - Processing pipeline optimization
@@ -328,11 +334,13 @@ WARNING:src.utils.entity_cleanup:Skipping invalid entity 'Navy Technical Methodo
 **Test Case**: MCPP RFP processing (October 10, 2025)
 
 **Warnings Breakdown**:
+
 - Invalid entity type errors: **22** (down from 90+ = **76% reduction** ✅)
 - LLM format errors: **13** (field count mismatches, wrong delimiters)
 - **Total**: 35 warnings vs 90+ baseline
 
 **Lost Entities** (Critical Data):
+
 - Organizations: USAMMA, HQMC
 - Documents: Watercraft Maintenance Status Report, DD Form 1348, CmdO 4790.1, DLA-Energy P2, 29 CFR 1915, MCO 4450.12, International Maritime Dangerous Goods Rules
 - Deliverables: Annual Spend Plan, Investigation Report, Container Packing Lists, Sustainment Blocks, AASP Plan, Class IX Battery Plan, CDRL 5010, Post Exercise After Action Report, Shipboard Post Exercise After Action Report
@@ -342,12 +350,13 @@ WARNING:src.utils.entity_cleanup:Skipping invalid entity 'Navy Technical Methodo
 - Requirements: Phase-Out
 
 **Corruption Patterns Still Present**:
+
 - `#>|TYPE` (most common) - 19 occurrences
 - `#|TYPE` - 1 occurrence
 - `#>|section` (lowercase!) - 1 occurrence
 - `#>|document` (lowercase!) - 1 occurrence
 
-**Assessment**: 
+**Assessment**:
 ✅ **MAJOR IMPROVEMENT** - 76% reduction in warnings  
 ❌ **STILL LOSING CRITICAL DATA** - ~22 important entities rejected  
 ⚠️ **ROOT CAUSE PERSISTS** - LLM generating special characters despite prompt simplification
@@ -355,27 +364,32 @@ WARNING:src.utils.entity_cleanup:Skipping invalid entity 'Navy Technical Methodo
 ### Next Steps
 
 1. **Commit Branch 005 Entity Type Fix** ✅
+
    - Document as partial success (76% improvement)
    - Note that corruption patterns persist
    - Ready for Branch 005 MinerU Optimization
 
 2. **Branch 005 MinerU Optimization Scope** (Critical Follow-up):
+
    - **Rewrite entity extraction prompt from scratch**
+
      - Study what triggers `#>|` corruption in Grok-4-fast-reasoning
      - Remove ALL special character references
      - Ultra-simplify delimiter instructions
      - Consider model-specific tuning
-   
+
    - **Add pre-validation cleanup** (done RIGHT this time)
+
      - Hook into RAG-Anything pipeline BEFORE validation
      - Clean entity types before rejection occurs
      - Log corrections for quality monitoring
-   
+
    - **Test alternative LLM models**
+
      - Try `grok-2-1212` vs `grok-4-fast-reasoning`
      - Compare with Claude or GPT-4 if needed
      - Model-specific prompt engineering
-   
+
    - **Prompt modularization** (architectural cleanup)
      - Extract hardcoded prompt to `/prompts/entity_extraction/`
      - Create `prompt_loader.py` utility
@@ -393,11 +407,13 @@ WARNING:src.utils.entity_cleanup:Skipping invalid entity 'Navy Technical Methodo
 Grok-4-fast-reasoning provided self-analysis of the corruption patterns:
 
 **Root Cause Identified**:
+
 1. **Prompt Echoing** - Model echoes instructional delimiters as output patterns
 2. **Field Count Mismatch** - Speed optimization sacrifices schema adherence
 3. **Model-Specific Behavior** - `grok-4-fast-reasoning` prioritizes speed over strict formatting
 
 **Recommended Solutions** (now in Branch 005 scope):
+
 1. ✅ **Ultra-simplify entity type list** - Remove ALL special character references
 2. ✅ **Switch to JSON output** - Eliminate line-based parsing issues (if feasible)
 3. ✅ **Pre-validation sanitizer** - Strip corruption BEFORE validation
