@@ -1,71 +1,102 @@
 """
-GovCon Capture Vibe - Ontology-Based RAG for Government Contracting
+GovCon Capture Vibe - Ontology-Based RAG for Government Contract Analysis
 
-Phase 2+3: Ontology-Modified LightRAG System
+Module Architecture & Dependency Flow:
 
-A sophisticated RFP analysis system built on LightRAG with ontology-guided extraction.
-Implements Shipley methodology through structured PydanticAI agents.
+┌─────────────────────────────────────────────────────────────┐
+│                    Module Dependency Hierarchy              │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  1. core/ (Foundation Layer)                                │
+│     ├── prompt_loader.py - External prompt loading         │
+│     └── Shared utilities used by all modules               │
+│                                                             │
+│  2. ingestion/ & inference/ (Processing Layer)              │
+│     ├── ingestion/detector.py - UCF format detection       │
+│     ├── ingestion/processor.py - Section-aware extraction  │
+│     ├── inference/graph_io.py - GraphML/kv_store I/O       │
+│     └── inference/engine.py - LLM relationship inference   │
+│     Dependencies: core/                                     │
+│                                                             │
+│  3. server/ (Orchestration Layer)                           │
+│     ├── config.py - Environment configuration              │
+│     ├── initialization.py - RAGAnything setup              │
+│     └── routes.py - FastAPI endpoints                      │
+│     Dependencies: core/, ingestion/, inference/            │
+│                                                             │
+│  4. raganything_server.py + app.py (Entry Points)          │
+│     Dependencies: server/                                   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
 
-Architecture (Phase 2+3):
-- core/: Ontology-modified LightRAG integration (Path B)
-  - ontology.py: Entity types and relationship constraints  
-  - lightrag_prompts.py: Ontology-guided extraction prompts
-  - ontology_validation.py: Post-processing validation
-  - lightrag_integration.py: Path B initialization
-- agents/: PydanticAI structured agents for Shipley methodology
-- models/: Pydantic models defining RFP data structures
-- api/: FastAPI routes for RFP analysis endpoints
-- utils/: Logging, performance monitoring, and utilities
+Dependency Flow (Bottom-Up):
+    
+    core
+      ↓
+    ┌───────────┬────────────┐
+    ↓           ↓            ↓
+  ingestion  inference  (independent)
+    ↓           ↓
+    └───────────┴────────────┘
+              ↓
+            server
+              ↓
+    raganything_server + app
 
-This system injects government contracting ontology into LightRAG's extraction engine,
-combining knowledge graphs with structured AI agents for comprehensive RFP analysis.
+Import Rules:
+- ✅ core can import: nothing (foundation)
+- ✅ ingestion/inference can import: core
+- ✅ server can import: core, ingestion, inference
+- ❌ NO circular imports (enforced by structure)
+- ❌ NO horizontal imports (ingestion <-> inference)
+
+Module Responsibilities:
+
+core/
+  - Prompt loading from external Markdown files
+  - Shared utilities and constants
+  - Domain-agnostic helpers
+
+ingestion/
+  - UCF (Uniform Contract Format) detection
+  - Section-aware document processing
+  - Format normalization
+
+inference/
+  - LLM-powered relationship inference
+  - Knowledge graph enhancement
+  - 6 semantic inference algorithms:
+    1. Document hierarchy (ANNEX → SECTION)
+    2. Section L↔M mapping (instructions → evaluation)
+    3. Attachment linking (annexes → sections)
+    4. Clause clustering (FAR/DFARS → sections)
+    5. Requirement evaluation (requirements → factors)
+    6. Semantic concept linking (win themes, pain points)
+
+server/
+  - Environment configuration (18 entity types)
+  - RAGAnything initialization
+  - FastAPI endpoints
+  - Semantic post-processing orchestration
+
+Usage Example:
+
+    # Entry point (app.py or raganything_server.py)
+    from src.server import initialize_raganything, create_insert_endpoint
+    
+    # Server imports from ingestion and inference
+    from src.ingestion import detect_ucf_format
+    from src.inference import infer_all_relationships
+    
+    # Ingestion and inference import from core
+    from src.core.prompt_loader import load_prompt
+
+For detailed architecture documentation, see:
+- HANDOFF_SUMMARY.md - Branch 004 results and quick start
+- docs/BRANCH_004_CODE_OPTIMIZATION.md - Charter and constraints
+- docs/ARCHITECTURE.md - Complete technical details
 """
 
-# Core ontology components (Phase 2+3)
-from .core import (
-    EntityType,
-    RelationshipType,
-    VALID_RELATIONSHIPS,
-    create_ontology_modified_lightrag,
-    get_government_contracting_entity_types,
-)
-
-# Structured AI agents
-from .agents import RFPAnalysisAgents, RequirementsExtractionOutput, RFPContext
-
-# Data models
-from .models import (
-    RFPRequirement, ComplianceAssessment, RFPAnalysisResult,
-    ComplianceLevel, RequirementType, ComplianceStatus, RiskLevel
-)
-
-# Utilities
-from .utils import setup_logging, get_monitor
-
-__version__ = "3.0.0"  # Phase 3: DELIVERABLE entity added
-__all__ = [
-    # Core ontology (Phase 2+3)
-    'EntityType',
-    'RelationshipType',
-    'VALID_RELATIONSHIPS',
-    'create_ontology_modified_lightrag',
-    'get_government_contracting_entity_types',
-    
-    # AI agents
-    'RFPAnalysisAgents',
-    'RequirementsExtractionOutput',
-    'RFPContext',
-    
-    # Data models
-    'RFPRequirement',
-    'ComplianceAssessment',
-    'RFPAnalysisResult',
-    'ComplianceLevel',
-    'RequirementType',
-    'ComplianceStatus', 
-    'RiskLevel',
-    
-    # Utilities
-    'setup_logging',
-    'get_monitor'
-]
+__version__ = "4.0.0"
+__branch__ = "004-code-optimization"
+__status__ = "COMPLETE - Ready for merge to main"

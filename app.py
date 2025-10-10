@@ -35,10 +35,7 @@ sys.path.insert(0, str(src_path))
 from raganything_server import main
 
 if __name__ == "__main__":
-    print("🎯 Starting GovCon Capture Vibe with RAG-Anything...")
-    print("   RAG-Anything is built on top of LightRAG")
-    print("   Multimodal processing: images, tables, equations")
-    print("   Grounded in Shipley methodology for government contracting\n")
+    print("🎯 Starting GovCon Capture Vibe Server...\n")
     
     try:
         asyncio.run(main())
