@@ -65,18 +65,19 @@ ingestion/
 inference/
   - LLM-powered relationship inference
   - Knowledge graph enhancement
-  - 5 core inference algorithms:
+  - 6 semantic inference algorithms:
     1. Document hierarchy (ANNEX → SECTION)
     2. Section L↔M mapping (instructions → evaluation)
     3. Attachment linking (annexes → sections)
     4. Clause clustering (FAR/DFARS → sections)
     5. Requirement evaluation (requirements → factors)
+    6. Semantic concept linking (win themes, pain points)
 
 server/
-  - Environment configuration
+  - Environment configuration (18 entity types)
   - RAGAnything initialization
   - FastAPI endpoints
-  - Phase 6.1 auto-processing orchestration
+  - Semantic post-processing orchestration
 
 Usage Example:
 

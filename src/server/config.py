@@ -49,7 +49,7 @@ def configure_raganything_args():
     global_args.embedding_api_key = openai_api_key
     global_args.embedding_dim = 3072  # CRITICAL: text-embedding-3-large dimension
     
-    # Government contracting entity types (Phase 6 Enhanced)
+    # Government contracting entity types (18 specialized types)
     # Semantic-first detection: Content determines entity type, not section labels
     global_args.entity_types = [
         # Core entities
@@ -117,13 +117,13 @@ def configure_raganything_args():
     logger.info(f"    Embedding parallel requests: {os.getenv('EMBEDDING_FUNC_MAX_ASYNC', '32')}")
     logger.info(f"    Target: Process 71-page RFP in under 2 minutes")
     logger.info(f"")
-    logger.info(f"  🎯 ENTITY EXTRACTION (Phase 6 Enhanced):")
-    logger.info(f"    Entity types: {len(global_args.entity_types)} govcon types")
-    logger.info(f"    NEW: SUBMISSION_INSTRUCTION, STRATEGIC_THEME, ANNEX, STATEMENT_OF_WORK")
+    logger.info(f"  🎯 ENTITY EXTRACTION (Government Contracting Ontology):")
+    logger.info(f"    Entity types: {len(global_args.entity_types)} specialized types")
+    logger.info(f"    Latest additions: EQUIPMENT, REGULATION, PROGRAM (18 total)")
     logger.info(f"    Semantic-first detection: Content over labels")
     logger.info(f"    Multimodal: enabled (MinerU parser)")
     logger.info(f"")
-    logger.info(f"  🤖 POST-PROCESSING LAYER (Phase 6.1 - LLM-Powered):")
+    logger.info(f"  🤖 SEMANTIC POST-PROCESSING (LLM-Powered Relationship Inference):")
     logger.info(f"    Method: Grok LLM semantic understanding (REPLACES regex patterns)")
     logger.info(f"    Reads from: GraphML (correct data source)")
     logger.info(f"    Infers 5 core relationship algorithms:")

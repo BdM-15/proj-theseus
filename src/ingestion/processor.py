@@ -11,7 +11,7 @@ Architecture:
     - Regex finds: "Section M starts at char 8000, ends at char 12000"
     - LLM extracts from Section M WITH CONTEXT: "This is Section M (Evaluation Factors), 
       expect EVALUATION_FACTOR entities with relative_importance, subfactors, etc."
-    - Same 12+ entity types as Generic RAG, just better relationship accuracy
+    - Same 18 entity types as Generic RAG, just better relationship accuracy
     
     Generic RAG Path:
     - No section detection
@@ -208,7 +208,7 @@ EXPECTED ENTITY TYPES: {', '.join(section_info['expected_entities'])}
 
 EXTRACTION FOCUS: {section_info['extraction_focus']}
 
-IMPORTANT: Extract ALL entities using the full ontology (12+ types) with capture intelligence metadata:
+IMPORTANT: Extract ALL entities using the full government contracting ontology (18 specialized types) with capture intelligence metadata:
 - REQUIREMENT: requirement_type (FUNCTIONAL, PERFORMANCE, SECURITY, TECHNICAL, INTERFACE, MANAGEMENT, DESIGN, QUALITY)
 - REQUIREMENT: criticality_level (MANDATORY via "shall/must", IMPORTANT via "should", OPTIONAL via "may")
 - EVALUATION_FACTOR: relative_importance ("Most Important", "Significantly More Important than Price")

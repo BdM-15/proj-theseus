@@ -2,14 +2,14 @@
 Server module for RAG-Anything + LightRAG integration
 
 This module provides:
-- Configuration (config.py): Entity types, API credentials, chunking settings
+- Configuration (config.py): 18 entity types, API credentials, chunking settings
 - Initialization (initialization.py): RAGAnything instance with custom prompts
-- Routes (routes.py): FastAPI endpoints + Phase 6.1 auto-processing
+- Routes (routes.py): FastAPI endpoints + semantic post-processing
 
 Usage:
     from src.server.config import configure_raganything_args
     from src.server.initialization import initialize_raganything
-    from src.server.routes import create_insert_endpoint, phase6_auto_processor
+    from src.server.routes import create_insert_endpoint, semantic_post_processor_monitor
 """
 
 __all__ = [
@@ -18,7 +18,7 @@ __all__ = [
     "get_rag_instance",
     "create_insert_endpoint",
     "create_documents_upload_endpoint",
-    "phase6_auto_processor",
+    "semantic_post_processor_monitor",
     "process_document_with_ucf_detection",
     "post_process_knowledge_graph",
 ]

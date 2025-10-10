@@ -3,7 +3,7 @@ RAG-Anything Initialization Module
 
 This module handles the initialization of the RAG-Anything instance with:
 - Custom entity extraction prompts (fixes "#/>CONCEPT" format issues)
-- Government contracting entity types (12 Phase 6 enhanced types)
+- Government contracting ontology (18 specialized entity types)
 - Multimodal document processing (MinerU parser)
 - Cloud LLM integration (xAI Grok + OpenAI embeddings)
 """
@@ -27,7 +27,7 @@ async def initialize_raganything():
     
     Configuration:
     - Parser: MinerU (multimodal - images, tables, equations)
-    - Entity Types: 12 government contracting types (semantic-first detection)
+    - Entity Types: 18 government contracting types (semantic-first detection)
     - LLM: xAI Grok-4-fast-reasoning (cloud processing, 2M context)
     - Embeddings: OpenAI text-embedding-3-large (3072-dim, 8192 max tokens)
     - Chunking: 2048 tokens, 256 overlap (87% fewer embedding calls vs 800)
@@ -45,7 +45,7 @@ async def initialize_raganything():
     openai_api_key = os.getenv("EMBEDDING_BINDING_API_KEY")
     working_dir = global_args.working_dir
     
-    # Government contracting entity types (Phase 6 Enhanced)
+    # Government contracting entity types (18 specialized types)
     # Semantic-first detection: Content determines entity type, not section labels
     entity_types = [
         # Core entities
@@ -331,7 +331,7 @@ Text:
     print(f"   Working dir: {working_dir}")
     print(f"   Parser: {parser} (method: {parse_method})")
     print(f"   Multimodal: images={enable_image}, tables={enable_table}, equations={enable_equation}")
-    print(f"   Entity types: {len(entity_types)} govcon types (Phase 6 enhanced)")
+    print(f"   Entity types: {len(entity_types)} specialized government contracting types")
     print(f"   Custom extraction prompt: Enabled (clean entity type format)")
     print(f"   LightRAG: Storages initialized ✅")
     print(f"   Compatibility fix: Disabled multimodal_processed field writing ✅")

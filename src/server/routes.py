@@ -2,14 +2,14 @@
 FastAPI Routes Module
 
 Custom endpoints for RAG-Anything + LightRAG server:
-- /insert: Document upload with Phase 6.1 auto-processing
-- Background monitor: Auto-detects WebUI uploads, triggers Phase 6.1
+- /insert: Document upload with automatic semantic post-processing
+- Background monitor: Auto-detects WebUI uploads, triggers relationship inference
 
 Architecture:
 1. Document Upload → process_document_with_ucf_detection()
 2. UCF Detection → Dual-path processing (section-aware OR standard)
-3. LightRAG Extraction → Entity/relationship extraction
-4. Phase 6.1 Auto-Run → LLM-powered semantic inference
+3. LightRAG Extraction → Entity/relationship extraction (18 types)
+4. Semantic Post-Processing → LLM-powered relationship inference
 5. Knowledge Graph Updated → GraphML + kv_store files
 """
 
@@ -43,7 +43,7 @@ async def process_document_with_ucf_detection(file_path: str, file_name: str, ra
     2. If UCF (confidence >= 0.70): Use section-aware LLM extraction
     3. If non-UCF: Use standard semantic RAG extraction
     
-    Both paths extract the same 12+ entity types with capture intelligence metadata.
+    Both paths extract the same 18 entity types with capture intelligence metadata.
     UCF path gets better relationship accuracy due to section context.
     
     Args:
@@ -77,7 +77,7 @@ async def process_document_with_ucf_detection(file_path: str, file_name: str, ra
             sections = prepare_ucf_sections_for_llm(document_text, ucf_result.detected_sections)
             
             # Step 3: Process with RAG-Anything (full document processing)
-            # Note: Section metadata will be used by Phase 6.1 for enhanced extraction
+            # Note: Section metadata will be used by semantic post-processing for enhanced extraction
             # CRITICAL: Use process_document_complete() NOT process_document_complete_lightrag_api()
             # The _lightrag_api version is for external server integration and expects
             # LightRAG to accept multimodal_content param in ainsert(), which it doesn't
@@ -88,7 +88,7 @@ async def process_document_with_ucf_detection(file_path: str, file_name: str, ra
                 parse_method="auto"
             )
             
-            # Step 4: Store section metadata for Phase 6.1 to use
+            # Step 4: Store section metadata for semantic post-processing
             section_metadata_path = Path(global_args.working_dir) / f"ucf_sections_{Path(file_name).stem}.json"
             section_data = {
                 "file_name": file_name,
@@ -108,7 +108,7 @@ async def process_document_with_ucf_detection(file_path: str, file_name: str, ra
             with open(section_metadata_path, 'w', encoding='utf-8') as f:
                 json.dump(section_data, f, indent=2)
             
-            logger.info(f"✅ UCF section metadata saved for Phase 6.1 enhancement")
+            logger.info(f"✅ UCF section metadata saved for semantic enhancement")
             
             return {
                 "path": "UCF",
@@ -138,24 +138,25 @@ async def process_document_with_ucf_detection(file_path: str, file_name: str, ra
 
 async def post_process_knowledge_graph(rag_storage_path: str, llm_func) -> dict:
     """
-    Phase 6.1 Post-Processing Layer: LLM-Powered Semantic Relationship Inference
+    Semantic Post-Processing: LLM-Powered Relationship Inference
     
-    CRITICAL CHANGE: Replaced brittle regex patterns with Grok LLM semantic understanding.
+    ARCHITECTURE: Replaces brittle regex patterns with LLM semantic understanding.
     
     Timeline:
-    - t=0-70s: LightRAG extraction (entities + initial relationships)
+    - t=0-70s: LightRAG extraction (18 entity types + initial relationships)
     - t=70s: Knowledge graph files written (GraphML, kv_store files)
     - t=70-85s: This function runs (LLM-powered relationship inference)
     - t=85s: Knowledge graph files UPDATED (100% annex linkage, comprehensive coverage)
     
-    Architecture:
-    1. Parse GraphML (correct data source with full entity details)
-    2. Group entities by type for efficient batching
-    3. Call Grok LLM to infer relationships using semantic understanding
-    4. Parse structured JSON responses with confidence scores and reasoning
-    5. Save new relationships to both GraphML and kv_store
+    Processing Pipeline:
+    1. Parse GraphML (full entity details from multimodal extraction)
+    2. Clean entity types (fixes #/>CONCEPT format corruption)
+    3. Group entities by type for efficient batching
+    4. Call Grok LLM to infer relationships using semantic understanding
+    5. Parse structured JSON responses with confidence scores and reasoning
+    6. Save new relationships to both GraphML and kv_store
     
-    Benefits over Phase 6.0 regex approach:
+    Benefits:
     - Agency-agnostic: Handles ANY RFP structure (Navy, Air Force, Army, civilian agencies)
     - Context-aware: Understands content semantics, not just naming patterns
     - Self-documenting: LLM provides human-readable reasoning for each relationship
@@ -163,12 +164,13 @@ async def post_process_knowledge_graph(rag_storage_path: str, llm_func) -> dict:
     - Cost-effective: ~$0.05 per document (8 LLM batches × ~$0.006/batch)
     - Leverages existing 2M-context Grok infrastructure
     
-    Relationship Types Inferred (5 core algorithms):
+    Relationship Types Inferred (6 algorithms):
     1. Section L↔M mapping: SUBMISSION_INSTRUCTION ↔ EVALUATION_FACTOR
     2. Document hierarchy: CHILD_OF relationships (J-02000000-10 → J-02000000)
     3. Attachment section linking: ANNEX → SECTION (ATTACHMENT_OF)
     4. Clause clustering: CLAUSE → SECTION (CHILD_OF)
     5. Requirement evaluation: REQUIREMENT → EVALUATION_FACTOR (EVALUATED_BY)
+    6. Semantic concept linking: Win themes, pain points, strategic relationships
     
     Args:
         rag_storage_path: Path to rag_storage directory
@@ -178,8 +180,8 @@ async def post_process_knowledge_graph(rag_storage_path: str, llm_func) -> dict:
         dict: Processing result with status, relationships_added, method
     """
     logger.info("=" * 80)
-    logger.info("🤖 Phase 6.1: LLM-Powered Post-Processing")
-    logger.info("   Replacing regex patterns with semantic understanding")
+    logger.info("🤖 SEMANTIC POST-PROCESSING: LLM-Powered Relationship Inference")
+    logger.info("   Augmenting knowledge graph with inferred relationships")
     logger.info("=" * 80)
     
     rag_storage = Path(rag_storage_path)
@@ -253,14 +255,14 @@ async def post_process_knowledge_graph(rag_storage_path: str, llm_func) -> dict:
         save_relationships_to_kv_store(rag_storage, new_relationships, nodes)
         
         # Step 4: Final validation
-        logger.info(f"  [4/4] Phase 6.1 complete")
+        logger.info(f"  [4/4] Semantic post-processing complete")
         
         logger.info("=" * 80)
-        logger.info(f"🎯 Phase 6.1 LLM-Powered Post-Processing Complete")
+        logger.info(f"🎯 SEMANTIC POST-PROCESSING COMPLETE")
         logger.info(f"  Entity type cleanup: {correction_count} corrections")
         logger.info(f"  Total new relationships: {len(new_relationships)}")
         logger.info(f"  Method: Grok LLM semantic understanding + format cleanup")
-        logger.info(f"  Cost: ~$0.03 (5 LLM batches)")
+        logger.info(f"  Cost: ~$0.03 (6 inference algorithms)")
         logger.info(f"  Processing time: ~15 seconds")
         logger.info("=" * 80)
         
@@ -287,19 +289,19 @@ async def post_process_knowledge_graph(rag_storage_path: str, llm_func) -> dict:
 
 def create_insert_endpoint(app, rag_instance):
     """
-    Create custom /insert endpoint with Phase 6.1 integration
+    Create custom /insert endpoint with automatic semantic post-processing
     
     This overrides LightRAG's default /insert to automatically run
-    Phase 6.1 LLM-powered relationship inference after document extraction.
+    LLM-powered relationship inference after document extraction.
     
     Args:
         app: FastAPI application instance
         rag_instance: Initialized RAGAnything instance
     """
     @app.post("/insert")
-    async def insert_with_phase6(file: UploadFile = File(...)):
+    async def insert_with_semantic_processing(file: UploadFile = File(...)):
         """
-        Standard LightRAG insert endpoint with Phase 6.1 post-processing
+        Standard LightRAG insert endpoint with semantic post-processing
         
         API clients use this endpoint directly.
         """
@@ -317,9 +319,9 @@ def create_insert_endpoint(app, rag_instance):
             logger.info(f"✅ LightRAG extraction complete for {file.filename}")
             logger.info(f"   Path: {processing_result['path']}, Confidence: {processing_result['confidence']:.2f}")
             
-            # Phase 6.1: Run post-processing layer to infer semantic relationships
-            logger.info(f"🤖 Phase 6.1: LLM-Powered Post-Processing")
-            logger.info(f"   Replacing regex patterns with semantic understanding...")
+            # Semantic post-processing: LLM-powered relationship inference
+            logger.info(f"🤖 SEMANTIC POST-PROCESSING: Inferring relationships...")
+            logger.info(f"   Using LLM semantic understanding for 6 inference algorithms")
             post_process_result = await post_process_knowledge_graph(
                 global_args.working_dir,
                 rag_instance.llm_model_func
@@ -334,8 +336,8 @@ def create_insert_endpoint(app, rag_instance):
                 "processing_path": processing_result["path"],
                 "ucf_confidence": processing_result["confidence"],
                 "ucf_sections": processing_result["sections"],
-                "phase6_relationships_added": post_process_result.get("total_relationships_added", 0),
-                "method": "Dual-path (UCF/Generic RAG) + Phase 6.1 LLM inference"
+                "relationships_inferred": post_process_result.get("total_relationships_added", 0),
+                "method": "Dual-path (UCF/Generic RAG) + LLM semantic inference"
             })
             
         except Exception as e:
@@ -376,9 +378,9 @@ def create_documents_upload_endpoint(app, rag_instance):
             logger.info(f"✅ RAG-Anything processing complete for {file.filename}")
             logger.info(f"   Path: {processing_result['path']}, Confidence: {processing_result['confidence']:.2f}")
             
-            # Phase 6.1: Run post-processing layer to infer semantic relationships
-            logger.info(f"🤖 Phase 6.1: LLM-Powered Post-Processing")
-            logger.info(f"   Replacing regex patterns with semantic understanding...")
+            # Semantic post-processing: LLM-powered relationship inference
+            logger.info(f"🤖 SEMANTIC POST-PROCESSING: Inferring relationships...")
+            logger.info(f"   Using LLM semantic understanding for 6 inference algorithms")
             post_process_result = await post_process_knowledge_graph(
                 global_args.working_dir,
                 rag_instance.llm_model_func
@@ -393,8 +395,8 @@ def create_documents_upload_endpoint(app, rag_instance):
                 "processing_path": processing_result["path"],
                 "ucf_confidence": processing_result["confidence"],
                 "ucf_sections": processing_result["sections"],
-                "phase6_relationships_added": post_process_result.get("total_relationships_added", 0),
-                "method": "RAG-Anything (MinerU multimodal) + Phase 6.1 LLM inference"
+                "relationships_inferred": post_process_result.get("total_relationships_added", 0),
+                "method": "RAG-Anything (MinerU multimodal) + LLM semantic inference"
             })
             
         except Exception as e:
@@ -404,19 +406,19 @@ def create_documents_upload_endpoint(app, rag_instance):
             return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 
-async def phase6_auto_processor(rag_instance):
+async def semantic_post_processor_monitor(rag_instance):
     """
-    Background task that monitors doc_status and automatically runs Phase 6.1
+    Background task that monitors doc_status and automatically runs semantic post-processing
     when new documents are fully processed.
     
-    This enables automatic post-processing for WebUI uploads without
+    This enables automatic relationship inference for WebUI uploads without
     overriding LightRAG's internal endpoints.
     
     Args:
         rag_instance: Initialized RAGAnything instance (for LLM function access)
     """
     processed_docs = set()
-    logger.info("🤖 Phase 6.1 Auto-Processor: Started monitoring for new documents")
+    logger.info("🤖 SEMANTIC POST-PROCESSOR: Started monitoring for new documents")
     
     while True:
         try:
@@ -436,20 +438,20 @@ async def phase6_auto_processor(rag_instance):
                 if status in ["completed", "processed"] and doc_id not in processed_docs:
                     file_name = doc_data.get("file_path", doc_id)
                     logger.info(f"📄 New document detected: {file_name}")
-                    logger.info(f"🤖 Phase 6.1: Auto-triggering post-processing...")
+                    logger.info(f"🤖 Auto-triggering semantic post-processing...")
                     
-                    # Run Phase 6.1 post-processing
+                    # Run semantic post-processing
                     post_process_result = await post_process_knowledge_graph(
                         global_args.working_dir,
                         rag_instance.llm_model_func
                     )
                     relationships_added = post_process_result.get("total_relationships_added", 0)
                     
-                    logger.info(f"✅ Phase 6.1 complete: {relationships_added} relationships added for {file_name}")
+                    logger.info(f"✅ Semantic post-processing complete: {relationships_added} relationships added for {file_name}")
                     
                     # Mark as processed
                     processed_docs.add(doc_id)
                     
         except Exception as e:
-            logger.error(f"❌ Phase 6.1 auto-processor error: {e}")
+            logger.error(f"❌ Semantic post-processor error: {e}")
             await asyncio.sleep(10)  # Wait longer on error
