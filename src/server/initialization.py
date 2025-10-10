@@ -2,7 +2,7 @@
 RAG-Anything Initialization Module
 
 This module handles the initialization of the RAG-Anything instance with:
-- Custom entity extraction prompts (fixes "#/>CONCEPT" format issues)
+- Custom entity extraction prompts (simplified for clarity)
 - Government contracting ontology (18 specialized entity types)
 - Multimodal document processing (MinerU parser)
 - Cloud LLM integration (xAI Grok + OpenAI embeddings)
@@ -195,22 +195,8 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
     *   Format: `relation{tuple_delimiter}source_entity{tuple_delimiter}target_entity{tuple_delimiter}relationship_keywords{tuple_delimiter}relationship_description`
 
 3.  **Delimiter Usage Protocol:**
-    *   The `{tuple_delimiter}` is a complete, atomic marker and **must not be filled with content**. It serves strictly as a field separator.
-    
-    ═══════════════════════════════════════════════════════════════════════════════
-    🔧 DELIMITER RULES:
-    ═══════════════════════════════════════════════════════════════════════════════
-    
-    ✅ CORRECT: Use {tuple_delimiter} EXACTLY as shown, with NO modifications
-    ❌ WRONG: Do NOT add content inside the delimiter
-    ❌ WRONG: Do NOT modify the delimiter characters
-    ❌ WRONG: Do NOT use alternative delimiters
-    
-    Examples:
-    ❌ WRONG: entity{tuple_delimiter}Tokyo<|location|>Tokyo is the capital of Japan.
-    ✅ CORRECT: entity{tuple_delimiter}Tokyo{tuple_delimiter}LOCATION{tuple_delimiter}Tokyo is the capital of Japan.
-    
-    ═══════════════════════════════════════════════════════════════════════════════
+    *   The `{tuple_delimiter}` is a complete, atomic marker. It serves strictly as a field separator.
+    *   Use {tuple_delimiter} EXACTLY as shown in the examples below, with NO modifications.
 
 4.  **Relationship Direction & Duplication:**
     *   Treat all relationships as **undirected** unless explicitly stated otherwise. Swapping the source and target entities for an undirected relationship does not constitute a new relationship.
