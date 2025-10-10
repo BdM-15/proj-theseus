@@ -171,7 +171,57 @@ Test Query: "What are the evaluation factors in Section M and their weights?"
 
 ---
 
-## 🔧 Technical Details
+## � Additional Tasks: Prompt Modularization
+
+### Issue Identified (Branch 005-entity-type-quality-fix)
+
+**Problem**: Entity extraction prompt is hardcoded in `src/server/initialization.py` (~100 lines, lines 140-240)
+
+**Expected Architecture**: All prompts should be modularized in `/prompts` directory as markdown files
+
+**Current State**:
+- ✅ CORRECT: `/prompts/relationship_inference/*.md` (6 files) - properly modularized
+- ❌ VIOLATION: Entity extraction prompt hardcoded in initialization.py
+- ✅ REFERENCE: `/prompts/entity_extraction/entity_detection_rules.md` (reference doc)
+
+### Proposed Solution
+
+**Task**: Extract entity extraction prompt to `/prompts/entity_extraction/entity_extraction_prompt.md`
+
+**Implementation** (1 hour):
+
+1. **Create prompt file**: `/prompts/entity_extraction/entity_extraction_prompt.md`
+   - Extract lines 140-240 from `initialization.py`
+   - Add metadata header (purpose, usage, model)
+   - Document template variables (`{entity_types}`, `{tuple_delimiter}`, etc.)
+   - Add version history
+
+2. **Create prompt loader utility**: `src/utils/prompt_loader.py`
+   ```python
+   def load_prompt(prompt_path: str, variables: Dict[str, str]) -> str:
+       """Load prompt from /prompts with template substitution."""
+   ```
+
+3. **Update initialization**: `src/server/initialization.py`
+   - Replace hardcoded prompt with `load_prompt()` call
+   - Remove ~100 lines of prompt text
+   - Cleaner initialization logic
+
+4. **Update exports**: `src/utils/__init__.py`
+   - Add `load_prompt` to exports
+
+**Benefits**:
+- Cleaner code: -100 lines from `initialization.py`
+- Easier prompt engineering: Edit markdown, not Python
+- Version control: Track prompt changes separately
+- Consistency: Aligns with relationship inference architecture
+- Collaboration: Non-developers can edit prompts
+
+**Timeline**: Add to Branch 005 scope after UCF experiment completes
+
+---
+
+## �🔧 Technical Details
 
 ### UCF Detection Current Logic
 
