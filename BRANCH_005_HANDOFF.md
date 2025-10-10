@@ -14,12 +14,14 @@
 ### Supporting Evidence
 
 1. **MinerU Structure Preservation** (Validated October 8-9, 2025)
+
    - 29% of entities extracted from tables/images (1,245 out of 4,302)
    - 42 tables extracted with structure preserved
    - Hierarchical relationships maintained (Factor A/B/C > D > F > E)
    - Comprehensive query responses without explicit UCF labels
 
 2. **Current UCF System** (971 lines)
+
    - `src/ingestion/detector.py`: 314 lines (FAR 15.204-1 pattern matching)
    - `src/ingestion/processor.py`: 301 lines (section-aware extraction prompts)
    - `src/ingestion/__init__.py`: 45 lines (module exports)
@@ -57,6 +59,7 @@ logger.info("⚠️  EXPERIMENT: UCF detection disabled - testing MinerU-only st
 
 **Test Document**: Navy MBOS RFP (425 pages)  
 **Baseline Metrics** (with UCF enabled):
+
 - Entities: 4,302 entities
 - Relationships: 5,715 relationships
 - Tables: 42 tables extracted
@@ -65,6 +68,7 @@ logger.info("⚠️  EXPERIMENT: UCF detection disabled - testing MinerU-only st
 - Cost: $0.042
 
 **Actions**:
+
 1. Delete existing Navy MBOS from `./rag_storage/`
 2. Clear LLM cache: `kv_store_llm_response_cache.json`
 3. Re-upload via WebUI
@@ -74,18 +78,19 @@ logger.info("⚠️  EXPERIMENT: UCF detection disabled - testing MinerU-only st
 
 **Success Criteria** (±5% acceptable variance):
 
-| Metric | Baseline (UCF ON) | Target (UCF OFF) | Status |
-|--------|-------------------|------------------|--------|
-| Total Entities | 4,302 | 4,000-4,500 | ? |
-| Relationships | 5,715 | 5,400-6,000 | ? |
-| SECTION Entities | ~50-60 | ~45-65 | ? |
-| Tables Extracted | 42 | 42 | ? |
-| Processing Time | 69s | ≤75s | ? |
+| Metric           | Baseline (UCF ON) | Target (UCF OFF) | Status |
+| ---------------- | ----------------- | ---------------- | ------ |
+| Total Entities   | 4,302             | 4,000-4,500      | ?      |
+| Relationships    | 5,715             | 5,400-6,000      | ?      |
+| SECTION Entities | ~50-60            | ~45-65           | ?      |
+| Tables Extracted | 42                | 42               | ?      |
+| Processing Time  | 69s               | ≤75s             | ?      |
 
 **Query Validation**:
 Test Query: "What are the evaluation factors in Section M and their weights?"
 
 **Expected Output**:
+
 - ✅ All 6 factors (A-F) identified
 - ✅ Hierarchical importance preserved
 - ✅ Page limits captured
@@ -93,6 +98,7 @@ Test Query: "What are the evaluation factors in Section M and their weights?"
 - ✅ Integration with Section L
 
 **Semantic Post-Processing Check**:
+
 - ✅ Section L↔M relationships inferred
 - ✅ Document hierarchy maintained
 - ✅ Attachment linking works
@@ -108,6 +114,7 @@ Test Query: "What are the evaluation factors in Section M and their weights?"
 **Action**: ✅ **DELETE UCF SYSTEM** (971 lines)
 
 **Implementation** (1 hour):
+
 1. Delete `src/ingestion/detector.py` (314 lines)
 2. Delete `src/ingestion/processor.py` (301 lines)
 3. Delete `src/ingestion/__init__.py` (45 lines)
@@ -116,6 +123,7 @@ Test Query: "What are the evaluation factors in Section M and their weights?"
 6. Update module documentation in `src/__init__.py`
 
 **Impact**:
+
 - **LOC Reduction**: -971 lines (40% reduction: 2,375 → 1,404 lines)
 - **Architecture Simplification**: 5 stages → 3 stages
   - Before: Upload → UCF Detection → Dual-path → MinerU → Extraction → Semantic Post-Processing
@@ -124,6 +132,7 @@ Test Query: "What are the evaluation factors in Section M and their weights?"
 - **Performance**: No regression (MinerU already does the work)
 
 **Add Table Entity Types** (30 min):
+
 ```python
 # src/server/config.py - Add 4 new entity types
 "TABLE",    # Structured data: compliance matrices, price schedules
@@ -139,6 +148,7 @@ Test Query: "What are the evaluation factors in Section M and their weights?"
 **Action**: ❌ **KEEP UCF SYSTEM** (0 LOC reduction)
 
 **Still Add Table Entity Types** (30 min):
+
 - Leverage MinerU's 42 tables extraction
 - Better classification of multimodal content
 - No architecture changes required
@@ -152,18 +162,21 @@ Test Query: "What are the evaluation factors in Section M and their weights?"
 ## 🎯 Expected Outcomes
 
 ### Best Case Scenario (85% probability)
+
 - UCF redundant → Delete 971 lines
 - Add 4 table entity types
 - **Net Result**: 40% LOC reduction, simpler architecture, maintained quality
 - **Confidence**: High (MinerU evidence is strong)
 
 ### Worst Case Scenario (15% probability)
+
 - UCF still needed → Keep system
 - Add 4 table entity types
 - **Net Result**: +0 LOC, +4 entity types, better multimodal support
 - **Confidence**: Still valuable (table types improve extraction)
 
 ### Risk Mitigation
+
 - ✅ Experiment on separate branch (main untouched)
 - ✅ Quick rollback if degraded (30-minute test)
 - ✅ No data loss (baseline stored in main branch)
@@ -180,6 +193,7 @@ Test Query: "What are the evaluation factors in Section M and their weights?"
 **Expected Architecture**: All prompts should be modularized in `/prompts` directory as markdown files
 
 **Current State**:
+
 - ✅ CORRECT: `/prompts/relationship_inference/*.md` (6 files) - properly modularized
 - ❌ VIOLATION: Entity extraction prompt hardcoded in initialization.py
 - ✅ REFERENCE: `/prompts/entity_extraction/entity_detection_rules.md` (reference doc)
@@ -191,18 +205,21 @@ Test Query: "What are the evaluation factors in Section M and their weights?"
 **Implementation** (1 hour):
 
 1. **Create prompt file**: `/prompts/entity_extraction/entity_extraction_prompt.md`
+
    - Extract lines 140-240 from `initialization.py`
    - Add metadata header (purpose, usage, model)
    - Document template variables (`{entity_types}`, `{tuple_delimiter}`, etc.)
    - Add version history
 
 2. **Create prompt loader utility**: `src/utils/prompt_loader.py`
+
    ```python
    def load_prompt(prompt_path: str, variables: Dict[str, str]) -> str:
        """Load prompt from /prompts with template substitution."""
    ```
 
 3. **Update initialization**: `src/server/initialization.py`
+
    - Replace hardcoded prompt with `load_prompt()` call
    - Remove ~100 lines of prompt text
    - Cleaner initialization logic
@@ -211,6 +228,7 @@ Test Query: "What are the evaluation factors in Section M and their weights?"
    - Add `load_prompt` to exports
 
 **Benefits**:
+
 - Cleaner code: -100 lines from `initialization.py`
 - Easier prompt engineering: Edit markdown, not Python
 - Version control: Track prompt changes separately
@@ -231,7 +249,7 @@ Test Query: "What are the evaluation factors in Section M and their weights?"
 def detect_ucf_format(text: str, filename: str) -> UCFDetectionResult:
     """
     Detect if document follows FAR 15.204-1 Uniform Contract Format.
-    
+
     Patterns:
     - Section A: Solicitation/Contract Form
     - Section B: Supplies/Services & Prices
@@ -241,7 +259,7 @@ def detect_ucf_format(text: str, filename: str) -> UCFDetectionResult:
     - Section J: Attachments
     - Section L: Instructions to Offerors
     - Section M: Evaluation Factors
-    
+
     Returns: UCFDetectionResult with is_ucf flag and detected sections
     """
     # ~314 lines of regex pattern matching
@@ -252,6 +270,7 @@ def detect_ucf_format(text: str, filename: str) -> UCFDetectionResult:
 ### MinerU Table Extraction
 
 **What MinerU Captures**:
+
 - Table headers (e.g., "Section M - Evaluation Factors for Award")
 - Table structure (rows/columns with hierarchical relationships)
 - Cell content (factor descriptions, weights, page limits)
@@ -289,16 +308,19 @@ $before = @{
 ## 📚 Key Resources
 
 **Branch 004 Baseline**:
+
 - `BRANCH_004_COMPLETION.md` - Final metrics and achievements
 - `docs/ARCHITECTURE.md` - Current system architecture
 - Commit `4ff58ad` - Last 004 commit with all improvements
 
 **MinerU Validation**:
+
 - Navy MBOS query results (comprehensive Section M response)
 - 29% entity extraction from tables/images
 - 42 tables with structure preserved
 
 **UCF Documentation**:
+
 - FAR 15.204-1: Uniform Contract Format specification
 - `src/ingestion/detector.py`: Current implementation
 - `src/ingestion/processor.py`: Section-aware extraction logic
