@@ -134,9 +134,9 @@ async def initialize_raganything():
         func=lambda texts: openai_embed(texts, model="text-embedding-3-large", api_key=openai_api_key),
     )
     
-    # Custom extraction prompt to fix entity type format issues
-    # Problem: LightRAG sometimes outputs "#/>CONCEPT" instead of "CONCEPT"
-    # Solution: Explicit format rules with correct/wrong examples
+    # Simplified extraction prompt - shows ONLY correct patterns
+    # Philosophy: Remove complexity that confuses the LLM
+    # Based on Branch 004 99.7% success rate analysis
     custom_entity_extraction_prompt = """---Role---
 You are a Knowledge Graph Specialist responsible for extracting entities and relationships from the input text.  
 
@@ -145,72 +145,40 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
     *   **Identification:** Identify clearly defined and meaningful entities in the input text.
     *   **Entity Details:** For each identified entity, extract the following information:
         *   `entity_name`: The name of the entity. If the entity name is case-insensitive, capitalize the first letter of each significant word (title case). Ensure **consistent naming** across the entire extraction process.
-        *   `entity_type`: Categorize the entity using one of the following types: `{entity_types}`. 
+        *   `entity_type`: Categorize the entity using ONE of these exact types: `{entity_types}`. 
             
-            ═══════════════════════════════════════════════════════════════════════════════
-            ⚠️  CRITICAL - Entity Type Format Rules (READ CAREFULLY):
-            ═══════════════════════════════════════════════════════════════════════════════
+            **CRITICAL: Entity types must be PLAIN UPPERCASE with NO special characters.**
             
-            ✅ CORRECT FORMAT:
-               Output ONLY the plain entity type name exactly as shown in {entity_types}
-               Example: ANNEX
-               Example: CLAUSE
-               Example: REQUIREMENT
-               Example: DOCUMENT
-               Example: CONCEPT
-               Example: SECTION
+            Valid types include: ORGANIZATION, CONCEPT, EVENT, TECHNOLOGY, PERSON, LOCATION, 
+            REQUIREMENT, CLAUSE, SECTION, DOCUMENT, DELIVERABLE, ANNEX, PROGRAM, EQUIPMENT, 
+            REGULATION, EVALUATION_FACTOR, SUBMISSION_INSTRUCTION, STRATEGIC_THEME, STATEMENT_OF_WORK
             
-            ❌ WRONG FORMATS (DO NOT USE ANY OF THESE):
-               ❌ "#/>CONCEPT"      → NEVER add hash (#) or angle brackets (< >)
-               ❌ "#>|DOCUMENT"     → NEVER add hash (#), angle bracket (>), or pipe (|)
-               ❌ "#|CLAUSE"        → NEVER add hash (#) or pipe (|) before type
-               ❌ "<|CONCEPT|>"     → NEVER add angle brackets or pipes around type
-               ❌ "CLAUSE#|"        → NEVER add special characters AFTER the type
-               ❌ " ANNEX "         → NEVER add spaces before or after the type
-               ❌ "concept"         → ALWAYS use UPPERCASE as specified in {entity_types}
-            
-            ═══════════════════════════════════════════════════════════════════════════════
-            ✅ CORRECT EXAMPLE (FULL LINE):
-            entity{tuple_delimiter}Annex 17 Transportation{tuple_delimiter}ANNEX{tuple_delimiter}Annex 17 Transportation addresses performance methodology for transportation.
-            
-            ❌ WRONG EXAMPLE (FULL LINE):
-            entity{tuple_delimiter}Veteran-Owned Small Business{tuple_delimiter}#/>CONCEPT{tuple_delimiter}A business owned by veterans.
-            
-            ✅ CORRECTED VERSION:
-            entity{tuple_delimiter}Veteran-Owned Small Business{tuple_delimiter}CONCEPT{tuple_delimiter}A business owned by veterans.
-            ═══════════════════════════════════════════════════════════════════════════════
-            
-            If none of the provided entity types apply, classify it as `OTHER`.
         *   `entity_description`: Provide a concise yet comprehensive description of the entity's attributes and activities, based *solely* on the information present in the input text.
     *   **Output Format - Entities:** Output a total of 4 fields for each entity, delimited by `{tuple_delimiter}`, on a single line. The first field *must* be the literal string `entity`.
     
     ═══════════════════════════════════════════════════════════════════════════════
-    📋 ENTITY OUTPUT FORMAT (EXACT TEMPLATE):
+    📋 ENTITY OUTPUT FORMAT:
     ═══════════════════════════════════════════════════════════════════════════════
     
     entity{tuple_delimiter}[ENTITY_NAME]{tuple_delimiter}[ENTITY_TYPE]{tuple_delimiter}[DESCRIPTION]
     
-    Where:
-    - [ENTITY_NAME] = Name with consistent capitalization
-    - [ENTITY_TYPE] = PLAIN UPPERCASE TYPE from {entity_types} (NO special characters!)
-    - [DESCRIPTION] = Concise description from input text
+    ✅ CORRECT EXAMPLES (follow these patterns exactly):
     
-    ✅ CORRECT EXAMPLES:
     entity{tuple_delimiter}Annex 17 Transportation{tuple_delimiter}ANNEX{tuple_delimiter}Annex 17 Transportation addresses performance methodology for transportation.
-    entity{tuple_delimiter}Veteran-Owned Small Business{tuple_delimiter}CONCEPT{tuple_delimiter}A business owned by veterans.
+    entity{tuple_delimiter}Veteran-Owned Small Business{tuple_delimiter}CONCEPT{tuple_delimiter}A business owned by veterans eligible for federal contracting preferences.
     entity{tuple_delimiter}FAR 52.212-1{tuple_delimiter}CLAUSE{tuple_delimiter}Instructions to Offerors—Commercial Products and Commercial Services.
+    entity{tuple_delimiter}Section J{tuple_delimiter}SECTION{tuple_delimiter}List of attachments and referenced documents for the solicitation.
+    entity{tuple_delimiter}CDRL A001{tuple_delimiter}DELIVERABLE{tuple_delimiter}Monthly status report due 5 days after period end.
     entity{tuple_delimiter}MCPP II{tuple_delimiter}PROGRAM{tuple_delimiter}Marine Corps Prepositioning Program II - a major DoD logistics program for prepositioned equipment.
     entity{tuple_delimiter}Navy MBOS{tuple_delimiter}PROGRAM{tuple_delimiter}Navy Maintenance Base Operating Support program providing facilities maintenance and base operations services.
-    entity{tuple_delimiter}Defense Enterprise Infrastructure Program{tuple_delimiter}PROGRAM{tuple_delimiter}DoD-wide infrastructure modernization program covering IT systems, facilities, and equipment.
     entity{tuple_delimiter}Concorde RG-24 Battery{tuple_delimiter}EQUIPMENT{tuple_delimiter}12-volt battery used for starting aircraft generators and ground support equipment.
     entity{tuple_delimiter}6200 Tennant Floor Sweeper{tuple_delimiter}EQUIPMENT{tuple_delimiter}Commercial floor cleaning equipment used for warehouse maintenance operations.
     entity{tuple_delimiter}Public Law 99-234{tuple_delimiter}REGULATION{tuple_delimiter}Federal statute requiring the submission of certified cost or pricing data.
     entity{tuple_delimiter}5 U.S.C. 5332{tuple_delimiter}REGULATION{tuple_delimiter}United States Code section governing position classification and General Schedule pay rates.
-    
-    ❌ WRONG EXAMPLES (LEARN FROM THESE MISTAKES):
-    entity{tuple_delimiter}Veteran-Owned Small Business{tuple_delimiter}#/>CONCEPT{tuple_delimiter}A business owned by veterans.
-    entity{tuple_delimiter}FAR 52.212-1{tuple_delimiter}#>|CLAUSE{tuple_delimiter}Instructions to Offerors.
-    entity{tuple_delimiter}Section J{tuple_delimiter}#|SECTION{tuple_delimiter}List of attachments.
+    entity{tuple_delimiter}Technical Approach Volume{tuple_delimiter}SUBMISSION_INSTRUCTION{tuple_delimiter}Proposal section limited to 25 pages addressing technical methodology and staffing.
+    entity{tuple_delimiter}Past Performance Factor{tuple_delimiter}EVALUATION_FACTOR{tuple_delimiter}Evaluation criterion worth 30 points assessing contractor's relevant experience.
+    entity{tuple_delimiter}Integrated Logistics Support{tuple_delimiter}STRATEGIC_THEME{tuple_delimiter}Cross-cutting capability for supply chain, maintenance, and transportation coordination.
+    entity{tuple_delimiter}Performance Work Statement{tuple_delimiter}STATEMENT_OF_WORK{tuple_delimiter}Detailed task descriptions and performance objectives for contract execution.
     
     ═══════════════════════════════════════════════════════════════════════════════
 
