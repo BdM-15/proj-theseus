@@ -51,9 +51,7 @@ async def main():
     - Background monitor: Auto-detects WebUI uploads, triggers inference
     - UCF detection: Section-aware extraction for federal RFPs
     """
-    print("🎯 Starting GovCon Capture Vibe with RAG-Anything...")
-    print("   Architecture: RAG-Anything (ingestion) + LightRAG (WebUI/queries)")
-    print("   Multimodal: images, tables, equations via MinerU parser\n")
+    # Initialization message moved to app.py for cleaner startup
     
     # Step 1: Configure LightRAG global_args
     configure_raganything_args()
@@ -88,10 +86,7 @@ async def main():
         new_routes.append(route)
     app.router.routes = new_routes
     
-    if found_insert:
-        print("   ✅ Overriding /insert endpoint with RAG-Anything + Phase 6.1")
-    if found_upload:
-        print("   ✅ Overriding /documents/upload endpoint with RAG-Anything + Phase 6.1")
+    # Endpoint override confirmation (removed verbose logging)
     
     # Add our custom endpoints with RAG-Anything multimodal processing
     create_insert_endpoint(app, rag_instance)
@@ -100,23 +95,12 @@ async def main():
     # Step 5: Start background monitoring task for semantic post-processing
     asyncio.create_task(semantic_post_processor_monitor(rag_instance))
     
-    # Print startup info
-    print(f"\n🎯 GovCon Capture Vibe Server Ready:")
-    print(f"   ├─ Host: {host}")
-    print(f"   ├─ Port: {port}")
-    print(f"   ├─ WebUI: http://{host}:{port}/")
-    print(f"   ├─ API Docs: http://{host}:{port}/docs")
-    print(f"   ├─ /insert endpoint: RAG-Anything + semantic post-processing ✅")
-    print(f"   ├─ /documents/upload endpoint: RAG-Anything + semantic post-processing ✅ (WebUI uses this!)")
-    print(f"   ├─ Background Monitor: Auto-detects WebUI uploads ✅")
-    print(f"   └─ Architecture: RAG-Anything (ingestion) + LightRAG (queries) + Semantic inference\n")
-    print(f"\n✨ Semantic Post-Processing Features:")
-    print(f"   ├─ Automatic: Runs after every document upload (WebUI or /insert)")
-    print(f"   ├─ LLM-Powered: Semantic relationship inference (no regex)")
-    print(f"   ├─ 6 Inference Algorithms: Section L↔M, document hierarchy, attachment linking, clause clustering, requirement evaluation, semantic concepts")
-    print(f"   └─ Transparent: No user interaction required\n")
-    
-    logger.info(f"Server starting on {host}:{port}")
+    # Print concise startup info
+    print(f"\n✅ Server Ready:")
+    print(f"   WebUI: http://{host}:{port}/")
+    print(f"   API Docs: http://{host}:{port}/docs")
+    print(f"   Features: Multimodal extraction + semantic post-processing")
+    print(f"   Background monitor: Active (auto-processes uploads)\n")
     
     # Step 6: Start server
     config = uvicorn.Config(app=app, host=host, port=port, log_level="info")

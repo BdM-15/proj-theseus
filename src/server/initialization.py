@@ -328,13 +328,10 @@ Text:
     
     # Use print() instead of logger to ensure output visibility during startup
     print("✅ RAG-Anything initialized")
-    print(f"   Working dir: {working_dir}")
-    print(f"   Parser: {parser} (method: {parse_method})")
-    print(f"   Multimodal: images={enable_image}, tables={enable_table}, equations={enable_equation}")
-    print(f"   Entity types: {len(entity_types)} specialized government contracting types")
-    print(f"   Custom extraction prompt: Enabled (clean entity type format)")
-    print(f"   LightRAG: Storages initialized ✅")
-    print(f"   Compatibility fix: Disabled multimodal_processed field writing ✅")
+    print(f"   Parser: MinerU ({parse_method}) - multimodal enabled")
+    print(f"   Entity types: {len(entity_types)} specialized types")
+    print(f"   LightRAG storages: Ready")
+    print(f"   500 error fix: Applied ✅")
     
     return _rag_anything
 
