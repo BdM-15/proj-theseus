@@ -13,6 +13,7 @@ from typing import List, Dict
 from pathlib import Path
 
 from src.inference.graph_io import group_entities_by_type
+from src.core.prompt_loader import load_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -99,10 +100,13 @@ async def infer_relationships_batch(
     )
     
     try:
+        # Load system prompt from external file
+        system_prompt = load_prompt("relationship_inference/system_prompt").strip()
+        
         # Call LLM
         response = await llm_func(
             prompt,
-            system_prompt="You are a government contracting expert analyzing RFP documents. Output ONLY valid JSON.",
+            system_prompt=system_prompt,
         )
         
         # Parse JSON response (handle markdown code blocks)
@@ -193,14 +197,11 @@ async def infer_all_relationships(
     # Algorithm 1: ANNEX → SECTION (Document Hierarchy)
     if 'annex' in grouped and 'section' in grouped:
         logger.info(f"\n  [1/5] Document Hierarchy: ANNEX → SECTION...")
+        relationship_context = load_prompt("relationship_inference/annex_section_linking")
         annex_section_rels = await infer_relationships_batch(
             source_entities=grouped['annex'],
             target_entities=grouped['section'],
-            relationship_context="""
-RELATIONSHIP TYPE: ANNEX → SECTION (CHILD_OF)
-CONTEXT: Annexes are numbered attachments that belong to parent sections.
-PATTERNS: Prefix matching (J-12345 → Section J), explicit naming (Annex 17 → Section J Annexes)
-""",
+            relationship_context=relationship_context,
             llm_func=llm_func
         )
         all_new_relationships.extend(annex_section_rels)
@@ -208,14 +209,11 @@ PATTERNS: Prefix matching (J-12345 → Section J), explicit naming (Annex 17 →
     # Algorithm 2: CLAUSE → SECTION (Clause Clustering)
     if 'clause' in grouped and 'section' in grouped:
         logger.info(f"\n  [2/5] Clause Clustering: CLAUSE → SECTION...")
+        relationship_context = load_prompt("relationship_inference/clause_clustering")
         clause_section_rels = await infer_relationships_batch(
             source_entities=grouped['clause'],
             target_entities=grouped['section'],
-            relationship_context="""
-RELATIONSHIP TYPE: CLAUSE → SECTION (CHILD_OF)
-CONTEXT: Contract clauses belong to parent sections (typically Section I).
-PATTERNS: FAR/DFARS/AFFARS numbering → Section I, clause references in text
-""",
+            relationship_context=relationship_context,
             llm_func=llm_func
         )
         all_new_relationships.extend(clause_section_rels)
@@ -223,14 +221,11 @@ PATTERNS: FAR/DFARS/AFFARS numbering → Section I, clause references in text
     # Algorithm 3: SUBMISSION_INSTRUCTION ↔ EVALUATION_FACTOR (Section L↔M Mapping)
     if 'submission_instruction' in grouped and 'evaluation_factor' in grouped:
         logger.info(f"\n  [3/5] Section L↔M Mapping: SUBMISSION_INSTRUCTION ↔ EVALUATION_FACTOR...")
+        relationship_context = load_prompt("relationship_inference/section_l_m_mapping")
         instruction_factor_rels = await infer_relationships_batch(
             source_entities=grouped['submission_instruction'],
             target_entities=grouped['evaluation_factor'],
-            relationship_context="""
-RELATIONSHIP TYPE: SUBMISSION_INSTRUCTION → EVALUATION_FACTOR (GUIDES)
-CONTEXT: Submission instructions (Section L) guide how proposals are evaluated (Section M).
-PATTERNS: Explicit references (Volume 1), format requirements, semantic overlap
-""",
+            relationship_context=relationship_context,
             llm_func=llm_func
         )
         all_new_relationships.extend(instruction_factor_rels)
@@ -238,14 +233,11 @@ PATTERNS: Explicit references (Volume 1), format requirements, semantic overlap
     # Algorithm 4: REQUIREMENT → EVALUATION_FACTOR (Requirement Evaluation)
     if 'requirement' in grouped and 'evaluation_factor' in grouped:
         logger.info(f"\n  [4/5] Requirement Evaluation: REQUIREMENT → EVALUATION_FACTOR...")
+        relationship_context = load_prompt("relationship_inference/requirement_evaluation")
         requirement_factor_rels = await infer_relationships_batch(
             source_entities=grouped['requirement'],
             target_entities=grouped['evaluation_factor'],
-            relationship_context="""
-RELATIONSHIP TYPE: REQUIREMENT → EVALUATION_FACTOR (EVALUATED_BY)
-CONTEXT: Requirements are evaluated using specific evaluation factors.
-PATTERNS: Topic alignment, explicit mapping, semantic similarity
-""",
+            relationship_context=relationship_context,
             llm_func=llm_func
         )
         all_new_relationships.extend(requirement_factor_rels)
@@ -253,15 +245,11 @@ PATTERNS: Topic alignment, explicit mapping, semantic similarity
     # Algorithm 5: STATEMENT_OF_WORK → DELIVERABLE (Work to Deliverables)
     if 'statement_of_work' in grouped and 'deliverable' in grouped:
         logger.info(f"\n  [5/5] Work to Deliverables: STATEMENT_OF_WORK → DELIVERABLE...")
+        relationship_context = load_prompt("relationship_inference/sow_deliverable_linking")
         sow_deliverable_rels = await infer_relationships_batch(
             source_entities=grouped['statement_of_work'],
             target_entities=grouped['deliverable'],
-            relationship_context="""
-RELATIONSHIP TYPE: STATEMENT_OF_WORK → DELIVERABLE (PRODUCES)
-CONTEXT: Work statements define tasks/objectives that produce specific deliverables.
-NOTE: STATEMENT_OF_WORK includes SOW (prescriptive), PWS (performance-based), SOO (objective-based)
-PATTERNS: Explicit task→deliverable mentions, work-product mapping, timeline alignment
-""",
+            relationship_context=relationship_context,
             llm_func=llm_func
         )
         all_new_relationships.extend(sow_deliverable_rels)
