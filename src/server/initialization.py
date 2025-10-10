@@ -37,8 +37,6 @@ async def initialize_raganything():
     """
     global _rag_anything
     
-    print("🔍 DEBUG: initialize_raganything() called - starting initialization...")
-    
     # Get API credentials (using RAG-Anything official variable names)
     xai_api_key = os.getenv("LLM_BINDING_API_KEY")
     xai_base_url = os.getenv("LLM_BINDING_HOST", "https://api.x.ai/v1")
@@ -135,7 +133,6 @@ async def initialize_raganything():
         max_token_size=8192,
         func=lambda texts: openai_embed(texts, model="text-embedding-3-large", api_key=openai_api_key),
     )
-    logger.info(f"✅ Created embedding_func with embedding_dim={embedding_func.embedding_dim}")
     
     # Custom extraction prompt to fix entity type format issues
     # Problem: LightRAG sometimes outputs "#/>CONCEPT" instead of "CONCEPT"
@@ -297,7 +294,6 @@ Text:
     # CRITICAL: Ensure LightRAG is initialized BEFORE any document processing
     # This is required because process_document_complete_lightrag_api() accesses
     # self.lightrag.doc_status BEFORE calling _ensure_lightrag_initialized()
-    print("🔧 Initializing LightRAG storages...")
     result = await _rag_anything._ensure_lightrag_initialized()
     if not result.get("success", False):
         error_msg = result.get("error", "Unknown error")

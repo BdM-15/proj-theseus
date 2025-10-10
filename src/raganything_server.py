@@ -24,6 +24,11 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+# Suppress verbose logging from libraries
+logging.getLogger("raganything").setLevel(logging.WARNING)
+logging.getLogger("lightrag").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 # Import LightRAG server
 from lightrag.api.lightrag_server import create_app
 from lightrag.api.config import global_args
