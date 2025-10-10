@@ -188,11 +188,11 @@ WARNING:src.utils.entity_cleanup:Skipping invalid entity 'Navy Technical Methodo
 - [ ] Save backup of current extraction prompt
 
 ### Option A Changes
-- [ ] Remove "❌ WRONG EXAMPLES" section (lines 211-213)
-- [ ] Expand "✅ CORRECT EXAMPLES" to 15+ entity examples
-- [ ] Add explicit valid entity type list in prompt header
-- [ ] Simplify delimiter rules section (remove redundancy)
-- [ ] Remove references to malformed patterns in comments
+- [x] Remove "❌ WRONG EXAMPLES" section (lines 211-213) ✅ DONE
+- [x] Expand "✅ CORRECT EXAMPLES" to 15+ entity examples ✅ DONE (15 examples)
+- [x] Add explicit valid entity type list in prompt header ✅ DONE (19 types)
+- [x] Simplify delimiter rules section (remove redundancy) ✅ DONE (removed nested warnings)
+- [x] Remove references to malformed patterns in comments ✅ DONE (clean comments)
 
 ### Testing
 - [ ] Restart server with new prompt
