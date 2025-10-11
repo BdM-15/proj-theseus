@@ -170,7 +170,7 @@ async def infer_all_relationships(
         List of new relationship dicts
     """
     logger.info("=" * 80)
-    logger.info("🤖 Phase 6.1: LLM-Powered Relationship Inference")
+    logger.info("🤖 SEMANTIC RELATIONSHIP INFERENCE: LLM-Powered Analysis")
     logger.info("=" * 80)
     
     # Group entities by type

@@ -2,7 +2,7 @@
 Knowledge Graph I/O Operations
 
 Handles reading and writing to GraphML and kv_store files for the knowledge graph.
-Provides clean interfaces for Phase 6.1 LLM-powered relationship inference.
+Provides clean interfaces for semantic relationship inference and post-processing.
 """
 
 import json
@@ -173,7 +173,7 @@ def save_relationships_to_graphml(
         
         source_data = ET.SubElement(edge, 'data')
         source_data.set('key', 'd6')
-        source_data.text = 'phase6.1_llm_inference'
+        source_data.text = 'semantic_post_processing'
         
         next_edge_id += 1
     
@@ -245,7 +245,7 @@ def save_relationships_to_kv_store(
             'description': f"{rel['reasoning']} (LLM-inferred, confidence={rel['confidence']:.2f})",
             'weight': rel['confidence'],
             'keywords': rel['relationship_type'],
-            'source_id': 'phase6.1_llm_inference'
+            'source_id': 'semantic_post_processing'
         }
         
         # CRITICAL: Also add to document's relation_pairs array for WebUI display
