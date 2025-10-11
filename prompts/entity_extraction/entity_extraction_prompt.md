@@ -2,9 +2,15 @@
 
 **Purpose**: Extract government contracting entities and relationships from RFP documents  
 **Model**: xAI Grok-4-fast-reasoning (2M context window)  
+**Prompt Size**: ~5,593 tokens (0.28% of context window)  
 **Entity Types**: 17 specialized government contracting types  
-**Enhancement**: Domain knowledge patterns (FAR/DFARS, UCF, Shipley, CDRL)  
-**Last Updated**: October 11, 2025 (Branch 005 - Domain Knowledge Enhancement)
+**Enhancements**:
+
+- Domain knowledge patterns (FAR/DFARS, UCF, Shipley, CDRL)
+- 5 annotated RFP examples (Section L↔M, requirements, attachments, clauses, deliverables)
+- 8 decision rules for ambiguous cases (edge case handling)
+- Location-agnostic extraction (content over location)  
+  **Last Updated**: October 11, 2025 (Branch 005 - Examples + Decision Tree)
 
 ---
 
@@ -81,6 +87,239 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
       - Major acquisition programs: MCPP II, Navy MBOS, JPALS, etc.
       - Equipment with model numbers: Concorde RG-24, 6200 Tennant
       - Distinguish PROGRAM (services/initiatives) from EQUIPMENT (physical items)
+
+    - **Decision Tree for Ambiguous Cases:**
+
+      **Q: Document with "J-02000000 Performance Work Statement" - What entity type?**
+      A: Extract as BOTH:
+
+      - DOCUMENT type: "J-02000000 Performance Work Statement" (for section linkage)
+      - STATEMENT_OF_WORK type: "Performance Work Statement" (for semantic content)
+        Why: Preserves both structural (attachment) and semantic (work definition) relationships
+
+      **Q: Text says "Contractor shall have 5 years experience" - REQUIREMENT or EVALUATION_FACTOR?**
+      A: REQUIREMENT (experience requirement)
+
+      - If also mentioned in Section M, create second entity as EVALUATION_FACTOR
+      - Link them: REQUIREMENT --EVALUATED_BY--> EVALUATION_FACTOR
+        Why: Requirements and evaluation are different concepts (what vs how scored)
+
+      **Q: Clause text "The Government shall provide GFE within 30 days" - Extract as REQUIREMENT?**
+      A: NO - Skip government obligations
+
+      - Only extract contractor obligations (shall/must/should/may)
+      - Government obligations are informational context, not requirements
+        Why: Requirements = contractor obligations only
+
+      **Q: Text says "CDRL A001 Monthly Status Report" in both Section C and Section J?**
+      A: Extract ONCE as DELIVERABLE with full identifier "CDRL A001"
+
+      - Link to both source sections if mentioned in multiple locations
+      - Avoid duplicate entities (same CDRL = same deliverable)
+        Why: Physical deliverables are unique, even if referenced multiple times
+
+      **Q: "Navy MBOS Program" vs "Concorde RG-24 Battery" - How to distinguish?**
+      A: Look for model numbers and physical characteristics:
+
+      - PROGRAM: Services, initiatives, no model numbers (Navy MBOS, MCPP II)
+      - EQUIPMENT: Model numbers, physical items (Concorde RG-24, 6200 Tennant)
+        Why: Programs are abstract services; equipment is tangible hardware
+
+      **Q: Section H says "Contractor shall maintain security clearances" - What type?**
+      A: REQUIREMENT (special requirement from Section H)
+
+      - Section H requirements are still requirements (location doesn't change type)
+      - Extract modal verb (shall) and subject (security clearances)
+        Why: Content-based typing, not location-based
+
+      **Q: "Exhibit A - Pricing Schedule" - DOCUMENT or something else?**
+      A: DOCUMENT (pricing attachment)
+
+      - Extract individual prices/CLINs as CONCEPT entities if detailed
+      - Link to Section B (Supplies/Prices) with ATTACHMENT_OF relationship
+        Why: Pricing exhibits are documents containing structured data
+
+      **Q: Text references "MIL-STD-882E" but document not attached?**
+      A: DOCUMENT (referenced standard)
+
+      - Extract with description noting it's referenced (not attached)
+      - Create REFERENCES relationship from citing section
+        Why: Referenced standards are still entities (even if external)
+
+    - **Annotated RFP Examples:**
+
+      **Example 1: Section L ↔ Section M Mapping**
+
+      Input Text:
+
+      ```
+      Section L.3.1 Technical Volume
+
+      The Technical Volume shall address Evaluation Factors 1 and 2 (Technical
+      Approach and Maintenance Approach) and shall not exceed 25 pages, 12-point
+      font, Times New Roman. Include system architecture diagrams and integration
+      plans.
+
+      Section M: Evaluation Factors
+
+      Factor 1: Technical Approach (Most Important, 40%)
+      The Government will evaluate the offeror's understanding of technical
+      requirements, including system architecture and integration methodology.
+
+      Factor 2: Maintenance Approach (Significantly More Important, 30%)
+      The Government will evaluate the offeror's maintenance strategy and
+      sustainment plans.
+      ```
+
+      Extracted Entities:
+
+      ```
+      entity|Technical Volume|SUBMISSION_INSTRUCTION|Proposal section limited to 25 pages, 12-point Times New Roman font, must address Technical Approach and Maintenance Approach factors
+      entity|Factor 1 Technical Approach|EVALUATION_FACTOR|Most Important factor worth 40% evaluating technical understanding, system architecture, and integration methodology
+      entity|Factor 2 Maintenance Approach|EVALUATION_FACTOR|Significantly More Important factor worth 30% evaluating maintenance strategy and sustainment plans
+      ```
+
+      Extracted Relationships:
+
+      ```
+      relation|Technical Volume|Factor 1 Technical Approach|GUIDES|Submission instruction explicitly addresses this evaluation factor
+      relation|Technical Volume|Factor 2 Maintenance Approach|GUIDES|Submission instruction explicitly addresses this evaluation factor
+      ```
+
+      **Example 2: Requirements with Criticality (Section C)**
+
+      Input Text:
+
+      ```
+      3.2 System Requirements
+
+      The Contractor shall provide 24/7 help desk support with average response
+      time under 4 hours for Priority 1 incidents. The Contractor should implement
+      automated monitoring tools to detect system anomalies. The Contractor may
+      use commercial off-the-shelf (COTS) solutions where appropriate.
+      ```
+
+      Extracted Entities:
+
+      ```
+      entity|24/7 Help Desk Support|REQUIREMENT|Mandatory requirement (shall) to provide round-the-clock help desk with 4-hour average response time for Priority 1 incidents
+      entity|Automated Monitoring Tools|REQUIREMENT|Important requirement (should) to implement automated monitoring for system anomaly detection
+      entity|COTS Solutions|CONCEPT|Optional approach (may) allowing use of commercial off-the-shelf solutions where appropriate
+      ```
+
+      Note: "shall" = REQUIREMENT (mandatory), "should" = REQUIREMENT (important), "may" = CONCEPT (option, not requirement)
+
+      **Example 3: Attachment Structure (Section J)**
+
+      Input Text:
+
+      ```
+      Section J: List of Attachments
+
+      The following documents are incorporated into this solicitation:
+
+      1. J-02000000 Performance Work Statement (PWS)
+      2. J-03000000 Quality Assurance Surveillance Plan (QASP)
+      3. J-04000000 Contract Data Requirements List (CDRL)
+         3.1 CDRL A001 - Monthly Status Report
+         3.2 CDRL A002 - Quarterly Technical Review
+      ```
+
+      Extracted Entities:
+
+      ```
+      entity|Section J|SECTION|List of attachments and referenced documents for the solicitation
+      entity|J-02000000 Performance Work Statement|DOCUMENT|Attachment containing detailed task descriptions and performance objectives
+      entity|Performance Work Statement|STATEMENT_OF_WORK|Detailed task descriptions and performance objectives for contract execution
+      entity|J-03000000 Quality Assurance Surveillance Plan|DOCUMENT|Quality assurance surveillance plan and inspection procedures
+      entity|J-04000000 Contract Data Requirements List|DOCUMENT|List of required contract deliverables with submission schedules
+      entity|CDRL A001|DELIVERABLE|Monthly status report due to government
+      entity|CDRL A002|DELIVERABLE|Quarterly technical review deliverable
+      ```
+
+      Extracted Relationships:
+
+      ```
+      relation|J-02000000 Performance Work Statement|Section J|ATTACHMENT_OF|Top-level attachment listed under Section J
+      relation|J-03000000 Quality Assurance Surveillance Plan|Section J|ATTACHMENT_OF|Top-level attachment listed under Section J
+      relation|J-04000000 Contract Data Requirements List|Section J|ATTACHMENT_OF|Top-level attachment listed under Section J
+      relation|CDRL A001|J-04000000 Contract Data Requirements List|CHILD_OF|Deliverable item listed within CDRL attachment
+      relation|CDRL A002|J-04000000 Contract Data Requirements List|CHILD_OF|Deliverable item listed within CDRL attachment
+      ```
+
+      Note: PWS extracted as BOTH DOCUMENT (structure) and STATEMENT_OF_WORK (semantics)
+
+      **Example 4: FAR Clauses (Section I)**
+
+      Input Text:
+
+      ```
+      Section I: Contract Clauses
+
+      The following Federal Acquisition Regulation (FAR) clauses are incorporated
+      by reference:
+
+      FAR 52.212-1 Instructions to Offerors—Commercial Products and Commercial Services
+      FAR 52.212-4 Contract Terms and Conditions—Commercial Products and Commercial Services
+      DFARS 252.204-7012 Safeguarding Covered Defense Information and Cyber Incident Reporting
+      ```
+
+      Extracted Entities:
+
+      ```
+      entity|Section I|SECTION|Contract clauses incorporated by reference from FAR and DFARS
+      entity|FAR 52.212-1|CLAUSE|Instructions to Offerors for commercial products and commercial services acquisitions
+      entity|FAR 52.212-4|CLAUSE|Standard contract terms and conditions for commercial products and services
+      entity|DFARS 252.204-7012|CLAUSE|DoD cybersecurity requirements for safeguarding covered defense information with NIST SP 800-171 compliance
+      ```
+
+      Extracted Relationships:
+
+      ```
+      relation|FAR 52.212-1|Section I|CHILD_OF|Clause incorporated in Section I contract clauses
+      relation|FAR 52.212-4|Section I|CHILD_OF|Clause incorporated in Section I contract clauses
+      relation|DFARS 252.204-7012|Section I|CHILD_OF|Clause incorporated in Section I contract clauses
+      ```
+
+      **Example 5: Deliverables from SOW (Content-Location Flexibility)**
+
+      Input Text:
+
+      ```
+      Attachment 0001: Performance Work Statement
+
+      Task 3.4: Reporting Requirements
+
+      The Contractor shall submit the following deliverables:
+      - Monthly Progress Reports (due 5th business day of following month)
+      - Quarterly Risk Assessments (due 15 days after quarter end)
+      - Final Project Report (due at contract completion)
+
+      All deliverables shall comply with CDRL A001, A002, and A003 respectively.
+      ```
+
+      Extracted Entities:
+
+      ```
+      entity|Attachment 0001 Performance Work Statement|DOCUMENT|Attachment containing detailed task descriptions and performance objectives
+      entity|Performance Work Statement|STATEMENT_OF_WORK|Detailed task descriptions and performance objectives for contract execution
+      entity|Monthly Progress Reports|DELIVERABLE|Monthly progress reports due 5th business day of following month per CDRL A001
+      entity|Quarterly Risk Assessments|DELIVERABLE|Quarterly risk assessment deliverables due 15 days after quarter end per CDRL A002
+      entity|Final Project Report|DELIVERABLE|Final project report deliverable due at contract completion per CDRL A003
+      entity|CDRL A001|DELIVERABLE|Contract data requirement for monthly progress reporting
+      entity|CDRL A002|DELIVERABLE|Contract data requirement for quarterly risk assessments
+      entity|CDRL A003|DELIVERABLE|Contract data requirement for final project report
+      ```
+
+      Extracted Relationships:
+
+      ```
+      relation|Performance Work Statement|Monthly Progress Reports|PRODUCES|SOW task defines this deliverable requirement
+      relation|Performance Work Statement|Quarterly Risk Assessments|PRODUCES|SOW task defines this deliverable requirement
+      relation|Performance Work Statement|Final Project Report|PRODUCES|SOW task defines this deliverable requirement
+      ```
+
+      Note: SOW in attachment (not Section C) - extracted based on CONTENT, not LOCATION
 
     - **Relationship Patterns to Recognize:**
 
