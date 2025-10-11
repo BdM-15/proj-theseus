@@ -2,8 +2,8 @@
 
 **Purpose**: Extract government contracting entities and relationships from RFP documents  
 **Model**: xAI Grok-4-fast-reasoning (2M context)  
-**Entity Types**: 18 specialized government contracting types  
-**Last Updated**: October 10, 2025 (Branch 005 - MinerU Optimization)
+**Entity Types**: 17 specialized government contracting types  
+**Last Updated**: October 10, 2025 (Branch 005 - Delimiter Simplification)
 
 ---
 
@@ -45,27 +45,28 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
 
     **Entity Output Format:**
 
-    The format is: entity, then the entity name, then the entity type, then the description.
+    Four fields separated by the pipe character (|):
+    entity | entity_name | ENTITY_TYPE | description
 
     **Correct Examples:**
 
-    entity{tuple_delimiter}Annex 17 Transportation{tuple_delimiter}DOCUMENT{tuple_delimiter}Numbered attachment addressing performance methodology for transportation.
-    entity{tuple_delimiter}J-0005 Performance Work Statement{tuple_delimiter}DOCUMENT{tuple_delimiter}Attachment J-0005 containing detailed task descriptions and performance objectives.
-    entity{tuple_delimiter}Public Law 99-234{tuple_delimiter}DOCUMENT{tuple_delimiter}Federal statute requiring the submission of certified cost or pricing data.
-    entity{tuple_delimiter}5 U.S.C. 5332{tuple_delimiter}DOCUMENT{tuple_delimiter}United States Code section governing position classification and General Schedule pay rates.
-    entity{tuple_delimiter}MIL-STD-882E{tuple_delimiter}DOCUMENT{tuple_delimiter}Department of Defense standard practice for system safety.
-    entity{tuple_delimiter}Veteran-Owned Small Business{tuple_delimiter}CONCEPT{tuple_delimiter}A business owned by veterans eligible for federal contracting preferences.
-    entity{tuple_delimiter}FAR 52.212-1{tuple_delimiter}CLAUSE{tuple_delimiter}Instructions to Offerors—Commercial Products and Commercial Services.
-    entity{tuple_delimiter}Section J{tuple_delimiter}SECTION{tuple_delimiter}List of attachments and referenced documents for the solicitation.
-    entity{tuple_delimiter}CDRL A001{tuple_delimiter}DELIVERABLE{tuple_delimiter}Monthly status report due 5 days after period end.
-    entity{tuple_delimiter}MCPP II{tuple_delimiter}PROGRAM{tuple_delimiter}Marine Corps Prepositioning Program II - a major DoD logistics program for prepositioned equipment.
-    entity{tuple_delimiter}Navy MBOS{tuple_delimiter}PROGRAM{tuple_delimiter}Navy Maintenance Base Operating Support program providing facilities maintenance and base operations services.
-    entity{tuple_delimiter}Concorde RG-24 Battery{tuple_delimiter}EQUIPMENT{tuple_delimiter}12-volt battery used for starting aircraft generators and ground support equipment.
-    entity{tuple_delimiter}6200 Tennant Floor Sweeper{tuple_delimiter}EQUIPMENT{tuple_delimiter}Commercial floor cleaning equipment used for warehouse maintenance operations.
-    entity{tuple_delimiter}Technical Approach Volume{tuple_delimiter}SUBMISSION_INSTRUCTION{tuple_delimiter}Proposal section limited to 25 pages addressing technical methodology and staffing.
-    entity{tuple_delimiter}Past Performance Factor{tuple_delimiter}EVALUATION_FACTOR{tuple_delimiter}Evaluation criterion worth 30 points assessing contractor's relevant experience.
-    entity{tuple_delimiter}Integrated Logistics Support{tuple_delimiter}STRATEGIC_THEME{tuple_delimiter}Cross-cutting capability for supply chain, maintenance, and transportation coordination.
-    entity{tuple_delimiter}Performance Work Statement{tuple_delimiter}STATEMENT_OF_WORK{tuple_delimiter}Detailed task descriptions and performance objectives for contract execution.
+    entity|Annex 17 Transportation|DOCUMENT|Numbered attachment addressing performance methodology for transportation.
+    entity|J-0005 Performance Work Statement|DOCUMENT|Attachment J-0005 containing detailed task descriptions and performance objectives.
+    entity|Public Law 99-234|DOCUMENT|Federal statute requiring the submission of certified cost or pricing data.
+    entity|5 U.S.C. 5332|DOCUMENT|United States Code section governing position classification and General Schedule pay rates.
+    entity|MIL-STD-882E|DOCUMENT|Department of Defense standard practice for system safety.
+    entity|Veteran-Owned Small Business|CONCEPT|A business owned by veterans eligible for federal contracting preferences.
+    entity|FAR 52.212-1|CLAUSE|Instructions to Offerors—Commercial Products and Commercial Services.
+    entity|Section J|SECTION|List of attachments and referenced documents for the solicitation.
+    entity|CDRL A001|DELIVERABLE|Monthly status report due 5 days after period end.
+    entity|MCPP II|PROGRAM|Marine Corps Prepositioning Program II providing prepositioned equipment.
+    entity|Navy MBOS|PROGRAM|Navy Maintenance Base Operating Support program for facilities maintenance.
+    entity|Concorde RG-24 Battery|EQUIPMENT|12-volt battery for aircraft generators and ground support equipment.
+    entity|6200 Tennant Floor Sweeper|EQUIPMENT|Commercial floor cleaning equipment for warehouse maintenance.
+    entity|Technical Approach Volume|SUBMISSION_INSTRUCTION|Proposal section limited to 25 pages addressing technical methodology.
+    entity|Past Performance Factor|EVALUATION_FACTOR|Evaluation criterion worth 30 points assessing contractor experience.
+    entity|Integrated Logistics Support|STRATEGIC_THEME|Cross-cutting capability for supply chain and maintenance coordination.
+    entity|Performance Work Statement|STATEMENT_OF_WORK|Detailed task descriptions and performance objectives for contract execution.
 
 2.  **Relationship Extraction & Output:**
 
@@ -78,11 +79,15 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
       - `relationship_keywords`: One or more high-level keywords summarizing the relationship. Separate multiple keywords with a comma.
       - `relationship_description`: A concise explanation of the nature of the relationship between the source and target entities, providing a clear rationale for their connection.
     - **Output Format - Relationships:** Output 5 fields for each relationship on a single line. The first field must be the word relation.
-    - Format: relation, source entity, target entity, relationship keywords, relationship description
+    
+    **Relationship Output Format:**
+
+    Five fields separated by the pipe character (|):
+    relation | source_entity | target_entity | keywords | description
 
 3.  **Field Separator:**
 
-    - Use the specified field separator between each field exactly as shown in the examples.
+    - Use the pipe character (|) to separate fields, exactly as shown in the examples above.
 
 4.  **Relationship Direction & Duplication:**
 
@@ -106,14 +111,6 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
 
 8.  **Completion Signal:** Output the completion marker only after all entities and relationships have been extracted.
 
----Examples---
-{examples}
+---Real Data---
 
----Real Data to be Processed---
-<Input>
-Entity_types: [{entity_types}]
-Text:
-
-```
-{input_text}
-```
+Extract entities and relationships from the following text. Use the exact output format shown in the examples above.
