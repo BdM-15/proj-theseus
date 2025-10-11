@@ -64,6 +64,98 @@ python graph_node_edits/auto_bulk/bulk_graph_fixes.py --pattern all --apply
 
 ---
 
+### Method 4: Entity Corruption Cleanup (Branch 005)
+
+**Best for**: Fixing LLM reasoning artifact corruption (~2% of entities)
+
+**Context**: Grok-4-fast-reasoning occasionally outputs entity names with chain-of-thought prefixes:
+
+- `#>|LOCATION` instead of valid `LOCATION` type
+- `#|PROGRAM` instead of valid `PROGRAM` type
+- `#>|evaluation_factor` (lowercase) instead of `EVALUATION_FACTOR`
+
+**Baseline Corruption Rate**: 2.2% (13/594 entities in Navy MBOS)
+
+**Detection**: Check server logs during processing for warnings like:
+
+```
+WARNING: Invalid entity type '#>|LOCATION' for entity 'San Diego Naval Base' (expected one of 17 valid types)
+WARNING: Invalid entity type '#|PROGRAM' for entity 'MCPP II' (expected one of 17 valid types)
+```
+
+**Manual Cleanup Workflow**:
+
+```powershell
+# Step 1: Identify corrupted entities in logs
+# Look for "WARNING: Invalid entity type" during processing
+
+# Step 2: Find affected entities in GraphML
+python -c "
+from llm_relationship_inference import parse_graphml
+entities, _ = parse_graphml('./rag_storage/graph_chunk_entity_relation.graphml')
+corrupted = [e for e in entities if e['entity_type'].startswith('#')]
+print(f'Found {len(corrupted)} corrupted entities:')
+for e in corrupted: print(f'  - {e[\"entity_name\"]}: {e[\"entity_type\"]}')"
+
+# Step 3: Fix using bulk corruption tool (RECOMMENDED)
+# ⚠️  CRITICAL: Web UI CANNOT edit entity_type field - only description/keywords
+# ⚠️  CRITICAL: Web UI limited to 1000 nodes - unusable for 4000+ node graphs
+
+# ONLY option: Automated bulk corruption cleanup
+python graph_node_edits/auto_bulk/bulk_graph_fixes.py --pattern corruption --dry-run
+
+# ⚠️  WARNING: DO NOT apply without dedicated branch and backup!
+# python graph_node_edits/auto_bulk/bulk_graph_fixes.py --pattern corruption --apply
+```
+
+**Common Corruption Patterns**:
+
+| Corrupted Type          | Expected Type        | Frequency (Navy MBOS) | Fix Priority |
+| ----------------------- | -------------------- | --------------------- | ------------ |
+| `#>\|LOCATION`          | `LOCATION`           | 3 instances           | Medium       |
+| `#>\|DELIVERABLE`       | `DELIVERABLE`        | 2 instances           | Medium       |
+| `#>\|DOCUMENT`          | `DOCUMENT`           | 2 instances           | Low          |
+| `#>\|CONCEPT`           | `CONCEPT`            | 2 instances           | Low          |
+| `#>\|REQUIREMENT`       | `REQUIREMENT`        | 1 instance            | High         |
+| `#\|PROGRAM`            | `PROGRAM`            | 1 instance            | High         |
+| `#\|EQUIPMENT`          | `EQUIPMENT`          | 1 instance            | Medium       |
+| `#\|DOCUMENT`           | `DOCUMENT`           | 1 instance            | Low          |
+| `#>\|Other`             | _(invalid - delete)_ | 1 instance            | High         |
+| `#>\|evaluation_factor` | `EVALUATION_FACTOR`  | 1 instance            | **CRITICAL** |
+
+**Priority Guidance**:
+
+- **CRITICAL**: `EVALUATION_FACTOR` corruption affects Section M analysis (proposal scoring)
+- **HIGH**: `REQUIREMENT` and `PROGRAM` are core RFP entities
+- **MEDIUM**: Other corruptions impact queries but aren't blocking
+- **LOW**: `DOCUMENT`/`CONCEPT` are generic types with less impact
+
+**Automated Cleanup Tool** (Branch 005 - EXPERIMENTAL):
+
+- `python graph_node_edits/auto_bulk/bulk_graph_fixes.py --pattern corruption --dry-run`
+- Detects #>|TYPE, #|TYPE, lowercase types, invalid types
+- Auto-fixes high-confidence patterns (≥0.80 confidence)
+- Flags low-confidence items for manual review
+- **⚠️ NOT TESTED YET** - requires dedicated branch for implementation
+- **⚠️ NOT included in 'all' pattern** (must explicitly specify)
+- See `auto_bulk/README.md` for full documentation
+
+**Future Automation** (Task 2 from Branch 005):
+
+- Pre-validation sanitizer: Strip `#>|` and `#|` prefixes BEFORE entity type validation
+- Expected result: 100% recovery of rejected entities, 0% corruption warnings
+- Implementation: `src/utils/entity_sanitizer.py`
+
+**PostgreSQL Tracking** (Phase 8):
+
+- Corruption patterns will be logged to `entity_corruption_tracking` table
+- Enables trend analysis across RFPs and LLM model versions
+- See `docs/POSTGRESQL_IMPLEMENTATION_PLAN.md` for schema details
+
+**See**: Server logs during processing for real-time corruption detection
+
+---
+
 ## Workflow Recommendation
 
 1. **Analyze** graph with bulk tool dry-run:
@@ -90,11 +182,12 @@ python graph_node_edits/auto_bulk/bulk_graph_fixes.py --pattern all --apply
 
 ## Available Patterns (Bulk Tool)
 
-| Pattern             | Description                | Example Fix                |
-| ------------------- | -------------------------- | -------------------------- |
-| `isolated_nodes`    | Nodes with < 3 edges       | SINCGARS → MCPP II Program |
-| `missing_hierarchy` | Missing parent-child links | ANNEX J-#### → Section J   |
-| `all`               | Run all patterns           | Combined fixes             |
+| Pattern             | Description                         | Example Fix                         |
+| ------------------- | ----------------------------------- | ----------------------------------- |
+| `isolated_nodes`    | Nodes with < 3 edges                | SINCGARS → MCPP II Program          |
+| `missing_hierarchy` | Missing parent-child links          | ANNEX J-#### → Section J            |
+| `corruption` ⚠️     | Entity type corruption (Branch 005) | #>\|LOCATION → LOCATION             |
+| `all`               | Run all patterns EXCEPT corruption  | Combined fixes (safe patterns only) |
 
 ---
 

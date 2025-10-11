@@ -6,13 +6,17 @@ This is the PRIMARY method for fixing common graph issues:
 - Missing hierarchical relationships
 - Untyped or generic relationships
 - Scattered clauses/annexes
+- Entity type corruption (Branch 005 - #>|TYPE, #|TYPE, lowercase)
 
 For one-off or controversial edits, use interactive_graph_edit.ps1 instead.
 
 Usage:
     python bulk_graph_fixes.py --pattern isolated_nodes --dry-run
     python bulk_graph_fixes.py --pattern missing_hierarchy --apply
+    python bulk_graph_fixes.py --pattern corruption --dry-run
     python bulk_graph_fixes.py --pattern all --dry-run
+
+WARNING: 'corruption' pattern modifies entity_type directly. Test on dedicated branch first!
 """
 
 import asyncio
@@ -394,12 +398,186 @@ class BulkGraphFixer:
         
         print()
     
+    def find_corrupted_entity_types(self, nodes: List[Dict]) -> List[Dict]:
+        """
+        Find entities with corrupted entity_type values (Branch 005).
+        
+        Corruption patterns from Grok-4-fast-reasoning chain-of-thought artifacts:
+        - Prefix "#>|" or "#|" (e.g., "#>|LOCATION", "#|PROGRAM")
+        - Lowercase when should be uppercase (e.g., "evaluation_factor")
+        - Invalid types not in entity_types list
+        
+        Baseline: 2.2% corruption rate (13/594 entities in Navy MBOS)
+        
+        WARNING: This modifies entity_type directly. Test on dedicated branch first!
+        """
+        # 17 valid entity types from src/raganything_server.py
+        VALID_TYPES = {
+            'ORGANIZATION', 'CONCEPT', 'EVENT', 'TECHNOLOGY', 'PERSON', 'LOCATION',
+            'REQUIREMENT', 'CLAUSE', 'SECTION', 'DOCUMENT', 'DELIVERABLE', 
+            'PROGRAM', 'EQUIPMENT', 'EVALUATION_FACTOR', 'SUBMISSION_INSTRUCTION',
+            'STRATEGIC_THEME', 'STATEMENT_OF_WORK'
+        }
+        
+        corrupted = []
+        
+        for node in nodes:
+            entity_type = node.get('entity_type', '')
+            entity_name = node.get('entity_name', '')
+            
+            # Skip if no type
+            if not entity_type or entity_type in ['', 'None']:
+                continue
+            
+            # Pattern 1: Prefix corruption (#>|TYPE, #|TYPE)
+            if entity_type.startswith('#>|') or entity_type.startswith('#|'):
+                clean_type = entity_type.replace('#>|', '').replace('#|', '').strip()
+                expected_type = clean_type.upper() if clean_type.upper() in VALID_TYPES else 'UNKNOWN'
+                
+                corrupted.append({
+                    'node_id': node['id'],
+                    'entity_name': entity_name,
+                    'corrupted_type': entity_type,
+                    'expected_type': expected_type,
+                    'pattern': 'prefix_corruption',
+                    'confidence': 0.95 if expected_type != 'UNKNOWN' else 0.50
+                })
+            
+            # Pattern 2: Lowercase corruption (evaluation_factor -> EVALUATION_FACTOR)
+            elif entity_type.lower() in [t.lower() for t in VALID_TYPES] and entity_type not in VALID_TYPES:
+                expected_type = entity_type.upper()
+                
+                corrupted.append({
+                    'node_id': node['id'],
+                    'entity_name': entity_name,
+                    'corrupted_type': entity_type,
+                    'expected_type': expected_type,
+                    'pattern': 'lowercase_corruption',
+                    'confidence': 0.90
+                })
+            
+            # Pattern 3: Invalid type not in list (excluding common variations)
+            elif entity_type not in VALID_TYPES:
+                # Try to guess expected type
+                expected_type = 'UNKNOWN'
+                
+                # Common mappings
+                type_lower = entity_type.lower()
+                if 'location' in type_lower or 'place' in type_lower:
+                    expected_type = 'LOCATION'
+                elif 'program' in type_lower or 'project' in type_lower:
+                    expected_type = 'PROGRAM'
+                elif 'document' in type_lower or 'file' in type_lower:
+                    expected_type = 'DOCUMENT'
+                elif 'requirement' in type_lower or 'req' in type_lower:
+                    expected_type = 'REQUIREMENT'
+                
+                corrupted.append({
+                    'node_id': node['id'],
+                    'entity_name': entity_name,
+                    'corrupted_type': entity_type,
+                    'expected_type': expected_type,
+                    'pattern': 'invalid_type',
+                    'confidence': 0.50 if expected_type != 'UNKNOWN' else 0.20
+                })
+        
+        return corrupted
+    
+    async def fix_corrupted_entity_types(self, corrupted: List[Dict], apply: bool = False):
+        """
+        Fix corrupted entity types by updating entity metadata.
+        
+        WARNING: This directly modifies entity_type. Only auto-fixes high-confidence patterns.
+        Low-confidence items require manual review.
+        """
+        print("=" * 80)
+        print("FIX PATTERN: Entity Type Corruption (Branch 005)")
+        print("=" * 80)
+        print()
+        print("⚠️  WARNING: This pattern modifies entity_type directly!")
+        print("   Only run on dedicated branch after backup.")
+        print("   Baseline corruption rate: 2.2% (13/594 entities)")
+        print()
+        
+        if not corrupted:
+            print("✅ No corrupted entity types found!")
+            return
+        
+        # Separate by confidence
+        high_confidence = [c for c in corrupted if c['confidence'] >= 0.80]
+        low_confidence = [c for c in corrupted if c['confidence'] < 0.80]
+        
+        print(f"Found {len(corrupted)} corrupted entity types:")
+        print(f"  - High confidence (auto-fixable): {len(high_confidence)}")
+        print(f"  - Low confidence (manual review):  {len(low_confidence)}")
+        print()
+        
+        # Show high-confidence fixes
+        if high_confidence:
+            print("HIGH CONFIDENCE FIXES (auto-fixable):")
+            print()
+            for item in high_confidence:
+                print(f"  • {item['entity_name']}")
+                print(f"    Corrupted: {item['corrupted_type']}")
+                print(f"    Expected:  {item['expected_type']}")
+                print(f"    Pattern:   {item['pattern']}")
+                print(f"    Confidence: {item['confidence']:.2f}")
+                print()
+        
+        # Show low-confidence items (require manual review)
+        if low_confidence:
+            print("LOW CONFIDENCE ITEMS (require manual review):")
+            print()
+            for item in low_confidence:
+                print(f"  • {item['entity_name']}")
+                print(f"    Corrupted: {item['corrupted_type']}")
+                print(f"    Suggested: {item['expected_type']}")
+                print(f"    Pattern:   {item['pattern']}")
+                print(f"    Confidence: {item['confidence']:.2f}")
+                print()
+        
+        print("=" * 80)
+        print(f"SUMMARY: {len(high_confidence)} auto-fixable, {len(low_confidence)} manual review")
+        print("=" * 80)
+        print()
+        
+        if apply and not self.dry_run:
+            print("Applying fixes to high-confidence items...")
+            fixed_count = 0
+            for item in high_confidence:
+                if item['expected_type'] != 'UNKNOWN':
+                    try:
+                        await self.rag.aedit_entity(
+                            entity_name=item['entity_name'],
+                            updated_data={'entity_type': item['expected_type']}
+                        )
+                        print(f"  ✅ {item['entity_name']}: {item['corrupted_type']} → {item['expected_type']}")
+                        fixed_count += 1
+                    except Exception as e:
+                        print(f"  ❌ {item['entity_name']}: Failed - {str(e)}")
+            
+            print()
+            print(f"✅ Fixed {fixed_count}/{len(high_confidence)} high-confidence items")
+            
+            if low_confidence:
+                print()
+                print(f"⚠️  {len(low_confidence)} items require manual review via Web UI or interactive CLI")
+        else:
+            print("DRY RUN - No changes applied")
+            print("Run with --apply to execute fixes")
+            if low_confidence:
+                print()
+                print(f"Note: Only {len(high_confidence)} high-confidence items would be auto-fixed")
+                print(f"      {len(low_confidence)} low-confidence items require manual review regardless")
+        
+        print()
+    
     async def run_pattern(self, pattern: str, apply: bool = False):
         """
         Run a specific fix pattern.
         
         Args:
-            pattern: One of ['isolated_nodes', 'missing_hierarchy', 'all']
+            pattern: One of ['isolated_nodes', 'missing_hierarchy', 'corruption', 'all']
             apply: If True, apply fixes. If False, dry run only.
         """
         self.dry_run = not apply
@@ -414,6 +592,12 @@ class BulkGraphFixer:
         if pattern in ['missing_hierarchy', 'all']:
             missing = self.find_missing_hierarchical_relationships(nodes, edges)
             await self.fix_missing_hierarchical_relationships(missing, apply=apply)
+        
+        if pattern in ['corruption']:
+            # NOTE: 'corruption' pattern NOT included in 'all' for safety
+            # Must be explicitly requested
+            corrupted = self.find_corrupted_entity_types(nodes)
+            await self.fix_corrupted_entity_types(corrupted, apply=apply)
 
 
 async def main():
@@ -433,19 +617,28 @@ Examples:
   
   # Apply all fixes
   python bulk_graph_fixes.py --pattern all --apply
+  
+  # Check for entity type corruption (Branch 005)
+  python bulk_graph_fixes.py --pattern corruption --dry-run
+  
+  # Fix corruption (WARNING: Test on dedicated branch first!)
+  python bulk_graph_fixes.py --pattern corruption --apply
 
 Patterns:
   isolated_nodes     - Fix nodes with < 3 edges
   missing_hierarchy  - Add missing CHILD_OF relationships
-  all               - Run all patterns
+  corruption         - Fix entity_type corruption (#>|TYPE, #|TYPE, lowercase)
+                       WARNING: NOT included in 'all', must explicitly specify
+                       Test on dedicated branch first!
+  all                - Run all patterns EXCEPT corruption (for safety)
         """
     )
     
     parser.add_argument(
         '--pattern',
-        choices=['isolated_nodes', 'missing_hierarchy', 'all'],
+        choices=['isolated_nodes', 'missing_hierarchy', 'corruption', 'all'],
         required=True,
-        help='Fix pattern to run'
+        help='Fix pattern to run (NOTE: corruption must be explicitly specified, not included in all)'
     )
     
     parser.add_argument(
