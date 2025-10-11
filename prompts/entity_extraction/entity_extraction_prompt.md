@@ -16,6 +16,7 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
 
     - **Identification:** Identify clearly defined and meaningful entities in the input text.
     - **Entity Details:** For each identified entity, extract the following information:
+
       - `entity_name`: The name of the entity. If the entity name is case-insensitive, capitalize the first letter of each significant word (title case). Ensure **consistent naming** across the entire extraction process.
       - `entity_type`: Categorize the entity using ONE of these exact types from the list below.
 
@@ -41,6 +42,7 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
         • STATEMENT_OF_WORK
 
       - `entity_description`: Provide a concise yet comprehensive description of the entity's attributes and activities, based _solely_ on the information present in the input text.
+
     - **Output Format - Entities:** Output 4 fields for each entity on a single line. The first field must be the word entity.
 
     **Entity Output Format:**
@@ -79,7 +81,7 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
       - `relationship_keywords`: One or more high-level keywords summarizing the relationship. Separate multiple keywords with a comma.
       - `relationship_description`: A concise explanation of the nature of the relationship between the source and target entities, providing a clear rationale for their connection.
     - **Output Format - Relationships:** Output 5 fields for each relationship on a single line. The first field must be the word relation.
-    
+
     **Relationship Output Format:**
 
     Five fields separated by the pipe character (|):
