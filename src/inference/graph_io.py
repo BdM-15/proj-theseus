@@ -274,7 +274,7 @@ def group_entities_by_type(nodes: List[Dict]) -> Dict[str, List[Dict]]:
         
     Example:
         grouped = group_entities_by_type(nodes)
-        # {"annex": [...], "section": [...], "requirement": [...]}
+        # {"document": [...], "section": [...], "requirement": [...]}
     """
     grouped = {}
     for node in nodes:

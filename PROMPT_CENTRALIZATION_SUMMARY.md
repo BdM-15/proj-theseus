@@ -18,11 +18,13 @@ All hardcoded prompts have been extracted from Python scripts and centralized in
 ### Files Modified (3)
 
 1. **`src/server/initialization.py`** (-100 lines)
+
    - Removed: 100-line `custom_entity_extraction_prompt` hardcoded string
    - Added: `load_prompt("entity_extraction/entity_extraction_prompt")` call
    - Added: Import for `prompt_loader`
 
 2. **`src/inference/engine.py`** (-25 lines)
+
    - Removed: 5 hardcoded `relationship_context` strings
    - Added: 5 `load_prompt()` calls for relationship inference
    - Added: `load_prompt()` call for system prompt
@@ -38,21 +40,25 @@ All hardcoded prompts have been extracted from Python scripts and centralized in
 #### New Files
 
 1. **`prompts/entity_extraction/entity_extraction_prompt.md`** (NEW - 100 lines)
+
    - Main entity extraction prompt with examples
    - Template variables: `{entity_types}`, `{tuple_delimiter}`, `{completion_delimiter}`, etc.
    - Supports all 18 government contracting entity types
 
 2. **`prompts/relationship_inference/annex_section_linking.md`** (NEW - 80 lines)
+
    - ANNEX → SECTION relationship inference rules
    - Prefix matching patterns (J-12345 → Section J)
    - Confidence thresholds and examples
 
 3. **`prompts/relationship_inference/section_l_m_mapping.md`** (NEW - 90 lines)
+
    - SUBMISSION_INSTRUCTION ↔ EVALUATION_FACTOR mapping rules
    - Explicit references, format requirements, semantic overlap
    - Multi-factor instruction handling
 
 4. **`prompts/relationship_inference/sow_deliverable_linking.md`** (NEW - 95 lines)
+
    - STATEMENT_OF_WORK → DELIVERABLE relationship rules
    - SOW/PWS/SOO variations
    - CDRL cross-reference patterns
@@ -65,6 +71,7 @@ All hardcoded prompts have been extracted from Python scripts and centralized in
 #### Pre-Existing Files (Validated)
 
 6. **`prompts/relationship_inference/clause_clustering.md`** (EXISTING - 700+ lines)
+
    - CLAUSE → SECTION relationship rules
    - 26+ agency supplement patterns (FAR, DFARS, AFFARS, etc.)
    - Comprehensive clustering logic
@@ -119,25 +126,30 @@ Available Prompts by Category
 ## 📈 Benefits Achieved
 
 ### 1. **Rapid Iteration** (5-second edit cycles)
+
 - Edit markdown → Save → Test (no server restart)
 - Previously: Edit Python → Restart server → Test (30+ seconds)
 
 ### 2. **Code Clarity** (-125 lines from core modules)
+
 - `initialization.py`: -100 lines
 - `engine.py`: -25 lines
 - Cleaner, more maintainable code
 
 ### 3. **Prompt Versioning**
+
 - Prompts tracked separately in Git
 - Easy rollback to previous prompt versions
 - Clear diff history for prompt evolution
 
 ### 4. **Domain Expert Collaboration**
+
 - Non-programmers can edit prompts directly
 - Markdown format (human-readable)
 - No Python syntax knowledge required
 
 ### 5. **2M Context Utilization**
+
 - Detailed, example-rich prompts now feasible
 - 100+ line prompts with 15+ examples (entity extraction)
 - 700+ line prompts with comprehensive patterns (clause clustering)
@@ -196,6 +208,7 @@ prompts/
 Now that prompts are centralized, we can begin **BRANCH_005_OPTIMIZATION_HANDOFF.md** tasks:
 
 ### ✅ Prerequisites Complete
+
 - [x] All prompts externalized
 - [x] Prompt loader utility working
 - [x] Validation test passing
@@ -203,17 +216,20 @@ Now that prompts are centralized, we can begin **BRANCH_005_OPTIMIZATION_HANDOFF
 ### 🎯 Ready for Implementation
 
 **TASK 1: Ultra-Simplify Entity Type List** (30 min)
+
 - Edit: `prompts/entity_extraction/entity_extraction_prompt.md`
 - Remove delimiter instructions that trigger Grok echoing
 - Present entity types as simple bulleted list
 - **No code changes required** - just edit the markdown file!
 
 **TASK 2: Pre-Validation Sanitizer** (45 min)
+
 - Create: `src/utils/entity_sanitizer.py` (NEW FILE)
 - Integration: `src/server/routes.py` (before validation)
 - Strips corruption BEFORE validation (recovers entities)
 
 **TASK 3: Prompt Modularization** (ALREADY DONE ✅)
+
 - This task is now **complete** as part of centralization work
 - All prompts already modularized in `/prompts` directory
 
@@ -222,14 +238,17 @@ Now that prompts are centralized, we can begin **BRANCH_005_OPTIMIZATION_HANDOFF
 ## 📚 Key Files Reference
 
 ### Core Infrastructure
+
 - **`src/core/prompt_loader.py`** - Prompt loading utility (pre-existing)
 - **`test_prompt_loading.py`** - Validation script (NEW)
 
 ### Updated Modules
+
 - **`src/server/initialization.py`** - Entity extraction prompt loading
 - **`src/inference/engine.py`** - Relationship inference prompt loading
 
 ### Prompt Files (7 required)
+
 1. `prompts/entity_extraction/entity_extraction_prompt.md`
 2. `prompts/relationship_inference/annex_section_linking.md`
 3. `prompts/relationship_inference/clause_clustering.md`
@@ -243,6 +262,7 @@ Now that prompts are centralized, we can begin **BRANCH_005_OPTIMIZATION_HANDOFF
 ## 🔍 Quality Assurance
 
 ### Validation Checks Passed ✅
+
 1. ✅ All 7 required prompts load successfully
 2. ✅ No `FileNotFoundError` exceptions
 3. ✅ Prompt loader returns valid strings
@@ -250,6 +270,7 @@ Now that prompts are centralized, we can begin **BRANCH_005_OPTIMIZATION_HANDOFF
 5. ✅ Existing prompt files validated (clause_clustering, requirement_evaluation)
 
 ### Code Quality Metrics
+
 - **LOC Removed**: 125 lines (100 from initialization.py, 25 from engine.py)
 - **Files Modified**: 3 (2 core modules + 1 test script)
 - **Prompt Files Created**: 5 new markdown files
@@ -277,6 +298,7 @@ python test_prompt_loading.py
 ### Prompt Template Variables
 
 Entity extraction prompt supports these variables:
+
 - `{entity_types}` - Comma-separated list of 18 entity types
 - `{tuple_delimiter}` - Field separator (default: `<|>`)
 - `{record_delimiter}` - Record separator (default: `##`)
@@ -290,6 +312,7 @@ Entity extraction prompt supports these variables:
 ### Cache Behavior
 
 Prompts are cached in-memory after first load:
+
 - **Benefit**: Fast repeated access
 - **Development**: Use `use_cache=False` or `clear_cache()` when iterating
 - **Production**: Cache enabled by default
@@ -301,13 +324,16 @@ Prompts are cached in-memory after first load:
 This work directly supports **BRANCH_005_OPTIMIZATION_HANDOFF.md**:
 
 ### Original Task 3: Prompt Modularization ✅ COMPLETE
+
 - ✅ Extract prompt to `/prompts/entity_extraction/entity_extraction_prompt.md`
 - ✅ Create `src/utils/prompt_loader.py` (already existed - validated)
 - ✅ Update `src/server/initialization.py` to use `load_prompt()`
 - ✅ Update `src/utils/__init__.py` to export `load_prompt`
 
 ### Enables Task 1: Ultra-Simplify Entity Type List
+
 Now that prompts are externalized, we can:
+
 1. Edit `entity_extraction_prompt.md` (markdown, not code)
 2. Remove delimiter references that trigger Grok echoing
 3. Test immediately (no code compilation)

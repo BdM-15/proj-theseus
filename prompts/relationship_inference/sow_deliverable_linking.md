@@ -14,16 +14,19 @@ Statement of Work (SOW), Performance Work Statement (PWS), and Statement of Obje
 ## SOW Type Variations
 
 ### SOW (Prescriptive)
+
 - **Definition**: Detailed task descriptions with specific methods
 - **Example**: "Conduct weekly system backups using approved tools"
 - **Deliverable**: Backup logs, compliance reports
 
 ### PWS (Performance-Based)
+
 - **Definition**: Performance objectives without prescribing methods
 - **Example**: "Maintain 99.9% system uptime"
 - **Deliverable**: Uptime reports, SLA compliance metrics
 
 ### SOO (Objective-Based)
+
 - **Definition**: High-level mission objectives
 - **Example**: "Enhance cybersecurity posture"
 - **Deliverable**: Security assessment reports, remediation plans
@@ -31,16 +34,19 @@ Statement of Work (SOW), Performance Work Statement (PWS), and Statement of Obje
 ## Common Patterns
 
 ### Explicit Task→Deliverable Mentions
+
 - **SOW**: "Prepare monthly status reports..."
 - **Deliverable**: "CDRL A001 - Monthly Status Report"
 - **Relationship**: Direct text reference
 
 ### Work-Product Mapping
+
 - **PWS**: "Maintain facility infrastructure..."
 - **Deliverable**: "Maintenance logs, inspection reports"
 - **Relationship**: Implied work products
 
 ### Timeline Alignment
+
 - **SOO**: "Complete Phase 1 objectives by Q2..."
 - **Deliverable**: "Phase 1 Summary Report (due June 30)"
 - **Relationship**: Temporal correlation
@@ -48,10 +54,12 @@ Statement of Work (SOW), Performance Work Statement (PWS), and Statement of Obje
 ## Detection Rules
 
 1. **Direct References**: Search for deliverable names/IDs in SOW text
+
    - CDRL numbers (A001, B002)
    - Report names (Status Report, Technical Manual)
 
 2. **Semantic Overlap**: Match work scope to deliverable descriptions
+
    - Task keywords → Deliverable type
    - Example: "testing" → "Test Report"
 
@@ -68,6 +76,7 @@ Statement of Work (SOW), Performance Work Statement (PWS), and Statement of Obje
 ## Output Format
 
 Each relationship must include:
+
 - `source_id`: STATEMENT_OF_WORK entity ID
 - `target_id`: DELIVERABLE entity ID
 - `relationship_type`: "PRODUCES"
@@ -98,16 +107,19 @@ Each relationship must include:
 ## Special Cases
 
 ### Multi-Deliverable Tasks
+
 - One SOW section may produce multiple deliverables
 - Example: "System testing" → Test Plan + Test Report + Test Data
 - Create separate relationships for each
 
 ### Deliverable Hierarchy
+
 - Parent SOW → Summary deliverables
 - Sub-tasks → Detailed deliverables
 - Preserve hierarchical relationships
 
 ### CDRL Cross-References
+
 - Look for Contract Data Requirements List (CDRL) item numbers
 - Pattern: `CDRL [A-Z]\d{3}`
 - High confidence when matched

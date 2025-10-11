@@ -82,7 +82,7 @@ def list_available_prompts() -> Dict[str, list]:
     Example:
         {
             "entity_extraction": ["entity_detection_rules", "metadata_extraction", ...],
-            "relationship_inference": ["section_l_m_linking", "annex_linking", ...]
+            "relationship_inference": ["section_l_m_linking", "document_section_linking", ...]
         }
     """
     prompts_dir = Path("prompts")

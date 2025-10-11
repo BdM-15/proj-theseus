@@ -17,7 +17,7 @@ def main():
         "entity_extraction/entity_extraction_prompt",
         
         # Relationship inference (5 algorithms)
-        "relationship_inference/annex_section_linking",
+        "relationship_inference/document_section_linking",
         "relationship_inference/clause_clustering",
         "relationship_inference/section_l_m_mapping",
         "relationship_inference/requirement_evaluation",

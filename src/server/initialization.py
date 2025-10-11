@@ -45,7 +45,7 @@ async def initialize_raganything():
     openai_api_key = os.getenv("EMBEDDING_BINDING_API_KEY")
     working_dir = global_args.working_dir
     
-    # Government contracting entity types (18 specialized types)
+    # Government contracting entity types (16 specialized types)
     # Semantic-first detection: Content determines entity type, not section labels
     entity_types = [
         # Core entities
@@ -57,19 +57,22 @@ async def initialize_raganything():
         # Structural entities
         "CLAUSE",                   # FAR/DFARS/AFFARS patterns, will cluster by parent section
         "SECTION",                  # Stores both structural_label + semantic_type
-        "DOCUMENT",
+        "DOCUMENT",                 # References: specs, standards, manuals, regulations, attachments, annexes
         "DELIVERABLE",
-        "ANNEX",                    # NEW: Numbered attachments (J-######, Attachment #, Annex ##)
         
         # Evaluation entities (semantic detection, may be embedded in non-standard sections)
         "EVALUATION_FACTOR",        # Scoring criteria (Section M content)
-        "SUBMISSION_INSTRUCTION",   # NEW: Format/page limits (Section L content, may be IN Section M)
+        "SUBMISSION_INSTRUCTION",   # Format/page limits (Section L content, may be IN Section M)
         
-        # Strategic entities (NEW: Capture planning patterns)
+        # Strategic entities (Capture planning patterns)
         "STRATEGIC_THEME",          # Win themes, hot buttons, discriminators, proof points
         
-        # Work scope (NEW: Semantic detection regardless of location)
+        # Work scope (Semantic detection regardless of location)
         "STATEMENT_OF_WORK",        # PWS/SOW/SOO content (may be Section C or attachment)
+        
+        # Programs and equipment
+        "PROGRAM",                  # Major programs (MCPP II, Navy MBOS, etc.)
+        "EQUIPMENT",                # Physical items (batteries, vehicles, tools)
     ]
     
     # MinerU configuration from environment variables

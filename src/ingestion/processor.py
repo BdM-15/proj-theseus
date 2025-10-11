@@ -11,7 +11,7 @@ Architecture:
     - Regex finds: "Section M starts at char 8000, ends at char 12000"
     - LLM extracts from Section M WITH CONTEXT: "This is Section M (Evaluation Factors), 
       expect EVALUATION_FACTOR entities with relative_importance, subfactors, etc."
-    - Same 18 entity types as Generic RAG, just better relationship accuracy
+    - Same 16 entity types as Generic RAG, just better relationship accuracy
     
     Generic RAG Path:
     - No section detection
@@ -64,8 +64,8 @@ Extract as STATEMENT_OF_WORK regardless of which format customer uses."""
     },
     "Section J": {
         "semantic_type": "ATTACHMENTS",
-        "expected_entities": ["ANNEX", "ATTACHMENT", "STATEMENT_OF_WORK"],
-        "extraction_focus": "J-###### annexes, attachments, supplemental documents"
+        "expected_entities": ["DOCUMENT", "STATEMENT_OF_WORK"],
+        "extraction_focus": "J-###### documents, attachments, specs, standards, supplemental materials"
     },
     "Section L": {
         "semantic_type": "SUBMISSION_INSTRUCTIONS",
@@ -208,14 +208,14 @@ EXPECTED ENTITY TYPES: {', '.join(section_info['expected_entities'])}
 
 EXTRACTION FOCUS: {section_info['extraction_focus']}
 
-IMPORTANT: Extract ALL entities using the full government contracting ontology (18 specialized types) with capture intelligence metadata:
+IMPORTANT: Extract ALL entities using the full government contracting ontology (16 specialized types) with capture intelligence metadata:
 - REQUIREMENT: requirement_type (FUNCTIONAL, PERFORMANCE, SECURITY, TECHNICAL, INTERFACE, MANAGEMENT, DESIGN, QUALITY)
 - REQUIREMENT: criticality_level (MANDATORY via "shall/must", IMPORTANT via "should", OPTIONAL via "may")
 - EVALUATION_FACTOR: relative_importance ("Most Important", "Significantly More Important than Price")
 - EVALUATION_FACTOR: subfactors (M1 → M1.1 → M1.1.1 hierarchy)
 - SUBMISSION_INSTRUCTION: page_limits, format_requirements, volume_name
 - CLAUSE: FAR/DFARS/AFFARS patterns with agency supplement identification
-- ANNEX: J-###### patterns with linkage to parent section
+- DOCUMENT: J-###### attachments, specs, standards, regulations, manuals with linkage to parent section
 - STATEMENT_OF_WORK: Semantically includes SOW (prescriptive), PWS (performance-based), SOO (objective-based)
   Extract as STATEMENT_OF_WORK regardless of customer terminology
 

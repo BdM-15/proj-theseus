@@ -49,7 +49,7 @@ def configure_raganything_args():
     global_args.embedding_api_key = openai_api_key
     global_args.embedding_dim = 3072  # CRITICAL: text-embedding-3-large dimension
     
-    # Government contracting entity types (18 specialized types)
+    # Government contracting entity types (16 specialized types - consolidated for flexibility)
     # Semantic-first detection: Content determines entity type, not section labels
     global_args.entity_types = [
         # Core entities
@@ -66,27 +66,23 @@ def configure_raganything_args():
         # Structural entities
         "CLAUSE",                   # FAR/DFARS/AFFARS patterns, will cluster by parent section
         "SECTION",                  # Stores both structural_label + semantic_type
-        "DOCUMENT",
+        "DOCUMENT",                 # References: specs, standards, manuals, regulations, attachments, annexes
         "DELIVERABLE",
-        "ANNEX",                    # NEW: Numbered attachments (J-######, Attachment #, Annex ##)
         
-        # Hierarchical program entities (NEW: Top-level containers)
-        "PROGRAM",                  # Major named programs/initiatives (MCPP II, Navy MBOS, DEIP) - NOT generic concepts, must be a proper named program with scope/budget/timeline
+        # Hierarchical program entities
+        "PROGRAM",                  # Major named programs/initiatives (MCPP II, Navy MBOS, DEIP)
         
         # Physical assets and equipment
         "EQUIPMENT",                # Physical assets: MHE, generators, batteries, GSE, CESE, watercraft, vehicles
         
-        # Legal and regulatory citations
-        "REGULATION",               # Legal citations: Public Law, USC, CFR, Executive Orders, DFARS/FAR references
-        
         # Evaluation entities (semantic detection, may be embedded in non-standard sections)
         "EVALUATION_FACTOR",        # Scoring criteria (Section M content)
-        "SUBMISSION_INSTRUCTION",   # NEW: Format/page limits (Section L content, may be IN Section M)
+        "SUBMISSION_INSTRUCTION",   # Format/page limits (Section L content, may be IN Section M)
         
-        # Strategic entities (NEW: Capture planning patterns)
+        # Strategic entities (Capture planning patterns)
         "STRATEGIC_THEME",          # Win themes, hot buttons, discriminators, proof points
         
-        # Work scope (NEW: Semantic detection regardless of location)
+        # Work scope (Semantic detection regardless of location)
         "STATEMENT_OF_WORK",        # PWS/SOW/SOO content (may be Section C or attachment)
     ]
     

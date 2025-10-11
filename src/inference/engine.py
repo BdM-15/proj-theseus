@@ -155,11 +155,11 @@ async def infer_all_relationships(
     Infer all missing relationships using LLM semantic understanding.
     
     Implements 5 core relationship inference algorithms:
-    1. Document hierarchy: CHILD_OF relationships (annexes, clauses → sections)
-    2. Section L↔M mapping: GUIDES relationships (instructions → factors)
-    3. Attachment section linking: ATTACHMENT_OF relationships (annexes → sections)
-    4. Clause clustering: CHILD_OF relationships (clauses → sections)
-    5. Requirement evaluation: EVALUATED_BY relationships (requirements → factors)
+    1. Document hierarchy: CHILD_OF relationships (documents, clauses → sections)
+    2. Clause clustering: CHILD_OF relationships (clauses → sections)
+    3. Section L↔M mapping: GUIDES relationships (instructions → factors)
+    4. Requirement evaluation: EVALUATED_BY relationships (requirements → factors)
+    5. Work-deliverable linking: PRODUCES relationships (SOW → deliverables)
     
     Args:
         nodes: List of entity nodes from GraphML
@@ -194,17 +194,17 @@ async def infer_all_relationships(
     
     logger.info(f"  Existing relationships: {len(existing_pairs) // 2}")
     
-    # Algorithm 1: ANNEX → SECTION (Document Hierarchy)
-    if 'annex' in grouped and 'section' in grouped:
-        logger.info(f"\n  [1/5] Document Hierarchy: ANNEX → SECTION...")
-        relationship_context = load_prompt("relationship_inference/annex_section_linking")
-        annex_section_rels = await infer_relationships_batch(
-            source_entities=grouped['annex'],
+    # Algorithm 1: DOCUMENT → SECTION (Document Hierarchy)
+    if 'document' in grouped and 'section' in grouped:
+        logger.info(f"\n  [1/5] Document Hierarchy: DOCUMENT → SECTION...")
+        relationship_context = load_prompt("relationship_inference/document_section_linking")
+        document_section_rels = await infer_relationships_batch(
+            source_entities=grouped['document'],
             target_entities=grouped['section'],
             relationship_context=relationship_context,
             llm_func=llm_func
         )
-        all_new_relationships.extend(annex_section_rels)
+        all_new_relationships.extend(document_section_rels)
     
     # Algorithm 2: CLAUSE → SECTION (Clause Clustering)
     if 'clause' in grouped and 'section' in grouped:

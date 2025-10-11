@@ -8,7 +8,7 @@ Custom endpoints for RAG-Anything + LightRAG server:
 Architecture:
 1. Document Upload → process_document_with_ucf_detection()
 2. UCF Detection → Dual-path processing (section-aware OR standard)
-3. LightRAG Extraction → Entity/relationship extraction (18 types)
+3. LightRAG Extraction → Entity/relationship extraction (16 types)
 4. Semantic Post-Processing → LLM-powered relationship inference
 5. Knowledge Graph Updated → GraphML + kv_store files
 """
@@ -43,7 +43,7 @@ async def process_document_with_ucf_detection(file_path: str, file_name: str, ra
     2. If UCF (confidence >= 0.70): Use section-aware LLM extraction
     3. If non-UCF: Use standard semantic RAG extraction
     
-    Both paths extract the same 18 entity types with capture intelligence metadata.
+    Both paths extract the same 16 entity types with capture intelligence metadata.
     UCF path gets better relationship accuracy due to section context.
     
     Args:
@@ -143,10 +143,10 @@ async def post_process_knowledge_graph(rag_storage_path: str, llm_func) -> dict:
     ARCHITECTURE: Replaces brittle regex patterns with LLM semantic understanding.
     
     Timeline:
-    - t=0-70s: LightRAG extraction (18 entity types + initial relationships)
+    - t=0-70s: LightRAG extraction (16 entity types + initial relationships)
     - t=70s: Knowledge graph files written (GraphML, kv_store files)
     - t=70-85s: This function runs (LLM-powered relationship inference)
-    - t=85s: Knowledge graph files UPDATED (100% annex linkage, comprehensive coverage)
+    - t=85s: Knowledge graph files UPDATED (100% document linkage, comprehensive coverage)
     
     Processing Pipeline:
     1. Parse GraphML (full entity details from multimodal extraction)
@@ -160,17 +160,16 @@ async def post_process_knowledge_graph(rag_storage_path: str, llm_func) -> dict:
     - Agency-agnostic: Handles ANY RFP structure (Navy, Air Force, Army, civilian agencies)
     - Context-aware: Understands content semantics, not just naming patterns
     - Self-documenting: LLM provides human-readable reasoning for each relationship
-    - Higher coverage: 84.6% → 100% annex linkage expected
-    - Cost-effective: ~$0.05 per document (8 LLM batches × ~$0.006/batch)
+    - Higher coverage: 100% document linkage for attachments, specs, regulations
+    - Cost-effective: ~$0.03 per document (5 LLM batches × ~$0.006/batch)
     - Leverages existing 2M-context Grok infrastructure
     
-    Relationship Types Inferred (6 algorithms):
+    Relationship Types Inferred (5 algorithms):
     1. Section L↔M mapping: SUBMISSION_INSTRUCTION ↔ EVALUATION_FACTOR
-    2. Document hierarchy: CHILD_OF relationships (J-02000000-10 → J-02000000)
-    3. Attachment section linking: ANNEX → SECTION (ATTACHMENT_OF)
+    2. Document section linking: DOCUMENT → SECTION (ATTACHMENT_OF/CHILD_OF)
+    3. SOW deliverable linking: STATEMENT_OF_WORK → DELIVERABLE (REQUIRES)
     4. Clause clustering: CLAUSE → SECTION (CHILD_OF)
     5. Requirement evaluation: REQUIREMENT → EVALUATION_FACTOR (EVALUATED_BY)
-    6. Semantic concept linking: Win themes, pain points, strategic relationships
     
     Args:
         rag_storage_path: Path to rag_storage directory
@@ -290,7 +289,7 @@ def create_insert_endpoint(app, rag_instance):
             
             # Semantic post-processing: LLM-powered relationship inference
             logger.info(f"🤖 SEMANTIC POST-PROCESSING: Inferring relationships...")
-            logger.info(f"   Using LLM semantic understanding for 6 inference algorithms")
+            logger.info(f"   Using LLM semantic understanding for 5 inference algorithms")
             post_process_result = await post_process_knowledge_graph(
                 global_args.working_dir,
                 rag_instance.llm_model_func
@@ -349,7 +348,7 @@ def create_documents_upload_endpoint(app, rag_instance):
             
             # Semantic post-processing: LLM-powered relationship inference
             logger.info(f"🤖 SEMANTIC POST-PROCESSING: Inferring relationships...")
-            logger.info(f"   Using LLM semantic understanding for 6 inference algorithms")
+            logger.info(f"   Using LLM semantic understanding for 5 inference algorithms")
             post_process_result = await post_process_knowledge_graph(
                 global_args.working_dir,
                 rag_instance.llm_model_func
