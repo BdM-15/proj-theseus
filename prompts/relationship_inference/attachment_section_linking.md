@@ -298,24 +298,34 @@ J-02000000-10 --ATTACHMENT_OF--> Section J ❌ (use CHILD_OF instead)
 
 ---
 
-### Case 2: Section C vs. Section J (SOW Location)
+### Case 2: Work Statement Location (SOW/PWS Flexibility)
 
-**Problem**: PWS/SOW can be in Section C (inline) OR Section J (attached)
+**Reality**: Work statements (SOW/PWS/SOO) can appear in multiple locations:
 
-**Detection**:
+- **Section C** (inline): Traditional location for Statement of Work
+- **Section J attachment**: Separate PWS document (e.g., "J-02000000 PWS")
+- **Section H**: Special requirements that define work scope
+- **Technical Annexes**: Detailed task descriptions (various naming)
+
+**Detection Logic**:
 
 ```
-IF PWS has J-prefix → Section J (attached)
-IF PWS labeled "Section C" → Section C (inline)
-IF unclear → Check page location (Section J typically page 40+)
+IF document has J-prefix AND contains work statement → Section J (attached PWS)
+IF document labeled "Section C" → Section C (inline SOW)
+IF document in Section H → Section H (special requirements)
+IF technical annex with task descriptions → Section J or parent section
 ```
 
-**Example**:
+**Examples**:
 
 ```
 "J-02000000 Performance Work Statement" → Section J ✅
 "Section C: Statement of Work" → Section C ✅
+"Attachment 0001 PWS" → Section J ✅
+"Section H Special Requirements" → Section H ✅
 ```
+
+**Key Principle**: Extract work statements as STATEMENT_OF_WORK type regardless of physical location
 
 ---
 

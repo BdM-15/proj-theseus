@@ -9,7 +9,16 @@
 
 ## Context
 
-Statement of Work (SOW), Performance Work Statement (PWS), and Statement of Objectives (SOO) define tasks/objectives that produce specific deliverables. Understanding these relationships enables work planning and CDRL mapping.
+Statement of Work (SOW), Performance Work Statement (PWS), and Statement of Objectives (SOO) define tasks/objectives that produce specific deliverables. These work statements may appear in Section C (inline), as attachments (Section J), or in technical annexes.
+
+**Location Variability**: SOW/PWS/SOO content location varies by agency and RFP structure:
+
+- **Section C**: Traditional inline SOW
+- **Attachment**: Separate PWS document (common in DoD - e.g., "J-02000000 PWS")
+- **Section H**: Special requirements that define work scope
+- **Technical Annexes**: Detailed task descriptions in appendices
+
+Understanding these relationships enables work planning and CDRL mapping regardless of document location.
 
 ## SOW Type Variations
 
@@ -35,9 +44,10 @@ Statement of Work (SOW), Performance Work Statement (PWS), and Statement of Obje
 
 ### Explicit Task→Deliverable Mentions
 
-- **SOW**: "Prepare monthly status reports..."
+- **Work Statement**: "Prepare monthly status reports..." (may be in Section C, attachment, or Section H)
 - **Deliverable**: "CDRL A001 - Monthly Status Report"
 - **Relationship**: Direct text reference
+- **Location-agnostic**: Works regardless of where work statement appears
 
 ### Work-Product Mapping
 
@@ -53,10 +63,11 @@ Statement of Work (SOW), Performance Work Statement (PWS), and Statement of Obje
 
 ## Detection Rules
 
-1. **Direct References**: Search for deliverable names/IDs in SOW text
+1. **Direct References**: Search for deliverable names/IDs in work statement text
 
    - CDRL numbers (A001, B002)
    - Report names (Status Report, Technical Manual)
+   - Works across Section C, attachments, and Section H content
 
 2. **Semantic Overlap**: Match work scope to deliverable descriptions
 

@@ -1,9 +1,10 @@
 # Entity Extraction Prompt
 
 **Purpose**: Extract government contracting entities and relationships from RFP documents  
-**Model**: xAI Grok-4-fast-reasoning (2M context)  
+**Model**: xAI Grok-4-fast-reasoning (2M context window)  
 **Entity Types**: 17 specialized government contracting types  
-**Last Updated**: October 10, 2025 (Branch 005 - Delimiter Simplification)
+**Enhancement**: Domain knowledge patterns (FAR/DFARS, UCF, Shipley, CDRL)  
+**Last Updated**: October 11, 2025 (Branch 005 - Domain Knowledge Enhancement)
 
 ---
 
@@ -41,6 +42,75 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
         • STRATEGIC_THEME
         • STATEMENT_OF_WORK
 
+    - **Domain Knowledge - Government Contracting Patterns:**
+
+      **FAR/DFARS Clause Recognition:**
+
+      - FAR clauses: Format "FAR [Part].[Subpart]-[Number]" (e.g., FAR 52.212-1)
+      - DFARS clauses: Format "DFARS 252.[Part]-[Number]" (e.g., DFARS 252.204-7012)
+      - Agency supplements: AFFARS, NMCARS, DARS, TRANSFARS, etc.
+      - Always extract as CLAUSE type, preserve full citation in entity_name
+
+      **Uniform Contract Format (UCF) Sections:**
+
+      - Section A: Solicitation/Contract Form (cover, dates, contact info)
+      - Section B: Supplies/Services & Prices (CLINs, pricing)
+      - Section C: Statement of Work (SOW/PWS location varies - may be Section C or attachment)
+      - Section H: Special Requirements (security, key personnel)
+      - Section I: Contract Clauses (FAR/DFARS - extract individual clauses)
+      - Section J: Attachments (various naming: J-0001, Attachment 1, Annex A, Exhibit B)
+      - Section L: Instructions to Offerors (page limits - SUBMISSION_INSTRUCTION)
+      - Section M: Evaluation Factors (scoring - EVALUATION_FACTOR)
+      - Note: Extract SOW/PWS as STATEMENT_OF_WORK regardless of location (section or attachment)
+
+      **Deliverable Patterns (CDRL):**
+
+      - Contract Data Requirements List items: CDRL A001, CDRL 6022, etc.
+      - Extract as DELIVERABLE with full identifier preserved
+      - DD Form 1423 references indicate deliverable tracking
+
+      **Requirement Criticality (Shipley Methodology):**
+
+      - SHALL/MUST = mandatory requirement (compliance required)
+      - SHOULD = important but not mandatory (best practice)
+      - MAY = optional (contractor discretion)
+      - Extract modal verb context in description
+
+      **Program and Equipment Identification:**
+
+      - Major acquisition programs: MCPP II, Navy MBOS, JPALS, etc.
+      - Equipment with model numbers: Concorde RG-24, 6200 Tennant
+      - Distinguish PROGRAM (services/initiatives) from EQUIPMENT (physical items)
+
+    - **Relationship Patterns to Recognize:**
+
+      **Section L ↔ Section M Links:**
+
+      - Submission instructions (Section L) often correspond to evaluation factors (Section M)
+      - Example: "Technical Approach Volume" (L) relates to "Technical Factor" (M)
+      - Create relationships when same topic appears in both sections
+
+      **Attachment/Annex Hierarchy (Flexible Content Location):**
+
+      - Attachments vary by agency: J-0001, Attachment 1, Annex A, Exhibit B, Enclosure 1
+      - SOW/PWS location varies: May be Section C, attachment, or annex
+      - Requirements may appear in: Section C, attachments, Section H, or technical annexes
+      - Extract with full identifier preserved, type based on content not location
+      - Link DOCUMENT entities to their parent SECTION when structure is clear
+
+      **Clause Clustering:**
+
+      - FAR/DFARS clauses in Section I belong to that section
+      - Create CHILD_OF relationships for clause grouping
+
+      **Requirement Traceability:**
+
+      - Requirements may appear in: Section C (SOW), attachments (PWS), Section H (special requirements)
+      - All requirements may be evaluated in Section M regardless of source location
+      - Deliverables (CDRL) stem from requirements wherever they appear
+      - Link REQUIREMENT to EVALUATION_FACTOR when traceability exists
+      - Type based on content (SHALL/MUST/SHOULD/MAY), not document location
+
       - `entity_description`: Provide a concise yet comprehensive description of the entity's attributes and activities, based _solely_ on the information present in the input text.
 
     - **Output Format - Entities:** Output 4 fields for each entity on a single line. The first field must be the word entity.
@@ -53,7 +123,8 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
     **Correct Examples:**
 
     entity|Annex 17 Transportation|DOCUMENT|Numbered attachment addressing performance methodology for transportation.
-    entity|J-0005 Performance Work Statement|DOCUMENT|Attachment J-0005 containing detailed task descriptions and performance objectives.
+    entity|Attachment 0001 Performance Work Statement|DOCUMENT|Attachment containing detailed task descriptions and performance objectives.
+    entity|Exhibit B Quality Assurance Plan|DOCUMENT|Quality assurance surveillance plan and inspection procedures.
     entity|Public Law 99-234|DOCUMENT|Federal statute requiring the submission of certified cost or pricing data.
     entity|5 U.S.C. 5332|DOCUMENT|United States Code section governing position classification and General Schedule pay rates.
     entity|MIL-STD-882E|DOCUMENT|Department of Defense standard practice for system safety.
