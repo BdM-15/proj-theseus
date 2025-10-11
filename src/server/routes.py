@@ -31,6 +31,7 @@ from src.inference import (
     save_relationships_to_graphml,
     save_relationships_to_kv_store
 )
+from src.utils import sanitize_entities_batch
 
 
 logger = logging.getLogger(__name__)
@@ -193,15 +194,33 @@ async def post_process_knowledge_graph(rag_storage_path: str, llm_func) -> dict:
     
     try:
         # Step 1: Parse GraphML to extract entities and relationships
-        logger.info(f"  [1/4] Parsing GraphML: {graphml_path.name}")
+        logger.info(f"  [1/5] Parsing GraphML: {graphml_path.name}")
         nodes, existing_edges = parse_graphml(graphml_path)
         
         if not nodes:
             logger.warning(f"No entities found in GraphML, skipping post-processing")
             return {"status": "skipped", "reason": "no_entities"}
         
-        # Step 2: Use LLM to infer missing relationships
-        logger.info(f"  [2/4] Calling Grok LLM for semantic relationship inference...")
+        # Step 2: Sanitize entity types (fix #>|TYPE corruption from LLM reasoning artifacts)
+        logger.info(f"  [2/5] Sanitizing entity types (checking {len(nodes)} entities)...")
+        cleaned_nodes, corruption_count = sanitize_entities_batch(nodes)
+        
+        if corruption_count > 0:
+            logger.info(f"  ")
+            logger.info(f"  🧹 CORRUPTION RECOVERY: {corruption_count} entities sanitized")
+            logger.info(f"     Pattern: Chain-of-thought artifacts (#>|TYPE, #|TYPE, lowercase)")
+            logger.info(f"     Recovery rate: {corruption_count}/{len(nodes)} ({100*corruption_count/len(nodes):.1f}%)")
+            logger.info(f"  ")
+            # Update GraphML and kv_store with cleaned entities
+            save_relationships_to_graphml(graphml_path, [], cleaned_nodes)
+            save_relationships_to_kv_store(rag_storage, [], cleaned_nodes)
+            # Use cleaned nodes for subsequent processing
+            nodes = cleaned_nodes
+        else:
+            logger.info(f"  ✅ No corruption detected - all {len(nodes)} entity types valid")
+        
+        # Step 3: Use LLM to infer missing relationships
+        logger.info(f"  [3/5] Calling Grok LLM for semantic relationship inference...")
         
         new_relationships = await infer_all_relationships(
             nodes=nodes,
@@ -214,24 +233,26 @@ async def post_process_knowledge_graph(rag_storage_path: str, llm_func) -> dict:
             return {
                 "status": "success",
                 "relationships_added": 0,
+                "corrupted_entities_recovered": corruption_count,
                 "method": "llm_powered",
                 "message": "No new relationships needed"
             }
         
-        # Step 3: Save new relationships to both GraphML and kv_store
-        logger.info(f"  [3/4] Saving {len(new_relationships)} new relationships...")
+        # Step 4: Save new relationships to both GraphML and kv_store
+        logger.info(f"  [4/5] Saving {len(new_relationships)} new relationships...")
         
         save_relationships_to_graphml(graphml_path, new_relationships, nodes)
         save_relationships_to_kv_store(rag_storage, new_relationships, nodes)
         
-        # Step 4: Final validation
-        logger.info(f"  [4/4] Semantic post-processing complete")
+        # Step 5: Final validation
+        logger.info(f"  [5/5] Semantic post-processing complete")
         
         logger.info("=" * 80)
         logger.info(f"🎯 SEMANTIC POST-PROCESSING COMPLETE")
+        logger.info(f"  Corrupted entities recovered: {corruption_count}")
         logger.info(f"  Total new relationships: {len(new_relationships)}")
         logger.info(f"  Method: Grok LLM semantic understanding")
-        logger.info(f"  Cost: ~$0.03 (6 inference algorithms)")
+        logger.info(f"  Cost: ~$0.03 (5 inference algorithms)")
         logger.info(f"  Processing time: ~15 seconds")
         logger.info("=" * 80)
         
@@ -239,6 +260,7 @@ async def post_process_knowledge_graph(rag_storage_path: str, llm_func) -> dict:
             "status": "success",
             "relationships_added": len(new_relationships),
             "total_relationships_added": len(new_relationships),  # For background monitor compatibility
+            "corrupted_entities_recovered": corruption_count,
             "method": "llm_powered",
             "batches_processed": 5,
             "estimated_cost_usd": 0.03
