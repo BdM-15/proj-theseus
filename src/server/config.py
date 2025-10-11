@@ -5,13 +5,18 @@ Configures global_args for LightRAG server with government contracting ontology.
 Uses xAI Grok for LLM and OpenAI for embeddings.
 """
 
+# CRITICAL: Load .env BEFORE importing LightRAG modules
+# LightRAG's chunk_token_size default: int(os.getenv("CHUNK_SIZE", 1200))
+# Must set environment variables before LightRAG classes are defined
 import os
-import logging
 from dotenv import load_dotenv
+load_dotenv()
+
+# Now safe to import LightRAG
+import logging
 from lightrag.api.config import global_args
 from lightrag.operate import chunking_by_token_size
 
-load_dotenv()
 logger = logging.getLogger(__name__)
 
 

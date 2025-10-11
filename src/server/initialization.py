@@ -8,7 +8,14 @@ This module handles the initialization of the RAG-Anything instance with:
 - Cloud LLM integration (xAI Grok + OpenAI embeddings)
 """
 
+# CRITICAL: Ensure .env is loaded before LightRAG imports
+# This file is imported by raganything_server.py which loads .env first
+# But we import it here too for safety if this module is used standalone
 import os
+from dotenv import load_dotenv
+load_dotenv()
+
+# Now safe to import LightRAG and related modules
 import logging
 from lightrag.api.config import global_args
 from lightrag.llm.openai import openai_complete_if_cache, openai_embed

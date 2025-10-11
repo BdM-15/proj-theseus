@@ -16,15 +16,17 @@ Workflow:
 5. Knowledge Graph Updated → GraphML + kv_store files
 """
 
+# CRITICAL: Load .env BEFORE any imports that might import LightRAG
+# LightRAG's dataclass field defaults evaluate os.getenv() at import time:
+#   chunk_token_size: int = field(default=int(os.getenv("CHUNK_SIZE", 1200)))
+# If .env isn't loaded first, it uses the hardcoded 1200 default
 import os
+from dotenv import load_dotenv
+load_dotenv()
+
+# Now safe to import modules that may import LightRAG
 import asyncio
 import logging
-from dotenv import load_dotenv
-
-# CRITICAL: Load environment variables FIRST before any imports that access os.getenv()
-# This ensures CHUNK_SIZE, CHUNK_OVERLAP_SIZE, and other config values are available
-# when config.py and initialization.py execute their module-level code
-load_dotenv()
 
 # Suppress verbose logging from libraries
 logging.getLogger("raganything").setLevel(logging.WARNING)
