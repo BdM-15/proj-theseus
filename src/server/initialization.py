@@ -32,7 +32,7 @@ async def initialize_raganything():
     - Entity Types: 18 government contracting types (semantic-first detection)
     - LLM: xAI Grok-4-fast-reasoning (cloud processing, 2M context)
     - Embeddings: OpenAI text-embedding-3-large (3072-dim, 8192 max tokens)
-    - Chunking: 2048 tokens, 256 overlap (87% fewer embedding calls vs 800)
+    - Chunking: 4096 tokens, 512 overlap (50% fewer API calls vs 2048 baseline, better semantic coherence)
     
     Returns:
         RAGAnything: Configured instance ready for document ingestion
@@ -155,8 +155,8 @@ async def initialize_raganything():
                 "entity_extraction_system_prompt": custom_entity_extraction_prompt,
             },
             "chunking_func": chunking_by_token_size,
-            "chunk_token_size": int(os.getenv("CHUNK_SIZE", "2048")),
-            "chunk_overlap_token_size": int(os.getenv("CHUNK_OVERLAP_SIZE", "256")),
+            "chunk_token_size": int(os.getenv("CHUNK_SIZE", "4096")),
+            "chunk_overlap_token_size": int(os.getenv("CHUNK_OVERLAP_SIZE", "512")),
         },
     )
     

@@ -21,7 +21,9 @@ import asyncio
 import logging
 from dotenv import load_dotenv
 
-# Load environment variables
+# CRITICAL: Load environment variables FIRST before any imports that access os.getenv()
+# This ensures CHUNK_SIZE, CHUNK_OVERLAP_SIZE, and other config values are available
+# when config.py and initialization.py execute their module-level code
 load_dotenv()
 
 # Suppress verbose logging from libraries
@@ -34,7 +36,7 @@ from lightrag.api.lightrag_server import create_app
 from lightrag.api.config import global_args
 import uvicorn
 
-# Import modular components
+# Import modular components (AFTER load_dotenv() so they see environment variables)
 from src.server.config import configure_raganything_args
 from src.server.initialization import initialize_raganything, get_rag_instance
 from src.server.routes import create_insert_endpoint, create_documents_upload_endpoint, semantic_post_processor_monitor

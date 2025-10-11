@@ -87,9 +87,10 @@ def configure_raganything_args():
     ]
     
     # Chunking configuration (cloud-optimized for 2M context window)
+    # Branch 005: 4096 tokens = 2x larger chunks for better semantic coherence
     global_args.chunking_func = chunking_by_token_size
-    global_args.chunk_token_size = int(os.getenv("CHUNK_SIZE", "2048"))
-    global_args.chunk_overlap_token_size = int(os.getenv("CHUNK_OVERLAP_SIZE", "256"))
+    global_args.chunk_token_size = int(os.getenv("CHUNK_SIZE", "4096"))
+    global_args.chunk_overlap_token_size = int(os.getenv("CHUNK_OVERLAP_SIZE", "512"))
     
     # Multimodal support
     global_args.enable_multimodal = True
