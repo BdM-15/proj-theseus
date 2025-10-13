@@ -647,9 +647,296 @@ Risk:
 
 ---
 
-## Category 10: Teaming & Subcontracting
+## Category 10: Amendment & Change Analysis
 
-### Query 10.1: Capability Gap Analysis
+### Query 10.1: Amendment Summary
+
+```
+What changed in Amendment [NUMBER]? Provide a summary of additions, modifications, and removals.
+
+Example: "What changed in Amendment 0001?"
+```
+
+**Expected Output**:
+
+```
+AMENDMENT 0001 SUMMARY (Issued: 2025-01-15)
+
+CRITICAL CHANGES (3):
+❗ MODIFIED: Section L - Technical Volume page limit
+   - Baseline: 10 pages
+   - Amendment 1: 15 pages (+5 pages)
+   - Impact: More space for technical detail, adjust proposal outline
+
+❗ ADDED: New Attachment J-06 - Cybersecurity Requirements Matrix
+   - Content: NIST 800-171 compliance crosswalk (15 pages)
+   - Impact: Must address in Technical Approach, add compliance matrix
+
+❗ REMOVED: Requirement REQ-089 - Daily status reports
+   - Replaced with: Weekly status reports (REQ-043 modified)
+   - Impact: Reduce reporting burden, adjust management approach
+
+MINOR CHANGES (5):
+✏️ MODIFIED: Section A - Submission deadline extended
+   - Baseline: 2025-02-01
+   - Amendment 1: 2025-02-15 (+14 days)
+
+✏️ MODIFIED: Attachment J-02 - PWS Section 3.2.1
+   - Added: "Contractor shall provide monthly invoicing"
+   - Impact: Administrative change, no technical impact
+
+ADMINISTRATIVE (2):
+📋 Corrected typo in Section M (page 42, "evalution" → "evaluation")
+📋 Updated POC email address (Section A)
+
+DOCUMENTS SUPERSEDED:
+- Attachment J-06 replaces previous J-05-OLD
+```
+
+**Use Case**: Immediate impact assessment for proposal teams
+
+---
+
+### Query 10.2: Compare Baseline vs Latest Amendment
+
+```
+Show me all differences between the baseline RFP and the current version (after all amendments).
+
+Example: "Compare baseline to Amendment 0003"
+```
+
+**Expected Output**:
+
+```
+CUMULATIVE CHANGES (Baseline → Amendment 3)
+
+SECTION L (Instructions to Offerors):
+├── Page Limits:
+│   - Technical Volume: 10 → 15 pages (AMD 1)
+│   - Management Volume: 8 → 8 pages (no change)
+│   - Past Performance: 5 → 10 pages (AMD 2)
+├── Format Requirements:
+│   - Font: Times New Roman 12pt → Arial 11pt (AMD 3)
+│   - Margins: 1" → 0.75" (AMD 3)
+
+SECTION M (Evaluation Factors):
+├── Factor Weights:
+│   - Technical: 40% → 45% (AMD 2)
+│   - Management: 30% → 25% (AMD 2)
+│   - Past Performance: 20% → 20% (no change)
+│   - Price: 10% → 10% (no change)
+
+SECTION C (SOW):
+├── Performance Period: 5 years → 3 years base + 2 option years (AMD 1)
+├── Deliverables: 12 → 15 CDRLs (AMD 2 added 3 new)
+
+REQUIREMENTS:
+├── ADDED: 8 new requirements (AMD 1: 3, AMD 2: 5)
+├── MODIFIED: 12 requirements (scope/deadline changes)
+├── REMOVED: 4 requirements (REQ-089, REQ-104, REQ-127, REQ-133)
+
+NET EFFECT:
+- Proposal complexity: +25% (more pages, deliverables, requirements)
+- Timeline: +14 days (submission extended)
+- Competitive position: Technical factor increased (favors our strengths)
+```
+
+**Use Case**: Comprehensive change tracking across all amendments
+
+---
+
+### Query 10.3: Amendment Impact on Our Proposal
+
+```
+How does Amendment [NUMBER] affect our current proposal draft? What sections need revision?
+
+Example: "How does Amendment 0002 affect our proposal?"
+```
+
+**Expected Output**:
+
+```
+AMENDMENT 0002 IMPACT ASSESSMENT
+
+HIGH PRIORITY REVISIONS (3 sections):
+
+1. TECHNICAL APPROACH (Volume I, Section 1)
+   - Change: Factor weight increased from 40% to 45%
+   - Current Status: 10 pages (within old limit)
+   - Required Action: Expand to 15 pages (new limit from AMD 1)
+   - Content Gaps: AMD 2 added REQ-156 (AI/ML capabilities) - NOT ADDRESSED
+   - Effort: 40 hours (add 5 pages + address new requirement)
+   - Deadline: 5 days before submission
+
+2. PAST PERFORMANCE (Volume I, Section 3)
+   - Change: Page limit increased from 5 to 10 pages
+   - Current Status: 5 pages (at old limit)
+   - Required Action: Add 2 more references (AMD 2 requires 5 total, we have 3)
+   - Content Gaps: Need DOD AI/ML contracts (align with REQ-156)
+   - Effort: 24 hours (2 new references + expand narratives)
+   - Deadline: 7 days before submission
+
+3. COST PROPOSAL (Volume II)
+   - Change: AMD 2 modified CLIN structure (5 CLINs → 7 CLINs)
+   - Current Status: OLD STRUCTURE (invalid)
+   - Required Action: Completely rebuild cost proposal
+   - Content Gaps: New CLINs for AI/ML services, training
+   - Effort: 60 hours (re-price + justify new CLINs)
+   - Deadline: 10 days before submission (cost realism review)
+
+LOW PRIORITY REVISIONS (2 sections):
+✏️ Management Approach: Update org chart (AMD 2 changed KP requirements)
+✏️ Section J Cross-References: Update attachment numbers (J-05 → J-06)
+
+NO IMPACT (1 section):
+✅ Corporate Experience: No changes from amendments
+
+RISK ASSESSMENT:
+🔴 HIGH RISK: Cost proposal rebuild (60 hours, complex pricing)
+🟡 MEDIUM RISK: AI/ML requirement (new capability, limited past performance)
+🟢 LOW RISK: Page limit expansions (more space = easier)
+
+RECOMMENDED ACTIONS:
+1. Immediately assign cost team to CLIN restructuring
+2. Identify AI/ML past performance references by EOD today
+3. Schedule technical writers for 5-page expansion (Technical)
+4. Hold amendment review meeting tomorrow 9 AM
+```
+
+**Use Case**: Real-time proposal revision planning
+
+---
+
+### Query 10.4: Amendment Change Detection (Attachments)
+
+```
+Compare Attachment [ID] between baseline and Amendment [NUMBER]. What changed in the document content?
+
+Example: "Compare Attachment J-02 (PWS) between baseline and Amendment 0001"
+```
+
+**Expected Output**:
+
+```
+ATTACHMENT J-02 CHANGE ANALYSIS (PWS)
+Baseline vs. Amendment 0001
+
+DOCUMENT METADATA:
+- Baseline: PWS_Baseline_v1.0.docx (45 pages, 2024-11-01)
+- Amendment 1: PWS_AMD001_v1.1.docx (52 pages, 2025-01-15)
+- Net Change: +7 pages, 78 modifications
+
+SECTION-BY-SECTION CHANGES:
+
+Section 3.1 - System Architecture:
+├── ADDED: "3.1.5 AI/ML Integration Requirements" (2 pages)
+│   - 8 new technical requirements for ML model deployment
+│   - Performance metrics: 95% accuracy, <100ms latency
+│   - Impact: Major scope addition, requires AI capability demonstration
+├── MODIFIED: "3.1.3 Cybersecurity Controls"
+│   - Added requirement for Zero Trust Architecture (ZTA)
+│   - Removed reference to NIST 800-53 Rev 4 (replaced with Rev 5)
+
+Section 3.2 - Performance Standards:
+├── MODIFIED: "3.2.1 Availability"
+│   - Baseline: 99.5% uptime
+│   - Amendment 1: 99.9% uptime (+0.4% increase)
+│   - Impact: More stringent SLA, affects infrastructure design
+├── ADDED: "3.2.5 Response Times"
+│   - P1 incidents: 15 minutes → 10 minutes
+│   - P2 incidents: 4 hours → 2 hours
+│   - Impact: Requires 24/7 staffing model
+
+Section 4.0 - Deliverables (CDRL):
+├── ADDED: 3 new deliverables
+│   - CDRL 6089: AI/ML Model Documentation (monthly)
+│   - CDRL 6090: Zero Trust Implementation Plan (one-time)
+│   - CDRL 6091: Performance Dashboard (real-time)
+├── MODIFIED: CDRL 6012 - Monthly Status Report
+│   - Added requirement for AI/ML metrics
+│   - Changed format from Word to PowerPoint
+
+DELETED CONTENT:
+├── REMOVED: Section 3.4 - Legacy System Support
+│   - Reason: Legacy system decommissioned (no longer in scope)
+│   - Impact: Reduces scope, may lower cost
+
+REQUIREMENT TRACEABILITY:
+NEW: 12 requirements added (REQ-156 through REQ-167)
+MODIFIED: 8 requirements changed (scope/performance/deadline)
+REMOVED: 4 requirements deleted (legacy system related)
+
+SPREADSHEET CHANGES (Attachment J-02-ANNEX-A):
+- Staffing Matrix: Added "AI/ML Engineer" labor category
+- Equipment List: Added GPU servers for ML training
+- Pricing Template: Added CLIN 0007 for AI/ML services
+
+ESTIMATED PROPOSAL IMPACT:
+📊 Cost Impact: +$2.5M (AI/ML capability, higher SLAs, new deliverables)
+⏱️ Schedule Impact: +30 days (AI/ML implementation, ZTA deployment)
+👥 Staffing Impact: +3 FTE (AI engineers, 24/7 coverage)
+📝 Proposal Rewrite: Technical Approach (Section 1), Management (Section 2), Cost
+```
+
+**Use Case**: Deep-dive analysis for complex attachment changes (PWS, SOW, specifications)
+
+---
+
+### Query 10.5: Questions Triggered by Amendment
+
+```
+What questions should we ask the government based on Amendment [NUMBER]?
+
+Example: "What questions should we ask based on Amendment 0002?"
+```
+
+**Expected Output**:
+
+```
+RECOMMENDED Q&A QUESTIONS (Amendment 0002)
+
+CRITICAL QUESTIONS (3):
+
+Q1: AI/ML Requirements Clarification
+- Issue: Amendment 2 added Section 3.1.5 "AI/ML Integration" with 95% accuracy requirement
+- Ambiguity: What is the baseline dataset for accuracy measurement?
+- Question: "For the AI/ML accuracy requirement in Amendment 2 Section 3.1.5, please clarify: (a) What dataset will be used to measure 95% accuracy? (b) Is accuracy measured at deployment or continuously monitored? (c) Are there specific ML frameworks required (TensorFlow, PyTorch, etc.)?"
+- Impact: HIGH (affects technical approach, tooling selection, cost)
+
+Q2: Zero Trust Architecture Scope
+- Issue: Amendment 2 modified Section 3.1.3 to require "Zero Trust Architecture"
+- Ambiguity: Does ZTA apply to entire network or just cloud environment?
+- Question: "Amendment 2 Section 3.1.3 requires Zero Trust Architecture implementation. Please clarify: (a) Does ZTA apply to on-premise infrastructure, cloud, or both? (b) What ZTA maturity level is required (CISA ZTA Maturity Model levels 1-5)? (c) Is phased implementation acceptable?"
+- Impact: HIGH (major cost/schedule impact depending on scope)
+
+Q3: Availability SLA Conflict
+- Issue: Amendment 2 increased uptime from 99.5% to 99.9%
+- Conflict: Section C states "8x5 support" but 99.9% typically requires 24/7
+- Question: "Amendment 2 Section 3.2.1 requires 99.9% availability, but Section C implies 8x5 support. Please confirm: (a) Is 24/7 NOC required for 99.9% uptime? (b) Are planned maintenance windows allowed? (c) What is the acceptable downtime per month (43 minutes at 99.9%)?"
+- Impact: CRITICAL (affects staffing model, cost structure)
+
+MEDIUM PRIORITY QUESTIONS (2):
+
+Q4: CDRL Deliverable Format
+- Issue: Amendment 2 changed CDRL 6012 format from Word to PowerPoint
+- Question: "Amendment 2 modified CDRL 6012 to require PowerPoint format. Is there a specific template or slide count requirement?"
+- Impact: MEDIUM (affects reporting process)
+
+Q5: Past Performance Scoring
+- Issue: Amendment 2 increased Past Performance page limit from 5 to 10 pages
+- Question: "With the increased page limit for Past Performance (Amendment 2), does the Government prefer more references (5+ instead of 3) or deeper detail on fewer references?"
+- Impact: MEDIUM (affects proposal strategy)
+
+DEADLINE: Q&A period closes 2025-01-25 (10 days)
+```
+
+**Use Case**: Proactive government engagement after amendments
+
+---
+
+## Category 11: Teaming & Subcontracting
+
+### Query 11.1: Capability Gap Analysis
 
 ```
 What capabilities do we lack that require teaming partners or subcontractors?
