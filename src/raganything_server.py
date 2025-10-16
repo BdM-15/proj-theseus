@@ -41,7 +41,7 @@ import uvicorn
 # Import modular components (AFTER load_dotenv() so they see environment variables)
 from src.server.config import configure_raganything_args
 from src.server.initialization import initialize_raganything, get_rag_instance
-from src.server.routes import create_insert_endpoint, create_documents_upload_endpoint, semantic_post_processor_monitor
+from src.server.routes import create_insert_endpoint, create_documents_upload_endpoint
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -101,15 +101,12 @@ async def main():
     create_insert_endpoint(app, rag_instance)
     create_documents_upload_endpoint(app, rag_instance)
     
-    # Step 5: Start background monitoring task for semantic post-processing
-    asyncio.create_task(semantic_post_processor_monitor(rag_instance))
-    
     # Print concise startup info
     print(f"\n✅ Server Ready:")
     print(f"   WebUI: http://{host}:{port}/")
     print(f"   API Docs: http://{host}:{port}/docs")
     print(f"   Features: Multimodal extraction + semantic post-processing")
-    print(f"   Background monitor: Active (auto-processes uploads)\n")
+    print(f"   Background monitor: Removed (synchronous post-processing)\n")
     
     # Step 6: Start server
     config = uvicorn.Config(app=app, host=host, port=port, log_level="info")

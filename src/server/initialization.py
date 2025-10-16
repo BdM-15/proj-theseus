@@ -38,8 +38,14 @@ async def initialize_raganything():
     - Parser: MinerU (multimodal - images, tables, equations)
     - Entity Types: 18 government contracting types (semantic-first detection)
     - LLM: xAI Grok-4-fast-reasoning (cloud processing, 2M context)
-    - Embeddings: OpenAI text-embedding-3-large (3072-dim, 8192 max tokens)
-    - Chunking: 4096 tokens, 512 overlap (50% fewer API calls vs 2048 baseline, better semantic coherence)
+    - Embeddings: OpenAI text-embedding-3-large (3072-dim, 8192 token limit)
+    - Chunking: 8K tokens (overlap: 1.2K) - Multiple focused extraction passes
+    
+    Architecture Note:
+    LightRAG chunks documents at 8192 tokens. Same chunks go to BOTH:
+    - LLM entity extraction (multiple focused passes = comprehensive entity coverage)
+    - Embedding generation (fits within 8192 token limit, no truncation needed)
+    Smaller chunks prevent LLM attention decay that caused 50K chunk extraction failure.
     
     Returns:
         RAGAnything: Configured instance ready for document ingestion
@@ -88,11 +94,16 @@ async def initialize_raganything():
     enable_image = os.getenv("ENABLE_IMAGE_PROCESSING", "true").lower() == "true"
     enable_table = os.getenv("ENABLE_TABLE_PROCESSING", "true").lower() == "true"
     enable_equation = os.getenv("ENABLE_EQUATION_PROCESSING", "true").lower() == "true"
+    device = os.getenv("MINERU_DEVICE", "auto")  # cuda, cpu, or auto (MinerU reads this directly)
+    
+    # CRITICAL: MinerU reads MINERU_DEVICE from environment, NOT from RAGAnythingConfig
+    # Ensure it's set in the current process environment so MinerU subprocess inherits it
+    os.environ["MINERU_DEVICE"] = device
     
     # Note: HF_TOKEN and HF_HUB_DISABLE_SYMLINKS_WARNING are automatically
     # inherited by MinerU subprocess if set in environment
     
-    # Create RAG-Anything configuration
+    # Create RAG-Anything configuration (does NOT accept device parameter)
     config = RAGAnythingConfig(
         working_dir=working_dir,
         parser=parser,
@@ -103,8 +114,8 @@ async def initialize_raganything():
     )
     
     # Define LLM function (xAI Grok wrapper)
-    def llm_model_func(prompt, system_prompt=None, history_messages=[], **kwargs):
-        return openai_complete_if_cache(
+    async def llm_model_func(prompt, system_prompt=None, history_messages=[], **kwargs):
+        return await openai_complete_if_cache(
             "grok-4-fast-reasoning",
             prompt,
             system_prompt=system_prompt,
@@ -115,35 +126,55 @@ async def initialize_raganything():
         )
     
     # Define vision function (multimodal Grok wrapper)
-    def vision_model_func(prompt, system_prompt=None, history_messages=[], image_data=None, messages=None, **kwargs):
+    async def vision_model_func(prompt, system_prompt=None, history_messages=[], image_data=None, messages=None, **kwargs):
         if messages:
-            return openai_complete_if_cache(
+            return await openai_complete_if_cache(
                 "grok-4-fast-reasoning", "", system_prompt=None, history_messages=[],
                 messages=messages, api_key=xai_api_key, base_url=xai_base_url, **kwargs
             )
         elif image_data:
-            return openai_complete_if_cache(
+            messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}},
+                    ],
+                }
+            ]
+            if system_prompt:
+                messages.insert(0, {"role": "system", "content": system_prompt})
+            return await openai_complete_if_cache(
                 "grok-4-fast-reasoning", "", system_prompt=None, history_messages=[],
-                messages=[
-                    {"role": "system", "content": system_prompt} if system_prompt else None,
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}},
-                        ],
-                    } if image_data else {"role": "user", "content": prompt},
-                ],
+                messages=messages,
                 api_key=xai_api_key, base_url=xai_base_url, **kwargs
             )
         else:
-            return llm_model_func(prompt, system_prompt, history_messages, **kwargs)
+            return await llm_model_func(prompt, system_prompt, history_messages, **kwargs)
     
-    # Define embedding function (OpenAI wrapper)
+    # Define embedding function with safety truncation (8K chunks can slightly exceed 8192 due to overlap)
+    async def safe_embed_func(texts):
+        """Truncate texts to 8192 tokens before embedding to handle edge cases"""
+        import tiktoken
+        enc = tiktoken.get_encoding("cl100k_base")  # OpenAI tokenizer
+        
+        truncated_texts = []
+        for text in texts:
+            tokens = enc.encode(text)
+            if len(tokens) > 8192:
+                # Truncate to 8192 tokens and decode back to text
+                truncated_tokens = tokens[:8192]
+                truncated_text = enc.decode(truncated_tokens)
+                truncated_texts.append(truncated_text)
+            else:
+                truncated_texts.append(text)
+        
+        return await openai_embed(truncated_texts, model="text-embedding-3-large", api_key=openai_api_key)
+    
     embedding_func = EmbeddingFunc(
         embedding_dim=3072,
-        max_token_size=8192,
-        func=lambda texts: openai_embed(texts, model="text-embedding-3-large", api_key=openai_api_key),
+        max_token_size=8192,  # OpenAI text-embedding-3-large limit
+        func=safe_embed_func,
     )
     
     # Load entity extraction prompt from external file
@@ -162,8 +193,8 @@ async def initialize_raganything():
                 "entity_extraction_system_prompt": custom_entity_extraction_prompt,
             },
             "chunking_func": chunking_by_token_size,
-            "chunk_token_size": int(os.getenv("CHUNK_SIZE", "4096")),
-            "chunk_overlap_token_size": int(os.getenv("CHUNK_OVERLAP_SIZE", "512")),
+            "chunk_token_size": int(os.getenv("CHUNK_SIZE", "50000")),  # LLM + embeddings (auto-truncate at 8192)
+            "chunk_overlap_token_size": int(os.getenv("CHUNK_OVERLAP_SIZE", "1000")),
         },
     )
     
@@ -201,6 +232,7 @@ async def initialize_raganything():
     # Use print() instead of logger to ensure output visibility during startup
     print("✅ RAG-Anything initialized")
     print(f"   Parser: MinerU ({parse_method}) - multimodal enabled")
+    print(f"   Device: {device.upper()} (GPU acceleration {'enabled' if device == 'cuda' else 'disabled'})")
     print(f"   Entity types: {len(entity_types)} specialized types")
     print(f"   LightRAG storages: Ready")
     print(f"   500 error fix: Applied ✅")

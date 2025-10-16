@@ -130,8 +130,18 @@ async def infer_relationships_batch(
             logger.warning(f"  ⚠️ LLM returned non-list: {type(relationships)}")
             return []
         
-        # Filter by confidence threshold
-        filtered_rels = [r for r in relationships if r.get('confidence', 0) >= 0.3]
+        # Filter by confidence threshold (handle both string and float)
+        filtered_rels = []
+        for r in relationships:
+            confidence = r.get('confidence', 0)
+            # Handle string confidence values
+            if isinstance(confidence, str):
+                try:
+                    confidence = float(confidence)
+                except (ValueError, TypeError):
+                    confidence = 0.0
+            if confidence >= 0.3:
+                filtered_rels.append(r)
         
         logger.info(f"    ✅ Inferred {len(filtered_rels)} relationships (filtered from {len(relationships)})")
         

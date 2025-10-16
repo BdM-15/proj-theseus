@@ -91,11 +91,13 @@ def configure_raganything_args():
         "STATEMENT_OF_WORK",        # PWS/SOW/SOO content (may be Section C or attachment)
     ]
     
-    # Chunking configuration (cloud-optimized for 2M context window)
-    # Branch 005: 4096 tokens = 2x larger chunks for better semantic coherence
+    # Chunking configuration (leverages Grok-4's 2M context window)
+    # CHUNK_SIZE: Document chunking for BOTH LLM entity extraction and embeddings
+    # - LLM processes full 50K chunks (utilizing Grok-4's massive context)
+    # - Embeddings auto-truncate to 8192 via EmbeddingFunc.max_token_size
     global_args.chunking_func = chunking_by_token_size
-    global_args.chunk_token_size = int(os.getenv("CHUNK_SIZE", "4096"))
-    global_args.chunk_overlap_token_size = int(os.getenv("CHUNK_OVERLAP_SIZE", "512"))
+    global_args.chunk_token_size = int(os.getenv("CHUNK_SIZE", "50000"))
+    global_args.chunk_overlap_token_size = int(os.getenv("CHUNK_OVERLAP_SIZE", "1000"))
     
     # Multimodal support
     global_args.enable_multimodal = True
@@ -104,8 +106,10 @@ def configure_raganything_args():
     logger.info("⚙️  CONFIGURATION SUMMARY")
     logger.info("=" * 80)
     logger.info(f"  LLM: grok-4-fast-reasoning (2M context)")
-    logger.info(f"  Embeddings: text-embedding-3-large (3072-dim)")
+    logger.info(f"  Embeddings: text-embedding-3-large (3072-dim, auto-truncate at 8192 tokens)")
     logger.info(f"  Chunking: {global_args.chunk_token_size} tokens (overlap: {global_args.chunk_overlap_token_size})")
+    logger.info(f"  → LLM processes full {global_args.chunk_token_size}-token chunks")
+    logger.info(f"  → Embeddings auto-truncate via EmbeddingFunc.max_token_size=8192")
     logger.info(f"  Concurrency: {os.getenv('MAX_ASYNC', '32')} parallel LLM requests")
     logger.info(f"  Entity Types: {len(global_args.entity_types)} specialized govcon types")
     logger.info(f"  Semantic Inference: 6 algorithms (L↔M, hierarchy, attachments, clauses, requirements, concepts)")
