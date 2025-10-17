@@ -8,7 +8,7 @@ Custom endpoints for RAG-Anything + LightRAG server:
 Architecture:
 1. Document Upload → process_document_with_ucf_detection()
 2. UCF Detection → Dual-path processing (section-aware OR standard)
-3. LightRAG Extraction → Entity/relationship extraction (18 types)
+3. LightRAG Extraction → Entity/relationship extraction (16 types)
 4. Semantic Post-Processing → LLM-powered relationship inference
 5. Knowledge Graph Updated → GraphML + kv_store files
 """
@@ -31,28 +31,29 @@ from src.inference import (
     save_relationships_to_graphml,
     save_relationships_to_kv_store
 )
-
-
 logger = logging.getLogger(__name__)
 
 
-async def process_document_with_ucf_detection(file_path: str, file_name: str, rag_instance) -> dict:
+async def process_document_with_ucf_detection(file_path: str, file_name: str, rag_instance, llm_func=None) -> dict:
     """
-    Dual-path document processing:
+    Integrated document processing with semantic relationship inference:
     1. Detect if document follows Uniform Contract Format (UCF)
-    2. If UCF (confidence >= 0.70): Use section-aware LLM extraction
-    3. If non-UCF: Use standard semantic RAG extraction
+    2. ALWAYS use RAG-Anything with MinerU multimodal processing
+    3. Extract 17 entity types with capture intelligence metadata
+    4. INTEGRATED: Run LLM-powered relationship inference immediately after
+    5. Save complete knowledge graph with entities + relationships
     
-    Both paths extract the same 18 entity types with capture intelligence metadata.
-    UCF path gets better relationship accuracy due to section context.
+    This integrates what was previously separate post-processing into the ingestion pipeline,
+    following Branch 003's successful approach but maintaining modular architecture.
     
     Args:
         file_path: Path to document file
         file_name: Original filename
         rag_instance: Initialized RAGAnything instance
+        llm_func: LLM function for relationship inference (optional for backward compatibility)
     
     Returns:
-        dict: Processing result with path, confidence, sections
+        dict: Processing result with path, confidence, sections, relationships_inferred
     """
     try:
         # Read document text for UCF detection
@@ -64,7 +65,7 @@ async def process_document_with_ucf_detection(file_path: str, file_name: str, ra
     
     ucf_result = None
     
-    # Step 1: Detect UCF format
+    # Step 1: Detect UCF format (for metadata purposes only)
     if document_text:
         ucf_result = detect_ucf_format(document_text, file_name)
         
@@ -76,19 +77,7 @@ async def process_document_with_ucf_detection(file_path: str, file_name: str, ra
             # Step 2: Prepare sections with enhanced context
             sections = prepare_ucf_sections_for_llm(document_text, ucf_result.detected_sections)
             
-            # Step 3: Process with RAG-Anything (full document processing)
-            # Note: Section metadata will be used by semantic post-processing for enhanced extraction
-            # CRITICAL: Use process_document_complete() NOT process_document_complete_lightrag_api()
-            # The _lightrag_api version is for external server integration and expects
-            # LightRAG to accept multimodal_content param in ainsert(), which it doesn't
-            await rag_instance.process_document_complete(
-                file_path=file_path,
-                output_dir=global_args.working_dir,
-                # Parser from config: mineru
-                parse_method="auto"
-            )
-            
-            # Step 4: Store section metadata for semantic post-processing
+            # Step 3: Store section metadata for semantic post-processing
             section_metadata_path = Path(global_args.working_dir) / f"ucf_sections_{Path(file_name).stem}.json"
             section_data = {
                 "file_name": file_name,
@@ -110,29 +99,55 @@ async def process_document_with_ucf_detection(file_path: str, file_name: str, ra
             
             logger.info(f"✅ UCF section metadata saved for semantic enhancement")
             
-            return {
-                "path": "UCF",
-                "confidence": ucf_result.confidence,
-                "sections": len(sections)
-            }
+            # Continue to document processing below...
         else:
             logger.info(f"📄 Non-UCF Document (confidence={ucf_result.confidence:.2f})")
             logger.info(f"   Using standard semantic RAG extraction...")
     else:
         logger.info(f"📄 Unable to detect format, using standard semantic RAG extraction...")
     
-    # Step 5: Process with standard RAG-Anything (Generic RAG path)
-    await rag_instance.process_document_complete_lightrag_api(
+    # Step 4: ALWAYS use RAG-Anything with MinerU multimodal processing
+    # CRITICAL: Never fall back to generic LightRAG - always use multimodal processing
+    logger.info(f"🔧 Processing with RAG-Anything (MinerU multimodal parser)...")
+    await rag_instance.process_document_complete(
         file_path=file_path,
         output_dir=global_args.working_dir,
         # Parser from config: mineru
         parse_method="auto"
     )
     
+    # INTEGRATED: Run semantic relationship inference immediately after entity extraction
+    # Pattern from Branch 003 Phase 6.1 (working implementation):
+    # Call post_process_knowledge_graph() immediately after process_document_complete()
+    # The RAG-Anything processing is synchronous - when it returns, GraphML is ready
+    relationships_inferred = 0
+    enable_post_processing = os.getenv("ENABLE_POST_PROCESSING", "true").lower() == "true"
+    
+    if llm_func and enable_post_processing:
+        logger.info(f"🤖 INTEGRATED: Running LLM-powered relationship inference...")
+        
+        # Small delay to ensure file system sync (Windows buffering)
+        await asyncio.sleep(1)
+        
+        # Verify GraphML exists before processing
+        graphml_path = Path(global_args.working_dir) / "graph_chunk_entity_relation.graphml"
+        if graphml_path.exists() and graphml_path.stat().st_size > 0:
+            # Run inference using modular inference engine
+            inference_result = await post_process_knowledge_graph(global_args.working_dir, llm_func)
+            relationships_inferred = inference_result.get("total_relationships_added", 0)
+            logger.info(f"✅ INTEGRATED: {relationships_inferred} relationships inferred")
+        else:
+            logger.warning(f"⚠️ GraphML file never populated, skipping relationship inference")
+    elif not enable_post_processing:
+        logger.info(f"ℹ️ Post-processing disabled (ENABLE_POST_PROCESSING=false)")
+    else:
+        logger.info(f"ℹ️ No LLM function provided, skipping relationship inference")
+    
     return {
         "path": "Generic RAG",
         "confidence": ucf_result.confidence if ucf_result else 0.0,
-        "sections": 0
+        "sections": 0,
+        "relationships_inferred": relationships_inferred
     }
 
 
@@ -143,10 +158,10 @@ async def post_process_knowledge_graph(rag_storage_path: str, llm_func) -> dict:
     ARCHITECTURE: Replaces brittle regex patterns with LLM semantic understanding.
     
     Timeline:
-    - t=0-70s: LightRAG extraction (18 entity types + initial relationships)
+    - t=0-70s: LightRAG extraction (16 entity types + initial relationships)
     - t=70s: Knowledge graph files written (GraphML, kv_store files)
     - t=70-85s: This function runs (LLM-powered relationship inference)
-    - t=85s: Knowledge graph files UPDATED (100% annex linkage, comprehensive coverage)
+    - t=85s: Knowledge graph files UPDATED (100% document linkage, comprehensive coverage)
     
     Processing Pipeline:
     1. Parse GraphML (full entity details from multimodal extraction)
@@ -160,17 +175,16 @@ async def post_process_knowledge_graph(rag_storage_path: str, llm_func) -> dict:
     - Agency-agnostic: Handles ANY RFP structure (Navy, Air Force, Army, civilian agencies)
     - Context-aware: Understands content semantics, not just naming patterns
     - Self-documenting: LLM provides human-readable reasoning for each relationship
-    - Higher coverage: 84.6% → 100% annex linkage expected
-    - Cost-effective: ~$0.05 per document (8 LLM batches × ~$0.006/batch)
+    - Higher coverage: 100% document linkage for attachments, specs, regulations
+    - Cost-effective: ~$0.03 per document (5 LLM batches × ~$0.006/batch)
     - Leverages existing 2M-context Grok infrastructure
     
-    Relationship Types Inferred (6 algorithms):
+    Relationship Types Inferred (5 algorithms):
     1. Section L↔M mapping: SUBMISSION_INSTRUCTION ↔ EVALUATION_FACTOR
-    2. Document hierarchy: CHILD_OF relationships (J-02000000-10 → J-02000000)
-    3. Attachment section linking: ANNEX → SECTION (ATTACHMENT_OF)
+    2. Document section linking: DOCUMENT → SECTION (ATTACHMENT_OF/CHILD_OF)
+    3. SOW deliverable linking: STATEMENT_OF_WORK → DELIVERABLE (REQUIRES)
     4. Clause clustering: CLAUSE → SECTION (CHILD_OF)
     5. Requirement evaluation: REQUIREMENT → EVALUATION_FACTOR (EVALUATED_BY)
-    6. Semantic concept linking: Win themes, pain points, strategic relationships
     
     Args:
         rag_storage_path: Path to rag_storage directory
@@ -232,7 +246,7 @@ async def post_process_knowledge_graph(rag_storage_path: str, llm_func) -> dict:
         logger.info(f"🎯 SEMANTIC POST-PROCESSING COMPLETE")
         logger.info(f"  Total new relationships: {len(new_relationships)}")
         logger.info(f"  Method: Grok LLM semantic understanding")
-        logger.info(f"  Cost: ~$0.03 (6 inference algorithms)")
+        logger.info(f"  Cost: ~$0.03 (5 inference algorithms)")
         logger.info(f"  Processing time: ~15 seconds")
         logger.info("=" * 80)
         
@@ -282,19 +296,14 @@ def create_insert_endpoint(app, rag_instance):
             
             logger.info(f"📄 Processing {file.filename} via WebUI /insert endpoint")
             
-            # Dual-path processing: UCF detection → section-aware OR standard extraction
-            processing_result = await process_document_with_ucf_detection(tmp_path, file.filename, rag_instance)
-            
-            logger.info(f"✅ LightRAG extraction complete for {file.filename}")
-            logger.info(f"   Path: {processing_result['path']}, Confidence: {processing_result['confidence']:.2f}")
-            
-            # Semantic post-processing: LLM-powered relationship inference
-            logger.info(f"🤖 SEMANTIC POST-PROCESSING: Inferring relationships...")
-            logger.info(f"   Using LLM semantic understanding for 6 inference algorithms")
-            post_process_result = await post_process_knowledge_graph(
-                global_args.working_dir,
-                rag_instance.llm_model_func
+            # Integrated processing: Entity extraction + relationship inference in one pipeline
+            processing_result = await process_document_with_ucf_detection(
+                tmp_path, file.filename, rag_instance, rag_instance.llm_model_func
             )
+            
+            logger.info(f"✅ INTEGRATED processing complete for {file.filename}")
+            logger.info(f"   Path: {processing_result['path']}, Confidence: {processing_result['confidence']:.2f}")
+            logger.info(f"   Relationships inferred: {processing_result['relationships_inferred']}")
             
             # Clean up temp file
             os.unlink(tmp_path)
@@ -305,8 +314,8 @@ def create_insert_endpoint(app, rag_instance):
                 "processing_path": processing_result["path"],
                 "ucf_confidence": processing_result["confidence"],
                 "ucf_sections": processing_result["sections"],
-                "relationships_inferred": post_process_result.get("total_relationships_added", 0),
-                "method": "Dual-path (UCF/Generic RAG) + LLM semantic inference"
+                "relationships_inferred": processing_result["relationships_inferred"],
+                "method": "Integrated (RAG-Anything + LLM semantic inference)"
             })
             
         except Exception as e:
@@ -341,19 +350,14 @@ def create_documents_upload_endpoint(app, rag_instance):
             logger.info(f"📄 Processing {file.filename} via WebUI /documents/upload endpoint")
             logger.info(f"   🔧 Routing through RAG-Anything for MinerU multimodal parsing...")
             
-            # Dual-path processing: UCF detection → section-aware OR standard extraction
-            processing_result = await process_document_with_ucf_detection(tmp_path, file.filename, rag_instance)
-            
-            logger.info(f"✅ RAG-Anything processing complete for {file.filename}")
-            logger.info(f"   Path: {processing_result['path']}, Confidence: {processing_result['confidence']:.2f}")
-            
-            # Semantic post-processing: LLM-powered relationship inference
-            logger.info(f"🤖 SEMANTIC POST-PROCESSING: Inferring relationships...")
-            logger.info(f"   Using LLM semantic understanding for 6 inference algorithms")
-            post_process_result = await post_process_knowledge_graph(
-                global_args.working_dir,
-                rag_instance.llm_model_func
+            # Integrated processing: Entity extraction + relationship inference in one pipeline
+            processing_result = await process_document_with_ucf_detection(
+                tmp_path, file.filename, rag_instance, rag_instance.llm_model_func
             )
+            
+            logger.info(f"✅ INTEGRATED processing complete for {file.filename}")
+            logger.info(f"   Path: {processing_result['path']}, Confidence: {processing_result['confidence']:.2f}")
+            logger.info(f"   Relationships inferred: {processing_result['relationships_inferred']}")
             
             # Clean up temp file
             os.unlink(tmp_path)
@@ -364,8 +368,8 @@ def create_documents_upload_endpoint(app, rag_instance):
                 "processing_path": processing_result["path"],
                 "ucf_confidence": processing_result["confidence"],
                 "ucf_sections": processing_result["sections"],
-                "relationships_inferred": post_process_result.get("total_relationships_added", 0),
-                "method": "RAG-Anything (MinerU multimodal) + LLM semantic inference"
+                "relationships_inferred": processing_result["relationships_inferred"],
+                "method": "Integrated (RAG-Anything + LLM semantic inference)"
             })
             
         except Exception as e:

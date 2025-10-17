@@ -3,7 +3,7 @@ RAG-Anything Server with LightRAG WebUI
 Multimodal RAG system for government contracting documents
 
 Architecture:
-- src/server/config.py: Configuration (18 entity types, API credentials, chunking)
+- src/server/config.py: Configuration (16 entity types, API credentials, chunking)
 - src/server/initialization.py: RAGAnything initialization (custom prompts, LLM wrappers)
 - src/server/routes.py: FastAPI endpoints + semantic post-processing
 - This file: Main entry point + server orchestration
@@ -11,18 +11,22 @@ Architecture:
 Workflow:
 1. Document Upload → /insert endpoint → UCF detection
 2. Dual-Path Processing → Section-aware OR standard extraction
-3. LightRAG Extraction → 18 entity types + relationships
-4. Semantic Post-Processing → 6 LLM inference algorithms
+3. LightRAG Extraction → 16 entity types + relationships
+4. Semantic Post-Processing → 5 LLM inference algorithms
 5. Knowledge Graph Updated → GraphML + kv_store files
 """
 
+# CRITICAL: Load .env BEFORE any imports that might import LightRAG
+# LightRAG's dataclass field defaults evaluate os.getenv() at import time:
+#   chunk_token_size: int = field(default=int(os.getenv("CHUNK_SIZE", 1200)))
+# If .env isn't loaded first, it uses the hardcoded 1200 default
 import os
+from dotenv import load_dotenv
+load_dotenv()
+
+# Now safe to import modules that may import LightRAG
 import asyncio
 import logging
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
 
 # Suppress verbose logging from libraries
 logging.getLogger("raganything").setLevel(logging.WARNING)
@@ -34,10 +38,10 @@ from lightrag.api.lightrag_server import create_app
 from lightrag.api.config import global_args
 import uvicorn
 
-# Import modular components
+# Import modular components (AFTER load_dotenv() so they see environment variables)
 from src.server.config import configure_raganything_args
 from src.server.initialization import initialize_raganything, get_rag_instance
-from src.server.routes import create_insert_endpoint, create_documents_upload_endpoint, semantic_post_processor_monitor
+from src.server.routes import create_insert_endpoint, create_documents_upload_endpoint
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -97,15 +101,12 @@ async def main():
     create_insert_endpoint(app, rag_instance)
     create_documents_upload_endpoint(app, rag_instance)
     
-    # Step 5: Start background monitoring task for semantic post-processing
-    asyncio.create_task(semantic_post_processor_monitor(rag_instance))
-    
     # Print concise startup info
     print(f"\n✅ Server Ready:")
     print(f"   WebUI: http://{host}:{port}/")
     print(f"   API Docs: http://{host}:{port}/docs")
     print(f"   Features: Multimodal extraction + semantic post-processing")
-    print(f"   Background monitor: Active (auto-processes uploads)\n")
+    print(f"   Background monitor: Removed (synchronous post-processing)\n")
     
     # Step 6: Start server
     config = uvicorn.Config(app=app, host=host, port=port, log_level="info")

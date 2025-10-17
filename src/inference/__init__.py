@@ -4,9 +4,9 @@ Relationship Inference Module
 LLM-powered semantic relationship inference for knowledge graphs.
 Implements 5 core algorithms for government contracting RFPs:
 
-1. Document Hierarchy: ANNEX/CLAUSE → SECTION (CHILD_OF)
+1. Document Hierarchy: DOCUMENT/CLAUSE → SECTION (CHILD_OF)
 2. Section L↔M Mapping: SUBMISSION_INSTRUCTION → EVALUATION_FACTOR (GUIDES)
-3. Attachment Section Linking: ANNEX → SECTION (ATTACHMENT_OF)
+3. Document Section Linking: DOCUMENT → SECTION (ATTACHMENT_OF)
 4. Clause Clustering: CLAUSE → SECTION (CHILD_OF)
 5. Requirement Evaluation: REQUIREMENT → EVALUATION_FACTOR (EVALUATED_BY)
 

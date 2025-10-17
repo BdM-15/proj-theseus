@@ -91,9 +91,63 @@ Found 12 missing hierarchical relationships:
     Confidence: 0.95
 ```
 
-### 3. `all`
+### 3. `corruption` ⚠️ **EXPERIMENTAL - Branch 005**
 
-Runs all patterns sequentially.
+**Finds**: Entity type corruption from LLM reasoning artifacts
+
+**Corruption Patterns**:
+
+- Prefix corruption: `#>|LOCATION`, `#|PROGRAM`
+- Lowercase corruption: `evaluation_factor` → `EVALUATION_FACTOR`
+- Invalid types: Non-existent entity types
+
+**Baseline**: 2.2% corruption rate (13/594 entities in Navy MBOS)
+
+**Fixes**:
+
+- High confidence (≥0.80): Auto-fix by stripping prefixes, uppercasing
+- Low confidence (<0.80): Flag for manual review
+
+**Example Output**:
+
+```
+Found 13 corrupted entity types:
+  - High confidence (auto-fixable): 10
+  - Low confidence (manual review):  3
+
+HIGH CONFIDENCE FIXES (auto-fixable):
+
+  • San Diego Naval Base (LOCATION)
+    Corrupted: #>|LOCATION
+    Expected:  LOCATION
+    Pattern:   prefix_corruption
+    Confidence: 0.95
+
+  • Factor D: Past Performance (EVALUATION_FACTOR)
+    Corrupted: #>|evaluation_factor
+    Expected:  EVALUATION_FACTOR
+    Pattern:   lowercase_corruption
+    Confidence: 0.90
+```
+
+**⚠️ CRITICAL WARNINGS**:
+
+- **NOT included in 'all' pattern** (must explicitly specify)
+- **Test on dedicated branch first** before applying to production
+- **Backup your graph** before running with `--apply`
+- **Only auto-fixes high-confidence patterns** (≥0.80 confidence)
+- **Low-confidence items require manual review** via Web UI (but see limitations below)
+
+**Why This Pattern Exists**:
+
+- Web UI limitations: Cannot edit `entity_type` field directly
+- Web UI node limit: Only shows 1000 nodes at a time (unusable for 4000+ node graphs)
+- Manual cleanup infeasible: Would require editing each entity in JSON files
+- Root cause: Grok-4-fast-reasoning chain-of-thought artifacts bleeding into structured output
+
+### 4. `all`
+
+Runs all patterns sequentially **EXCEPT `corruption`** (for safety).
 
 ---
 
@@ -101,7 +155,7 @@ Runs all patterns sequentially.
 
 ```bash
 python graph_node_edits/auto_bulk/bulk_graph_fixes.py \
-  --pattern <pattern>      # Required: isolated_nodes | missing_hierarchy | all
+  --pattern <pattern>      # Required: isolated_nodes | missing_hierarchy | corruption | all
   --apply                  # Apply fixes (default is dry-run)
   --dry-run               # Preview only (default)
   --working-dir <path>    # Custom RAG storage (default: ./rag_storage)
@@ -124,6 +178,12 @@ python graph_node_edits/auto_bulk/bulk_graph_fixes.py --pattern all --apply
 
 # Use custom working directory
 python graph_node_edits/auto_bulk/bulk_graph_fixes.py --pattern all --dry-run --working-dir ./custom_rag
+
+# Check for entity type corruption (Branch 005 - DO NOT apply without dedicated branch!)
+python graph_node_edits/auto_bulk/bulk_graph_fixes.py --pattern corruption --dry-run
+
+# Apply corruption fixes (WARNING: Test on dedicated branch first!)
+python graph_node_edits/auto_bulk/bulk_graph_fixes.py --pattern corruption --apply
 ```
 
 ---

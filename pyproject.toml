@@ -18,10 +18,9 @@ dependencies = [
     # Configuration management
     "python-dotenv>=1.0.0",
     
-<<<<<<< HEAD
     # Authentication (required by lightrag-hku API server)
     "PyJWT>=2.10.0",
-=======
+    
     # ============================================================================
     # GPU Acceleration for MinerU (CRITICAL for performance)
     # ============================================================================
@@ -40,7 +39,6 @@ dependencies = [
     # dependencies in raganything[all] will install CPU versions. You MUST manually
     # reinstall with --index-url flag for GPU support.
     # ============================================================================
->>>>>>> 004-code-optimization
 ]
 
 # Note: raganything[all] bundles the following dependencies:

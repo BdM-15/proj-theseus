@@ -665,10 +665,54 @@ CREATE TABLE training_examples (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Track entity extraction corruption patterns (Branch 005)
+CREATE TABLE entity_corruption_tracking (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    workspace TEXT NOT NULL REFERENCES rfp_workspaces(workspace_name) ON DELETE RESTRICT,
+    document_id TEXT NOT NULL,
+    chunk_id TEXT,
+    entity_name TEXT NOT NULL,
+    corruption_pattern TEXT NOT NULL,    -- e.g., "#>|LOCATION", "#|PROGRAM", "#>|evaluation_factor"
+    detected_type TEXT,                  -- What the corrupted entity_type was
+    expected_type TEXT,                  -- What it should be (if known)
+    original_value TEXT NOT NULL,        -- Full entity extraction string
+    corrected_value TEXT,                -- After manual cleanup
+    detected_at TIMESTAMPTZ DEFAULT NOW(),
+    corrected_at TIMESTAMPTZ,
+    corrected_by TEXT,
+    correction_method TEXT,              -- 'manual', 'automated', 'validation_filter'
+    notes TEXT,
+
+    -- Metadata for tracking LLM behavior
+    llm_model TEXT,                      -- e.g., "grok-4-fast-reasoning"
+    prompt_version TEXT,                 -- Track which prompt caused corruption
+    reasoning_artifacts TEXT             -- Chain-of-thought bleed-through
+);
+
+-- Corruption pattern statistics (for monitoring trends)
+CREATE TABLE corruption_statistics (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    workspace TEXT NOT NULL REFERENCES rfp_workspaces(workspace_name) ON DELETE RESTRICT,
+    document_id TEXT NOT NULL,
+    processing_date DATE NOT NULL,
+    total_entities INT NOT NULL,
+    corrupted_entities INT NOT NULL,
+    corruption_rate DECIMAL(5,2),        -- e.g., 2.2%
+    pattern_breakdown JSONB,             -- {"#>|TYPE": 10, "#|TYPE": 2, "lowercase": 1}
+    llm_model TEXT,
+    prompt_version TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Index for fast queries
 CREATE INDEX idx_corrections_workspace ON user_corrections(workspace);
 CREATE INDEX idx_corrections_type ON user_corrections(correction_type);
 CREATE INDEX idx_training_quality ON training_examples(quality_score DESC);
+CREATE INDEX idx_corruption_workspace ON entity_corruption_tracking(workspace);
+CREATE INDEX idx_corruption_pattern ON entity_corruption_tracking(corruption_pattern);
+CREATE INDEX idx_corruption_detected_at ON entity_corruption_tracking(detected_at DESC);
+CREATE INDEX idx_corruption_stats_date ON corruption_statistics(processing_date DESC);
+CREATE INDEX idx_corruption_stats_workspace ON corruption_statistics(workspace);
 ```
 
 ### API Endpoints for Corrections
@@ -797,7 +841,7 @@ CREATE TABLE rfp_workspaces (
 -- User corrections (training data)
 CREATE TABLE user_corrections (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    workspace TEXT REFERENCES rfp_workspaces(workspace_name),
+    workspace TEXT REFERENCES rfp_workspaces(workspace_name) ON DELETE RESTRICT,
     entity_id TEXT,
     original_extraction JSONB,
     corrected_extraction JSONB,
@@ -815,7 +859,7 @@ CREATE TABLE training_examples (
     entity_types TEXT[],
     user_corrected BOOLEAN DEFAULT FALSE,
     quality_score DECIMAL(3,2),
-    source_workspace TEXT REFERENCES rfp_workspaces(workspace_name),
+    source_workspace TEXT REFERENCES rfp_workspaces(workspace_name) ON DELETE RESTRICT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

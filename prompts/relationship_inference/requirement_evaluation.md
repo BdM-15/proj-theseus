@@ -87,11 +87,12 @@ EVALUATION_FACTOR: "Management Approach" (weight: 30%)
 ```
 Section M: Evaluation Factor 2 - Technical Approach (40%)
 
-Section C: The contractor shall implement a cybersecurity framework
-compliant with NIST 800-171.
+The contractor shall implement a cybersecurity framework compliant with NIST 800-171.
+(Note: This requirement could appear in Section C, attachments, or Section H)
 ```
 
-**Proximity**: Cybersecurity requirement discussed near Technical Approach factor
+**Proximity**: Cybersecurity requirement discussed near Technical Approach factor  
+**Location-agnostic**: Works regardless of where requirement appears in RFP
 
 **Extraction**:
 
@@ -258,7 +259,7 @@ For each requirement, determine which evaluation factor(s) will score it based o
 
 3. CONTENT PROXIMITY (Confidence 0.70):
    - Requirement discussed near factor in document
-   - Section C requirement referenced in Section M factor
+   - Works regardless of requirement location (Section C, attachments, Section H)
 
 4. EXPLICIT CROSS-REFERENCE (Confidence 0.95):
    - "see Section M, Factor 3"

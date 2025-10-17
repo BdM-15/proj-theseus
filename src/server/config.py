@@ -5,13 +5,18 @@ Configures global_args for LightRAG server with government contracting ontology.
 Uses xAI Grok for LLM and OpenAI for embeddings.
 """
 
+# CRITICAL: Load .env BEFORE importing LightRAG modules
+# LightRAG's chunk_token_size default: int(os.getenv("CHUNK_SIZE", 1200))
+# Must set environment variables before LightRAG classes are defined
 import os
-import logging
 from dotenv import load_dotenv
+load_dotenv()
+
+# Now safe to import LightRAG
+import logging
 from lightrag.api.config import global_args
 from lightrag.operate import chunking_by_token_size
 
-load_dotenv()
 logger = logging.getLogger(__name__)
 
 
@@ -49,7 +54,7 @@ def configure_raganything_args():
     global_args.embedding_api_key = openai_api_key
     global_args.embedding_dim = 3072  # CRITICAL: text-embedding-3-large dimension
     
-    # Government contracting entity types (18 specialized types)
+    # Government contracting entity types (16 specialized types - consolidated for flexibility)
     # Semantic-first detection: Content determines entity type, not section labels
     global_args.entity_types = [
         # Core entities
@@ -66,34 +71,33 @@ def configure_raganything_args():
         # Structural entities
         "CLAUSE",                   # FAR/DFARS/AFFARS patterns, will cluster by parent section
         "SECTION",                  # Stores both structural_label + semantic_type
-        "DOCUMENT",
+        "DOCUMENT",                 # References: specs, standards, manuals, regulations, attachments, annexes
         "DELIVERABLE",
-        "ANNEX",                    # NEW: Numbered attachments (J-######, Attachment #, Annex ##)
         
-        # Hierarchical program entities (NEW: Top-level containers)
-        "PROGRAM",                  # Major named programs/initiatives (MCPP II, Navy MBOS, DEIP) - NOT generic concepts, must be a proper named program with scope/budget/timeline
+        # Hierarchical program entities
+        "PROGRAM",                  # Major named programs/initiatives (MCPP II, Navy MBOS, DEIP)
         
         # Physical assets and equipment
         "EQUIPMENT",                # Physical assets: MHE, generators, batteries, GSE, CESE, watercraft, vehicles
         
-        # Legal and regulatory citations
-        "REGULATION",               # Legal citations: Public Law, USC, CFR, Executive Orders, DFARS/FAR references
-        
         # Evaluation entities (semantic detection, may be embedded in non-standard sections)
         "EVALUATION_FACTOR",        # Scoring criteria (Section M content)
-        "SUBMISSION_INSTRUCTION",   # NEW: Format/page limits (Section L content, may be IN Section M)
+        "SUBMISSION_INSTRUCTION",   # Format/page limits (Section L content, may be IN Section M)
         
-        # Strategic entities (NEW: Capture planning patterns)
+        # Strategic entities (Capture planning patterns)
         "STRATEGIC_THEME",          # Win themes, hot buttons, discriminators, proof points
         
-        # Work scope (NEW: Semantic detection regardless of location)
+        # Work scope (Semantic detection regardless of location)
         "STATEMENT_OF_WORK",        # PWS/SOW/SOO content (may be Section C or attachment)
     ]
     
-    # Chunking configuration (cloud-optimized for 2M context window)
+    # Chunking configuration (leverages Grok-4's 2M context window)
+    # CHUNK_SIZE: Document chunking for BOTH LLM entity extraction and embeddings
+    # - LLM processes full 50K chunks (utilizing Grok-4's massive context)
+    # - Embeddings auto-truncate to 8192 via EmbeddingFunc.max_token_size
     global_args.chunking_func = chunking_by_token_size
-    global_args.chunk_token_size = int(os.getenv("CHUNK_SIZE", "2048"))
-    global_args.chunk_overlap_token_size = int(os.getenv("CHUNK_OVERLAP_SIZE", "256"))
+    global_args.chunk_token_size = int(os.getenv("CHUNK_SIZE", "50000"))
+    global_args.chunk_overlap_token_size = int(os.getenv("CHUNK_OVERLAP_SIZE", "1000"))
     
     # Multimodal support
     global_args.enable_multimodal = True
@@ -102,8 +106,10 @@ def configure_raganything_args():
     logger.info("⚙️  CONFIGURATION SUMMARY")
     logger.info("=" * 80)
     logger.info(f"  LLM: grok-4-fast-reasoning (2M context)")
-    logger.info(f"  Embeddings: text-embedding-3-large (3072-dim)")
+    logger.info(f"  Embeddings: text-embedding-3-large (3072-dim, auto-truncate at 8192 tokens)")
     logger.info(f"  Chunking: {global_args.chunk_token_size} tokens (overlap: {global_args.chunk_overlap_token_size})")
+    logger.info(f"  → LLM processes full {global_args.chunk_token_size}-token chunks")
+    logger.info(f"  → Embeddings auto-truncate via EmbeddingFunc.max_token_size=8192")
     logger.info(f"  Concurrency: {os.getenv('MAX_ASYNC', '32')} parallel LLM requests")
     logger.info(f"  Entity Types: {len(global_args.entity_types)} specialized govcon types")
     logger.info(f"  Semantic Inference: 6 algorithms (L↔M, hierarchy, attachments, clauses, requirements, concepts)")
