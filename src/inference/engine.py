@@ -228,10 +228,10 @@ async def infer_all_relationships(
         )
         all_new_relationships.extend(clause_section_rels)
     
-    # Algorithm 3: SUBMISSION_INSTRUCTION ↔ EVALUATION_FACTOR (Section L↔M Mapping)
+    # Algorithm 3: SUBMISSION_INSTRUCTION ↔ EVALUATION_FACTOR (Instruction-Evaluation Linking)
     if 'submission_instruction' in grouped and 'evaluation_factor' in grouped:
-        logger.info(f"\n  [3/5] Section L↔M Mapping: SUBMISSION_INSTRUCTION ↔ EVALUATION_FACTOR...")
-        relationship_context = load_prompt("relationship_inference/section_l_m_mapping")
+        logger.info(f"\n  [3/5] Instruction-Evaluation Linking: SUBMISSION_INSTRUCTION ↔ EVALUATION_FACTOR...")
+        relationship_context = load_prompt("relationship_inference/instruction_evaluation_linking")
         instruction_factor_rels = await infer_relationships_batch(
             source_entities=grouped['submission_instruction'],
             target_entities=grouped['evaluation_factor'],

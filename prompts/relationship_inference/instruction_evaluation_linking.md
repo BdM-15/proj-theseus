@@ -1,8 +1,18 @@
-# Section L↔M Linking Rules
+# Submission Instructions ↔ Evaluation Criteria Linking
 
-**Purpose**: Infer relationships between submission instructions (Section L) and evaluation factors (Section M)  
-**Why This Matters**: Proposal managers need to know which page limits affect which evaluation factors  
-**Method**: LLM-powered semantic inference (replaces brittle regex patterns)
+**Purpose**: Link submission instructions to their corresponding evaluation factors/criteria  
+**Entity Types**: SUBMISSION_INSTRUCTION --GUIDES--> EVALUATION_FACTOR  
+**Why This Matters**: Proposal teams need to know which format requirements (page limits, volumes, fonts)
+apply to which evaluation factors to optimize compliance and scoring.
+
+**Common Locations**:
+
+- **Federal UCF**: Instructions in Section L, Evaluation in Section M
+- **Task Orders**: "Proposal Instructions" → "Selection Criteria"
+- **Quotes**: "Response Format" → "Award Methodology"
+- **Embedded**: Instructions within evaluation factor descriptions
+
+**Method**: LLM-powered semantic inference (format-agnostic, works across all RFP structures)
 
 ---
 
