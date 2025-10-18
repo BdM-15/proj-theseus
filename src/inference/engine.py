@@ -130,36 +130,33 @@ async def infer_relationships_batch(
             logger.warning(f"  ⚠️ LLM returned non-list: {type(relationships)}")
             return []
         
-        # Filter by confidence threshold and normalize structure
+        # Filter by confidence threshold and validate structure
         filtered_rels = []
-        for r in relationships:
-            # Validate required keys (handle variations in key names)
-            source_id = r.get('source_id') or r.get('source') or r.get('src')
-            target_id = r.get('target_id') or r.get('target') or r.get('tgt')
-            rel_type = r.get('relationship_type') or r.get('type') or r.get('relation')
+        for i, r in enumerate(relationships):
+            # Strict validation - LLM must follow prompt format exactly
+            required_keys = {'source_id', 'target_id', 'relationship_type', 'confidence'}
+            missing_keys = required_keys - set(r.keys())
             
-            if not source_id or not target_id or not rel_type:
-                logger.warning(f"  ⚠️ Skipping malformed relationship (missing keys): {list(r.keys())}")
+            if missing_keys:
+                logger.error(f"  ❌ Relationship {i+1} missing required keys: {missing_keys}")
+                logger.error(f"     Got keys: {list(r.keys())}")
+                logger.error(f"     Full relationship: {r}")
                 continue
             
-            confidence = r.get('confidence', 0)
-            # Handle string confidence values
+            confidence = r['confidence']
+            # Handle string confidence values (LLM sometimes returns "0.85" instead of 0.85)
             if isinstance(confidence, str):
                 try:
                     confidence = float(confidence)
                 except (ValueError, TypeError):
+                    logger.warning(f"  ⚠️ Invalid confidence value: {confidence}, defaulting to 0.0")
                     confidence = 0.0
             
             if confidence >= 0.3:
-                # Normalize to expected structure
-                normalized_rel = {
-                    'source_id': source_id,
-                    'target_id': target_id,
-                    'relationship_type': rel_type,
-                    'confidence': confidence,
-                    'reasoning': r.get('reasoning', 'No reasoning provided')
-                }
-                filtered_rels.append(normalized_rel)
+                # Ensure reasoning exists
+                r['reasoning'] = r.get('reasoning', 'No reasoning provided')
+                r['confidence'] = confidence  # Use normalized float value
+                filtered_rels.append(r)
         
         logger.info(f"    ✅ Inferred {len(filtered_rels)} relationships (filtered from {len(relationships)})")
         

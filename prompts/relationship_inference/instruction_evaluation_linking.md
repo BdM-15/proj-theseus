@@ -121,7 +121,7 @@ Use this prompt structure when calling LLM for instruction-evaluation inference:
 You are analyzing submission instructions and evaluation criteria/factors
 to determine which instructions guide which evaluation factors.
 
-NOTE: Instructions may be labeled as "Section L", "Proposal Instructions", 
+NOTE: Instructions may be labeled as "Section L", "Proposal Instructions",
 "Response Format", or embedded within factor descriptions depending on RFP structure.
 
 SUBMISSION INSTRUCTIONS:
