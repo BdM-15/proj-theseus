@@ -65,13 +65,17 @@ async def process_document_with_semantic_inference(
     """
     logger.info(f"📄 Processing {file_name}")
     logger.info(f"🔧 Using RAG-Anything + LLM semantic inference (format-agnostic)")
+    print(f"DEBUG: About to call process_document_complete_lightrag_api()...")
     
-    # Step 1: Multimodal extraction + entity extraction
-    await rag_instance.process_document_complete(
+    # Step 1: Multimodal extraction + entity extraction (using LightRAG API method)
+    await rag_instance.process_document_complete_lightrag_api(
         file_path=file_path,
         output_dir=global_args.working_dir,
         parse_method="auto"
     )
+    
+    print(f"DEBUG: process_document_complete_lightrag_api() returned successfully!")
+    print(f"DEBUG: Now checking for GraphML file...")
     
     # Step 2: ROBUST - Wait for GraphML with exponential backoff
     graphml_path = Path(global_args.working_dir) / "graph_chunk_entity_relation.graphml"
@@ -81,10 +85,16 @@ async def process_document_with_semantic_inference(
     
     for attempt, wait_time in enumerate(wait_times):
         await asyncio.sleep(wait_time)
+        print(f"DEBUG: Checking GraphML (attempt {attempt+1}/{max_retries})...")
+        print(f"DEBUG: Path: {graphml_path}")
+        print(f"DEBUG: Exists: {graphml_path.exists()}")
+        if graphml_path.exists():
+            print(f"DEBUG: Size: {graphml_path.stat().st_size} bytes")
         
         if graphml_path.exists() and graphml_path.stat().st_size > 100:
             total_wait = sum(wait_times[:attempt+1])
             logger.info(f"✅ GraphML ready after {total_wait}s total wait")
+            print(f"DEBUG: GraphML ready! Proceeding to semantic inference...")
             break
         
         logger.warning(
@@ -98,14 +108,17 @@ async def process_document_with_semantic_inference(
             f"❌ GraphML never populated after {total_wait}s total wait. "
             f"This indicates RAG-Anything processing failed."
         )
+        print(f"DEBUG: GraphML never appeared - returning early!")
         return {
             "relationships_inferred": 0,
             "error": "GraphML file not created"
         }
     
     # Step 3: Capture BEFORE state for validation
+    print(f"DEBUG: About to parse GraphML for BEFORE state...")
     nodes_before, edges_before = parse_graphml(graphml_path)
-    logger.info(f"� PRE-INFERENCE: {len(nodes_before)} entities, {len(edges_before)} relationships")
+    logger.info(f"📊 PRE-INFERENCE: {len(nodes_before)} entities, {len(edges_before)} relationships")
+    print(f"DEBUG: Parsed {len(nodes_before)} nodes, {len(edges_before)} edges BEFORE inference")
     
     # Step 4: Run LLM-powered relationship inference (ALWAYS - no toggle)
     if not llm_func:
@@ -275,6 +288,7 @@ def create_insert_endpoint(app, rag_instance):
         
         API clients use this endpoint directly.
         """
+        print(f"🔔🔔🔔 CUSTOM ENDPOINT CALLED: /insert with file: {file.filename}")
         logger.info(f"🔔 ENDPOINT CALLED: /insert with file: {file.filename}")
         try:
             # Save uploaded file to temp location
@@ -336,6 +350,7 @@ def create_documents_upload_endpoint(app, rag_instance):
         
         This is the endpoint the WebUI actually uses (discovered via server logs).
         """
+        print(f"🔔🔔🔔 CUSTOM ENDPOINT CALLED: /documents/upload with file: {file.filename}")
         logger.info(f"🔔 ENDPOINT CALLED: /documents/upload with file: {file.filename}")
         try:
             # Save uploaded file to temp location
@@ -344,11 +359,14 @@ def create_documents_upload_endpoint(app, rag_instance):
                 tmp_path = tmp.name
             
             logger.info(f"📄 Processing {file.filename} via WebUI /documents/upload endpoint")
+            print(f"DEBUG: About to call process_document_with_semantic_inference() with file: {tmp_path}")
             
             # Integrated processing: Entity extraction + relationship inference in one pipeline
             processing_result = await process_document_with_semantic_inference(
                 tmp_path, file.filename, rag_instance, rag_instance.llm_model_func
             )
+            
+            print(f"DEBUG: process_document_with_semantic_inference() returned: {processing_result}")
             
             logger.info(f"✅ Processing complete for {file.filename}")
             logger.info(f"   Relationships inferred: {processing_result['relationships_inferred']}")
