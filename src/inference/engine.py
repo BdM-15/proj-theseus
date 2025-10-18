@@ -130,9 +130,18 @@ async def infer_relationships_batch(
             logger.warning(f"  ⚠️ LLM returned non-list: {type(relationships)}")
             return []
         
-        # Filter by confidence threshold (handle both string and float)
+        # Filter by confidence threshold and normalize structure
         filtered_rels = []
         for r in relationships:
+            # Validate required keys (handle variations in key names)
+            source_id = r.get('source_id') or r.get('source') or r.get('src')
+            target_id = r.get('target_id') or r.get('target') or r.get('tgt')
+            rel_type = r.get('relationship_type') or r.get('type') or r.get('relation')
+            
+            if not source_id or not target_id or not rel_type:
+                logger.warning(f"  ⚠️ Skipping malformed relationship (missing keys): {list(r.keys())}")
+                continue
+            
             confidence = r.get('confidence', 0)
             # Handle string confidence values
             if isinstance(confidence, str):
@@ -140,8 +149,17 @@ async def infer_relationships_batch(
                     confidence = float(confidence)
                 except (ValueError, TypeError):
                     confidence = 0.0
+            
             if confidence >= 0.3:
-                filtered_rels.append(r)
+                # Normalize to expected structure
+                normalized_rel = {
+                    'source_id': source_id,
+                    'target_id': target_id,
+                    'relationship_type': rel_type,
+                    'confidence': confidence,
+                    'reasoning': r.get('reasoning', 'No reasoning provided')
+                }
+                filtered_rels.append(normalized_rel)
         
         logger.info(f"    ✅ Inferred {len(filtered_rels)} relationships (filtered from {len(relationships)})")
         
@@ -151,8 +169,15 @@ async def infer_relationships_batch(
         logger.error(f"  ❌ JSON parse error: {e}")
         logger.error(f"  Response preview: {response[:500]}")
         return []
+    except KeyError as e:
+        logger.error(f"  ❌ Missing required key in relationship: {e}")
+        logger.error(f"  Relationship keys: {list(relationships[0].keys()) if relationships else 'empty'}")
+        return []
     except Exception as e:
         logger.error(f"  ❌ Error in relationship inference: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return []
         return []
 
 
