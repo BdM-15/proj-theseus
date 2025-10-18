@@ -115,16 +115,19 @@ Section M.1: Technical Approach
 
 ## LLM Inference Prompt Template
 
-Use this prompt structure when calling LLM for L↔M inference:
+Use this prompt structure when calling LLM for instruction-evaluation inference:
 
 ```
-You are analyzing submission instructions (Section L) and evaluation factors (Section M)
-to determine which instructions guide which factors.
+You are analyzing submission instructions and evaluation criteria/factors
+to determine which instructions guide which evaluation factors.
 
-SUBMISSION INSTRUCTIONS (Section L):
+NOTE: Instructions may be labeled as "Section L", "Proposal Instructions", 
+"Response Format", or embedded within factor descriptions depending on RFP structure.
+
+SUBMISSION INSTRUCTIONS:
 {json_list_of_submission_instructions}
 
-EVALUATION FACTORS (Section M):
+EVALUATION CRITERIA/FACTORS:
 {json_list_of_evaluation_factors}
 
 TASK:
