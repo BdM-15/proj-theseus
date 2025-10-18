@@ -95,17 +95,17 @@ async def main():
         new_routes.append(route)
     app.router.routes = new_routes
     
-    # Endpoint override confirmation (removed verbose logging)
-    
     # Add our custom endpoints with RAG-Anything multimodal processing
     create_insert_endpoint(app, rag_instance)
     create_documents_upload_endpoint(app, rag_instance)
+    logger.info("✅ Custom endpoints registered: /insert, /documents/upload")
     
     # Print concise startup info
     print(f"\n✅ Server Ready:")
     print(f"   WebUI: http://{host}:{port}/")
     print(f"   API Docs: http://{host}:{port}/docs")
     print(f"   Features: Multimodal extraction + semantic post-processing")
+    print(f"   Custom endpoints: /insert, /documents/upload (17 entity types)")
     print(f"   Background monitor: Removed (synchronous post-processing)\n")
     
     # Step 6: Start server

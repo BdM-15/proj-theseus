@@ -267,7 +267,6 @@ def create_insert_endpoint(app, rag_instance):
         app: FastAPI application instance
         rag_instance: Initialized RAGAnything instance
     """
-    @app.post("/insert")
     async def insert_with_semantic_processing(file: UploadFile = File(...)):
         """
         Standard LightRAG insert endpoint with semantic post-processing
@@ -303,6 +302,14 @@ def create_insert_endpoint(app, rag_instance):
         except Exception as e:
             logger.error(f"❌ Error processing document: {e}")
             return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+    
+    # Register the route explicitly (decorator doesn't work when called after app init)
+    app.add_api_route(
+        "/insert",
+        insert_with_semantic_processing,
+        methods=["POST"],
+        response_class=JSONResponse
+    )
 
 
 def create_documents_upload_endpoint(app, rag_instance):
@@ -316,7 +323,6 @@ def create_documents_upload_endpoint(app, rag_instance):
         app: FastAPI application instance
         rag_instance: Initialized RAGAnything instance
     """
-    @app.post("/documents/upload")
     async def documents_upload_with_raganything(file: UploadFile = File(...)):
         """
         WebUI document upload endpoint - routes through RAG-Anything for MinerU processing
@@ -354,3 +360,11 @@ def create_documents_upload_endpoint(app, rag_instance):
             import traceback
             logger.error(traceback.format_exc())
             return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+    
+    # Register the route explicitly (decorator doesn't work when called after app init)
+    app.add_api_route(
+        "/documents/upload",
+        documents_upload_with_raganything,
+        methods=["POST"],
+        response_class=JSONResponse
+    )
