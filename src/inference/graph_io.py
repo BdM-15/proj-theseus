@@ -146,7 +146,11 @@ def save_relationships_to_graphml(
     
     # Add new edges (using proper GraphML namespace - match LightRAG's ns0: prefix)
     graphml_ns = 'http://graphml.graphdrawing.org/xmlns'
-    ET.register_namespace('ns0', graphml_ns)  # Register as ns0: to match LightRAG
+    try:
+        ET.register_namespace('ns0', graphml_ns)  # Register as ns0: to match LightRAG
+    except ValueError:
+        # Namespace already registered (happens if file was parsed earlier in same process)
+        pass
     
     for rel in new_relationships:
         source_id = rel['source_id']
