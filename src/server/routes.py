@@ -273,6 +273,7 @@ def create_insert_endpoint(app, rag_instance):
         
         API clients use this endpoint directly.
         """
+        logger.info(f"🔔 ENDPOINT CALLED: /insert with file: {file.filename}")
         try:
             # Save uploaded file to temp location
             with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as tmp:
@@ -329,6 +330,7 @@ def create_documents_upload_endpoint(app, rag_instance):
         
         This is the endpoint the WebUI actually uses (discovered via server logs).
         """
+        logger.info(f"🔔 ENDPOINT CALLED: /documents/upload with file: {file.filename}")
         try:
             # Save uploaded file to temp location
             with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as tmp:

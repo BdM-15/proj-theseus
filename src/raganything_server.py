@@ -98,7 +98,14 @@ async def main():
     # Add our custom endpoints with RAG-Anything multimodal processing
     create_insert_endpoint(app, rag_instance)
     create_documents_upload_endpoint(app, rag_instance)
-    logger.info("✅ Custom endpoints registered: /insert, /documents/upload")
+    
+    # Debug: List all registered routes
+    post_routes = []
+    for route in app.router.routes:
+        if hasattr(route, 'path') and hasattr(route, 'methods') and 'POST' in route.methods:
+            post_routes.append(route.path)
+    logger.info(f"✅ Custom endpoints registered: /insert, /documents/upload")
+    logger.info(f"🔍 All POST routes: {post_routes}")
     
     # Print concise startup info
     print(f"\n✅ Server Ready:")
