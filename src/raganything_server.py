@@ -96,14 +96,21 @@ async def main():
     app.router.routes = new_routes
     
     # Add our custom endpoints with RAG-Anything multimodal processing
+    print("DEBUG: About to call create_insert_endpoint()...")
     create_insert_endpoint(app, rag_instance)
+    print("DEBUG: create_insert_endpoint() completed")
+    
+    print("DEBUG: About to call create_documents_upload_endpoint()...")
     create_documents_upload_endpoint(app, rag_instance)
+    print("DEBUG: create_documents_upload_endpoint() completed")
     
     # Debug: List all registered routes
+    print("DEBUG: Checking app.router.routes...")
     post_routes = []
     for route in app.router.routes:
         if hasattr(route, 'path') and hasattr(route, 'methods') and 'POST' in route.methods:
             post_routes.append(route.path)
+    print(f"DEBUG: Found POST routes: {post_routes}")
     logger.info(f"✅ Custom endpoints registered: /insert, /documents/upload")
     logger.info(f"🔍 All POST routes: {post_routes}")
     

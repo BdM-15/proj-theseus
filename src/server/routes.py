@@ -267,6 +267,8 @@ def create_insert_endpoint(app, rag_instance):
         app: FastAPI application instance
         rag_instance: Initialized RAGAnything instance
     """
+    print("DEBUG: Inside create_insert_endpoint(), about to define async function...")
+    
     async def insert_with_semantic_processing(file: UploadFile = File(...)):
         """
         Standard LightRAG insert endpoint with semantic post-processing
@@ -305,12 +307,14 @@ def create_insert_endpoint(app, rag_instance):
             return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
     
     # Register the route explicitly (decorator doesn't work when called after app init)
+    print("DEBUG: About to call app.add_api_route() for /insert...")
     app.add_api_route(
         "/insert",
         insert_with_semantic_processing,
         methods=["POST"],
         response_class=JSONResponse
     )
+    print("DEBUG: app.add_api_route() for /insert completed successfully")
 
 
 def create_documents_upload_endpoint(app, rag_instance):
@@ -324,6 +328,8 @@ def create_documents_upload_endpoint(app, rag_instance):
         app: FastAPI application instance
         rag_instance: Initialized RAGAnything instance
     """
+    print("DEBUG: Inside create_documents_upload_endpoint(), about to define async function...")
+    
     async def documents_upload_with_raganything(file: UploadFile = File(...)):
         """
         WebUI document upload endpoint - routes through RAG-Anything for MinerU processing
@@ -364,9 +370,11 @@ def create_documents_upload_endpoint(app, rag_instance):
             return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
     
     # Register the route explicitly (decorator doesn't work when called after app init)
+    print("DEBUG: About to call app.add_api_route() for /documents/upload...")
     app.add_api_route(
         "/documents/upload",
         documents_upload_with_raganything,
         methods=["POST"],
         response_class=JSONResponse
     )
+    print("DEBUG: app.add_api_route() for /documents/upload completed successfully")
