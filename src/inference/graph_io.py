@@ -144,7 +144,10 @@ def save_relationships_to_graphml(
     
     next_edge_id = max_edge_id + 1
     
-    # Add new edges
+    # Add new edges (using proper GraphML namespace - match LightRAG's ns0: prefix)
+    graphml_ns = 'http://graphml.graphdrawing.org/xmlns'
+    ET.register_namespace('ns0', graphml_ns)  # Register as ns0: to match LightRAG
+    
     for rel in new_relationships:
         source_id = rel['source_id']
         target_id = rel['target_id']
@@ -152,27 +155,27 @@ def save_relationships_to_graphml(
         confidence = rel['confidence']
         reasoning = rel['reasoning']
         
-        # Create edge element
-        edge = ET.SubElement(graph, 'edge')
+        # Create edge element with namespace
+        edge = ET.SubElement(graph, f'{{{graphml_ns}}}edge')
         edge.set('id', f'e{next_edge_id}')
         edge.set('source', source_id)
         edge.set('target', target_id)
         
-        # Add edge data (d3=keywords, d4=weight, d5=description, d6=source_id)
-        keywords_data = ET.SubElement(edge, 'data')
-        keywords_data.set('key', 'd3')
-        keywords_data.text = rel_type
-        
-        weight_data = ET.SubElement(edge, 'data')
-        weight_data.set('key', 'd4')
+        # Add edge data (MATCH LightRAG schema: d6=weight, d7=description, d8=keywords, d9=source_id)
+        weight_data = ET.SubElement(edge, f'{{{graphml_ns}}}data')
+        weight_data.set('key', 'd6')
         weight_data.text = str(confidence)
         
-        description_data = ET.SubElement(edge, 'data')
-        description_data.set('key', 'd5')
+        description_data = ET.SubElement(edge, f'{{{graphml_ns}}}data')
+        description_data.set('key', 'd7')
         description_data.text = f"{reasoning} (LLM-inferred)"
         
-        source_data = ET.SubElement(edge, 'data')
-        source_data.set('key', 'd6')
+        keywords_data = ET.SubElement(edge, f'{{{graphml_ns}}}data')
+        keywords_data.set('key', 'd8')
+        keywords_data.text = rel_type
+        
+        source_data = ET.SubElement(edge, f'{{{graphml_ns}}}data')
+        source_data.set('key', 'd9')
         source_data.text = 'semantic_post_processing'
         
         next_edge_id += 1
