@@ -130,17 +130,32 @@ async def infer_relationships_batch(
             logger.warning(f"  ⚠️ LLM returned non-list: {type(relationships)}")
             return []
         
-        # Filter by confidence threshold (handle both string and float)
+        # Filter by confidence threshold and validate structure
         filtered_rels = []
-        for r in relationships:
-            confidence = r.get('confidence', 0)
-            # Handle string confidence values
+        for i, r in enumerate(relationships):
+            # Strict validation - LLM must follow prompt format exactly
+            required_keys = {'source_id', 'target_id', 'relationship_type', 'confidence'}
+            missing_keys = required_keys - set(r.keys())
+            
+            if missing_keys:
+                logger.error(f"  ❌ Relationship {i+1} missing required keys: {missing_keys}")
+                logger.error(f"     Got keys: {list(r.keys())}")
+                logger.error(f"     Full relationship: {r}")
+                continue
+            
+            confidence = r['confidence']
+            # Handle string confidence values (LLM sometimes returns "0.85" instead of 0.85)
             if isinstance(confidence, str):
                 try:
                     confidence = float(confidence)
                 except (ValueError, TypeError):
+                    logger.warning(f"  ⚠️ Invalid confidence value: {confidence}, defaulting to 0.0")
                     confidence = 0.0
+            
             if confidence >= 0.3:
+                # Ensure reasoning exists
+                r['reasoning'] = r.get('reasoning', 'No reasoning provided')
+                r['confidence'] = confidence  # Use normalized float value
                 filtered_rels.append(r)
         
         logger.info(f"    ✅ Inferred {len(filtered_rels)} relationships (filtered from {len(relationships)})")
@@ -151,8 +166,15 @@ async def infer_relationships_batch(
         logger.error(f"  ❌ JSON parse error: {e}")
         logger.error(f"  Response preview: {response[:500]}")
         return []
+    except KeyError as e:
+        logger.error(f"  ❌ Missing required key in relationship: {e}")
+        logger.error(f"  Relationship keys: {list(relationships[0].keys()) if relationships else 'empty'}")
+        return []
     except Exception as e:
         logger.error(f"  ❌ Error in relationship inference: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return []
         return []
 
 
@@ -228,10 +250,10 @@ async def infer_all_relationships(
         )
         all_new_relationships.extend(clause_section_rels)
     
-    # Algorithm 3: SUBMISSION_INSTRUCTION ↔ EVALUATION_FACTOR (Section L↔M Mapping)
+    # Algorithm 3: SUBMISSION_INSTRUCTION ↔ EVALUATION_FACTOR (Instruction-Evaluation Linking)
     if 'submission_instruction' in grouped and 'evaluation_factor' in grouped:
-        logger.info(f"\n  [3/5] Section L↔M Mapping: SUBMISSION_INSTRUCTION ↔ EVALUATION_FACTOR...")
-        relationship_context = load_prompt("relationship_inference/section_l_m_mapping")
+        logger.info(f"\n  [3/5] Instruction-Evaluation Linking: SUBMISSION_INSTRUCTION ↔ EVALUATION_FACTOR...")
+        relationship_context = load_prompt("relationship_inference/instruction_evaluation_linking")
         instruction_factor_rels = await infer_relationships_batch(
             source_entities=grouped['submission_instruction'],
             target_entities=grouped['evaluation_factor'],

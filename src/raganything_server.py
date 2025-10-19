@@ -80,32 +80,52 @@ async def main():
     
     # Step 4: Override endpoints to use RAG-Anything + semantic post-processing
     # Remove original LightRAG endpoints
+    print(f"DEBUG: Total routes before removal: {len(app.router.routes)}")
     new_routes = []
     found_insert = False
     found_upload = False
     for route in app.router.routes:
         # Skip the original /insert POST endpoint
         if hasattr(route, 'path') and route.path == '/insert' and hasattr(route, 'methods') and 'POST' in route.methods:
+            print(f"DEBUG: Found and REMOVING /insert endpoint")
             found_insert = True
             continue
         # Skip the original /documents/upload POST endpoint (WebUI uses this!)
         if hasattr(route, 'path') and route.path == '/documents/upload' and hasattr(route, 'methods') and 'POST' in route.methods:
+            print(f"DEBUG: Found and REMOVING /documents/upload endpoint")
             found_upload = True
             continue
         new_routes.append(route)
     app.router.routes = new_routes
-    
-    # Endpoint override confirmation (removed verbose logging)
+    print(f"DEBUG: Total routes after removal: {len(new_routes)}")
+    print(f"DEBUG: Successfully removed /insert: {found_insert}")
+    print(f"DEBUG: Successfully removed /documents/upload: {found_upload}")
     
     # Add our custom endpoints with RAG-Anything multimodal processing
+    print("DEBUG: About to call create_insert_endpoint()...")
     create_insert_endpoint(app, rag_instance)
+    print("DEBUG: create_insert_endpoint() completed")
+    
+    print("DEBUG: About to call create_documents_upload_endpoint()...")
     create_documents_upload_endpoint(app, rag_instance)
+    print("DEBUG: create_documents_upload_endpoint() completed")
+    
+    # Debug: List all registered routes
+    print("DEBUG: Checking app.router.routes...")
+    post_routes = []
+    for route in app.router.routes:
+        if hasattr(route, 'path') and hasattr(route, 'methods') and 'POST' in route.methods:
+            post_routes.append(route.path)
+    print(f"DEBUG: Found POST routes: {post_routes}")
+    logger.info(f"✅ Custom endpoints registered: /insert, /documents/upload")
+    logger.info(f"🔍 All POST routes: {post_routes}")
     
     # Print concise startup info
     print(f"\n✅ Server Ready:")
     print(f"   WebUI: http://{host}:{port}/")
     print(f"   API Docs: http://{host}:{port}/docs")
     print(f"   Features: Multimodal extraction + semantic post-processing")
+    print(f"   Custom endpoints: /insert, /documents/upload (17 entity types)")
     print(f"   Background monitor: Removed (synchronous post-processing)\n")
     
     # Step 6: Start server

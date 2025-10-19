@@ -1,8 +1,18 @@
-# Section L↔M Linking Rules
+# Submission Instructions ↔ Evaluation Criteria Linking
 
-**Purpose**: Infer relationships between submission instructions (Section L) and evaluation factors (Section M)  
-**Why This Matters**: Proposal managers need to know which page limits affect which evaluation factors  
-**Method**: LLM-powered semantic inference (replaces brittle regex patterns)
+**Purpose**: Link submission instructions to their corresponding evaluation factors/criteria  
+**Entity Types**: SUBMISSION_INSTRUCTION --GUIDES--> EVALUATION_FACTOR  
+**Why This Matters**: Proposal teams need to know which format requirements (page limits, volumes, fonts)
+apply to which evaluation factors to optimize compliance and scoring.
+
+**Common Locations**:
+
+- **Federal UCF**: Instructions in Section L, Evaluation in Section M
+- **Task Orders**: "Proposal Instructions" → "Selection Criteria"
+- **Quotes**: "Response Format" → "Award Methodology"
+- **Embedded**: Instructions within evaluation factor descriptions
+
+**Method**: LLM-powered semantic inference (format-agnostic, works across all RFP structures)
 
 ---
 
@@ -105,16 +115,19 @@ Section M.1: Technical Approach
 
 ## LLM Inference Prompt Template
 
-Use this prompt structure when calling LLM for L↔M inference:
+Use this prompt structure when calling LLM for instruction-evaluation inference:
 
 ```
-You are analyzing submission instructions (Section L) and evaluation factors (Section M)
-to determine which instructions guide which factors.
+You are analyzing submission instructions and evaluation criteria/factors
+to determine which instructions guide which evaluation factors.
 
-SUBMISSION INSTRUCTIONS (Section L):
+NOTE: Instructions may be labeled as "Section L", "Proposal Instructions",
+"Response Format", or embedded within factor descriptions depending on RFP structure.
+
+SUBMISSION INSTRUCTIONS:
 {json_list_of_submission_instructions}
 
-EVALUATION FACTORS (Section M):
+EVALUATION CRITERIA/FACTORS:
 {json_list_of_evaluation_factors}
 
 TASK:
