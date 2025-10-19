@@ -24,7 +24,8 @@ from raganything import RAGAnything, RAGAnythingConfig
 from lightrag.operate import chunking_by_token_size
 
 from src.core.prompt_loader import load_prompt
-from src.utils.lightrag_multidigraph_fix import apply_multidigraph_fix
+from src.utils.graph_merge_utils import merge_graphml_files
+from src.ingestion.ucf_detector import detect_ucf_structure
 
 logger = logging.getLogger(__name__)
 
@@ -291,16 +292,13 @@ async def initialize_raganything():
     _rag_anything.lightrag.doc_status.get_docs_paginated = filtered_get_docs_paginated
     # ═════════════════════════════════════════════════════════════════════════════
     
-    # Apply MultiDiGraph compatibility fix for LightRAG 1.4.9.3
-    apply_multidigraph_fix()
-    
     # Use print() instead of logger to ensure output visibility during startup
     print("✅ RAG-Anything initialized")
     print(f"   Parser: MinerU ({parse_method}) - multimodal enabled")
     print(f"   Device: {device.upper()} (GPU acceleration {'enabled' if device == 'cuda' else 'disabled'})")
     print(f"   Entity types: {len(entity_types)} specialized types")
     print(f"   LightRAG storages: Ready")
-    print(f"   LightRAG version: 1.4.9.3 + MultiDiGraph edge fix ✅")
+    print(f"   LightRAG version: 1.4.9.3")
     print(f"   Multimodal processing: Using process_document_complete() (separate text/multimodal paths) ✅")
     
     return _rag_anything

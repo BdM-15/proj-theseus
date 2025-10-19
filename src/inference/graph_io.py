@@ -130,9 +130,11 @@ def save_relationships_to_graphml(
         logger.error("❌ Could not find graph element in GraphML")
         return
     
-    # Get next edge ID
+    # Get next edge ID and build set of existing edges to avoid duplicates
     existing_edges = graph.findall('.//graphml:edge', ns)
     max_edge_id = 0
+    existing_edge_pairs = set()
+    
     for edge in existing_edges:
         edge_id = edge.get('id', 'e0')
         if edge_id.startswith('e'):
@@ -141,6 +143,13 @@ def save_relationships_to_graphml(
                 max_edge_id = max(max_edge_id, edge_num)
             except ValueError:
                 pass
+        
+        # Track existing edges (normalized for undirected graph)
+        src = edge.get('source')
+        tgt = edge.get('target')
+        if src and tgt:
+            edge_pair = tuple(sorted([src, tgt]))
+            existing_edge_pairs.add(edge_pair)
     
     next_edge_id = max_edge_id + 1
     
@@ -152,9 +161,20 @@ def save_relationships_to_graphml(
         # Namespace already registered (happens if file was parsed earlier in same process)
         pass
     
+    added_count = 0
+    skipped_count = 0
+    
     for rel in new_relationships:
         source_id = rel['source_id']
         target_id = rel['target_id']
+        
+        # Check if edge already exists (normalized for undirected graph)
+        edge_pair = tuple(sorted([source_id, target_id]))
+        if edge_pair in existing_edge_pairs:
+            skipped_count += 1
+            logger.debug(f"  ⏭️  Skipping duplicate edge: {source_id} <-> {target_id}")
+            continue
+        
         rel_type = rel['relationship_type']
         confidence = rel['confidence']
         reasoning = rel['reasoning']
@@ -182,11 +202,18 @@ def save_relationships_to_graphml(
         source_data.set('key', 'd9')
         source_data.text = 'semantic_post_processing'
         
+        # Add to tracking set
+        existing_edge_pairs.add(edge_pair)
+        added_count += 1
         next_edge_id += 1
     
     # Write back to file
     tree.write(graphml_path, encoding='utf-8', xml_declaration=True)
-    logger.info(f"  💾 Saved {len(new_relationships)} new relationships to GraphML")
+    
+    if skipped_count > 0:
+        logger.info(f"  💾 Added {added_count} new relationships, skipped {skipped_count} duplicates")
+    else:
+        logger.info(f"  💾 Saved {added_count} new relationships to GraphML")
 
 
 def save_relationships_to_kv_store(
