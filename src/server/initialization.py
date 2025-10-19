@@ -94,11 +94,11 @@ async def initialize_raganything():
     enable_image = os.getenv("ENABLE_IMAGE_PROCESSING", "true").lower() == "true"
     enable_table = os.getenv("ENABLE_TABLE_PROCESSING", "true").lower() == "true"
     enable_equation = os.getenv("ENABLE_EQUATION_PROCESSING", "true").lower() == "true"
-    device = os.getenv("MINERU_DEVICE", "auto")  # cuda, cpu, or auto (MinerU reads this directly)
+    device = os.getenv("MINERU_DEVICE_MODE", "auto")  # cuda, cpu, or auto (MinerU reads this directly)
     
-    # CRITICAL: MinerU reads MINERU_DEVICE from environment, NOT from RAGAnythingConfig
+    # CRITICAL: MinerU reads MINERU_DEVICE_MODE from environment, NOT from RAGAnythingConfig
     # Ensure it's set in the current process environment so MinerU subprocess inherits it
-    os.environ["MINERU_DEVICE"] = device
+    os.environ["MINERU_DEVICE_MODE"] = device
     
     # Note: HF_TOKEN and HF_HUB_DISABLE_SYMLINKS_WARNING are automatically
     # inherited by MinerU subprocess if set in environment
@@ -208,26 +208,87 @@ async def initialize_raganything():
         raise RuntimeError(f"LightRAG initialization failed: {error_msg}")
     
     # ═══════════════════════════════════════════════════════════════════════════════
-    # COMPATIBILITY FIX: RAG-Anything + LightRAG doc_status schema
+    # COMPATIBILITY FIX: RAG-Anything 1.2.8 + LightRAG 1.4.9.3 doc_status schema
     # ═══════════════════════════════════════════════════════════════════════════════
-    # Issue: RAG-Anything writes 'multimodal_processed' field to doc_status after
-    #        multimodal content processing, but LightRAG's DocProcessingStatus
-    #        dataclass doesn't accept this field (causes 500 error in WebUI).
+    # Issue: RAG-Anything writes extra fields that LightRAG 1.4.9.3 doesn't support:
+    #        - 'multimodal_processed' (bool) - tracks multimodal processing completion
+    #        - 'multimodal_content' (list) - multimodal item metadata
+    #        - 'scheme_name' (str) - document scheme identifier
     #
-    # Official Workaround (from RAG-Anything examples/lmstudio_integration_example.py):
-    #   "Compatibility: avoid writing unknown field 'multimodal_processed' to 
-    #    LightRAG doc_status. Older LightRAG versions may not accept this extra 
-    #    field in DocProcessingStatus"
+    # RAG-Anything also uses 'handling' status (not in LightRAG's DocStatus enum)
     #
-    # Solution: Replace _mark_multimodal_processing_complete() with no-op function
-    #           to prevent writing the incompatible field.
+    # Solution: Wrap BOTH write (upsert) and read (get_by_id, get_docs_paginated) to
+    #           filter incompatible fields and normalize statuses
     # ═══════════════════════════════════════════════════════════════════════════════
-    async def _noop_mark_multimodal(doc_id: str):
-        """No-op replacement to prevent writing multimodal_processed field."""
-        return None
+    from lightrag.base import DocStatus
+    original_upsert = _rag_anything.lightrag.doc_status.upsert
+    original_get_by_id = _rag_anything.lightrag.doc_status.get_by_id
+    original_get_docs_paginated = _rag_anything.lightrag.doc_status.get_docs_paginated
     
-    _rag_anything._mark_multimodal_processing_complete = _noop_mark_multimodal
-    # ═══════════════════════════════════════════════════════════════════════════════
+    # Fields that RAG-Anything writes but LightRAG 1.4.9.3 DocProcessingStatus doesn't accept
+    INCOMPATIBLE_FIELDS = {'multimodal_processed', 'multimodal_content', 'scheme_name'}
+    
+    # Valid LightRAG statuses (from lightrag/base.py DocStatus enum)
+    VALID_STATUSES = {
+        DocStatus.PENDING.value,      # 'pending'
+        DocStatus.PROCESSING.value,   # 'processing'
+        DocStatus.PREPROCESSED.value, # 'multimodal_processed'
+        DocStatus.PROCESSED.value,    # 'processed'
+        DocStatus.FAILED.value,       # 'failed'
+    }
+    
+    def filter_doc_data(doc_data: dict) -> dict:
+        """Remove incompatible fields from doc_data"""
+        return {k: v for k, v in doc_data.items() if k not in INCOMPATIBLE_FIELDS}
+    
+    async def filtered_upsert(data: dict):
+        """Filter incompatible fields and normalize statuses for LightRAG 1.4.9.3"""
+        filtered_data = {}
+        for doc_id, doc_data in data.items():
+            # Create a copy without incompatible fields
+            filtered_doc_data = filter_doc_data(doc_data)
+            
+            # Normalize RAG-Anything statuses to LightRAG statuses
+            if 'status' in filtered_doc_data:
+                status = filtered_doc_data['status']
+                # Handle both string and enum values
+                status_value = status.value if hasattr(status, 'value') else status
+                
+                # Map RAG-Anything statuses to valid LightRAG statuses
+                if status_value == 'handling':
+                    filtered_doc_data['status'] = DocStatus.PROCESSING.value
+                elif status_value == 'ready':
+                    filtered_doc_data['status'] = DocStatus.PENDING.value
+                elif status_value not in VALID_STATUSES:
+                    logger.warning(f"Unknown status '{status_value}' for doc {doc_id}, mapping to PROCESSING")
+                    filtered_doc_data['status'] = DocStatus.PROCESSING.value
+            
+            filtered_data[doc_id] = filtered_doc_data
+        return await original_upsert(filtered_data)
+    
+    async def filtered_get_by_id(doc_id: str):
+        """Get doc_status with incompatible fields filtered"""
+        result = await original_get_by_id(doc_id)
+        if result and isinstance(result, dict):
+            return filter_doc_data(result)
+        return result
+    
+    async def filtered_get_docs_paginated(*args, **kwargs):
+        """Get paginated docs with incompatible fields filtered"""
+        result = await original_get_docs_paginated(*args, **kwargs)
+        if result and isinstance(result, tuple) and len(result) >= 2:
+            docs_with_ids, total_count = result[0], result[1]
+            # Filter each document's data
+            filtered_docs = []
+            for doc_id, doc_data in docs_with_ids:
+                filtered_docs.append((doc_id, filter_doc_data(doc_data)))
+            return (filtered_docs, total_count), *result[2:]
+        return result
+    
+    _rag_anything.lightrag.doc_status.upsert = filtered_upsert
+    _rag_anything.lightrag.doc_status.get_by_id = filtered_get_by_id
+    _rag_anything.lightrag.doc_status.get_docs_paginated = filtered_get_docs_paginated
+    # ═════════════════════════════════════════════════════════════════════════════
     
     # Use print() instead of logger to ensure output visibility during startup
     print("✅ RAG-Anything initialized")
@@ -235,7 +296,8 @@ async def initialize_raganything():
     print(f"   Device: {device.upper()} (GPU acceleration {'enabled' if device == 'cuda' else 'disabled'})")
     print(f"   Entity types: {len(entity_types)} specialized types")
     print(f"   LightRAG storages: Ready")
-    print(f"   500 error fix: Applied ✅")
+    print(f"   LightRAG version: 1.4.9.3 + compatibility filter (doc_status only) ✅")
+    print(f"   Multimodal processing: Using process_document_complete() (separate text/multimodal paths) ✅")
     
     return _rag_anything
 

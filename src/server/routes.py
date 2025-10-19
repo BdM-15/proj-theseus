@@ -65,16 +65,18 @@ async def process_document_with_semantic_inference(
     """
     logger.info(f"📄 Processing {file_name}")
     logger.info(f"🔧 Using RAG-Anything + LLM semantic inference (format-agnostic)")
-    print(f"DEBUG: About to call process_document_complete_lightrag_api()...")
+    print(f"DEBUG: About to call process_document_complete()...")
     
-    # Step 1: Multimodal extraction + entity extraction (using LightRAG API method)
-    await rag_instance.process_document_complete_lightrag_api(
+    # Step 1: Multimodal extraction + entity extraction
+    # Use process_document_complete() which handles multimodal content separately
+    # (NOT process_document_complete_lightrag_api() which tries to pass multimodal_content to ainsert)
+    await rag_instance.process_document_complete(
         file_path=file_path,
         output_dir=global_args.working_dir,
         parse_method="auto"
     )
     
-    print(f"DEBUG: process_document_complete_lightrag_api() returned successfully!")
+    print(f"DEBUG: process_document_complete() returned successfully!")
     print(f"DEBUG: Now checking for GraphML file...")
     
     # Step 2: ROBUST - Wait for GraphML with exponential backoff

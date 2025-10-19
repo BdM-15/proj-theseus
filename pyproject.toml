@@ -8,6 +8,11 @@ dependencies = [
     # Core RAG functionality (includes lightrag-hku, MinerU, and document parsers)
     "raganything[all]>=1.2.8",
     
+    # LightRAG with RAG-Anything compatibility (REQUIRED: >= 1.4.9.3)
+    # v1.4.9.3+ includes DocProcessingStatus multimodal field support (PR #2211)
+    # Critical for process_document_complete_lightrag_api() compatibility
+    "lightrag-hku>=1.4.9.3",
+    
     # Cloud LLM access (xAI Grok via OpenAI-compatible API)
     "openai>=1.0.0",
     
