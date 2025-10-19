@@ -24,8 +24,6 @@ from raganything import RAGAnything, RAGAnythingConfig
 from lightrag.operate import chunking_by_token_size
 
 from src.core.prompt_loader import load_prompt
-from src.utils.graph_merge_utils import merge_graphml_files
-from src.ingestion.ucf_detector import detect_ucf_structure
 
 logger = logging.getLogger(__name__)
 
