@@ -122,7 +122,7 @@ async def fixed_get_knowledge_graph(
         node_properties = {k: v for k, v in node_data.items()}
         result.nodes.append(
             KnowledgeGraphNode(
-                id=str(node), labels=[], properties=node_properties  # Empty labels for clean visualization
+                id=str(node), labels=[str(node)], properties=node_properties
             )
         )
         seen_nodes.add(str(node))
