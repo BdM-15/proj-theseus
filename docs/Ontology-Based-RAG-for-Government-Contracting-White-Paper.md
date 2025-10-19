@@ -351,6 +351,7 @@ Government Contracting Specific:
 ```
 
 **Key Innovation**: Every RFP processed through the same ontological lens enables:
+
 - Cross-RFP pattern recognition
 - Agency-specific intelligence
 - Reusable knowledge base
@@ -361,14 +362,15 @@ Government Contracting Specific:
 Once PostgreSQL data warehouse is implemented, the system unlocks powerful competitive intelligence:
 
 #### **1. Competitive Intelligence**
+
 ```sql
 -- Find evaluation factors Navy consistently values
-SELECT 
+SELECT
     workspace AS rfp_number,
     entity_name AS evaluation_factor,
     metadata->>'weight' AS weight
-FROM entities 
-WHERE entity_type = 'EVALUATION_FACTOR' 
+FROM entities
+WHERE entity_type = 'EVALUATION_FACTOR'
   AND workspace LIKE 'navy_%'
   AND created_at > '2023-01-01'
 ORDER BY (metadata->>'weight')::numeric DESC;
@@ -382,9 +384,10 @@ ORDER BY (metadata->>'weight')::numeric DESC;
 **Business Value**: Tailor proposal emphasis to agency priorities (Navy values technical vs Army values experience)
 
 #### **2. Compliance Pattern Recognition**
+
 ```sql
 -- Build master FAR/DFARS clause checklist
-SELECT 
+SELECT
     entity_name AS clause_number,
     description AS clause_title,
     COUNT(DISTINCT workspace) AS rfp_frequency
@@ -402,6 +405,7 @@ ORDER BY rfp_frequency DESC;
 **Business Value**: Standardize compliance processes across all proposals
 
 #### **3. Technical Capability Gap Analysis**
+
 ```sql
 -- Identify new technologies requiring teaming or capability development
 SELECT DISTINCT entity_name AS technology_name
@@ -409,8 +413,8 @@ FROM entities
 WHERE entity_type IN ('TECHNOLOGY', 'EQUIPMENT')
   AND workspace = 'new_air_force_rfp_2025'
   AND entity_name NOT IN (
-    SELECT DISTINCT entity_name 
-    FROM entities 
+    SELECT DISTINCT entity_name
+    FROM entities
     WHERE workspace LIKE 'historical_%'
   );
 
@@ -422,9 +426,10 @@ WHERE entity_type IN ('TECHNOLOGY', 'EQUIPMENT')
 **Business Value**: Early identification of teaming opportunities or capability investments
 
 #### **4. Win Theme Pattern Recognition**
+
 ```sql
 -- Discover winning themes from past successes
-SELECT 
+SELECT
     entity_name AS strategic_theme,
     COUNT(*) AS occurrences
 FROM entities e
@@ -443,9 +448,10 @@ ORDER BY occurrences DESC;
 **Business Value**: Build win theme library based on actual competitive successes
 
 #### **5. Deliverable Benchmarking**
+
 ```sql
 -- Standardize deliverable templates across agencies
-SELECT 
+SELECT
     metadata->>'agency' AS agency,
     entity_name AS deliverable_type,
     AVG((metadata->>'quantity')::numeric) AS avg_quantity,
@@ -464,9 +470,10 @@ HAVING COUNT(DISTINCT workspace) >= 3;
 **Business Value**: Create standardized deliverable templates reducing proposal development time
 
 #### **6. Section L↔M Risk Analysis**
+
 ```sql
 -- Identify high-risk compliance areas (strict page limits + high scoring)
-SELECT 
+SELECT
     ef.entity_name AS evaluation_factor,
     ef.metadata->>'weight' AS scoring_weight,
     si.description AS page_limit,
@@ -487,9 +494,10 @@ ORDER BY (ef.metadata->>'weight')::numeric DESC;
 **Business Value**: Optimize resource allocation - prioritize high-weight factors with strict constraints
 
 #### **7. Requirement Traceability**
+
 ```sql
 -- Find reusable proposal content from similar requirements
-SELECT 
+SELECT
     entity_name AS requirement_text,
     metadata->>'criticality' AS criticality,
     COUNT(DISTINCT workspace) AS appears_in_rfps
@@ -517,6 +525,7 @@ ORDER BY appears_in_rfps DESC;
 ```
 
 Each additional RFP makes the system **exponentially smarter**:
+
 - **Better pattern recognition**: More training examples for ML models
 - **Richer agency profiles**: Deeper understanding of evaluation priorities
 - **Stronger win/loss insights**: Data-driven proposal strategies
@@ -527,7 +536,9 @@ Each additional RFP makes the system **exponentially smarter**:
 **Critical Enterprise Use Case**: Multiple Award IDIQ Contracts with Task Orders
 
 #### **The Challenge**
+
 Government contracts often follow a hierarchical structure:
+
 ```
 IDIQ Base Contract (Parent)
 ├─ Base contract requirements (ceiling, period of performance, NAICS)
@@ -548,6 +559,7 @@ Task Order 002 (Child)
 ```
 
 **The Problem**: Traditional systems either:
+
 1. Merge everything into one graph (loses baseline vs task-specific context)
 2. Keep separate graphs (loses cross-reference intelligence)
 
@@ -567,7 +579,7 @@ task_requirements AS (
     WHERE workspace = 'seaport_nx_task_001'
       AND entity_type = 'REQUIREMENT'
 )
-SELECT 
+SELECT
     'IDIQ Baseline' AS source,
     i.entity_name,
     i.metadata->>'criticality' AS criticality
@@ -576,7 +588,7 @@ WHERE i.metadata->>'criticality' = 'must'
 
 UNION ALL
 
-SELECT 
+SELECT
     'Task Order Specific' AS source,
     t.entity_name,
     t.metadata->>'criticality'
@@ -587,6 +599,7 @@ ORDER BY source, entity_name;
 ```
 
 **Output Example**:
+
 ```
 Source              | Requirement                    | Criticality
 --------------------|--------------------------------|-------------
@@ -601,9 +614,10 @@ Task Order Specific | Agile methodology required     | must
 #### **Advanced IDIQ Intelligence Queries**
 
 ##### **1. Incremental Requirement Detection**
+
 ```sql
 -- Find new requirements added in task order beyond IDIQ baseline
-SELECT 
+SELECT
     t.entity_name AS new_requirement,
     t.description,
     t.metadata->>'section' AS appears_in_section
@@ -621,18 +635,19 @@ WHERE t.workspace = 'seaport_nx_task_001'
 **Use Case**: Identify scope creep or new capabilities needed for task order response
 
 ##### **2. Master Clause Applicability**
+
 ```sql
 -- Which IDIQ master clauses apply to this specific task order?
-SELECT 
+SELECT
     i.entity_name AS clause_number,
     i.description AS clause_title,
     i.metadata->>'flowdown_required' AS must_flowdown,
-    CASE 
+    CASE
         WHEN t.entity_id IS NOT NULL THEN 'Explicitly referenced in task order'
         ELSE 'Inherited from IDIQ (implicit applicability)'
     END AS applicability_type
 FROM entities i
-LEFT JOIN entities t 
+LEFT JOIN entities t
     ON t.workspace = 'seaport_nx_task_001'
    AND t.entity_name = i.entity_name
    AND t.entity_type = 'CLAUSE'
@@ -644,13 +659,14 @@ ORDER BY applicability_type, clause_number;
 **Use Case**: Compliance matrix generation showing both inherited and task-specific clauses
 
 ##### **3. Evaluation Criteria Inheritance**
+
 ```sql
 -- Compare IDIQ baseline evaluation vs task order modifications
-SELECT 
+SELECT
     COALESCE(i.entity_name, t.entity_name) AS evaluation_factor,
     i.metadata->>'weight' AS idiq_weight,
     t.metadata->>'weight' AS task_weight,
-    CASE 
+    CASE
         WHEN i.entity_name IS NULL THEN 'New in task order'
         WHEN t.entity_name IS NULL THEN 'IDIQ baseline only'
         WHEN i.metadata->>'weight' != t.metadata->>'weight' THEN 'Weight changed'
@@ -667,6 +683,7 @@ ORDER BY status, evaluation_factor;
 ```
 
 **Output Example**:
+
 ```
 Evaluation Factor    | IDIQ Weight | Task Weight | Status
 ---------------------|-------------|-------------|------------------------
@@ -679,9 +696,10 @@ Agile Expertise      | NULL        | 5%          | New in task order
 **Use Case**: Tailor proposal emphasis to task-specific evaluation priorities
 
 ##### **4. Cross-Task Order Pattern Recognition**
+
 ```sql
 -- Across all task orders under this IDIQ, what requirements appear most frequently?
-SELECT 
+SELECT
     t.entity_name AS recurring_requirement,
     COUNT(DISTINCT t.workspace) AS appears_in_tasks,
     ARRAY_AGG(DISTINCT t.workspace ORDER BY t.workspace) AS task_list
@@ -695,6 +713,7 @@ ORDER BY appears_in_tasks DESC;
 ```
 
 **Output Example**:
+
 ```
 Recurring Requirement          | Appears In | Task List
 -------------------------------|------------|---------------------------
@@ -706,11 +725,12 @@ CMMI Level 3 compliance        | 5 tasks    | [task_002, task_004, ...]
 **Use Case**: Build reusable task order response templates based on recurring patterns
 
 ##### **5. Virtual Graph Traversal (Parent → Child)**
+
 ```sql
 -- Navigate from IDIQ requirement through task order implementations
 WITH RECURSIVE requirement_hierarchy AS (
     -- Base case: IDIQ requirements
-    SELECT 
+    SELECT
         entity_id,
         entity_name,
         workspace,
@@ -720,11 +740,11 @@ WITH RECURSIVE requirement_hierarchy AS (
     WHERE workspace = 'seaport_nx_idiq_2024'
       AND entity_type = 'REQUIREMENT'
       AND entity_name LIKE '%security clearance%'
-    
+
     UNION ALL
-    
+
     -- Recursive case: Find task order references to parent requirement
-    SELECT 
+    SELECT
         e.entity_id,
         e.entity_name,
         e.workspace,
@@ -737,7 +757,7 @@ WITH RECURSIVE requirement_hierarchy AS (
        AND e.entity_type = 'REQUIREMENT'
     WHERE rh.depth < 5  -- Prevent infinite recursion
 )
-SELECT 
+SELECT
     depth,
     workspace AS implementation_location,
     entity_name,
@@ -750,6 +770,7 @@ ORDER BY root_requirement, depth, workspace;
 ```
 
 **Output Example**:
+
 ```
 Depth | Location              | Requirement                  | Level
 ------|----------------------|------------------------------|----------------------
@@ -777,7 +798,7 @@ CREATE TABLE workspaces (
 );
 
 -- Query: Find all task orders under a specific IDIQ
-SELECT 
+SELECT
     child.workspace_name AS task_order,
     child.solicitation_number,
     COUNT(DISTINCT e.entity_id) AS total_requirements
@@ -792,6 +813,7 @@ ORDER BY child.solicitation_number;
 ```
 
 **Output Example**:
+
 ```
 Task Order            | Solicitation    | Total Requirements
 ----------------------|-----------------|-------------------
@@ -814,10 +836,10 @@ seaport_nx_task_003   | N00178-24-R-003 | 102
 # Python SDK for IDIQ + Task Order queries
 class IDIQIntelligence:
     """Query interface for hierarchical IDIQ/Task Order knowledge graphs"""
-    
+
     def get_incremental_requirements(
-        self, 
-        idiq_workspace: str, 
+        self,
+        idiq_workspace: str,
         task_workspace: str
     ) -> List[Entity]:
         """Find requirements added in task order beyond IDIQ baseline"""
@@ -832,7 +854,7 @@ class IDIQIntelligence:
               )
         """
         return self.execute(query, {'idiq': idiq_workspace, 'task': task_workspace})
-    
+
     def get_combined_compliance_matrix(
         self,
         idiq_workspace: str,
@@ -842,7 +864,7 @@ class IDIQIntelligence:
         # Union query combining both workspaces with source labeling
         # Returns DataFrame ready for Excel export or proposal automation
         pass
-    
+
     def analyze_evaluation_inheritance(
         self,
         idiq_workspace: str,
@@ -854,6 +876,7 @@ class IDIQIntelligence:
 ```
 
 **Business Value Summary**:
+
 - **Faster task order responses**: Reuse IDIQ analysis + focus on deltas
 - **Compliance confidence**: Never miss inherited requirements
 - **Strategic insights**: Pattern recognition across task orders

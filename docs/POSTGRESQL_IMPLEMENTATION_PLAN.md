@@ -30,16 +30,17 @@
 These powerful queries become possible with PostgreSQL multi-workspace architecture:
 
 ### **Competitive Intelligence**
+
 ```sql
 -- Find all evaluation factors across Navy contracts in the last 2 years
 -- Shows what Navy consistently values (Technical Approach 40%, Past Performance 30%, etc.)
-SELECT 
+SELECT
     workspace AS rfp_number,
     entity_name AS evaluation_factor,
     metadata->>'weight' AS weight,
     metadata->>'parent_section' AS parent_section
-FROM entities 
-WHERE entity_type = 'EVALUATION_FACTOR' 
+FROM entities
+WHERE entity_type = 'EVALUATION_FACTOR'
   AND workspace LIKE 'navy_%'
   AND created_at > '2023-01-01'
 ORDER BY (metadata->>'weight')::numeric DESC;
@@ -51,17 +52,18 @@ ORDER BY (metadata->>'weight')::numeric DESC;
 ```
 
 ### **Pricing Strategy & CLIN Analysis**
+
 ```sql
 -- Compare CLIN structures across similar contracts
 -- Identify pricing patterns and competitive positioning
-SELECT 
+SELECT
     workspace,
     entity_name AS clin_number,
     description,
     metadata->>'unit_price' AS unit_price,
     metadata->>'contracting_agency' AS agency
 FROM entities
-WHERE entity_type = 'CONCEPT' 
+WHERE entity_type = 'CONCEPT'
   AND description LIKE '%CLIN%'
 ORDER BY workspace, clin_number;
 
@@ -69,10 +71,11 @@ ORDER BY workspace, clin_number;
 ```
 
 ### **Compliance Pattern Recognition**
+
 ```sql
 -- Find all unique FAR clauses across your RFP library
 -- Build a master compliance checklist for proposal teams
-SELECT 
+SELECT
     entity_name AS clause_number,
     description AS clause_title,
     COUNT(DISTINCT workspace) AS rfp_frequency,
@@ -91,10 +94,11 @@ LIMIT 20;
 ```
 
 ### **Win Theme Development**
+
 ```sql
 -- Identify recurring strategic themes across won contracts
 -- (After adding win/loss metadata to workspace table)
-SELECT 
+SELECT
     entity_name AS strategic_theme,
     COUNT(*) AS occurrences,
     ARRAY_AGG(DISTINCT w.workspace) AS won_contracts
@@ -115,10 +119,11 @@ LIMIT 10;
 ```
 
 ### **Technical Capability Gaps**
+
 ```sql
 -- Find technologies/equipment mentioned in new RFP that you haven't seen before
 -- Identifies potential teaming needs or capability development priorities
-SELECT DISTINCT 
+SELECT DISTINCT
     e.entity_name AS technology_name,
     e.entity_type,
     e.description
@@ -126,8 +131,8 @@ FROM entities e
 WHERE e.entity_type IN ('TECHNOLOGY', 'EQUIPMENT')
   AND e.workspace = 'new_air_force_rfp_2025'
   AND e.entity_name NOT IN (
-    SELECT DISTINCT entity_name 
-    FROM entities 
+    SELECT DISTINCT entity_name
+    FROM entities
     WHERE workspace LIKE 'historical_%'
       AND entity_type IN ('TECHNOLOGY', 'EQUIPMENT')
   )
@@ -140,10 +145,11 @@ ORDER BY entity_type, technology_name;
 ```
 
 ### **Deliverable Benchmarking**
+
 ```sql
 -- Compare deliverable requirements across agencies
 -- Standardize proposal response templates based on actual patterns
-SELECT 
+SELECT
     metadata->>'agency' AS agency,
     entity_name AS deliverable_type,
     AVG((metadata->>'quantity')::numeric) AS avg_quantity,
@@ -163,10 +169,11 @@ ORDER BY agency, num_rfps DESC;
 ```
 
 ### **Section L↔M Cross-Analysis**
+
 ```sql
 -- Find evaluation factors that have strict submission instructions
 -- Identify high-risk compliance areas (page limits + high scoring weight)
-SELECT 
+SELECT
     ef.entity_name AS evaluation_factor,
     ef.metadata->>'weight' AS scoring_weight,
     si.entity_name AS submission_instruction,
@@ -188,10 +195,11 @@ ORDER BY (ef.metadata->>'weight')::numeric DESC;
 ```
 
 ### **Requirement Traceability Across RFPs**
+
 ```sql
 -- Find similar requirements across multiple RFPs
 -- Identify reusable proposal content and past performance examples
-SELECT 
+SELECT
     r1.entity_name AS requirement_text,
     r1.metadata->>'criticality' AS criticality,
     COUNT(DISTINCT r1.workspace) AS appears_in_rfps,
@@ -211,10 +219,11 @@ LIMIT 50;
 ```
 
 ### **Clause Flowdown Analysis**
+
 ```sql
 -- Identify which FAR/DFARS clauses consistently flow down to subcontractors
 -- Build standard subcontract templates
-SELECT 
+SELECT
     c.entity_name AS clause_number,
     c.description AS clause_title,
     c.metadata->>'flowdown_required' AS flowdown,
@@ -229,10 +238,11 @@ ORDER BY frequency DESC;
 ```
 
 ### **Agency-Specific Evaluation Patterns**
+
 ```sql
 -- Compare how different agencies weight evaluation factors
 -- Tailor proposal strategies by agency culture
-SELECT 
+SELECT
     w.metadata->>'agency' AS agency,
     e.entity_name AS evaluation_factor,
     AVG((e.metadata->>'weight')::numeric) AS avg_weight,
@@ -259,17 +269,20 @@ ORDER BY agency, avg_weight DESC;
 When you're ready to unlock these capabilities:
 
 1. **Branch 009: PostgreSQL Foundation** (Week 1)
+
    - Docker setup with pgvector + Apache AGE
    - LightRAG PostgreSQL storage backends
    - Migrate existing Navy MBOS data
    - Validate query performance
 
 2. **Branch 010: Workspace Management** (Week 2)
+
    - WebUI workspace switcher
    - Project metadata (agency, solicitation number, due date, status)
    - Workspace isolation + cross-workspace queries
 
 3. **Branch 011: Analytics Dashboard** (Week 3)
+
    - Pre-built cross-RFP query templates (above examples as saved queries)
    - Clause frequency reports
    - Technology trend analysis
