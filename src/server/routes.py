@@ -293,23 +293,27 @@ def create_insert_endpoint(app, rag_instance):
         print(f"🔔🔔🔔 CUSTOM ENDPOINT CALLED: /insert with file: {file.filename}")
         logger.info(f"🔔 ENDPOINT CALLED: /insert with file: {file.filename}")
         try:
-            # Save uploaded file to temp location
-            with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as tmp:
-                shutil.copyfileobj(file.file, tmp)
-                tmp_path = tmp.name
+            # Save uploaded file with original filename to temp directory
+            # This preserves human-readable names in query citations
+            temp_dir = tempfile.gettempdir()
+            safe_filename = file.filename.replace('/', '_').replace('\\', '_')
+            file_path = os.path.join(temp_dir, safe_filename)
+            
+            with open(file_path, 'wb') as f:
+                shutil.copyfileobj(file.file, f)
             
             logger.info(f"📄 Processing {file.filename} via /insert endpoint")
             
             # Integrated processing: Entity extraction + relationship inference in one pipeline
             processing_result = await process_document_with_semantic_inference(
-                tmp_path, file.filename, rag_instance, rag_instance.llm_model_func
+                file_path, file.filename, rag_instance, rag_instance.llm_model_func
             )
             
             logger.info(f"✅ Processing complete for {file.filename}")
             logger.info(f"   Relationships inferred: {processing_result['relationships_inferred']}")
             
             # Clean up temp file
-            os.unlink(tmp_path)
+            os.unlink(file_path)
             
             return JSONResponse({
                 "status": "success",
@@ -355,17 +359,21 @@ def create_documents_upload_endpoint(app, rag_instance):
         print(f"🔔🔔🔔 CUSTOM ENDPOINT CALLED: /documents/upload with file: {file.filename}")
         logger.info(f"🔔 ENDPOINT CALLED: /documents/upload with file: {file.filename}")
         try:
-            # Save uploaded file to temp location
-            with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as tmp:
-                shutil.copyfileobj(file.file, tmp)
-                tmp_path = tmp.name
+            # Save uploaded file with original filename to temp directory
+            # This preserves human-readable names in query citations
+            temp_dir = tempfile.gettempdir()
+            safe_filename = file.filename.replace('/', '_').replace('\\', '_')
+            file_path = os.path.join(temp_dir, safe_filename)
+            
+            with open(file_path, 'wb') as f:
+                shutil.copyfileobj(file.file, f)
             
             logger.info(f"📄 Processing {file.filename} via WebUI /documents/upload endpoint")
-            print(f"DEBUG: About to call process_document_with_semantic_inference() with file: {tmp_path}")
+            print(f"DEBUG: About to call process_document_with_semantic_inference() with file: {file_path}")
             
             # Integrated processing: Entity extraction + relationship inference in one pipeline
             processing_result = await process_document_with_semantic_inference(
-                tmp_path, file.filename, rag_instance, rag_instance.llm_model_func
+                file_path, file.filename, rag_instance, rag_instance.llm_model_func
             )
             
             print(f"DEBUG: process_document_with_semantic_inference() returned: {processing_result}")
@@ -374,7 +382,7 @@ def create_documents_upload_endpoint(app, rag_instance):
             logger.info(f"   Relationships inferred: {processing_result['relationships_inferred']}")
             
             # Clean up temp file
-            os.unlink(tmp_path)
+            os.unlink(file_path)
             
             return JSONResponse({
                 "status": "success",
