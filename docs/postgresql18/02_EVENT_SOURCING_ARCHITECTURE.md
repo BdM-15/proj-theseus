@@ -25,6 +25,7 @@ rfp_documents table:
 ```
 
 **Problems**:
+
 1. ❌ **Amendment contamination**: When Amendment 0001 changes a requirement, do you UPDATE the entity (lose history) or INSERT new entity (duplicates)?
 2. ❌ **Proposal comparison**: How do you compare "what RFP required" vs. "what we proposed" if both are in same entities table?
 3. ❌ **Feedback traceability**: "Lacks detail on cloud migration" (debrief) → which proposal section → which RFP requirement?
@@ -73,29 +74,29 @@ EVALUATION_FEEDBACK (commit jkl012, parent: ghi789)
 ```sql
 CREATE TABLE document_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    
+
     -- Event metadata
     event_type VARCHAR(50) NOT NULL,              -- RFP_INITIAL, AMENDMENT, PROPOSAL_SUBMISSION, EVALUATION_FEEDBACK
     event_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    
+
     -- Git-style lineage
     parent_event_id UUID REFERENCES document_events(id),  -- NULL for base RFP, links to parent for amendments/proposals
     root_rfp_id UUID,                             -- Always points to base RFP (for fast "show all events for this RFP" queries)
-    
+
     -- Document metadata
     document_type VARCHAR(50),                    -- RFP, AMENDMENT, PROPOSAL_TECHNICAL, PROPOSAL_COST, DEBRIEF, EVALUATION_NOTICE
     original_filename VARCHAR(500),
-    
+
     -- ISOLATED knowledge graph (immutable)
     graphml_data BYTEA NOT NULL,                  -- THIS EVENT's knowledge graph (compressed)
     graphml_checksum VARCHAR(64) NOT NULL,        -- SHA-256 hash for integrity verification
-    
+
     -- Processing metadata
     entity_count INT,
     relationship_count INT,
     processing_time_seconds INT,
     processing_cost_usd NUMERIC(10,4),
-    
+
     -- Event-specific metadata (flexible JSONB)
     event_metadata JSONB DEFAULT '{}',
     /*
@@ -106,7 +107,7 @@ CREATE TABLE document_events (
       "critical_changes": 5,
       "changes_summary": "Changed page limits and added new deliverable"
     }
-    
+
     Example for PROPOSAL_SUBMISSION:
     {
       "volume": "Technical",
@@ -114,7 +115,7 @@ CREATE TABLE document_events (
       "submission_date": "2024-12-15",
       "team_members": ["Company A (Prime)", "Company B (Sub)"]
     }
-    
+
     Example for EVALUATION_FEEDBACK:
     {
       "feedback_type": "DEBRIEF",
@@ -124,13 +125,13 @@ CREATE TABLE document_events (
       "winner": "Competitor X"
     }
     */
-    
+
     -- Audit
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     created_by VARCHAR(100),                      -- User email or "system"
-    
+
     CONSTRAINT valid_event_type CHECK (event_type IN (
-        'RFP_INITIAL', 'AMENDMENT', 'PROPOSAL_SUBMISSION', 
+        'RFP_INITIAL', 'AMENDMENT', 'PROPOSAL_SUBMISSION',
         'EVALUATION_FEEDBACK', 'INTERCHANGE', 'DISCUSSION_NOTES',
         'PROTEST_RESPONSE', 'CONTRACT_AWARD'
     ))
@@ -154,20 +155,20 @@ CREATE INDEX idx_events_checksum ON document_events(graphml_checksum);
 CREATE TABLE entity_snapshots (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     event_id UUID NOT NULL REFERENCES document_events(id) ON DELETE CASCADE,
-    
+
     -- Entity core (from THIS event's processing)
     entity_name VARCHAR(500) NOT NULL,
     entity_type VARCHAR(50) NOT NULL,
     description TEXT NOT NULL,
-    
+
     -- Source tracking
     source_event_type VARCHAR(50),                -- RFP_INITIAL, AMENDMENT, PROPOSAL_SUBMISSION, etc.
     page_reference VARCHAR(50),
     section_reference VARCHAR(100),
-    
+
     -- Semantic search (pgvector)
     embedding vector(3072),                       -- OpenAI text-embedding-3-large
-    
+
     -- Event-specific metadata (flexible JSONB)
     metadata JSONB NOT NULL DEFAULT '{}',
     /*
@@ -177,14 +178,14 @@ CREATE TABLE entity_snapshots (
       "priority_score": 100,
       "modal_verb": "shall"
     }
-    
+
     Example for PROPOSED_SOLUTION (from Proposal):
     {
       "addresses_requirements": ["REQ_001", "REQ_042"],
       "win_theme": "Zero-downtime migration",
       "differentiator": "Unique phased approach"
     }
-    
+
     Example for WEAKNESS (from Feedback):
     {
       "factor_affected": "Technical Approach",
@@ -192,10 +193,10 @@ CREATE TABLE entity_snapshots (
       "evaluator_comment": "Lacks detail on report format"
     }
     */
-    
+
     -- Audit
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    
+
     CONSTRAINT unique_entity_per_event UNIQUE(event_id, entity_name),
     CONSTRAINT valid_entity_type CHECK (entity_type IN (
         'ORGANIZATION', 'CONCEPT', 'EVENT', 'TECHNOLOGY', 'PERSON', 'LOCATION',
@@ -231,23 +232,23 @@ CREATE INDEX idx_entity_snapshots_description_fts ON entity_snapshots USING gin(
 CREATE TABLE relationship_snapshots (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     event_id UUID NOT NULL REFERENCES document_events(id) ON DELETE CASCADE,
-    
+
     -- Relationship core
     source_entity_id UUID NOT NULL REFERENCES entity_snapshots(id) ON DELETE CASCADE,
     target_entity_id UUID NOT NULL REFERENCES entity_snapshots(id) ON DELETE CASCADE,
     relationship_type VARCHAR(50) NOT NULL,
-    
+
     -- Inference metadata
     confidence FLOAT,                              -- 0.0-1.0 (for LLM-inferred relationships)
     inference_method VARCHAR(50),                  -- "explicit", "semantic", "pattern", "llm"
     reasoning TEXT,                                -- Why this relationship was inferred
-    
+
     -- Relationship-specific metadata
     metadata JSONB DEFAULT '{}',
-    
+
     -- Audit
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    
+
     CONSTRAINT no_self_reference CHECK (source_entity_id != target_entity_id),
     CONSTRAINT unique_relationship_per_event UNIQUE(event_id, source_entity_id, target_entity_id, relationship_type)
 );
@@ -268,24 +269,24 @@ CREATE INDEX idx_rel_snapshots_type ON relationship_snapshots(relationship_type)
 ```sql
 CREATE TABLE entity_matches (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    
+
     -- The two entities being matched
     entity_1_id UUID NOT NULL REFERENCES entity_snapshots(id) ON DELETE CASCADE,
     entity_2_id UUID NOT NULL REFERENCES entity_snapshots(id) ON DELETE CASCADE,
-    
+
     -- Match metadata
     match_type VARCHAR(50) NOT NULL,              -- EXACT, SEMANTIC, EVOLVED, REFERENCED, ADDRESSES, CRITICIZES
     match_confidence FLOAT NOT NULL,              -- 0.0-1.0 (semantic similarity or LLM confidence)
     match_reasoning TEXT,                         -- LLM-generated explanation
-    
+
     -- Which events are being connected?
     event_1_id UUID NOT NULL REFERENCES document_events(id),
     event_2_id UUID NOT NULL REFERENCES document_events(id),
-    
+
     -- Evolution tracking (what changed between events?)
     delta_description TEXT,                       -- "Amendment changed page limit from 25 to 30 pages"
     impact_level VARCHAR(20),                     -- CRITICAL, HIGH, MEDIUM, LOW, NONE
-    
+
     -- Directional relationship (optional)
     relationship_direction VARCHAR(20),           -- FORWARD, BACKWARD, BIDIRECTIONAL
     /*
@@ -294,12 +295,12 @@ CREATE TABLE entity_matches (
     - BACKWARD: Feedback weakness → Proposal section (feedback critiques proposal)
     - BIDIRECTIONAL: Amendment requirement → Original requirement (evolution)
     */
-    
+
     -- Audit
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     match_method VARCHAR(50),                     -- AUTOMATIC, MANUAL, AGENT
     validated_by VARCHAR(100),                    -- User who confirmed match (if manual)
-    
+
     CONSTRAINT unique_match UNIQUE(entity_1_id, entity_2_id),
     CONSTRAINT no_self_match CHECK (entity_1_id != entity_2_id),
     CONSTRAINT different_events CHECK (event_1_id != event_2_id),
@@ -346,7 +347,7 @@ INSERT INTO document_events (
 
 -- Step 2: Insert 594 entity snapshots
 INSERT INTO entity_snapshots (event_id, entity_name, entity_type, description, embedding, metadata)
-SELECT 
+SELECT
     'event-1-uuid',
     entity_name,
     entity_type,
@@ -518,7 +519,7 @@ INSERT INTO entity_matches (
 -- Find the complete lineage of REQUIREMENT_001
 WITH RECURSIVE entity_lineage AS (
     -- Start with original RFP requirement
-    SELECT 
+    SELECT
         es.id AS entity_id,
         es.entity_name,
         es.description,
@@ -532,11 +533,11 @@ WITH RECURSIVE entity_lineage AS (
     WHERE es.entity_name = 'REQUIREMENT_001'
       AND de.event_type = 'RFP_INITIAL'
       AND de.root_rfp_id = 'navy-mbos-event-1'
-    
+
     UNION ALL
-    
+
     -- Recursively follow entity_matches to find evolution
-    SELECT 
+    SELECT
         es.id,
         es.entity_name,
         es.description,
@@ -547,7 +548,7 @@ WITH RECURSIVE entity_lineage AS (
         el.path || es.id
     FROM entity_lineage el
     JOIN entity_matches em ON el.entity_id IN (em.entity_1_id, em.entity_2_id)
-    JOIN entity_snapshots es ON es.id = CASE 
+    JOIN entity_snapshots es ON es.id = CASE
         WHEN em.entity_1_id = el.entity_id THEN em.entity_2_id
         ELSE em.entity_1_id
     END
@@ -555,18 +556,19 @@ WITH RECURSIVE entity_lineage AS (
     WHERE el.depth < 10  -- Prevent infinite loops
       AND es.id != ALL(el.path)  -- Prevent cycles
 )
-SELECT 
+SELECT
     entity_name,
     description,
     event_type,
     event_date,
     amendment_number,
     depth
-FROM entity_lineage 
+FROM entity_lineage
 ORDER BY depth, event_date;
 ```
 
 **Result**:
+
 ```
 entity_name              | description                                    | event_type            | amendment | depth
 -------------------------|------------------------------------------------|-----------------------|-----------|-------
@@ -582,7 +584,7 @@ WEAKNESS_TECH_2          | Lacks detail on report format                 | EVALU
 
 ```sql
 -- Find RFP requirements NOT addressed in proposal
-SELECT 
+SELECT
     es_rfp.entity_name AS requirement_id,
     es_rfp.description AS requirement_description,
     es_rfp.metadata->>'criticality_level' AS criticality,
@@ -626,7 +628,7 @@ ORDER BY (ef.metadata->>'factor_weight')::FLOAT DESC NULLS LAST;
 ```sql
 -- Find weaknesses that appear across multiple proposals for same agency
 WITH feedback_patterns AS (
-    SELECT 
+    SELECT
         es_feedback.entity_type,
         es_feedback.metadata->>'factor_affected' AS factor_affected,
         es_feedback.description AS weakness_description,
@@ -640,7 +642,7 @@ WITH feedback_patterns AS (
       AND es_feedback.entity_type IN ('WEAKNESS', 'DEFICIENCY')
       AND de_rfp.event_metadata->>'agency' = 'Department of Navy'
       AND de_feedback.created_at > NOW() - INTERVAL '2 years'
-    GROUP BY 
+    GROUP BY
         es_feedback.entity_type,
         es_feedback.metadata->>'factor_affected',
         es_feedback.description,
@@ -682,16 +684,16 @@ async def match_entities_between_events(
 ):
     """
     Agent: Automatically find entity matches between two document events
-    
+
     Algorithm:
     1. Semantic similarity (pgvector) - Fast first pass
     2. LLM analysis (Grok) - Determine match type and delta
     3. Insert entity_matches records
     """
-    
+
     conn = psycopg2.connect(os.getenv("DATABASE_URL"))
     cur = conn.cursor()
-    
+
     # Step 1: Load entities from both events
     cur.execute("""
         SELECT id, entity_name, entity_type, description, embedding, metadata
@@ -699,21 +701,21 @@ async def match_entities_between_events(
         WHERE event_id = %s
     """, (event_1_id,))
     entities_1 = cur.fetchall()
-    
+
     cur.execute("""
         SELECT id, entity_name, entity_type, description, embedding, metadata
         FROM entity_snapshots
         WHERE event_id = %s
     """, (event_2_id,))
     entities_2 = cur.fetchall()
-    
+
     # Step 2: Semantic similarity search (pgvector)
     matches_found = 0
     for e1_id, e1_name, e1_type, e1_desc, e1_emb, e1_meta in entities_1:
-        
+
         # Find similar entities in event 2 using cosine similarity
         cur.execute("""
-            SELECT 
+            SELECT
                 id, entity_name, entity_type, description, metadata,
                 1 - (embedding <=> %s::vector) AS similarity
             FROM entity_snapshots
@@ -723,46 +725,46 @@ async def match_entities_between_events(
             ORDER BY similarity DESC
             LIMIT 3  -- Top 3 candidates
         """, (e1_emb, event_2_id, e1_type, e1_emb, similarity_threshold))
-        
+
         candidates = cur.fetchall()
-        
+
         for e2_id, e2_name, e2_type, e2_desc, e2_meta, similarity in candidates:
-            
+
             # Step 3: LLM determines match type and delta
             agent = Agent(
                 model="openai:grok-beta",
                 result_type=EntityMatchResult
             )
-            
+
             result = await agent.run(f"""
             Compare these two entities and determine if they should be matched:
-            
+
             Entity 1 (from {event_1_id}):
             - Name: {e1_name}
             - Type: {e1_type}
             - Description: {e1_desc}
             - Metadata: {e1_meta}
-            
+
             Entity 2 (from {event_2_id}):
             - Name: {e2_name}
             - Type: {e2_type}
             - Description: {e2_desc}
             - Metadata: {e2_meta}
-            
+
             Semantic similarity: {similarity:.2f}
-            
+
             Determine:
             1. match_type: EXACT (unchanged), EVOLVED (modified), SEMANTIC (similar), ADDRESSES (responds to), CRITICIZES (critiques), or NO_MATCH
             2. confidence: 0.0-1.0 (adjust semantic similarity based on semantic analysis)
             3. delta_description: What changed between the two? (or how they relate)
             4. impact_level: CRITICAL, HIGH, MEDIUM, LOW, NONE
             5. reasoning: Why did you choose this match type?
-            
+
             If NO_MATCH, set confidence to 0.0.
             """)
-            
+
             match_result: EntityMatchResult = result.data
-            
+
             # Step 4: Insert match if confidence > threshold
             if match_result.confidence >= 0.7 and match_result.match_type != "NO_MATCH":
                 cur.execute("""
@@ -782,22 +784,24 @@ async def match_entities_between_events(
                     match_result.reasoning
                 ))
                 matches_found += 1
-    
+
     conn.commit()
     cur.close()
     conn.close()
-    
+
     return matches_found
 ```
 
 ### Agent Performance
 
 **Navy MBOS Amendment Example**:
+
 - Event 1 (RFP): 594 entities
 - Event 2 (Amendment): 620 entities
 - Combinations: 594 × 620 = 368,280 possible matches
 
 **Optimizations**:
+
 1. **Type filtering**: Only compare same entity types (REQUIREMENT → REQUIREMENT) → Reduces to ~80 × 80 = 6,400
 2. **Semantic similarity threshold**: Only analyze entities with similarity ≥ 0.85 → Reduces to ~200 candidates
 3. **LLM batch processing**: Analyze 10 entity pairs per prompt → 20 LLM calls
@@ -811,13 +815,13 @@ async def match_entities_between_events(
 
 ### Per RFP (4-Event Chain)
 
-| Event | Entities | Relationships | Matches | GraphML Blob | Total Size |
-|-------|----------|---------------|---------|--------------|------------|
-| RFP_INITIAL | 594 | 250 | 0 | 500 KB | 1.5 MB |
-| AMENDMENT_0001 | 620 | 265 | 594 | 520 KB | 2.0 MB |
-| PROPOSAL_SUBMISSION | 450 | 180 | 320 | 400 KB | 1.8 MB |
-| EVALUATION_FEEDBACK | 85 | 40 | 50 | 100 KB | 0.5 MB |
-| **Total** | **1,749** | **735** | **964** | **1.52 MB** | **5.8 MB** |
+| Event               | Entities  | Relationships | Matches | GraphML Blob | Total Size |
+| ------------------- | --------- | ------------- | ------- | ------------ | ---------- |
+| RFP_INITIAL         | 594       | 250           | 0       | 500 KB       | 1.5 MB     |
+| AMENDMENT_0001      | 620       | 265           | 594     | 520 KB       | 2.0 MB     |
+| PROPOSAL_SUBMISSION | 450       | 180           | 320     | 400 KB       | 1.8 MB     |
+| EVALUATION_FEEDBACK | 85        | 40            | 50      | 100 KB       | 0.5 MB     |
+| **Total**           | **1,749** | **735**       | **964** | **1.52 MB**  | **5.8 MB** |
 
 **100 RFPs with 4-event chains**: 580 MB  
 **1,000 RFPs with 4-event chains**: 5.8 GB
@@ -829,6 +833,7 @@ async def match_entities_between_events(
 ## ✅ Success Criteria (Branch 011)
 
 ### Functional Requirements
+
 - ✅ Process amendments without modifying original RFP entities
 - ✅ Link proposal sections to RFP requirements via entity matching
 - ✅ Trace requirement evolution through 4+ event chain
@@ -836,11 +841,13 @@ async def match_entities_between_events(
 - ✅ Agent achieves ≥90% entity matching accuracy
 
 ### Performance Requirements
+
 - ✅ Entity matching completes in ≤60 seconds per event pair
 - ✅ Cross-event recursive query completes in ≤2 seconds
 - ✅ Amendment processing creates new event (not update) in ≤90 seconds
 
 ### Data Integrity Requirements
+
 - ✅ Original event data never modified after creation
 - ✅ GraphML checksums verify integrity
 - ✅ Entity matches can be deleted/recreated without data loss
@@ -850,35 +857,42 @@ async def match_entities_between_events(
 ## 🚀 Implementation Roadmap
 
 ### Week 6: Event Sourcing Tables
+
 - Create 4 new tables (document_events, entity_snapshots, relationship_snapshots, entity_matches)
 - Migrate existing rfp_documents → document_events (convert to event-based model)
 
 ### Week 7: Entity Matching Agent
+
 - Build PydanticAI agent for semantic similarity + LLM analysis
 - Test on Navy MBOS RFP + Amendment 0001
 - Tune similarity thresholds for ≥90% accuracy
 
 ### Week 8: Amendment Processing
+
 - Add /process_amendment endpoint to app.py
 - Create event-2 from amendment upload
 - Run entity matching automatically
 
 ### Week 9: Proposal Processing
+
 - Add /process_proposal endpoint
 - Create event-3 from proposal upload
 - Match proposal sections to RFP requirements
 
 ### Week 10: Feedback Processing
+
 - Add /process_feedback endpoint
 - Create event-4 from debrief/evaluation notice
 - Match feedback weaknesses to proposal sections
 
 ### Week 11: Cross-Event Queries
+
 - Build recursive SQL queries for lineage tracing
 - Create lessons learned dashboard
 - Test with 5-10 real RFP chains
 
 ### Week 12: Production Deployment
+
 - AWS RDS migration
 - Performance optimization
 - User acceptance testing
