@@ -34,18 +34,19 @@ Transform GovCon-Capture-Vibe from single-workspace JSON storage to enterprise-g
 
 Each implementation task gets its own focused document:
 
-| Task                         | Document                         | Branch     | Status                | Estimated Time |
-| ---------------------------- | -------------------------------- | ---------- | --------------------- | -------------- |
-| PostgreSQL 18 local setup    | `TASK_01_LOCAL_SETUP.md`         | Branch 010 | ✅ Complete           | Week 1         |
-| Schema creation (17 tables)  | `TASK_02_SCHEMA_CREATION.md`     | Branch 010 | 📋 Create when needed | Week 2         |
-| JSON migration script        | `TASK_03_JSON_MIGRATION.md`      | Branch 010 | 📋 Create when needed | Week 3         |
-| Update app.py for PostgreSQL | `TASK_04_APP_INTEGRATION.md`     | Branch 010 | 📋 Create when needed | Week 4         |
-| Test with Navy MBOS baseline | `TASK_05_BASELINE_TESTING.md`    | Branch 010 | 📋 Create when needed | Week 5         |
-| Event sourcing tables        | `TASK_06_EVENT_TABLES.md`        | Branch 011 | 📋 Create when needed | Week 6-7       |
-| Entity matching agent        | `TASK_07_MATCHING_AGENT.md`      | Branch 011 | 📋 Create when needed | Week 8-9       |
-| Amendment processing         | `TASK_08_AMENDMENT_FLOW.md`      | Branch 011 | 📋 Create when needed | Week 10        |
-| Proposal comparison          | `TASK_09_PROPOSAL_COMPARISON.md` | Branch 011 | 📋 Create when needed | Week 11        |
-| Lessons learned dashboard    | `TASK_10_LESSONS_LEARNED.md`     | Branch 011 | 📋 Create when needed | Week 12        |
+| Task                         | Document                            | Branch     | Status                | Estimated Time |
+| ---------------------------- | ----------------------------------- | ---------- | --------------------- | -------------- |
+| PostgreSQL 18 local setup    | `TASK_01_LOCAL_SETUP.md`            | Branch 010 | ✅ Complete           | Week 1         |
+| Workspace selection UI       | `TASK_02_WORKSPACE_SELECTION_UI.md` | Branch 010 | 🔴 **URGENT**         | Week 2         |
+| Schema creation (17 tables)  | `TASK_03_SCHEMA_CREATION.md`        | Branch 010 | 📋 Create when needed | Week 2-3       |
+| JSON migration script        | `TASK_04_JSON_MIGRATION.md`         | Branch 010 | 📋 Create when needed | Week 3-4       |
+| Update app.py for PostgreSQL | `TASK_05_APP_INTEGRATION.md`        | Branch 010 | 📋 Create when needed | Week 4-5       |
+| Test with Navy MBOS baseline | `TASK_06_BASELINE_TESTING.md`       | Branch 010 | 📋 Create when needed | Week 5         |
+| Event sourcing tables        | `TASK_07_EVENT_TABLES.md`           | Branch 011 | 📋 Create when needed | Week 6-7       |
+| Entity matching agent        | `TASK_08_MATCHING_AGENT.md`         | Branch 011 | 📋 Create when needed | Week 8-9       |
+| Amendment processing         | `TASK_09_AMENDMENT_FLOW.md`         | Branch 011 | 📋 Create when needed | Week 10        |
+| Proposal comparison          | `TASK_10_PROPOSAL_COMPARISON.md`    | Branch 011 | 📋 Create when needed | Week 11        |
+| Lessons learned dashboard    | `TASK_11_LESSONS_LEARNED.md`        | Branch 011 | 📋 Create when needed | Week 12        |
 
 ---
 
@@ -133,7 +134,28 @@ PostgreSQL Database (4 new tables)
 - **Incremental sorting**: Better performance on large result sets
 - **Released**: September 2024 (stable)
 
-### 2. Why Event Sourcing?
+### 2. Why Workspace Isolation?
+
+**Problem**: Multiple RFPs, amendments, proposals stored in one database need logical separation without multiple databases.
+
+**Solution**: LightRAG's built-in `workspace` parameter provides row-level isolation in PostgreSQL:
+
+```sql
+-- Each workspace has its own entities
+SELECT * FROM entities WHERE workspace = 'navy_mbos_2025';
+SELECT * FROM entities WHERE workspace = 'army_comms_2025';
+```
+
+**Benefits**:
+
+- ✅ One PostgreSQL database, 100+ RFPs
+- ✅ Cross-workspace queries (lessons learned)
+- ✅ Event sourcing with workspace hierarchy
+- ✅ Zero data contamination
+
+**Implementation**: TASK_02 adds WebUI workspace dropdown for document uploads.
+
+### 3. Why Event Sourcing?
 
 **Problem**: Amendments modify requirements, proposals respond to RFPs, feedback references proposals. If you update entities in-place, you lose history.
 
@@ -149,7 +171,7 @@ PostgreSQL Database (4 new tables)
 
 **Trade-off**: More storage (minimal) for 10-100x faster queries.
 
-### 4. Why Hybrid Storage (Relational + JSONB)?
+### 5. Why Hybrid Storage (Relational + JSONB)?
 
 **Problem**: Entity types have unique fields (REQUIREMENT has criticality, EVALUATION_FACTOR has weight). Can't predict all future fields.
 
@@ -222,23 +244,46 @@ Follow **TASK_01_LOCAL_SETUP.md** to install PostgreSQL 18 + pgvector locally.
 
 **Success Criteria**: PostgreSQL 18.1+ running, pgvector installed, test connection works
 
-### Step 3: Create Schema (Week 2)
+### Step 3: Implement Workspace Selection UI (Week 2) - 🔴 **URGENT**
 
-Follow **TASK_02_SCHEMA_CREATION.md** (create from 01_SCHEMA_DESIGN.md when ready) to create 17 tables.
+Follow **TASK_02_WORKSPACE_SELECTION_UI.md** to add workspace dropdown to WebUI.
+
+**Why This is Critical**:
+
+- Blocks all event sourcing (Branch 011) - cannot process amendments/proposals without workspace isolation
+- Prevents data contamination - without workspace selection, all RFPs mix in PostgreSQL
+- Required for multi-RFP support - the core reason for PostgreSQL migration
+
+**Success Criteria**:
+
+- WebUI shows workspace dropdown
+- Users can create/select workspaces
+- Documents process to correct workspace (verify in PostgreSQL)
+- Workspace isolation confirmed (entities don't leak between workspaces)
+
+### Step 4: Create Schema (Weeks 2-3)
+
+Follow **TASK_03_SCHEMA_CREATION.md** (create from 01_SCHEMA_DESIGN.md when ready) to create 17 tables.
 
 **Success Criteria**: All 17 tables created with indexes, no SQL errors
 
-### Step 4: Migrate Navy MBOS (Week 3)
+### Step 5: Migrate Navy MBOS (Weeks 3-4)
 
-Follow **TASK_03_JSON_MIGRATION.md** (create from 03_FILE_MIGRATION_MAP.md when ready) to migrate baseline RFP.
+Follow **TASK_04_JSON_MIGRATION.md** (create from 03_FILE_MIGRATION_MAP.md when ready) to migrate baseline RFP.
 
 **Success Criteria**: 594 entities, 250 relationships migrated successfully
 
-### Step 5: Update Application (Week 4-5)
+### Step 6: Update Application (Weeks 4-5)
 
-Follow **TASK_04_APP_INTEGRATION.md** (create when ready) to update `src/raganything_server.py` for PostgreSQL.
+Follow **TASK_05_APP_INTEGRATION.md** (create when ready) to update `src/raganything_server.py` for PostgreSQL.
 
 **Success Criteria**: app.py queries PostgreSQL, WebUI works, no performance regression
+
+### Step 7: Baseline Testing (Week 5)
+
+Follow **TASK_06_BASELINE_TESTING.md** (create when ready) to validate PostgreSQL migration with Navy MBOS.
+
+**Success Criteria**: Processing time ≤ 69 seconds, entity count matches, queries work
 
 ---
 
@@ -252,10 +297,12 @@ Follow **TASK_04_APP_INTEGRATION.md** (create when ready) to update `src/raganyt
 
 ### PostgreSQL Implementation (This Folder)
 
+- `README.md` (this file) - Master plan and navigation
 - `01_SCHEMA_DESIGN.md` - 17-table schema reference
 - `02_EVENT_SOURCING_ARCHITECTURE.md` - Event-based design (Branch 011)
 - `03_FILE_MIGRATION_MAP.md` - JSON → PostgreSQL migration mapping
 - `TASK_01_LOCAL_SETUP.md` - PostgreSQL 18 installation guide
+- `TASK_02_WORKSPACE_SELECTION_UI.md` - Workspace dropdown implementation (URGENT)
 
 ### Future Features (After PostgreSQL Complete)
 

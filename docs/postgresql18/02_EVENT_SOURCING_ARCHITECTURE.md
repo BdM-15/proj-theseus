@@ -83,6 +83,10 @@ CREATE TABLE document_events (
     parent_event_id UUID REFERENCES document_events(id),  -- NULL for base RFP, links to parent for amendments/proposals
     root_rfp_id UUID,                             -- Always points to base RFP (for fast "show all events for this RFP" queries)
 
+    -- Workspace isolation (CRITICAL for multi-RFP support)
+    workspace VARCHAR(100) NOT NULL,              -- LightRAG workspace identifier (e.g., "navy_mbos_2025", "navy_mbos_2025_amendment_001")
+    parent_workspace VARCHAR(100),                -- Parent workspace (for amendment/proposal linking)
+
     -- Document metadata
     document_type VARCHAR(50),                    -- RFP, AMENDMENT, PROPOSAL_TECHNICAL, PROPOSAL_COST, DEBRIEF, EVALUATION_NOTICE
     original_filename VARCHAR(500),
@@ -143,6 +147,8 @@ CREATE INDEX idx_events_parent ON document_events(parent_event_id);
 CREATE INDEX idx_events_root ON document_events(root_rfp_id);
 CREATE INDEX idx_events_date ON document_events(event_date DESC);
 CREATE INDEX idx_events_checksum ON document_events(graphml_checksum);
+CREATE INDEX idx_events_workspace ON document_events(workspace);          -- NEW: Workspace isolation
+CREATE INDEX idx_events_parent_workspace ON document_events(parent_workspace);  -- NEW: Parent workspace lookup
 ```
 
 ---
@@ -329,15 +335,100 @@ CREATE INDEX idx_matches_impact ON entity_matches(impact_level);
 
 ## 🔄 Workflow Examples
 
+### Workspace Selection Workflow (How Documents Get Associated)
+
+**User uploads document via WebUI**:
+
+1. **User selects workspace from dropdown**:
+
+   ```
+   Workspace: [navy_mbos_2025 ▼]
+              - navy_mbos_2025
+              - army_comms_2025
+              - + Create New Workspace
+   ```
+
+2. **WebUI sends workspace parameter to `/insert` endpoint**:
+
+   ```javascript
+   formData.append("file", file);
+   formData.append("workspace", "navy_mbos_2025"); // From dropdown
+   formData.append("mode", "auto");
+   ```
+
+3. **Server gets workspace-specific RAGAnything instance**:
+
+   ```python
+   workspace = request.form.get('workspace', 'default')
+   rag = await workspace_manager.get_instance(workspace)
+   ```
+
+4. **LightRAG processes document in workspace**:
+
+   ```python
+   # All PostgreSQL operations use workspace parameter
+   # SELECT * FROM entities WHERE workspace = 'navy_mbos_2025'
+   # INSERT INTO entities (workspace, ...) VALUES ('navy_mbos_2025', ...)
+   ```
+
+5. **Event record created with workspace**:
+   ```sql
+   INSERT INTO document_events (workspace, event_type, ...)
+   VALUES ('navy_mbos_2025', 'RFP_INITIAL', ...);
+   ```
+
+**For amendments/proposals** (child events):
+
+1. **User selects PARENT workspace**:
+
+   ```
+   Workspace: [navy_mbos_2025 ▼]  -- Parent RFP workspace
+   Document Type: [Amendment ▼]
+   ```
+
+2. **System creates CHILD workspace**:
+
+   ```python
+   parent_workspace = 'navy_mbos_2025'
+   child_workspace = f'{parent_workspace}_amendment_001'  # Auto-generated
+   ```
+
+3. **Event record links to parent**:
+   ```sql
+   INSERT INTO document_events (
+       workspace, parent_workspace, parent_event_id, root_rfp_id, ...
+   ) VALUES (
+       'navy_mbos_2025_amendment_001',  -- Child workspace
+       'navy_mbos_2025',                -- Parent workspace
+       'event-1-uuid',                  -- Parent event
+       'event-1-uuid',                  -- Root RFP
+       ...
+   );
+   ```
+
+**Result**: Complete workspace hierarchy for traceability:
+
+```
+navy_mbos_2025                          (Base RFP workspace)
+├── navy_mbos_2025_amendment_001        (Amendment child workspace)
+│   └── navy_mbos_2025_amendment_002    (Amendment grandchild workspace)
+│       └── navy_mbos_2025_proposal     (Proposal great-grandchild workspace)
+│           └── navy_mbos_2025_feedback (Feedback great-great-grandchild workspace)
+```
+
+---
+
 ### Example 1: Process Navy MBOS RFP (Base Event)
 
 ```sql
 -- Step 1: Upload RFP → RAG-Anything processing → Phase 6 → Create Event 1
+-- User selected workspace: "navy_mbos_2025" from WebUI dropdown
 INSERT INTO document_events (
-    event_type, document_type, original_filename,
+    event_type, workspace, document_type, original_filename,
     graphml_data, entity_count, relationship_count
 ) VALUES (
     'RFP_INITIAL',
+    'navy_mbos_2025',  -- From WebUI workspace dropdown
     'RFP',
     'Navy_MBOS_RFP_2024.pdf',
     <graphml_blob>,
@@ -370,13 +461,18 @@ FROM parsed_graphml_relationships;
 
 ```sql
 -- Step 1: Upload Amendment → RAG-Anything processing → Phase 6 → Create Event 2
+-- User selected parent workspace: "navy_mbos_2025" from WebUI dropdown
+-- System auto-generates child workspace: "navy_mbos_2025_amendment_001"
 INSERT INTO document_events (
-    event_type, parent_event_id, root_rfp_id,
+    event_type, workspace, parent_workspace,
+    parent_event_id, root_rfp_id,
     document_type, original_filename,
     graphml_data, entity_count, relationship_count,
     event_metadata
 ) VALUES (
     'AMENDMENT',
+    'navy_mbos_2025_amendment_001',  -- Auto-generated child workspace
+    'navy_mbos_2025',                -- Parent workspace (from WebUI)
     'event-1-uuid',  -- Parent is base RFP
     'event-1-uuid',  -- Root is also base RFP
     'AMENDMENT',
