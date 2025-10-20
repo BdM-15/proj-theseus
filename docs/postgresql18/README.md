@@ -21,33 +21,31 @@ Transform GovCon-Capture-Vibe from single-workspace JSON storage to enterprise-g
 
 ## 📚 Documentation Structure
 
-### 1. Planning Documents (This Folder)
+### 1. Planning Documents (Reference Architecture)
 
-| Document                              | Purpose                                    | Status         |
-| ------------------------------------- | ------------------------------------------ | -------------- |
-| **README.md** (this file)             | Master plan and navigation                 | ✅ Complete    |
-| **01_SCHEMA_DESIGN.md**               | Complete 17-table schema for Branch 010    | ✅ Complete    |
-| **02_EVENT_SOURCING_ARCHITECTURE.md** | Advanced event-based design for Branch 011 | 🚧 In Progress |
-| **03_FILE_MIGRATION_MAP.md**          | JSON → PostgreSQL migration guide          | ✅ Complete    |
-| **04_ENTITY_MATCHING_ALGORITHM.md**   | Agent-powered cross-event linking          | 📋 Planned     |
-| **05_POSTGRESQL18_SETUP_GUIDE.md**    | Installation and configuration             | 📋 Planned     |
+| Document                              | Purpose                                    | Status      |
+| ------------------------------------- | ------------------------------------------ | ----------- |
+| **README.md** (this file)             | Master plan and navigation                 | ✅ Complete |
+| **01_SCHEMA_DESIGN.md**               | Complete 17-table schema for Branch 010    | ✅ Complete |
+| **02_EVENT_SOURCING_ARCHITECTURE.md** | Advanced event-based design for Branch 011 | ✅ Complete |
+| **03_FILE_MIGRATION_MAP.md**          | JSON → PostgreSQL migration guide          | ✅ Complete |
 
-### 2. Implementation Tasks (PRD-Style)
+### 2. Implementation Tasks (PRD-Style - Created As Needed)
 
 Each implementation task gets its own focused document:
 
-| Task                         | Document                         | Branch     | Estimated Time |
-| ---------------------------- | -------------------------------- | ---------- | -------------- |
-| PostgreSQL 18 local setup    | `TASK_01_LOCAL_SETUP.md`         | Branch 010 | Week 1         |
-| Schema creation (17 tables)  | `TASK_02_SCHEMA_CREATION.md`     | Branch 010 | Week 2         |
-| JSON migration script        | `TASK_03_JSON_MIGRATION.md`      | Branch 010 | Week 3         |
-| Update app.py for PostgreSQL | `TASK_04_APP_INTEGRATION.md`     | Branch 010 | Week 4         |
-| Test with Navy MBOS baseline | `TASK_05_BASELINE_TESTING.md`    | Branch 010 | Week 5         |
-| Event sourcing tables        | `TASK_06_EVENT_TABLES.md`        | Branch 011 | Week 6-7       |
-| Entity matching agent        | `TASK_07_MATCHING_AGENT.md`      | Branch 011 | Week 8-9       |
-| Amendment processing         | `TASK_08_AMENDMENT_FLOW.md`      | Branch 011 | Week 10        |
-| Proposal comparison          | `TASK_09_PROPOSAL_COMPARISON.md` | Branch 011 | Week 11        |
-| Lessons learned dashboard    | `TASK_10_LESSONS_LEARNED.md`     | Branch 011 | Week 12        |
+| Task                         | Document                         | Branch     | Status                | Estimated Time |
+| ---------------------------- | -------------------------------- | ---------- | --------------------- | -------------- |
+| PostgreSQL 18 local setup    | `TASK_01_LOCAL_SETUP.md`         | Branch 010 | ✅ Complete           | Week 1         |
+| Schema creation (17 tables)  | `TASK_02_SCHEMA_CREATION.md`     | Branch 010 | 📋 Create when needed | Week 2         |
+| JSON migration script        | `TASK_03_JSON_MIGRATION.md`      | Branch 010 | 📋 Create when needed | Week 3         |
+| Update app.py for PostgreSQL | `TASK_04_APP_INTEGRATION.md`     | Branch 010 | 📋 Create when needed | Week 4         |
+| Test with Navy MBOS baseline | `TASK_05_BASELINE_TESTING.md`    | Branch 010 | 📋 Create when needed | Week 5         |
+| Event sourcing tables        | `TASK_06_EVENT_TABLES.md`        | Branch 011 | 📋 Create when needed | Week 6-7       |
+| Entity matching agent        | `TASK_07_MATCHING_AGENT.md`      | Branch 011 | 📋 Create when needed | Week 8-9       |
+| Amendment processing         | `TASK_08_AMENDMENT_FLOW.md`      | Branch 011 | 📋 Create when needed | Week 10        |
+| Proposal comparison          | `TASK_09_PROPOSAL_COMPARISON.md` | Branch 011 | 📋 Create when needed | Week 11        |
+| Lessons learned dashboard    | `TASK_10_LESSONS_LEARNED.md`     | Branch 011 | 📋 Create when needed | Week 12        |
 
 ---
 
@@ -213,25 +211,34 @@ PostgreSQL Database (4 new tables)
 
 ### Step 1: Read Planning Documents (This Week)
 
-1. **01_SCHEMA_DESIGN.md** - Understand 17-table structure
-2. **02_EVENT_SOURCING_ARCHITECTURE.md** - Understand event-based design
-3. **03_FILE_MIGRATION_MAP.md** - Understand JSON → PostgreSQL mapping
+1. **README.md** (this file) - Understand overall architecture and timeline
+2. **01_SCHEMA_DESIGN.md** - Review 17-table structure
+3. **02_EVENT_SOURCING_ARCHITECTURE.md** - Review event-based design (Branch 011)
+4. **03_FILE_MIGRATION_MAP.md** - Review JSON → PostgreSQL mapping
 
 ### Step 2: Set Up PostgreSQL 18 (Week 1)
 
-Follow **TASK_01_LOCAL_SETUP.md** to install PostgreSQL 18 + pgvector + Apache AGE locally.
+Follow **TASK_01_LOCAL_SETUP.md** to install PostgreSQL 18 + pgvector locally.
+
+**Success Criteria**: PostgreSQL 18.1+ running, pgvector installed, test connection works
 
 ### Step 3: Create Schema (Week 2)
 
-Run SQL scripts from **TASK_02_SCHEMA_CREATION.md** to create 17 tables.
+Follow **TASK_02_SCHEMA_CREATION.md** (create from 01_SCHEMA_DESIGN.md when ready) to create 17 tables.
+
+**Success Criteria**: All 17 tables created with indexes, no SQL errors
 
 ### Step 4: Migrate Navy MBOS (Week 3)
 
-Run Python migration script from **TASK_03_JSON_MIGRATION.md** to move your baseline RFP.
+Follow **TASK_03_JSON_MIGRATION.md** (create from 03_FILE_MIGRATION_MAP.md when ready) to migrate baseline RFP.
+
+**Success Criteria**: 594 entities, 250 relationships migrated successfully
 
 ### Step 5: Update Application (Week 4-5)
 
-Follow **TASK_04_APP_INTEGRATION.md** to update `src/raganything_server.py` to query PostgreSQL.
+Follow **TASK_04_APP_INTEGRATION.md** (create when ready) to update `src/raganything_server.py` for PostgreSQL.
+
+**Success Criteria**: app.py queries PostgreSQL, WebUI works, no performance regression
 
 ---
 
@@ -239,15 +246,22 @@ Follow **TASK_04_APP_INTEGRATION.md** to update `src/raganything_server.py` to q
 
 ### Current System (Branch 008)
 
-- `docs/ARCHITECTURE.md` - Current JSON-based system
-- `.github/copilot-instructions.md` - System overview
-- `docs/SHIPLEY_LLM_CURATED_REFERENCE.md` - Shipley methodology
+- `docs/ARCHITECTURE.md` - Current JSON-based system architecture
+- `.github/copilot-instructions.md` - Complete system overview
+- `docs/capture-intelligence/SHIPLEY_LLM_CURATED_REFERENCE.md` - Shipley methodology
 
-### Future Features (After PostgreSQL)
+### PostgreSQL Implementation (This Folder)
 
-- `docs/PYDANTICAI_DECISION_SUMMARY.md` - Branch 009 agent implementation
-- `docs/AMENDMENT_HANDLING_ROADMAP.md` - Amendment processing (enabled by event sourcing)
-- `docs/CAPTURE_INTELLIGENCE_PATTERNS.md` - Lessons learned queries
+- `01_SCHEMA_DESIGN.md` - 17-table schema reference
+- `02_EVENT_SOURCING_ARCHITECTURE.md` - Event-based design (Branch 011)
+- `03_FILE_MIGRATION_MAP.md` - JSON → PostgreSQL migration mapping
+- `TASK_01_LOCAL_SETUP.md` - PostgreSQL 18 installation guide
+
+### Future Features (After PostgreSQL Complete)
+
+- `docs/capture-intelligence/FEATURE_ROADMAP.md` - Phase 9+ feature planning
+- `docs/agents/PYDANTICAI_DECISION_SUMMARY.md` - Agent architecture
+- `docs/amendments/AMENDMENT_HANDLING_ROADMAP.md` - Amendment processing
 
 ---
 
