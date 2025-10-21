@@ -80,7 +80,8 @@ async def process_document_with_semantic_inference(
     print(f"DEBUG: Now checking for GraphML file...")
     
     # Step 2: ROBUST - Wait for GraphML with exponential backoff
-    graphml_path = Path(global_args.working_dir) / "graph_chunk_entity_relation.graphml"
+    # CRITICAL: LightRAG writes to default/ subdirectory, not root working_dir
+    graphml_path = Path(global_args.working_dir) / "default" / "graph_chunk_entity_relation.graphml"
     
     max_retries = 5
     wait_times = [1, 2, 3, 4, 5]  # Total: 15 seconds max
@@ -200,7 +201,8 @@ async def post_process_knowledge_graph(rag_storage_path: str, llm_func) -> dict:
     logger.info("=" * 80)
     
     rag_storage = Path(rag_storage_path)
-    graphml_path = rag_storage / "graph_chunk_entity_relation.graphml"
+    # CRITICAL: LightRAG writes to default/ subdirectory
+    graphml_path = rag_storage / "default" / "graph_chunk_entity_relation.graphml"
     
     # Validate GraphML file exists
     if not graphml_path.exists():
@@ -238,7 +240,8 @@ async def post_process_knowledge_graph(rag_storage_path: str, llm_func) -> dict:
         logger.info(f"  [3/4] Saving {len(new_relationships)} new relationships...")
         
         save_relationships_to_graphml(graphml_path, new_relationships, nodes)
-        save_relationships_to_kv_store(rag_storage, new_relationships, nodes)
+        # kv_store files are in default/ subdirectory alongside GraphML
+        save_relationships_to_kv_store(rag_storage / "default", new_relationships, nodes)
         
         # Step 4: Final validation
         logger.info(f"  [4/4] Semantic post-processing complete")
