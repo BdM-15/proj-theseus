@@ -266,10 +266,35 @@ Edge keys (d6-d11):
 
 ---
 
-**Status**: � **PHASE 1 & 2 COMPLETE - READY FOR PRODUCTION USE**
+**Status**: 🟡 **PHASE 1 & 2 COMPLETE - PROMPT REFINEMENT IN PROGRESS**
+
+## 🔄 Latest Update: Prompt Strengthening (Branch 009 Iteration 2)
+
+**Issue Found**: After enabling gleaning, UNKNOWN entities increased 390% (23→113) and new generic types appeared (table, plan, policy, standard, instruction, system). LLM was inventing types not in ontology.
+
+**Solution Applied**: Combined Option 1 (strengthened rules) + Option 3 (classification examples)
+
+- Added explicit forbidden types list
+- Clear fallback mappings (plans→document, systems→technology, tables→concept)
+- 25+ concrete classification examples
+- Prompt size: 7,100 tokens (0.36% of 2M context)
+
+**Expected Results** (Next Processing):
+
+- UNKNOWN: 113 → ~20-30 (back to baseline)
+- Custom type coverage: 92.6% → 96%+
+- Total entities: ~3,400 (maintain gleaning benefits)
+- Eliminate: table, plan, policy, standard, instruction, system types
+
+**Next Actions**:
+
+1. ⏳ Restart server and reprocess RFP with updated prompt
+2. 📊 Validate UNKNOWN reduction and type classification improvement
+3. ✅ If successful → Ready for PostgreSQL migration
+4. ⚠️ If issues persist → Consider gleaning reduction (2→1)
 
 **Recommendation**:
 
-- ✅ Merge Branch 009 to main (configuration improvements validated)
-- ✅ Proceed with PostgreSQL migration (schema is clean)
-- ⚪ Phase 3 (code simplification) can be deferred as optional optimization
+- ⏸️ HOLD merge to main until prompt refinement validated
+- 🔄 Test iteration required before production use
+- ✅ GraphML schema and configuration cleanup remain solid
