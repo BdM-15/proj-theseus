@@ -21,7 +21,6 @@ from lightrag.api.config import global_args
 from lightrag.llm.openai import openai_complete_if_cache, openai_embed
 from lightrag.utils import EmbeddingFunc
 from raganything import RAGAnything, RAGAnythingConfig
-from lightrag.operate import chunking_by_token_size
 
 from src.core.prompt_loader import load_prompt
 
@@ -171,8 +170,11 @@ async def initialize_raganything():
         
         return await openai_embed(truncated_texts, model="text-embedding-3-large", api_key=openai_api_key)
     
+    # Get embedding dimension from environment (flexibility for different models)
+    embedding_dim = int(os.getenv("EMBEDDING_DIM", "3072"))
+    
     embedding_func = EmbeddingFunc(
-        embedding_dim=3072,
+        embedding_dim=embedding_dim,
         max_token_size=8192,  # OpenAI text-embedding-3-large limit
         func=safe_embed_func,
     )
@@ -182,6 +184,8 @@ async def initialize_raganything():
     custom_entity_extraction_prompt = load_prompt("entity_extraction/entity_extraction_prompt")
 
     # Initialize RAG-Anything with custom configuration
+    # IMPORTANT: LightRAG reads chunk_token_size from environment at import time
+    # Don't override via lightrag_kwargs - let it use CHUNK_SIZE from .env
     _rag_anything = RAGAnything(
         config=config,
         llm_model_func=llm_model_func,
@@ -192,9 +196,10 @@ async def initialize_raganything():
                 "entity_types": entity_types,
                 "entity_extraction_system_prompt": custom_entity_extraction_prompt,
             },
-            "chunking_func": chunking_by_token_size,
-            "chunk_token_size": int(os.getenv("CHUNK_SIZE", "50000")),  # LLM + embeddings (auto-truncate at 8192)
-            "chunk_overlap_token_size": int(os.getenv("CHUNK_OVERLAP_SIZE", "1000")),
+            # Chunking configuration comes from environment variables:
+            # - CHUNK_SIZE controls chunk_token_size (default: 8192)
+            # - CHUNK_OVERLAP_SIZE controls chunk_overlap_token_size (default: 1200)
+            # LightRAG reads these at dataclass field initialization time
         },
     )
     

@@ -52,7 +52,7 @@ def configure_raganything_args():
     global_args.embedding_model_name = "text-embedding-3-large"
     global_args.embedding_binding_host = "https://api.openai.com/v1"  # OpenAI endpoint for embeddings
     global_args.embedding_api_key = openai_api_key
-    global_args.embedding_dim = 3072  # CRITICAL: text-embedding-3-large dimension
+    global_args.embedding_dim = int(os.getenv("EMBEDDING_DIM", "3072"))  # Environment-driven for flexibility
     
     # Government contracting entity types (16 specialized types - consolidated for flexibility)
     # Semantic-first detection: Content determines entity type, not section labels
