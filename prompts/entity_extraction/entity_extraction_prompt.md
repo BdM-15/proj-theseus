@@ -27,26 +27,28 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
       - `entity_name`: The name of the entity. If the entity name is case-insensitive, capitalize the first letter of each significant word (title case). Ensure **consistent naming** across the entire extraction process.
       - `entity_type`: Categorize the entity using ONE of these exact types from the list below.
 
-        **CRITICAL: Entity types must be PLAIN UPPERCASE text only.**
+        **CRITICAL: Entity types must be lowercase with underscores (e.g., evaluation_factor).**
+        **ONLY use these 17 types. Do NOT use generic fallback types like "process", "other", "table", or "image".**
+        **If an entity doesn't clearly fit any type, use "concept" as the fallback.**
 
         Valid entity types (choose exactly ONE):
-        • ORGANIZATION
-        • CONCEPT
-        • EVENT
-        • TECHNOLOGY
-        • PERSON
-        • LOCATION
-        • REQUIREMENT
-        • CLAUSE
-        • SECTION
-        • DOCUMENT
-        • DELIVERABLE
-        • PROGRAM
-        • EQUIPMENT
-        • EVALUATION_FACTOR
-        • SUBMISSION_INSTRUCTION
-        • STRATEGIC_THEME
-        • STATEMENT_OF_WORK
+        • organization
+        • concept
+        • event
+        • technology
+        • person
+        • location
+        • requirement
+        • clause
+        • section
+        • document
+        • deliverable
+        • program
+        • equipment
+        • evaluation_factor
+        • submission_instruction
+        • strategic_theme
+        • statement_of_work
 
     - **Domain Knowledge - Government Contracting Patterns:**
 
