@@ -1130,23 +1130,220 @@ Algorithm: Extract section number from requirement source, map section to factor
 
 2.  **Relationship Extraction & Output:**
 
-    - **CRITICAL INSTRUCTION - Aggressive Relationship Extraction:**
+    - **RELATIONSHIP EXTRACTION PHILOSOPHY:**
+
+      **Extract relationships based on MEANING and SEMANTIC CONNECTION, not quotas.**
+
+      Knowledge graph quality depends on extracting **genuine, meaningful relationships** that:
+
+      - Reflect actual connections in the document
+      - Enable semantic navigation across related concepts
+      - Preserve document structure and cross-references
+      - Support capture intelligence queries
+
+      **DO NOT create fake relationships to meet numeric targets.**
+      **DO extract implicit relationships that genuinely exist in the content.**
+
+    - **COMPREHENSIVE RELATIONSHIP EXTRACTION RULES:**
 
       **YOU MUST EXTRACT BOTH EXPLICIT AND IMPLICIT RELATIONSHIPS!**
 
       - **Explicit relationships**: Directly stated in text ("addresses Factor 1", "incorporated in Section I")
       - **Implicit relationships**: Inferred from semantic similarity, naming patterns, or structural context
       - **DO NOT limit extraction to only explicitly stated relationships**
-      - **USE the relationship patterns described above** to infer connections
-      - **PRIORITIZE relationship extraction** - extract MORE relationships rather than fewer
-      - **CONFIDENCE is not required** - if semantic connection exists, create the relationship
+      - **USE the relationship patterns described above** to infer connections based on domain knowledge
+      - **PRIORITIZE meaningful connections** - extract relationships that add value for semantic search
+      - If a genuine semantic connection exists between entities, create the relationship
+      - Use the 50+ inference rules and patterns provided above as guidance
 
-      Examples of implicit relationships to extract:
+      **Examples of implicit relationships to extract when semantically justified:**
 
       - Topic matching: "Technical Volume" + "Technical Approach Factor" → GUIDES relationship
       - Naming patterns: "J-0001" + "Section J" → ATTACHMENT_OF relationship
       - Semantic similarity: "Help desk support requirement" + "Technical Support Factor" → EVALUATED_BY relationship
       - Co-location: Page limit mentioned in factor description → GUIDES relationship
+      - Shared keywords: Two requirements discussing same topic → RELATED_TO relationship
+      - Hierarchical: Any numbered entity (C.3.2.1) to its parent (C.3.2) → CHILD_OF relationship
+      - Cross-references: Entity A mentions Entity B by name → REFERENCES relationship
+      - Definitional: Entity A defines/explains Entity B → DEFINES relationship
+
+      **When to use each relationship type:**
+
+      - **CHILD_OF**: Hierarchical structure (sections, subsections, numbered documents)
+      - **ATTACHMENT_OF**: Documents attached to sections (J-0001 → Section J)
+      - **GUIDES**: Instructions that guide evaluation (Section L → Section M)
+      - **EVALUATED_BY**: Requirements/deliverables evaluated in factors (Requirement → Factor)
+      - **PRODUCES**: Work produces deliverables (SOW → CDRL)
+      - **REFERENCES**: Entity mentions another entity by name
+      - **CONTAINS**: Parent contains child (Section contains clauses)
+      - **RELATED_TO**: Semantic similarity, shared topics, or thematic connection
+      - **SUPPORTS**: One entity enables/supports another
+      - **DEFINES**: One entity defines/explains another
+
+    - **ONTOLOGY-GROUNDED RELATIONSHIP EXAMPLES:**
+
+      **Example 1: Hierarchical Document Structure (CHILD_OF)**
+
+      Entities extracted:
+
+      - entity|Section C Statement of Work|section|...
+      - entity|Section C.3 Technical Requirements|section|...
+      - entity|Section C.3.2 System Architecture|section|...
+
+      Relationships to extract:
+
+      ```
+      relation|Section C.3 Technical Requirements|Section C Statement of Work|CHILD_OF|Subsection C.3 is hierarchically contained within Section C
+      relation|Section C.3.2 System Architecture|Section C.3 Technical Requirements|CHILD_OF|Subsection C.3.2 is hierarchically contained within Section C.3
+      ```
+
+      Why: Numbered sections follow explicit hierarchy - extract parent-child relationships based on numbering pattern.
+
+      **Example 2: Clause Incorporation (CHILD_OF)**
+
+      Entities extracted:
+
+      - entity|Section I Contract Clauses|section|...
+      - entity|FAR 52.212-1|clause|Instructions to Offerors—Commercial Products and Services
+      - entity|DFARS 252.204-7012|clause|Safeguarding Covered Defense Information and Cyber Incident Reporting
+
+      Relationships to extract:
+
+      ```
+      relation|FAR 52.212-1|Section I Contract Clauses|CHILD_OF|FAR clause incorporated by reference in Section I per UCF standard
+      relation|DFARS 252.204-7012|Section I Contract Clauses|CHILD_OF|DFARS clause incorporated by reference in Section I per UCF standard
+      ```
+
+      Why: Federal clauses are standardly incorporated in Section I - create relationships even if not explicitly listed together.
+
+      **Example 3: Instruction-Evaluation Linking (GUIDES)**
+
+      Entities extracted:
+
+      - entity|Technical Approach Volume|submission_instruction|Proposal section limited to 25 pages addressing system architecture and integration methodology
+      - entity|Factor 1 Technical Approach|evaluation_factor|Most Important factor worth 40% evaluating technical solution and system design
+
+      Relationships to extract:
+
+      ```
+      relation|Technical Approach Volume|Factor 1 Technical Approach|GUIDES|Submission instruction addresses content evaluated in this factor based on topic matching (technical, architecture, system)
+      ```
+
+      Why: Both mention "technical approach" and "system" - semantic similarity indicates the instruction guides content for this evaluation factor.
+
+      **Example 4: Requirement-Evaluation Mapping (EVALUATED_BY)**
+
+      Entities extracted:
+
+      - entity|ISO 9001 Certification Requirement|requirement|Contractor shall maintain ISO 9001:2015 certification throughout contract period
+      - entity|Factor 3 Quality Assurance|evaluation_factor|Evaluation factor assessing quality management capabilities including ISO certification and quality processes
+
+      Relationships to extract:
+
+      ```
+      relation|ISO 9001 Certification Requirement|Factor 3 Quality Assurance|EVALUATED_BY|Quality certification requirement will be evaluated in quality assurance factor based on topic match (ISO, quality)
+      ```
+
+      Why: Requirement mentions "ISO 9001" and factor evaluates "ISO certification" - direct topic alignment indicates evaluation relationship.
+
+      **Example 5: Work-Deliverable Production (PRODUCES)**
+
+      Entities extracted:
+
+      - entity|Performance Work Statement|statement_of_work|Detailed task descriptions including monthly reporting requirements
+      - entity|CDRL A001 Monthly Status Report|deliverable|Monthly status report due 5th business day of following month
+
+      Relationships to extract:
+
+      ```
+      relation|Performance Work Statement|CDRL A001 Monthly Status Report|PRODUCES|PWS defines monthly reporting requirement that produces this CDRL deliverable
+      ```
+
+      Why: PWS task descriptions specify deliverable requirements that result in CDRLs - extract production relationship.
+
+      **Example 6: Attachment Hierarchy (ATTACHMENT_OF)**
+
+      Entities extracted:
+
+      - entity|Section J List of Attachments|section|...
+      - entity|J-02000000 Performance Work Statement|document|Attachment containing detailed performance requirements
+      - entity|Attachment 1 Quality Assurance Plan|document|...
+
+      Relationships to extract:
+
+      ```
+      relation|J-02000000 Performance Work Statement|Section J List of Attachments|ATTACHMENT_OF|Numbered attachment J-02000000 is listed under Section J per naming convention
+      relation|Attachment 1 Quality Assurance Plan|Section J List of Attachments|ATTACHMENT_OF|Attachment 1 is incorporated in Section J attachments list
+      ```
+
+      Why: Naming patterns (J-####, Attachment #) indicate document is an attachment of Section J.
+
+      **Example 7: Cross-Topic Semantic Relationships (RELATED_TO)**
+
+      Entities extracted:
+
+      - entity|Cybersecurity Requirements|requirement|Contractor shall implement NIST SP 800-171 security controls
+      - entity|System Architecture Design|requirement|Contractor shall design system with security-first architecture principles
+      - entity|NIST SP 800-171 Compliance|concept|Federal security standard for protecting Controlled Unclassified Information
+
+      Relationships to extract:
+
+      ```
+      relation|Cybersecurity Requirements|NIST SP 800-171 Compliance|RELATED_TO|Cybersecurity requirement references NIST SP 800-171 standard
+      relation|System Architecture Design|Cybersecurity Requirements|RELATED_TO|Architecture requirement incorporates security principles related to cybersecurity requirements
+      ```
+
+      Why: Both requirements discuss security/cybersecurity topics - thematic connection justifies RELATED_TO relationship.
+
+      **Example 8: Program-Equipment Relationships (RELATED_TO)**
+
+      Entities extracted:
+
+      - entity|MCPP II Program|program|Marine Corps Prepositioning Program II providing equipment sets
+      - entity|M1A1 Abrams Tank|equipment|Main battle tank prepositioned in MCPP stocks
+      - entity|Equipment Maintenance Services|requirement|Contractor shall maintain prepositioned equipment in ready condition
+
+      Relationships to extract:
+
+      ```
+      relation|M1A1 Abrams Tank|MCPP II Program|RELATED_TO|Tank equipment is part of MCPP II prepositioned stocks
+      relation|Equipment Maintenance Services|M1A1 Abrams Tank|RELATED_TO|Maintenance requirement applies to tank equipment
+      relation|Equipment Maintenance Services|MCPP II Program|RELATED_TO|Maintenance services support MCPP II program objectives
+      ```
+
+      Why: Program, equipment, and maintenance requirement form semantic cluster around prepositioning concept.
+
+      **Example 9: Strategic Theme Clustering (SUPPORTS)**
+
+      Entities extracted:
+
+      - entity|Veteran Hiring Initiative|strategic_theme|Commitment to hiring veterans for key positions
+      - entity|Small Business Partnerships|strategic_theme|Teaming with veteran-owned small businesses
+      - entity|Workforce Development Plan|requirement|Contractor shall develop workforce plan emphasizing veteran recruitment
+
+      Relationships to extract:
+
+      ```
+      relation|Veteran Hiring Initiative|Workforce Development Plan|SUPPORTS|Strategic theme supports workforce planning requirement focused on veteran hiring
+      relation|Small Business Partnerships|Veteran Hiring Initiative|RELATED_TO|Small business teaming theme relates to veteran hiring through VOSB partnerships
+      ```
+
+      Why: Strategic themes and requirements aligned on veteran employment create meaningful support/thematic relationships.
+
+      **Example 10: NOT Extracting Forced Relationships**
+
+      Entities extracted:
+
+      - entity|Payment Terms|concept|Net 30 payment terms for invoice processing
+      - entity|Cybersecurity Controls|requirement|Contractor shall implement NIST SP 800-171 controls
+
+      Relationships to AVOID:
+
+      ```
+      ❌ relation|Payment Terms|Cybersecurity Controls|RELATED_TO|Both are contract requirements
+      ```
+
+      Why NOT extract: Payment and cybersecurity have NO semantic connection - different topics, no shared keywords, no logical relationship. DO NOT create relationships just to connect isolated entities.
 
     - **Identification:** Identify ALL direct and implicit relationships between previously extracted entities.
     - **N-ary Relationship Decomposition:** If a single statement describes a relationship involving more than two entities (an N-ary relationship), decompose it into multiple binary (two-entity) relationship pairs for separate description.

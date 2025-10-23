@@ -286,7 +286,146 @@ async def infer_all_relationships(
         )
         all_new_relationships.extend(sow_deliverable_rels)
     
+    # Algorithm 6: Type-Based Heuristics (NEW - Solution 2)
+    logger.info(f"\n  [6/6] Type-Based Heuristics: Domain-Specific Patterns...")
+    heuristic_rels = apply_type_based_heuristics(grouped, existing_edges)
+    all_new_relationships.extend(heuristic_rels)
+    logger.info(f"    ✅ Added {len(heuristic_rels)} deterministic relationships")
+    
     logger.info(f"\n  🎯 Total relationships inferred: {len(all_new_relationships)}")
     logger.info("=" * 80)
     
     return all_new_relationships
+
+
+def apply_type_based_heuristics(
+    grouped: Dict[str, List[Dict]],
+    existing_edges: List[Dict]
+) -> List[Dict]:
+    """
+    Apply deterministic type-based relationship rules based on government contracting patterns.
+    
+    These are high-confidence structural relationships that don't require LLM inference:
+    - DELIVERABLE entities → Section J (standard UCF location)
+    - CLAUSE entities → Section I (standard UCF location)
+    - EVALUATION_FACTOR entities → Section M (standard UCF location)
+    - SUBMISSION_INSTRUCTION entities → Section L (standard UCF location)
+    
+    Args:
+        grouped: Entity dictionary grouped by type
+        existing_edges: List of existing relationships (for deduplication)
+        
+    Returns:
+        List of new relationship dicts
+    """
+    new_relationships = []
+    
+    # Create deduplication set
+    existing_pairs = set()
+    for edge in existing_edges:
+        source = edge.get('source')
+        target = edge.get('target')
+        if source and target:
+            existing_pairs.add((source, target))
+            existing_pairs.add((target, source))
+    
+    # Helper function to find section by name pattern
+    def find_section(section_name_pattern: str) -> Dict:
+        """Find section entity by name pattern (case-insensitive)."""
+        if 'section' not in grouped:
+            return None
+        for section in grouped['section']:
+            name = section.get('entity_name', '').lower()
+            if section_name_pattern.lower() in name:
+                return section
+        return None
+    
+    # Pattern 1: DELIVERABLE → Section J
+    section_j = find_section('section j')
+    if section_j and 'deliverable' in grouped:
+        for deliverable in grouped['deliverable']:
+            source_id = deliverable.get('id')
+            target_id = section_j.get('id')
+            if source_id and target_id and (source_id, target_id) not in existing_pairs:
+                new_relationships.append({
+                    'source_id': source_id,
+                    'target_id': target_id,
+                    'relationship_type': 'CHILD_OF',
+                    'confidence': 0.90,
+                    'reasoning': 'Deliverables are typically listed in Section J attachments per UCF standard'
+                })
+    
+    # Pattern 2: CLAUSE → Section I
+    section_i = find_section('section i')
+    if section_i and 'clause' in grouped:
+        for clause in grouped['clause']:
+            source_id = clause.get('id')
+            target_id = section_i.get('id')
+            if source_id and target_id and (source_id, target_id) not in existing_pairs:
+                new_relationships.append({
+                    'source_id': source_id,
+                    'target_id': target_id,
+                    'relationship_type': 'CHILD_OF',
+                    'confidence': 0.95,
+                    'reasoning': 'FAR/DFARS clauses are incorporated in Section I per UCF standard'
+                })
+    
+    # Pattern 3: EVALUATION_FACTOR → Section M
+    section_m = find_section('section m')
+    if section_m and 'evaluation_factor' in grouped:
+        for factor in grouped['evaluation_factor']:
+            source_id = factor.get('id')
+            target_id = section_m.get('id')
+            if source_id and target_id and (source_id, target_id) not in existing_pairs:
+                new_relationships.append({
+                    'source_id': source_id,
+                    'target_id': target_id,
+                    'relationship_type': 'CHILD_OF',
+                    'confidence': 0.95,
+                    'reasoning': 'Evaluation factors are defined in Section M per UCF standard'
+                })
+    
+    # Pattern 4: SUBMISSION_INSTRUCTION → Section L
+    section_l = find_section('section l')
+    if section_l and 'submission_instruction' in grouped:
+        for instruction in grouped['submission_instruction']:
+            source_id = instruction.get('id')
+            target_id = section_l.get('id')
+            if source_id and target_id and (source_id, target_id) not in existing_pairs:
+                new_relationships.append({
+                    'source_id': source_id,
+                    'target_id': target_id,
+                    'relationship_type': 'CHILD_OF',
+                    'confidence': 0.95,
+                    'reasoning': 'Submission instructions are provided in Section L per UCF standard'
+                })
+    
+    # Pattern 5: STATEMENT_OF_WORK → Section C (or Section J if in attachments)
+    section_c = find_section('section c')
+    if section_c and 'statement_of_work' in grouped:
+        for sow in grouped['statement_of_work']:
+            # Check if SOW is in Section C or Section J (look for J- pattern in description)
+            description = sow.get('description', '').lower()
+            name = sow.get('entity_name', '').lower()
+            
+            # If name contains J- or attachment patterns, link to Section J
+            if 'j-' in name or 'attachment' in name.lower() or 'annex' in name.lower():
+                target_section = find_section('section j')
+                if not target_section:
+                    target_section = section_c  # Fallback to Section C
+            else:
+                target_section = section_c
+            
+            if target_section:
+                source_id = sow.get('id')
+                target_id = target_section.get('id')
+                if source_id and target_id and (source_id, target_id) not in existing_pairs:
+                    new_relationships.append({
+                        'source_id': source_id,
+                        'target_id': target_id,
+                        'relationship_type': 'CHILD_OF',
+                        'confidence': 0.85,
+                        'reasoning': 'SOW/PWS typically located in Section C or Section J attachments'
+                    })
+    
+    return new_relationships
