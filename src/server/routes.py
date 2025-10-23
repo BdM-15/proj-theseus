@@ -211,15 +211,32 @@ async def post_process_knowledge_graph(rag_storage_path: str, llm_func) -> dict:
     
     try:
         # Step 1: Parse GraphML to extract entities and relationships
-        logger.info(f"  [1/4] Parsing GraphML: {graphml_path.name}")
+        logger.info(f"  [1/5] Parsing GraphML: {graphml_path.name}")
         nodes, existing_edges = parse_graphml(graphml_path)
         
         if not nodes:
             logger.warning(f"No entities found in GraphML, skipping post-processing")
             return {"status": "skipped", "reason": "no_entities"}
         
-        # Step 2: Use LLM to infer missing relationships
-        logger.info(f"  [2/4] Calling Grok LLM for semantic relationship inference...")
+        # Step 2: Cleanup forbidden entity types (UNKNOWN, other, etc.)
+        logger.info(f"  [2/5] Cleaning up forbidden entity types...")
+        from src.inference.forbidden_type_cleanup import cleanup_forbidden_types
+        
+        nodes, retyping_map = await cleanup_forbidden_types(
+            entities=nodes,
+            llm_func=llm_func,
+            batch_size=50
+        )
+        
+        if retyping_map:
+            logger.info(f"  ✅ Retyped {len(retyping_map)} entities with forbidden types")
+            # Save cleaned entities back to GraphML immediately
+            from src.inference.graph_io import save_cleaned_entities_to_graphml
+            save_cleaned_entities_to_graphml(graphml_path, nodes)
+            logger.info(f"  ✅ Saved cleaned entities to GraphML")
+        
+        # Step 3: Use LLM to infer missing relationships
+        logger.info(f"  [3/5] Calling Grok LLM for semantic relationship inference...")
         
         new_relationships = await infer_all_relationships(
             nodes=nodes,
@@ -236,15 +253,15 @@ async def post_process_knowledge_graph(rag_storage_path: str, llm_func) -> dict:
                 "message": "No new relationships needed"
             }
         
-        # Step 3: Save new relationships to both GraphML and kv_store
-        logger.info(f"  [3/4] Saving {len(new_relationships)} new relationships...")
+        # Step 4: Save new relationships to both GraphML and kv_store
+        logger.info(f"  [4/5] Saving {len(new_relationships)} new relationships...")
         
         save_relationships_to_graphml(graphml_path, new_relationships, nodes)
         # kv_store files are in default/ subdirectory alongside GraphML
         save_relationships_to_kv_store(rag_storage / "default", new_relationships, nodes)
         
-        # Step 4: Final validation
-        logger.info(f"  [4/4] Semantic post-processing complete")
+        # Step 5: Final validation
+        logger.info(f"  [5/5] Semantic post-processing complete")
         
         logger.info("=" * 80)
         logger.info(f"🎯 SEMANTIC POST-PROCESSING COMPLETE")

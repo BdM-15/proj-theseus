@@ -89,6 +89,48 @@ def parse_graphml(graphml_path: Path) -> Tuple[List[Dict], List[Dict]]:
     return nodes, edges
 
 
+def save_cleaned_entities_to_graphml(
+    graphml_path: Path,
+    nodes: List[Dict]
+) -> None:
+    """
+    Update entity types in GraphML after cleanup (removes UNKNOWN, other, #prefixes).
+    
+    Args:
+        graphml_path: Path to graph_chunk_entity_relation.graphml file
+        nodes: List of cleaned entity dicts with updated entity_type fields
+    """
+    # Parse existing GraphML
+    tree = ET.parse(graphml_path)
+    root = tree.getroot()
+    
+    ns = {'graphml': 'http://graphml.graphdrawing.org/xmlns'}
+    
+    # Create entity_type lookup from cleaned nodes
+    entity_type_map = {node['id']: node.get('entity_type', 'concept') for node in nodes}
+    
+    # Update entity_type (d1) for all nodes
+    updated_count = 0
+    for node in root.findall('.//graphml:node', ns):
+        node_id = node.get('id')
+        if node_id in entity_type_map:
+            new_type = entity_type_map[node_id]
+            
+            # Find d1 (entity_type) data element
+            for data in node.findall('graphml:data', ns):
+                if data.get('key') == 'd1':
+                    old_type = data.text
+                    if old_type != new_type:
+                        data.text = new_type
+                        updated_count += 1
+                        logger.debug(f"Updated {node_id}: {old_type} → {new_type}")
+                    break
+    
+    # Write updated GraphML back to file
+    tree.write(graphml_path, encoding='utf-8', xml_declaration=True)
+    logger.info(f"  ✅ Updated {updated_count} entity types in GraphML")
+
+
 def save_relationships_to_graphml(
     graphml_path: Path,
     new_relationships: List[Dict],

@@ -25,6 +25,134 @@ section_origin = detect_section(context)  # Could be L, M, or custom
 
 ---
 
+## Uniform Contract Format (UCF) Reference
+
+### Standard Federal RFP Structure (FAR 15.210)
+
+Federal solicitations use standard lettered sections A-M. **Note**: Extract entities based on CONTENT, not just section labels.
+
+| Section       | Purpose                    | Common Entity Types                                  | Content Signals                                                                          |
+| ------------- | -------------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| **Section A** | Solicitation/Contract Form | section, organization, person, event                 | SF 1449, cover page, solicitation number, POCs, Q&A deadline                             |
+| **Section B** | Supplies/Services & Prices | section, concept, program                            | CLIN/SLIN structure, pricing tables, line items, unit prices                             |
+| **Section C** | Statement of Work          | section, statement_of_work, requirement, deliverable | "contractor shall", task descriptions, performance objectives, work scope                |
+| **Section H** | Special Requirements       | section, requirement, person, location               | Security clearances, key personnel, organizational conflicts, facility requirements      |
+| **Section I** | Contract Clauses           | section, clause                                      | FAR/DFARS citations, "52.###-##" patterns, "incorporated by reference"                   |
+| **Section J** | Attachments                | section, document, statement_of_work                 | "Attachment", "Annex", "Exhibit", "J-####", referenced documents                         |
+| **Section L** | Instructions to Offerors   | section, submission_instruction                      | Page limits, font requirements, "proposal shall", volume structure, submission deadlines |
+| **Section M** | Evaluation Factors         | section, evaluation_factor                           | "will be evaluated", factor hierarchy, relative importance, adjectival ratings           |
+
+### Non-Standard Label Mapping
+
+Task Orders and Fair Opportunity Requests often use different terminology:
+
+| Non-Standard Label            | Standard Equivalent | Detection Strategy                       |
+| ----------------------------- | ------------------- | ---------------------------------------- |
+| Request for Quote (RFQ)       | Section A           | Cover page content signals               |
+| Technical Requirements        | Section C           | Task descriptions, requirements language |
+| Work Requirements             | Section C           | "shall perform" statements               |
+| Statement of Objectives (SOO) | Section C           | Outcome-based language                   |
+| Proposal Instructions         | Section L           | Page limits, format requirements         |
+| Submission Requirements       | Section L           | Submission deadlines, volume structure   |
+| Selection Criteria            | Section M           | Evaluation factor language               |
+| Evaluation Methodology        | Section M           | Adjectival ratings, scoring methodology  |
+| Source Selection Plan         | Section M           | Tradeoff approach, best value language   |
+
+### Agency-Specific Variations
+
+Different agencies use custom terminology:
+
+| Agency Term                      | Standard Equivalent | Entity Type Guidance                 |
+| -------------------------------- | ------------------- | ------------------------------------ |
+| Scope of Work                    | Section C           | Extract as statement_of_work         |
+| Performance Work Statement (PWS) | Section C           | Extract as statement_of_work         |
+| Special Contract Requirements    | Section H           | Extract requirements as requirement  |
+| Applicable Clauses               | Section I           | Extract individual clauses as clause |
+| Required Certifications          | Section K           | Extract as requirement (compliance)  |
+
+### Content-Based Detection Rules
+
+When section labels are ambiguous or missing:
+
+**EVALUATION_FACTOR Detection Signals:**
+
+- "will be evaluated", "evaluation factor", "most important"
+- "adjectival rating", "source selection", "significantly more important"
+- Factor numbering (M1, M2, M2.1), Point scores (100 points total)
+
+**SUBMISSION_INSTRUCTION Detection Signals:**
+
+- "page limit", "font size", "proposal shall", "volume structure"
+- "submit by", "electronic submission", "format requirements"
+- "Times New Roman 12pt", "1-inch margins"
+
+**CLAUSE Detection Signals:**
+
+- FAR/DFARS/AFFARS/NMCARS patterns: "52.###-##", "252.###-####"
+- "incorporated by reference", "clause title", "full text"
+
+**STATEMENT_OF_WORK Detection Signals:**
+
+- Task descriptions, performance objectives, deliverables lists
+- "contractor shall perform", Task numbering (1.0, 1.1, 1.1.1)
+- "SOW", "PWS", "SOO" labels
+
+### Mixed Content Handling
+
+Some sections contain multiple entity types:
+
+**Example 1: Section M with Embedded Instructions**
+
+```
+Section M: Evaluation Factors
+
+Factor 1: Technical Approach (Most Important)
+[Evaluation criteria...]
+The Technical Volume shall be limited to 25 pages...
+```
+
+**Extract**:
+
+- EVALUATION_FACTOR: "Factor 1: Technical Approach"
+- SUBMISSION_INSTRUCTION: "Technical Volume page limit"
+- Link them: SUBMISSION_INSTRUCTION --EVALUATED_BY--> EVALUATION_FACTOR
+
+**Example 2: Section C as Attachment**
+
+```
+Section C: Description/Specifications/Data
+See Attachment J-0200000-18 for Performance Work Statement.
+```
+
+**Extract**:
+
+- SECTION: "Section C"
+- DOCUMENT: "Attachment J-0200000-18"
+- STATEMENT_OF_WORK: "Performance Work Statement"
+- Link them: SECTION --REFERENCES--> DOCUMENT --CONTAINS--> STATEMENT_OF_WORK
+
+### Section Attribution for Ambiguous Entities
+
+**Clause Attribution:**
+
+- All FAR/DFARS clauses → Section I (Contract Clauses)
+- Representations/certifications (52.2##-## series) → Section K
+
+**Annex Attribution (Prefix-Based):**
+
+- `J-######` → Section J
+- `Attachment #` → Section J
+- `Annex ##` → Section J or standalone
+- Letter prefix → Corresponding section (A-#### → Section A)
+
+**Requirement Attribution:**
+
+- Default to Section C (SOW)
+- Unless labeled "Section H" → Special Requirements
+- Or part of Section I/K → Clauses/Certifications
+
+---
+
 ## Entity Type 1: EVALUATION_FACTOR
 
 ### Content Signals
@@ -55,23 +183,9 @@ section_origin = detect_section(context)  # Could be L, M, or custom
 - **Alternate**: Section L (sometimes embedded)
 - **Non-standard**: "Selection Criteria", "Source Selection Plan"
 
-### Metadata to Extract
+### Basic Attributes
 
-```json
-{
-  "factor_id": "M1" | "M2.1" | "M2.1.1",
-  "factor_name": "Technical Approach" | "Staffing Plan" | "Management Approach",
-  "relative_importance": "Most Important" | "Significantly More Important" | "Equal" | "Less Important",
-  "subfactors": ["M2.1 Staffing", "M2.2 Maintenance", "M2.3 Transition"],
-  "section_l_reference": "L.3.1" (link to submission instructions),
-  "page_limits": "25 pages" (from Section L cross-reference),
-  "format_requirements": "12pt Times New Roman, 1-inch margins",
-  "tradeoff_methodology": "Best Value" | "LPTA" | "Cost/Technical Tradeoff",
-  "evaluated_by_rating": "Adjectival" | "Point Score" | "Pass/Fail",
-  "section_origin": "Section M.2" | "Selection Criteria",
-  "contains_submission_instructions": true | false
-}
-```
+Capture entity_name, entity_type, and description. Additional structured metadata (factor_id, relative_importance, subfactors) can be enriched during query-time operations.
 
 ### Examples from Real RFPs
 
@@ -190,20 +304,9 @@ in separate sections.
 SUBMISSION_INSTRUCTION "Technical Volume Format" → GUIDES → EVALUATION_FACTOR "Factor 1"
 ```
 
-### Metadata to Extract
+### Basic Attributes
 
-```json
-{
-  "guides_factor": "M2" (which evaluation factor this instructs),
-  "volume_name": "Technical Volume" | "Management Volume" | "Cost Volume",
-  "page_limits": "25 pages" | "50 pages maximum" | "No limit",
-  "format_requirements": "12pt Times New Roman, 1-inch margins, single-spaced",
-  "section_origin": "Section L.3.1" | "Section M.2 (embedded)",
-  "delivery_method": "Electronic via email" | "Hard copy + electronic" | "Electronic portal",
-  "deadline": "2025-03-15T14:00:00-05:00" (ISO 8601),
-  "file_format": "PDF" | "MS Word" | "Both"
-}
-```
+Capture entity_name, entity_type, and description. Additional structured metadata (page_limits, format_requirements, deadlines) can be enriched during query-time operations.
 
 ### Examples from Real RFPs
 
@@ -365,19 +468,9 @@ organizational chart, resumes for key personnel, and project schedule.
   - "Peer code review required"
   - "User acceptance testing (UAT)"
 
-### Metadata to Extract
+### Basic Attributes
 
-```json
-{
-  "requirement_type": "FUNCTIONAL" | "PERFORMANCE" | "INTERFACE" | "DESIGN" | "SECURITY" | "TECHNICAL" | "MANAGEMENT" | "QUALITY",
-  "criticality_level": "MANDATORY" | "IMPORTANT" | "OPTIONAL" | "INFORMATIONAL",
-  "priority_score": 0-100 (auto-calculated: MANDATORY=100, IMPORTANT=75, OPTIONAL=25, INFORMATIONAL=0),
-  "section_origin": "Section C.3.1.2" | "PWS Task 1.2.3",
-  "semantic_context": "Performance requirement within maintenance SOW",
-  "modal_verb": "shall" | "should" | "may" | "will",
-  "subject": "Contractor" | "Offeror" | "Government" | "Agency"
-}
-```
+Capture entity_name, entity_type, and description. Requirement criticality (SHALL/SHOULD/MAY) and modal verb context can be enriched during query-time operations.
 
 ### Examples from Real RFPs
 
@@ -500,18 +593,9 @@ PROGRAM → CONTAINS → DELIVERABLE (program expects deliverables)
 - Capitalized or emphasized as primary subject
 - Referenced throughout document as umbrella
 
-### Metadata to Extract
+### Basic Attributes
 
-```json
-{
-  "program_name": "Marine Corps Prepositioning Program II",
-  "program_acronym": "MCPP II",
-  "program_scope": "Organic ground support equipment maintenance for USMC prepositioned equipment",
-  "parent_organization": "Marine Corps" | "Navy" | "Air Force",
-  "section_origin": "Section C" | "Document Title",
-  "program_type": "Major Acquisition" | "IT Modernization" | "Facility Maintenance"
-}
-```
+Capture entity_name, entity_type, and description. Program acronyms and scope details can be enriched during query-time operations.
 
 ### Example from Navy MBOS RFP
 
@@ -604,17 +688,16 @@ The entity type `STATEMENT_OF_WORK` represents **ANY** of these three formats:
 - Performance standards and metrics
 - Deliverable schedules
 
-### Metadata to Extract
+### Basic Attributes
 
-```json
-{
-  "work_type": "PWS" | "SOW" | "SOO",
-  "location": "Section C" | "Attachment J-1234567" | "Annex 5",
-  "hierarchical_structure": true | false,
-  "task_count": 12 (if hierarchical),
-  "performance_standards": true | false (PWS-specific),
-  "prescription_level": "High (SOW)" | "Medium (PWS)" | "Low (SOO)"
+Capture entity_name, entity_type, and description. Work statement location and task structure can be enriched during query-time operations.
+
+### Examples from Real RFPs
+
+"performance_standards": true | false (PWS-specific),
+"prescription_level": "High (SOW)" | "Medium (PWS)" | "Low (SOO)"
 }
+
 ```
 
 ### Examples from Real RFPs
@@ -622,18 +705,21 @@ The entity type `STATEMENT_OF_WORK` represents **ANY** of these three formats:
 **Example 1: PWS (Performance-Based)**
 
 ```
+
 Attachment J-0200000-18: Performance Work Statement
 
 3.1 MAINTENANCE SERVICES
 
 The Contractor shall perform scheduled and unscheduled maintenance
 on all GSE to achieve:
+
 - 95% equipment availability
 - 98% first-time fix rate
 - Mean time between failures (MTBF) ≥ 500 hours
 
 Performance shall be measured monthly against these standards.
-```
+
+````
 
 **Extracted Entity**:
 
@@ -646,7 +732,7 @@ Performance shall be measured monthly against these standards.
   "performance_standards": true,
   "prescription_level": "Medium (PWS)"
 }
-```
+````
 
 **Example 2: SOW (Prescriptive)**
 
@@ -705,21 +791,24 @@ An annex/attachment can contain:
 - Sample documents
 - Contract clauses
 
-### Metadata to Extract
+### Basic Attributes
 
-```json
-{
-  "original_numbering": "J-0200000-18" | "Attachment 5" | "Annex 17",
-  "prefix_pattern": "J-" | "Attachment " | "Annex " | "A-",
-  "content_type": "SOW" | "Specifications" | "Maps" | "Data" | "Sample" | "Clauses",
-  "parent_section": "Section J" (inferred from prefix),
-  "file_reference": "Equipment_List.pdf" (if separate file)
+Capture entity_name, entity_type, and description. Attachment numbering and parent section linkage can be inferred during relationship inference.
+
+### Examples from Real RFPs
+
+"prefix_pattern": "J-" | "Attachment " | "Annex " | "A-",
+"content_type": "SOW" | "Specifications" | "Maps" | "Data" | "Sample" | "Clauses",
+"parent_section": "Section J" (inferred from prefix),
+"file_reference": "Equipment_List.pdf" (if separate file)
 }
+
 ```
 
 ### Example from Navy MBOS
 
 ```
+
 Section J: List of Attachments
 
 The following documents are incorporated by reference:
@@ -727,7 +816,8 @@ The following documents are incorporated by reference:
 J-0200000-18: Performance Work Statement (PWS)
 J-0300000-12: Equipment List and Specifications
 J-0400000-05: Site Layout and Facility Maps
-```
+
+````
 
 **Extracted Entities** (3 annexes):
 
@@ -758,7 +848,7 @@ J-0400000-05: Site Layout and Facility Maps
     "parent_section": "Section J"
   }
 ]
-```
+````
 
 ---
 
@@ -796,22 +886,26 @@ Even if not adjacent in document:
 - All FAR 52.3##-# (Delivery) together
 - All security clauses together
 
-### Metadata to Extract
+### Basic Attributes
 
-```json
-{
-  "clause_number": "FAR 52.212-4" | "DFARS 252.204-7012",
-  "agency_supplement": "FAR" | "DFARS" | "AFFARS" | "NMCARS",
-  "clause_title": "Contract Terms and Conditions—Commercial Products and Commercial Services",
-  "section_attribution": "Section I" | "Section K",
-  "incorporation_method": "Full Text" | "By Reference",
-  "date": "JAN 2024" (clause effective date)
+Capture entity_name, entity_type, and description. Clause supplements (FAR/DFARS/AFFARS) and parent section clustering are handled during relationship inference.
+
+### Examples from Real RFPs
+
+"clause_number": "FAR 52.212-4" | "DFARS 252.204-7012",
+"agency_supplement": "FAR" | "DFARS" | "AFFARS" | "NMCARS",
+"clause_title": "Contract Terms and Conditions—Commercial Products and Commercial Services",
+"section_attribution": "Section I" | "Section K",
+"incorporation_method": "Full Text" | "By Reference",
+"date": "JAN 2024" (clause effective date)
 }
+
 ```
 
 ### Example from Navy RFP
 
 ```
+
 Section I: Contract Clauses
 
 52.212-4 Contract Terms and Conditions—Commercial Products
@@ -823,7 +917,8 @@ Commercial Services (JAN 2024)
 
 252.204-7012 Safeguarding Covered Defense Information and
 Cyber Incident Reporting (DEC 2019)
-```
+
+````
 
 **Extracted Entities** (3 clauses):
 
@@ -855,7 +950,7 @@ Cyber Incident Reporting (DEC 2019)
     "date": "DEC 2019"
   }
 ]
-```
+````
 
 ---
 
@@ -907,18 +1002,9 @@ Some sections contain multiple content types:
 }
 ```
 
-### Metadata to Extract
+### Basic Attributes
 
-```json
-{
-  "structural_label": "Section M.2.1" | "Selection Criteria",
-  "semantic_type": "EVALUATION_CRITERIA" | "SUBMISSION_INSTRUCTIONS" | "DESCRIPTION_SPECS",
-  "also_contains": ["SUBMISSION_INSTRUCTION", "REQUIREMENT"],
-  "confidence": 0.0-1.0,
-  "page_range": "15-25",
-  "subsections": ["M.1", "M.2", "M.2.1", "M.2.2"]
-}
-```
+Capture entity_name, entity_type, and description. Section semantic types and subsection structures can be enriched during relationship inference.
 
 ---
 
@@ -979,92 +1065,323 @@ PROOF POINT: "Reduced unscheduled downtime 40% on similar contract"
 CUSTOMER BENEFIT: "Ensures aircraft availability for critical missions"
 ```
 
-### Metadata to Extract
+### Basic Attributes
 
-```json
-{
-  "theme_type": "CUSTOMER_HOT_BUTTON" | "DISCRIMINATOR" | "PROOF_POINT" | "WIN_THEME",
-  "theme_statement": "Full description of strategic theme",
-  "competitive_context": "Incumbent advantage" | "New entrant gap" | "Competitive parity",
-  "evidence": "Supporting proof points, metrics, past performance",
-  "customer_benefit": "Mission outcome, agency value proposition",
-  "related_factors": ["M2", "M3"] (which evaluation factors this supports)
-}
-```
+Capture entity_name, entity_type, and description. Theme classification (hot button/discriminator/proof point) and competitive context are advanced analysis best performed during query-time.
 
 ---
 
-## Entity Type 10-12: Standard Entities
+## Entity Type 10: DELIVERABLE
 
-### ORGANIZATION
+### Content Signals
 
-Companies, agencies, departments, commands
+- **CDRL References**: "CDRL A001", "CDRL 6022", "DD Form 1423"
+- **Report Types**: "Monthly Status Report", "Quarterly Review", "Final Report"
+- **Documentation**: "System Design Document", "Technical Manual", "User Guide"
+- **Work Products**: "Deployed Application", "Training Materials", "Test Results"
+- **Submission Language**: "shall submit", "shall deliver", "shall provide"
 
-**Examples**:
+### Structural Patterns
 
-- "Naval Air Systems Command (NAVAIR)"
-- "General Dynamics Information Technology"
-- "Small Business Administration"
+- CDRL numbering: A001, B012, 6022
+- Series references: "8000 Series deliverables"
+- Explicit labels: "Deliverable 1.2", "Work Product 3"
 
-### CONCEPT
+### Context Clues
 
-CLINs, budget items, technical concepts, definitions
+- Near submission schedules ("due 5th business day")
+- Listed in "List of Deliverables" sections
+- Referenced in SOW tasks ("Task 1.2 deliverable")
+- DD Form 1423 mentions (official CDRL form)
 
-**Examples**:
+### Location
 
-- "CLIN 0001 Base Year Services"
-- "Total Small Business Set-Aside"
-- "Agile Software Development"
+- **Primary**: Section J attachments (CDRL lists)
+- **Alternate**: Section C SOW (embedded in tasks)
+- **Embedded**: Requirements text ("contractor shall deliver...")
 
-### EVENT
+### Basic Attributes
 
-Milestones, delivery dates, reviews, meetings
+Capture entity_name, entity_type, and description. CDRL identifiers and due dates preserved in natural language.
 
-**Examples**:
+---
 
-- "Kickoff Meeting (30 days after award)"
-- "Monthly Progress Review"
-- "Final Delivery: September 30, 2026"
+## Entity Type 11: DOCUMENT
 
-### TECHNOLOGY
+### Content Signals
 
-Systems, tools, platforms, equipment
+- **Attachment References**: "Attachment 1", "J-0200000-18", "Annex A", "Exhibit B"
+- **Referenced Documents**: "See Section X for...", "Incorporated by reference"
+- **Standards**: "MIL-STD-882E", "ISO 9001", "NIST SP 800-53"
+- **Forms**: "SF 1449", "DD Form 254", "Standard Form 30"
+- **Prior Documents**: "Previous contract N00024-18-C-1234"
 
-**Examples**:
+### Structural Patterns
 
-- "SINCGARS Radio System"
-- "AWS GovCloud Platform"
-- "ServiceNow ITSM"
+- Attachment numbering: J-####, Attachment #, Annex ##
+- Standard identifiers: MIL-STD-###, ISO ####, NIST SP ###-##
+- Form numbers: SF ###, DD ###
 
-### PERSON
+### Context Clues
 
-POCs, contracting officers, key personnel
+- "See Attachment X for details"
+- "Incorporated by reference"
+- "Listed in Section J"
+- "Reference documents include..."
 
-**Examples**:
+### Location
 
-- "Contracting Officer: Jane Smith"
-- "Program Manager: John Doe"
-- "COR: Technical Officer Name"
+- **Primary**: Section J (List of Attachments)
+- **Alternate**: Throughout RFP (referenced documents)
+- **Embedded**: Requirements citing standards
 
-### LOCATION
+### Basic Attributes
 
-Performance locations, delivery sites, facilities
+Capture entity_name, entity_type, and description. Document numbers and reference locations preserved.
 
-**Examples**:
+---
 
-- "Naval Air Station Pensacola, FL"
-- "Pentagon, Arlington, VA"
-- "CONUS (Continental United States)"
+## Entity Type 12: CONCEPT
 
-### DELIVERABLE
+### Content Signals
 
-Contract deliverables, work products, reports
+- **Budget/Pricing**: "CLIN 0001", "Base Year Services", "Option Period 2"
+- **Technical Concepts**: "Agile Development", "DevSecOps", "Zero Trust Architecture"
+- **Business Concepts**: "Small Business Set-Aside", "Joint Venture", "Teaming Arrangement"
+- **Processes**: "Change Control Process", "Risk Management", "Quality Assurance"
+- **Abstract Ideas**: "Readiness", "Sustainability", "Interoperability"
+- **Definitions**: Terms being defined in glossary or text
 
-**Examples**:
+### Structural Patterns
 
-- "Monthly Status Report"
-- "System Design Document"
-- "Deployed Application"
+- CLIN/SLIN numbering: "CLIN 0001", "SLIN 0001AA"
+- Abstract nouns (no physical form)
+- Process names ending in "-ing" or "Process"
+- Methodologies and frameworks
+
+### Context Clues
+
+- Near definitions ("means", "defined as", "refers to")
+- In glossary sections
+- Pricing tables (CLINs)
+- Conceptual discussions (not physical items)
+
+### Detection: Differentiation
+
+**NOT concept if**:
+
+- Physical item with model number → equipment
+- Scheduled activity → event
+- Named military unit → organization
+- Software with version → technology
+
+**IS concept if**:
+
+- Abstract idea or process
+- Business term or methodology
+- CLIN/budget line item
+- Term being defined
+
+### Basic Attributes
+
+Capture entity_name, entity_type, and description. Abstract nature preserved in description.
+
+---
+
+## Entity Type 13: EQUIPMENT
+
+### Content Signals
+
+- **Model Numbers**: "M1A1 Tank", "Concorde RG-24", "6200 Tennant Floor Scrubber"
+- **Military Equipment**: "TAMCN numbers", "End Item codes", "NSN (National Stock Number)"
+- **Physical Assets**: "Generator Set", "HVAC System", "Forklift", "Test Equipment"
+- **Vehicles**: "HMMWV", "MRAP", "Aircraft", "Ships"
+- **Hardware**: "Servers", "Workstations", "Network Equipment"
+
+### Structural Patterns
+
+- Model numbers with alphanumerics: "M1A1", "RG-24", "6200"
+- TAMCN format: 5-character codes
+- NSN format: ####-##-###-####
+- Make/model format: "Manufacturer ModelNumber"
+
+### Context Clues
+
+- Near maintenance language
+- In equipment lists or inventories
+- Quantities specified ("100 each", "12 units")
+- Physical descriptions (weight, dimensions, specifications)
+
+### Detection: Equipment vs Technology
+
+**EQUIPMENT**: Physical item you can touch
+
+- "M1A1 Tank" → equipment
+- "Generator Set" → equipment
+- "Server Hardware" → equipment
+
+**TECHNOLOGY**: Software, system, or platform
+
+- "Windows Server 2022" → technology
+- "ServiceNow Platform" → technology
+- "SINCGARS Radio System" → technology (if referring to system concept)
+
+### Basic Attributes
+
+Capture entity_name, entity_type, and description. Model numbers and specifications preserved.
+
+---
+
+## Entity Type 14: TECHNOLOGY
+
+### Content Signals
+
+- **Software**: "Windows Server 2022", "Oracle Database 19c", "Python 3.11"
+- **Platforms**: "AWS GovCloud", "Azure Government", "ServiceNow"
+- **Systems**: "SINCGARS Radio System", "GCSS-MC", "TBMCS"
+- **Protocols**: "TLS 1.3", "HTTPS", "SFTP"
+- **Standards**: "IPv6", "802.11ac", "Ethernet"
+
+### Structural Patterns
+
+- Version numbers: "Windows 10", "Python 3.11", "TLS 1.3"
+- Acronyms for systems: "GCSS-MC", "TBMCS", "DEERS"
+- Platform names: "AWS", "Azure", "ServiceNow"
+
+### Context Clues
+
+- Near technical requirements
+- In system architecture descriptions
+- Software stack discussions
+- IT infrastructure sections
+
+### Detection: Technology vs Equipment
+
+**TECHNOLOGY**: Software, logical system, protocol
+
+- "AWS GovCloud" → technology
+- "SINCGARS System" → technology (system concept)
+- "Windows Server" → technology
+
+**EQUIPMENT**: Physical hardware
+
+- "Dell Server" → equipment
+- "SINCGARS Radio Unit" → equipment (physical radio)
+- "Network Switch" → equipment
+
+### Basic Attributes
+
+Capture entity_name, entity_type, and description. Versions and platforms preserved.
+
+---
+
+## Entity Type 15: ORGANIZATION
+
+### Content Signals
+
+- **Companies**: "General Dynamics IT", "Lockheed Martin", "Small Business Name"
+- **Agencies**: "Department of Defense", "GSA", "DLA"
+- **Military Units**: "Marine Corps", "NAVAIR", "SPAWAR", "I MEF"
+- **Commands**: "Naval Air Systems Command", "Marine Corps Logistics Command"
+- **Departments**: "Contracting Office", "Program Management Office"
+
+### Structural Patterns
+
+- Acronyms: "NAVAIR", "SPAWAR", "GSA", "DLA"
+- "Inc.", "LLC", "Corp." suffixes
+- Military designations: "I MEF", "3rd Battalion"
+- Command structures
+
+### Context Clues
+
+- Near organizational roles
+- In past performance descriptions
+- Teaming arrangements
+- Points of contact affiliations
+
+### Basic Attributes
+
+Capture entity_name, entity_type, and description. Acronyms and full names preserved.
+
+---
+
+## Entity Type 16: EVENT
+
+### Content Signals
+
+- **Milestones**: "Kickoff Meeting", "Final Delivery", "Contract Award"
+- **Scheduled Activities**: "Monthly Review", "Quarterly Assessment", "Annual Update"
+- **Deadlines**: "Q&A Deadline: March 15, 2025", "Proposal Due Date"
+- **Periods**: "Base Period", "Option Year 2", "Ship Availability"
+- **Processes with Timing**: "CAL Signing", "Annual Inspection"
+
+### Structural Patterns
+
+- Dates: "March 15, 2025", "30 days after award"
+- Recurring patterns: "Monthly", "Quarterly", "Annual"
+- Event + timing: "Review (15 days)", "Meeting (30 days after award)"
+
+### Context Clues
+
+- Calendar dates
+- Time-bound language ("within X days", "by date")
+- Scheduling sections
+- Milestone charts
+
+### Detection: Event vs Concept
+
+**EVENT**: Scheduled, time-bound activity
+
+- "Monthly Review" → event (scheduled)
+- "Kickoff Meeting" → event (scheduled)
+- "Annual Update" → event (recurring)
+
+**CONCEPT**: Process without schedule
+
+- "Review Process" → concept (methodology)
+- "Meeting Protocol" → concept (procedure)
+- "Update Procedure" → concept (process)
+
+### Basic Attributes
+
+Capture entity_name, entity_type, and description. Dates and frequencies preserved in description.
+
+---
+
+## Entity Type 17: PERSON and LOCATION
+
+### PERSON: Content Signals
+
+- **Names**: "Jane Smith", "John Doe", "CDR Michael Johnson"
+- **Titles**: "Contracting Officer", "Program Manager", "COR", "Technical POC"
+- **Roles**: "Key Personnel", "Project Lead", "Security Officer"
+- **Contact Info**: Near email, phone, office
+
+### PERSON: Context Clues
+
+- "Contact: Name"
+- "POC: Title/Name"
+- Signature blocks
+- Key personnel sections
+
+### LOCATION: Content Signals
+
+- **Bases**: "Naval Air Station Pensacola", "Camp Lejeune", "Fort Bragg"
+- **Cities/States**: "Arlington, VA", "San Diego, CA"
+- **Facilities**: "Building 123", "Warehouse 5", "Depot Maintenance"
+- **Geographic Areas**: "CONUS", "OCONUS", "PACOM AOR"
+- **Countries**: "Host Nation", "Japan", "Germany"
+
+### LOCATION: Context Clues
+
+- Near performance location language
+- Delivery addresses
+- Site visit information
+- Geographic scoping
+
+### Basic Attributes
+
+Capture entity_name, entity_type, and description. Contact details and addresses preserved in description.
 
 ---
 

@@ -26,7 +26,7 @@ def load_prompt(prompt_name: str, use_cache: bool = True) -> str:
     
     Args:
         prompt_name: Prompt path relative to prompts/ directory (without .md extension)
-                    Example: "entity_extraction/entity_detection_rules"
+                    Example: "extraction/entity_detection_rules"
         use_cache: Use in-memory cache (default True). Set False for development/testing.
     
     Returns:
@@ -36,11 +36,11 @@ def load_prompt(prompt_name: str, use_cache: bool = True) -> str:
         FileNotFoundError: If prompt file doesn't exist
         
     Examples:
-        >>> load_prompt("entity_extraction/entity_detection_rules")
+        >>> load_prompt("extraction/entity_detection_rules")
         "SEMANTIC-FIRST ENTITY DETECTION RULES:\\n\\n1. EVALUATION_FACTOR:..."
         
-        >>> load_prompt("relationship_inference/section_l_m_linking")
-        "SECTION L↔M MAPPING RULES:\\n\\n..."
+        >>> load_prompt("query/proposal_outline_generator")
+        "PROPOSAL OUTLINE GENERATION:\\n\\nGenerate compliant outline..."
     """
     # Check cache first
     if use_cache and prompt_name in _prompt_cache:
@@ -109,7 +109,7 @@ def validate_prompts_exist(required_prompts: list) -> None:
     Validate that all required prompts exist at startup.
     
     Args:
-        required_prompts: List of prompt names (e.g., ["entity_extraction/entity_detection_rules"])
+        required_prompts: List of prompt names (e.g., ["extraction/entity_detection_rules"])
         
     Raises:
         FileNotFoundError: If any required prompt is missing

@@ -21,7 +21,6 @@ from lightrag.api.config import global_args
 from lightrag.llm.openai import openai_complete_if_cache, openai_embed
 from lightrag.utils import EmbeddingFunc
 from raganything import RAGAnything, RAGAnythingConfig
-from lightrag.operate import chunking_by_token_size
 
 from src.core.prompt_loader import load_prompt
 
@@ -58,34 +57,35 @@ async def initialize_raganything():
     openai_api_key = os.getenv("EMBEDDING_BINDING_API_KEY")
     working_dir = global_args.working_dir
     
-    # Government contracting entity types (16 specialized types)
+    # Government contracting entity types (17 specialized types)
     # Semantic-first detection: Content determines entity type, not section labels
+    # NOTE: LightRAG normalizes to lowercase internally - use lowercase for consistency
     entity_types = [
         # Core entities
-        "ORGANIZATION", "CONCEPT", "EVENT", "TECHNOLOGY", "PERSON", "LOCATION",
+        "organization", "concept", "event", "technology", "person", "location",
         
         # Requirements (semantic detection with metadata: requirement_type, criticality_level)
-        "REQUIREMENT",
+        "requirement",
         
         # Structural entities
-        "CLAUSE",                   # FAR/DFARS/AFFARS patterns, will cluster by parent section
-        "SECTION",                  # Stores both structural_label + semantic_type
-        "DOCUMENT",                 # References: specs, standards, manuals, regulations, attachments, annexes
-        "DELIVERABLE",
+        "clause",                   # FAR/DFARS/AFFARS patterns, will cluster by parent section
+        "section",                  # Stores both structural_label + semantic_type
+        "document",                 # References: specs, standards, manuals, regulations, attachments, annexes
+        "deliverable",
         
         # Evaluation entities (semantic detection, may be embedded in non-standard sections)
-        "EVALUATION_FACTOR",        # Scoring criteria (Section M content)
-        "SUBMISSION_INSTRUCTION",   # Format/page limits (Section L content, may be IN Section M)
+        "evaluation_factor",        # Scoring criteria (Section M content)
+        "submission_instruction",   # Format/page limits (Section L content, may be IN Section M)
         
         # Strategic entities (Capture planning patterns)
-        "STRATEGIC_THEME",          # Win themes, hot buttons, discriminators, proof points
+        "strategic_theme",          # Win themes, hot buttons, discriminators, proof points
         
         # Work scope (Semantic detection regardless of location)
-        "STATEMENT_OF_WORK",        # PWS/SOW/SOO content (may be Section C or attachment)
+        "statement_of_work",        # PWS/SOW/SOO content (may be Section C or attachment)
         
         # Programs and equipment
-        "PROGRAM",                  # Major programs (MCPP II, Navy MBOS, etc.)
-        "EQUIPMENT",                # Physical items (batteries, vehicles, tools)
+        "program",                  # Major programs (MCPP II, Navy MBOS, etc.)
+        "equipment",                # Physical items (batteries, vehicles, tools)
     ]
     
     # MinerU configuration from environment variables
@@ -171,17 +171,34 @@ async def initialize_raganything():
         
         return await openai_embed(truncated_texts, model="text-embedding-3-large", api_key=openai_api_key)
     
+    # Get embedding dimension from environment (flexibility for different models)
+    embedding_dim = int(os.getenv("EMBEDDING_DIM", "3072"))
+    
     embedding_func = EmbeddingFunc(
-        embedding_dim=3072,
+        embedding_dim=embedding_dim,
         max_token_size=8192,  # OpenAI text-embedding-3-large limit
         func=safe_embed_func,
     )
     
-    # Load entity extraction prompt from external file
-    # Philosophy: Prompts are training data, not code (2M context = detailed examples)
-    custom_entity_extraction_prompt = load_prompt("entity_extraction/entity_extraction_prompt")
+    # Load entity extraction prompts with clear separation of concerns
+    # Branch 009: Quality-first refactoring (extraction excellence → query excellence)
+    # Philosophy: Thorough extraction enables powerful queries (2M context window)
+    # Folder structure: prompts/extraction/ (ingestion-time) vs prompts/query/ (query-time)
+    entity_extraction_prompts = [
+        load_prompt("extraction/entity_extraction_prompt"),      # ~1,450 lines - WHAT to extract (rules, types, examples)
+        load_prompt("extraction/entity_detection_rules"),        # ~1,155 lines - HOW to detect (semantic signals, UCF)
+    ]
+    custom_entity_extraction_prompt = "\n\n---\n\n".join(entity_extraction_prompts)
+    
+    logger.info(f"📚 Loaded 2 entity extraction prompts (~2,605 lines total)")
+    logger.info(f"   → Core extraction rules: WHAT to extract (1,450 lines)")
+    logger.info(f"   → Semantic detection: HOW to detect (1,155 lines)")
+    logger.info(f"   → Metadata enrichment: Moved to prompts/query/ (Branch 010)")
+    logger.info(f"   → Separation of concerns: Extraction (ingestion) vs. Query (intelligence)")
 
     # Initialize RAG-Anything with custom configuration
+    # IMPORTANT: LightRAG reads chunk_token_size from environment at import time
+    # Don't override via lightrag_kwargs - let it use CHUNK_SIZE from .env
     _rag_anything = RAGAnything(
         config=config,
         llm_model_func=llm_model_func,
@@ -192,9 +209,10 @@ async def initialize_raganything():
                 "entity_types": entity_types,
                 "entity_extraction_system_prompt": custom_entity_extraction_prompt,
             },
-            "chunking_func": chunking_by_token_size,
-            "chunk_token_size": int(os.getenv("CHUNK_SIZE", "50000")),  # LLM + embeddings (auto-truncate at 8192)
-            "chunk_overlap_token_size": int(os.getenv("CHUNK_OVERLAP_SIZE", "1000")),
+            # Chunking configuration comes from environment variables:
+            # - CHUNK_SIZE controls chunk_token_size (default: 8192)
+            # - CHUNK_OVERLAP_SIZE controls chunk_overlap_token_size (default: 1200)
+            # LightRAG reads these at dataclass field initialization time
         },
     )
     

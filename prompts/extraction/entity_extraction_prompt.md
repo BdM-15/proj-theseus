@@ -27,26 +27,191 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
       - `entity_name`: The name of the entity. If the entity name is case-insensitive, capitalize the first letter of each significant word (title case). Ensure **consistent naming** across the entire extraction process.
       - `entity_type`: Categorize the entity using ONE of these exact types from the list below.
 
-        **CRITICAL: Entity types must be PLAIN UPPERCASE text only.**
+        **CRITICAL ENTITY NAMING NORMALIZATION RULES:**
 
-        Valid entity types (choose exactly ONE):
-        • ORGANIZATION
-        • CONCEPT
-        • EVENT
-        • TECHNOLOGY
-        • PERSON
-        • LOCATION
-        • REQUIREMENT
-        • CLAUSE
-        • SECTION
-        • DOCUMENT
-        • DELIVERABLE
-        • PROGRAM
-        • EQUIPMENT
-        • EVALUATION_FACTOR
-        • SUBMISSION_INSTRUCTION
-        • STRATEGIC_THEME
-        • STATEMENT_OF_WORK
+        **Prevent duplicate entities due to formatting variations!** Government RFPs use inconsistent formatting:
+
+        - Page titles: "SECTION C.4 - SUPPLY" (ALL CAPS)
+        - Text references: "Section C.4" (Title Case)
+        - Inline mentions: "section c.4" (lowercase)
+        - Cross-references: "Sec C.4", "C.4", "Section C-4"
+
+        **YOU MUST extract these as ONE entity, not multiple!**
+
+        **Normalization Rules:**
+
+        1. **Section Names**: Always use Title Case with periods
+
+           - ✅ CORRECT: "Section C.4 Supply"
+           - ❌ WRONG: "SECTION C.4", "section c.4", "Sec C.4", "Section C-4"
+           - If section has a title (e.g., "- SUPPLY"), include it in normalized form
+
+        2. **FAR/DFARS Clauses**: Always use exact citation format
+
+           - ✅ CORRECT: "FAR 52.212-1"
+           - ❌ WRONG: "far 52.212-1", "FAR 52.212.1", "FAR52.212-1"
+
+        3. **CDRL/Deliverables**: Always use uppercase identifier + descriptive name
+
+           - ✅ CORRECT: "CDRL A001 Monthly Status Report"
+           - ❌ WRONG: "CDRL a001", "Cdrl A001", "cdrl A001"
+
+        4. **Organizations/Programs**: Use official capitalization from context
+
+           - ✅ CORRECT: "Marine Corps Prepositioning Program" or "MCPP II"
+           - ❌ WRONG: "MARINE CORPS PREPOSITIONING PROGRAM", "mcpp ii"
+
+        5. **When you see multiple formatting variations**:
+           - Identify they refer to the same entity
+           - Extract ONCE using the most complete, properly formatted version
+           - Merge descriptions from all mentions using <SEP> separator
+
+        **Example - Section with Multiple Formats:**
+
+        Text contains:
+
+        - Page 15 title: "SECTION C.4 - SUPPLY"
+        - Page 27 reference: "per Section C.4"
+        - Page 45 mention: "section c.4 requirements"
+
+        Extract ONCE as:
+
+        ```
+        entity|Section C.4 Supply|section|Supply section defining materiel requirements per Section C subsection 4
+        ```
+
+        NOT three separate entities!
+
+        **Example - Clause with Variations:**
+
+        Text contains:
+
+        - "FAR 52.212-1 Instructions to Offerors"
+        - "far 52.212-1"
+        - "FAR clause 52.212-1"
+
+        Extract ONCE as:
+
+        ```
+        entity|FAR 52.212-1|clause|Instructions to Offerors—Commercial Products and Commercial Services
+        ```
+
+        **CRITICAL ENTITY TYPE RULES:**
+
+        1. **Entity types MUST be lowercase with underscores** (e.g., evaluation_factor, statement_of_work)
+
+        2. **You MUST use EXACTLY ONE of these 17 types for EVERY entity - NO EXCEPTIONS:**
+           • organization
+           • concept
+           • event
+           • technology
+           • person
+           • location
+           • requirement
+           • clause
+           • section
+           • document
+           • deliverable
+           • program
+           • equipment
+           • evaluation_factor
+           • submission_instruction
+           • strategic_theme
+           • statement_of_work
+
+        3. **STRICTLY FORBIDDEN entity types - NEVER USE THESE:**
+
+           ❌ **other** - USE concept INSTEAD
+           ❌ **UNKNOWN** - USE concept INSTEAD
+           ❌ process - USE concept INSTEAD
+           ❌ table - USE concept INSTEAD
+           ❌ image - Skip extraction (not text entity)
+           ❌ plan - USE document INSTEAD
+           ❌ policy - USE document INSTEAD
+           ❌ standard - USE document INSTEAD
+           ❌ instruction - USE document INSTEAD
+           ❌ system - USE technology INSTEAD
+           ❌ regulation - USE document INSTEAD
+           ❌ framework - USE concept INSTEAD
+           ❌ objective - USE concept INSTEAD
+           ❌ methodology - USE concept INSTEAD
+           ❌ approach - USE concept INSTEAD
+           ❌ strategy - USE concept INSTEAD
+           ❌ model - USE concept INSTEAD
+
+        4. **FALLBACK MAPPING (use when entity type is ambiguous):**
+
+           - Business concepts, accounts, codes → **concept**
+             Example: "MMFAQ9", "MMV200", "Business Systems" → concept
+
+           - Plans, policies, standards, regulations, manuals → **document**
+             Example: "Major Subordinate Element Plan", "Safety Plan" → document
+
+           - Systems, tools, software, platforms → **technology**
+             Example: "Electro-Optical" (tech category) → technology
+
+           - Reports, forms, deliverables with reference numbers → **deliverable**
+             Example: "10.B.8.a", "Mishap Report", "Selective Interchange Request" → deliverable
+
+           - CLINs, SLINs, contract line items → **concept**
+             Example: "CLIN 9005", "CLIN 0001 Base Year" → concept
+
+           - DoD codes, activity codes, identifiers → **organization** (if unit) OR **concept** (if account)
+             Example: "DODAAC M38450" → organization, "Account MMV200" → concept
+
+           - Abstract ideas, processes, methodologies → **concept**
+             Example: "Prepositioned Assets", "Supply Operations", "Column Headers" → concept
+
+           - Size standards, classifications, categories → **concept**
+             Example: "Small Business Size Standard" → concept
+
+           **IF STILL UNCLEAR**: Default to **concept** (catch-all for abstract entities)
+
+        5. **Example Classifications** (follow these patterns):
+
+           **Plans/Policies/Standards → document:**
+
+           - "Safety Plan" → document (NOT "plan")
+           - "Quality Assurance Plan" → document (NOT "plan")
+           - "Security Policy" → document (NOT "policy")
+           - "Privacy Policy" → document (NOT "policy")
+           - "MIL-STD-882E" → document (NOT "standard")
+           - "ISO 9001:2015" → document (NOT "standard")
+           - "Work Instruction 123" → document (NOT "instruction")
+           - "DoD 5220.22-M" → document (NOT "regulation")
+           - "Training Manual" → document (NOT "manual")
+
+           **Systems/Tools → technology:**
+
+           - "WAWF System" → technology (NOT "system")
+           - "RFID System" → technology (NOT "system")
+           - "ERP System" → technology (NOT "system")
+           - "Microsoft Project" → technology (NOT "tool")
+           - "Oracle Database" → technology (NOT "software")
+
+           **Tables/Lists/Schedules → concept:**
+
+           - "Table 1: Deliverables Schedule" → concept (NOT "table")
+           - "Milestone Schedule" → concept (NOT "schedule")
+           - "Pricing Matrix" → concept (NOT "matrix" or "table")
+           - "Risk Matrix" → concept (NOT "matrix")
+           - "Compliance Matrix" → concept (NOT "matrix")
+
+           **Processes/Workflows → concept:**
+
+           - "Continuous Process Improvement" → concept (NOT "process")
+           - "Change Control Process" → concept (NOT "process")
+           - "Approval Workflow" → concept (NOT "workflow")
+           - "Shipley Methodology" → concept (NOT "methodology")
+
+           **Ambiguous Technical Terms → Use context:**
+
+           - "MCPP Program" → program (named initiative)
+           - "MCPP II" → program (named initiative)
+           - "Prepositioning Concept" → concept (abstract idea)
+           - "Equipment Maintenance" → concept (activity/service)
+           - "M1A1 Tank" → equipment (physical asset)
+           - "Generator Set" → equipment (physical asset)
 
     - **Domain Knowledge - Government Contracting Patterns:**
 
@@ -56,18 +221,6 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
       - DFARS clauses: Format "DFARS 252.[Part]-[Number]" (e.g., DFARS 252.204-7012)
       - Agency supplements: AFFARS, NMCARS, DARS, TRANSFARS, etc.
       - Always extract as CLAUSE type, preserve full citation in entity_name
-
-      **Uniform Contract Format (UCF) Sections:**
-
-      - Section A: Solicitation/Contract Form (cover, dates, contact info)
-      - Section B: Supplies/Services & Prices (CLINs, pricing)
-      - Section C: Statement of Work (SOW/PWS location varies - may be Section C or attachment)
-      - Section H: Special Requirements (security, key personnel)
-      - Section I: Contract Clauses (FAR/DFARS - extract individual clauses)
-      - Section J: Attachments (various naming: J-0001, Attachment 1, Annex A, Exhibit B)
-      - Section L: Instructions to Offerors (page limits - SUBMISSION_INSTRUCTION)
-      - Section M: Evaluation Factors (scoring - EVALUATION_FACTOR)
-      - Note: Extract SOW/PWS as STATEMENT_OF_WORK regardless of location (section or attachment)
 
       **Deliverable Patterns (CDRL):**
 
@@ -1070,23 +1223,220 @@ Algorithm: Extract section number from requirement source, map section to factor
 
 2.  **Relationship Extraction & Output:**
 
-    - **CRITICAL INSTRUCTION - Aggressive Relationship Extraction:**
+    - **RELATIONSHIP EXTRACTION PHILOSOPHY:**
+
+      **Extract relationships based on MEANING and SEMANTIC CONNECTION, not quotas.**
+
+      Knowledge graph quality depends on extracting **genuine, meaningful relationships** that:
+
+      - Reflect actual connections in the document
+      - Enable semantic navigation across related concepts
+      - Preserve document structure and cross-references
+      - Support capture intelligence queries
+
+      **DO NOT create fake relationships to meet numeric targets.**
+      **DO extract implicit relationships that genuinely exist in the content.**
+
+    - **COMPREHENSIVE RELATIONSHIP EXTRACTION RULES:**
 
       **YOU MUST EXTRACT BOTH EXPLICIT AND IMPLICIT RELATIONSHIPS!**
 
       - **Explicit relationships**: Directly stated in text ("addresses Factor 1", "incorporated in Section I")
       - **Implicit relationships**: Inferred from semantic similarity, naming patterns, or structural context
       - **DO NOT limit extraction to only explicitly stated relationships**
-      - **USE the relationship patterns described above** to infer connections
-      - **PRIORITIZE relationship extraction** - extract MORE relationships rather than fewer
-      - **CONFIDENCE is not required** - if semantic connection exists, create the relationship
+      - **USE the relationship patterns described above** to infer connections based on domain knowledge
+      - **PRIORITIZE meaningful connections** - extract relationships that add value for semantic search
+      - If a genuine semantic connection exists between entities, create the relationship
+      - Use the 50+ inference rules and patterns provided above as guidance
 
-      Examples of implicit relationships to extract:
+      **Examples of implicit relationships to extract when semantically justified:**
 
       - Topic matching: "Technical Volume" + "Technical Approach Factor" → GUIDES relationship
       - Naming patterns: "J-0001" + "Section J" → ATTACHMENT_OF relationship
       - Semantic similarity: "Help desk support requirement" + "Technical Support Factor" → EVALUATED_BY relationship
       - Co-location: Page limit mentioned in factor description → GUIDES relationship
+      - Shared keywords: Two requirements discussing same topic → RELATED_TO relationship
+      - Hierarchical: Any numbered entity (C.3.2.1) to its parent (C.3.2) → CHILD_OF relationship
+      - Cross-references: Entity A mentions Entity B by name → REFERENCES relationship
+      - Definitional: Entity A defines/explains Entity B → DEFINES relationship
+
+      **When to use each relationship type:**
+
+      - **CHILD_OF**: Hierarchical structure (sections, subsections, numbered documents)
+      - **ATTACHMENT_OF**: Documents attached to sections (J-0001 → Section J)
+      - **GUIDES**: Instructions that guide evaluation (Section L → Section M)
+      - **EVALUATED_BY**: Requirements/deliverables evaluated in factors (Requirement → Factor)
+      - **PRODUCES**: Work produces deliverables (SOW → CDRL)
+      - **REFERENCES**: Entity mentions another entity by name
+      - **CONTAINS**: Parent contains child (Section contains clauses)
+      - **RELATED_TO**: Semantic similarity, shared topics, or thematic connection
+      - **SUPPORTS**: One entity enables/supports another
+      - **DEFINES**: One entity defines/explains another
+
+    - **ONTOLOGY-GROUNDED RELATIONSHIP EXAMPLES:**
+
+      **Example 1: Hierarchical Document Structure (CHILD_OF)**
+
+      Entities extracted:
+
+      - entity|Section C Statement of Work|section|...
+      - entity|Section C.3 Technical Requirements|section|...
+      - entity|Section C.3.2 System Architecture|section|...
+
+      Relationships to extract:
+
+      ```
+      relation|Section C.3 Technical Requirements|Section C Statement of Work|CHILD_OF|Subsection C.3 is hierarchically contained within Section C
+      relation|Section C.3.2 System Architecture|Section C.3 Technical Requirements|CHILD_OF|Subsection C.3.2 is hierarchically contained within Section C.3
+      ```
+
+      Why: Numbered sections follow explicit hierarchy - extract parent-child relationships based on numbering pattern.
+
+      **Example 2: Clause Incorporation (CHILD_OF)**
+
+      Entities extracted:
+
+      - entity|Section I Contract Clauses|section|...
+      - entity|FAR 52.212-1|clause|Instructions to Offerors—Commercial Products and Services
+      - entity|DFARS 252.204-7012|clause|Safeguarding Covered Defense Information and Cyber Incident Reporting
+
+      Relationships to extract:
+
+      ```
+      relation|FAR 52.212-1|Section I Contract Clauses|CHILD_OF|FAR clause incorporated by reference in Section I per UCF standard
+      relation|DFARS 252.204-7012|Section I Contract Clauses|CHILD_OF|DFARS clause incorporated by reference in Section I per UCF standard
+      ```
+
+      Why: Federal clauses are standardly incorporated in Section I - create relationships even if not explicitly listed together.
+
+      **Example 3: Instruction-Evaluation Linking (GUIDES)**
+
+      Entities extracted:
+
+      - entity|Technical Approach Volume|submission_instruction|Proposal section limited to 25 pages addressing system architecture and integration methodology
+      - entity|Factor 1 Technical Approach|evaluation_factor|Most Important factor worth 40% evaluating technical solution and system design
+
+      Relationships to extract:
+
+      ```
+      relation|Technical Approach Volume|Factor 1 Technical Approach|GUIDES|Submission instruction addresses content evaluated in this factor based on topic matching (technical, architecture, system)
+      ```
+
+      Why: Both mention "technical approach" and "system" - semantic similarity indicates the instruction guides content for this evaluation factor.
+
+      **Example 4: Requirement-Evaluation Mapping (EVALUATED_BY)**
+
+      Entities extracted:
+
+      - entity|ISO 9001 Certification Requirement|requirement|Contractor shall maintain ISO 9001:2015 certification throughout contract period
+      - entity|Factor 3 Quality Assurance|evaluation_factor|Evaluation factor assessing quality management capabilities including ISO certification and quality processes
+
+      Relationships to extract:
+
+      ```
+      relation|ISO 9001 Certification Requirement|Factor 3 Quality Assurance|EVALUATED_BY|Quality certification requirement will be evaluated in quality assurance factor based on topic match (ISO, quality)
+      ```
+
+      Why: Requirement mentions "ISO 9001" and factor evaluates "ISO certification" - direct topic alignment indicates evaluation relationship.
+
+      **Example 5: Work-Deliverable Production (PRODUCES)**
+
+      Entities extracted:
+
+      - entity|Performance Work Statement|statement_of_work|Detailed task descriptions including monthly reporting requirements
+      - entity|CDRL A001 Monthly Status Report|deliverable|Monthly status report due 5th business day of following month
+
+      Relationships to extract:
+
+      ```
+      relation|Performance Work Statement|CDRL A001 Monthly Status Report|PRODUCES|PWS defines monthly reporting requirement that produces this CDRL deliverable
+      ```
+
+      Why: PWS task descriptions specify deliverable requirements that result in CDRLs - extract production relationship.
+
+      **Example 6: Attachment Hierarchy (ATTACHMENT_OF)**
+
+      Entities extracted:
+
+      - entity|Section J List of Attachments|section|...
+      - entity|J-02000000 Performance Work Statement|document|Attachment containing detailed performance requirements
+      - entity|Attachment 1 Quality Assurance Plan|document|...
+
+      Relationships to extract:
+
+      ```
+      relation|J-02000000 Performance Work Statement|Section J List of Attachments|ATTACHMENT_OF|Numbered attachment J-02000000 is listed under Section J per naming convention
+      relation|Attachment 1 Quality Assurance Plan|Section J List of Attachments|ATTACHMENT_OF|Attachment 1 is incorporated in Section J attachments list
+      ```
+
+      Why: Naming patterns (J-####, Attachment #) indicate document is an attachment of Section J.
+
+      **Example 7: Cross-Topic Semantic Relationships (RELATED_TO)**
+
+      Entities extracted:
+
+      - entity|Cybersecurity Requirements|requirement|Contractor shall implement NIST SP 800-171 security controls
+      - entity|System Architecture Design|requirement|Contractor shall design system with security-first architecture principles
+      - entity|NIST SP 800-171 Compliance|concept|Federal security standard for protecting Controlled Unclassified Information
+
+      Relationships to extract:
+
+      ```
+      relation|Cybersecurity Requirements|NIST SP 800-171 Compliance|RELATED_TO|Cybersecurity requirement references NIST SP 800-171 standard
+      relation|System Architecture Design|Cybersecurity Requirements|RELATED_TO|Architecture requirement incorporates security principles related to cybersecurity requirements
+      ```
+
+      Why: Both requirements discuss security/cybersecurity topics - thematic connection justifies RELATED_TO relationship.
+
+      **Example 8: Program-Equipment Relationships (RELATED_TO)**
+
+      Entities extracted:
+
+      - entity|MCPP II Program|program|Marine Corps Prepositioning Program II providing equipment sets
+      - entity|M1A1 Abrams Tank|equipment|Main battle tank prepositioned in MCPP stocks
+      - entity|Equipment Maintenance Services|requirement|Contractor shall maintain prepositioned equipment in ready condition
+
+      Relationships to extract:
+
+      ```
+      relation|M1A1 Abrams Tank|MCPP II Program|RELATED_TO|Tank equipment is part of MCPP II prepositioned stocks
+      relation|Equipment Maintenance Services|M1A1 Abrams Tank|RELATED_TO|Maintenance requirement applies to tank equipment
+      relation|Equipment Maintenance Services|MCPP II Program|RELATED_TO|Maintenance services support MCPP II program objectives
+      ```
+
+      Why: Program, equipment, and maintenance requirement form semantic cluster around prepositioning concept.
+
+      **Example 9: Strategic Theme Clustering (SUPPORTS)**
+
+      Entities extracted:
+
+      - entity|Veteran Hiring Initiative|strategic_theme|Commitment to hiring veterans for key positions
+      - entity|Small Business Partnerships|strategic_theme|Teaming with veteran-owned small businesses
+      - entity|Workforce Development Plan|requirement|Contractor shall develop workforce plan emphasizing veteran recruitment
+
+      Relationships to extract:
+
+      ```
+      relation|Veteran Hiring Initiative|Workforce Development Plan|SUPPORTS|Strategic theme supports workforce planning requirement focused on veteran hiring
+      relation|Small Business Partnerships|Veteran Hiring Initiative|RELATED_TO|Small business teaming theme relates to veteran hiring through VOSB partnerships
+      ```
+
+      Why: Strategic themes and requirements aligned on veteran employment create meaningful support/thematic relationships.
+
+      **Example 10: NOT Extracting Forced Relationships**
+
+      Entities extracted:
+
+      - entity|Payment Terms|concept|Net 30 payment terms for invoice processing
+      - entity|Cybersecurity Controls|requirement|Contractor shall implement NIST SP 800-171 controls
+
+      Relationships to AVOID:
+
+      ```
+      ❌ relation|Payment Terms|Cybersecurity Controls|RELATED_TO|Both are contract requirements
+      ```
+
+      Why NOT extract: Payment and cybersecurity have NO semantic connection - different topics, no shared keywords, no logical relationship. DO NOT create relationships just to connect isolated entities.
 
     - **Identification:** Identify ALL direct and implicit relationships between previously extracted entities.
     - **N-ary Relationship Decomposition:** If a single statement describes a relationship involving more than two entities (an N-ary relationship), decompose it into multiple binary (two-entity) relationship pairs for separate description.
@@ -1128,6 +1478,17 @@ Algorithm: Extract section number from requirement source, map section to factor
     - Keep proper nouns (personal names, place names, organization names) in their original language if appropriate.
 
 8.  **Completion Signal:** Output the completion marker only after all entities and relationships have been extracted.
+
+---
+
+**FINAL REMINDER - ENTITY TYPE COMPLIANCE:**
+
+Before outputting, verify EVERY entity uses one of the 17 ALLOWED types:
+✅ organization, concept, event, technology, person, location, requirement, clause, section, document, deliverable, program, equipment, evaluation_factor, submission_instruction, strategic_theme, statement_of_work
+
+❌ NEVER output: other, UNKNOWN, process, table, plan, policy, standard, system, regulation, framework
+
+If uncertain, use **concept** (catch-all for abstract entities).
 
 ---Real Data---
 

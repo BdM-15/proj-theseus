@@ -52,43 +52,44 @@ def configure_raganything_args():
     global_args.embedding_model_name = "text-embedding-3-large"
     global_args.embedding_binding_host = "https://api.openai.com/v1"  # OpenAI endpoint for embeddings
     global_args.embedding_api_key = openai_api_key
-    global_args.embedding_dim = 3072  # CRITICAL: text-embedding-3-large dimension
+    global_args.embedding_dim = int(os.getenv("EMBEDDING_DIM", "3072"))  # Environment-driven for flexibility
     
-    # Government contracting entity types (16 specialized types - consolidated for flexibility)
+    # Government contracting entity types (17 specialized types - consolidated for flexibility)
     # Semantic-first detection: Content determines entity type, not section labels
+    # NOTE: LightRAG normalizes to lowercase internally - use lowercase for consistency
     global_args.entity_types = [
         # Core entities
-        "ORGANIZATION",
-        "CONCEPT",
-        "EVENT",
-        "TECHNOLOGY",
-        "PERSON",
-        "LOCATION",
+        "organization",
+        "concept",
+        "event",
+        "technology",
+        "person",
+        "location",
         
         # Requirements (semantic detection with metadata: requirement_type, criticality_level)
-        "REQUIREMENT",
+        "requirement",
         
         # Structural entities
-        "CLAUSE",                   # FAR/DFARS/AFFARS patterns, will cluster by parent section
-        "SECTION",                  # Stores both structural_label + semantic_type
-        "DOCUMENT",                 # References: specs, standards, manuals, regulations, attachments, annexes
-        "DELIVERABLE",
+        "clause",                   # FAR/DFARS/AFFARS patterns, will cluster by parent section
+        "section",                  # Stores both structural_label + semantic_type
+        "document",                 # References: specs, standards, manuals, regulations, attachments, annexes
+        "deliverable",
         
         # Hierarchical program entities
-        "PROGRAM",                  # Major named programs/initiatives (MCPP II, Navy MBOS, DEIP)
+        "program",                  # Major named programs/initiatives (MCPP II, Navy MBOS, DEIP)
         
         # Physical assets and equipment
-        "EQUIPMENT",                # Physical assets: MHE, generators, batteries, GSE, CESE, watercraft, vehicles
+        "equipment",                # Physical assets: MHE, generators, batteries, GSE, CESE, watercraft, vehicles
         
         # Evaluation entities (semantic detection, may be embedded in non-standard sections)
-        "EVALUATION_FACTOR",        # Scoring criteria (Section M content)
-        "SUBMISSION_INSTRUCTION",   # Format/page limits (Section L content, may be IN Section M)
+        "evaluation_factor",        # Scoring criteria (Section M content)
+        "submission_instruction",   # Format/page limits (Section L content, may be IN Section M)
         
         # Strategic entities (Capture planning patterns)
-        "STRATEGIC_THEME",          # Win themes, hot buttons, discriminators, proof points
+        "strategic_theme",          # Win themes, hot buttons, discriminators, proof points
         
         # Work scope (Semantic detection regardless of location)
-        "STATEMENT_OF_WORK",        # PWS/SOW/SOO content (may be Section C or attachment)
+        "statement_of_work",        # PWS/SOW/SOO content (may be Section C or attachment)
     ]
     
     # Chunking configuration (leverages Grok-4's 2M context window)
