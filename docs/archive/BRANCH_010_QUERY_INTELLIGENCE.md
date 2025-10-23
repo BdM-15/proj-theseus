@@ -561,6 +561,27 @@ async def intelligent_query_endpoint(
 
 ---
 
-**Status**: 🔴 **NOT STARTED - Waiting for Branch 009 merge to main**
+**Status**: � **READY TO START - Branch 009 merged, Branch 010 created**
 
-**Next Action**: Complete Branch 009 Iteration 5 testing → Merge to main → Create Branch 010
+**Current State**:
+
+- ✅ Branch 009 merged to main (99.8% coverage, 0 forbidden types)
+- ✅ Branch 010 created: `010-query-prompts-integration`
+- ✅ Directory structure in place: `prompts/query/`, `prompts/user_queries/`
+- ✅ Query library documented: `prompts/user_queries/capture_manager_prompts.md` (11 categories, 40+ queries)
+- ✅ Architecture documented: `prompts/query/README.md`
+
+**What Exists**:
+
+1. `prompts/query/metadata_enrichment.md` - Metadata extraction prompt (moved from extraction/)
+2. `prompts/query/README.md` - Architecture and usage patterns
+3. `prompts/user_queries/capture_manager_prompts.md` - Comprehensive query library with examples
+
+**What's Needed** (Priority Order):
+
+1. 🔥 Implement QueryParam.user_prompt integration in `/query` endpoint
+2. 🔥 Create proposal_outline_generator.md (convert Query 3.1 to user_prompt format)
+3. 🔥 Create compliance_assessment.md (convert Query 4.1 to user_prompt format)
+4. 🟡 Create questions_for_government.md (convert Query 7.2 to user_prompt format)
+5. 🟡 Create win_themes_analyzer.md (convert Query 2.2 to user_prompt format)
+6. 🟢 Implement intent_classifier.md for automatic routing
