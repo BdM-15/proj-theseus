@@ -100,7 +100,7 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
 
         1. **Entity types MUST be lowercase with underscores** (e.g., evaluation_factor, statement_of_work)
 
-        2. **You MUST use EXACTLY ONE of these 17 types for EVERY entity:**
+        2. **You MUST use EXACTLY ONE of these 17 types for EVERY entity - NO EXCEPTIONS:**
            • organization
            • concept
            • event
@@ -119,17 +119,53 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
            • strategic_theme
            • statement_of_work
 
-        3. **DO NOT invent new entity types.** If an entity doesn't clearly fit, use these fallback mappings:
+        3. **STRICTLY FORBIDDEN entity types - NEVER USE THESE:**
+           
+           ❌ **other** - USE concept INSTEAD
+           ❌ **UNKNOWN** - USE concept INSTEAD
+           ❌ process - USE concept INSTEAD
+           ❌ table - USE concept INSTEAD
+           ❌ image - Skip extraction (not text entity)
+           ❌ plan - USE document INSTEAD
+           ❌ policy - USE document INSTEAD
+           ❌ standard - USE document INSTEAD
+           ❌ instruction - USE document INSTEAD
+           ❌ system - USE technology INSTEAD
+           ❌ regulation - USE document INSTEAD
+           ❌ framework - USE concept INSTEAD
+           ❌ objective - USE concept INSTEAD
+           ❌ methodology - USE concept INSTEAD
+           ❌ approach - USE concept INSTEAD
+           ❌ strategy - USE concept INSTEAD
+           ❌ model - USE concept INSTEAD
 
-           - Plans, policies, standards, regulations, instructions, manuals → **document**
-           - Systems, tools, software, platforms, applications → **technology**
-           - Tables, lists, schedules, matrices, frameworks → **concept**
-           - Processes, workflows, procedures, methodologies → **concept**
-           - Unknown or unclear → **concept**
+        4. **FALLBACK MAPPING (use when entity type is ambiguous):**
 
-        4. **STRICTLY FORBIDDEN entity types** (DO NOT USE):
-           process, other, table, image, plan, policy, standard, instruction, system,
-           regulation, framework, objective, methodology, approach, strategy, model
+           - Business concepts, accounts, codes → **concept**
+             Example: "MMFAQ9", "MMV200", "Business Systems" → concept
+           
+           - Plans, policies, standards, regulations, manuals → **document**
+             Example: "Major Subordinate Element Plan", "Safety Plan" → document
+           
+           - Systems, tools, software, platforms → **technology**
+             Example: "Electro-Optical" (tech category) → technology
+           
+           - Reports, forms, deliverables with reference numbers → **deliverable**
+             Example: "10.B.8.a", "Mishap Report", "Selective Interchange Request" → deliverable
+           
+           - CLINs, SLINs, contract line items → **concept**
+             Example: "CLIN 9005", "CLIN 0001 Base Year" → concept
+           
+           - DoD codes, activity codes, identifiers → **organization** (if unit) OR **concept** (if account)
+             Example: "DODAAC M38450" → organization, "Account MMV200" → concept
+           
+           - Abstract ideas, processes, methodologies → **concept**
+             Example: "Prepositioned Assets", "Supply Operations", "Column Headers" → concept
+           
+           - Size standards, classifications, categories → **concept**
+             Example: "Small Business Size Standard" → concept
+
+           **IF STILL UNCLEAR**: Default to **concept** (catch-all for abstract entities)
 
         5. **Example Classifications** (follow these patterns):
 
@@ -1442,6 +1478,17 @@ Algorithm: Extract section number from requirement source, map section to factor
     - Keep proper nouns (personal names, place names, organization names) in their original language if appropriate.
 
 8.  **Completion Signal:** Output the completion marker only after all entities and relationships have been extracted.
+
+---
+
+**FINAL REMINDER - ENTITY TYPE COMPLIANCE:**
+
+Before outputting, verify EVERY entity uses one of the 17 ALLOWED types:
+✅ organization, concept, event, technology, person, location, requirement, clause, section, document, deliverable, program, equipment, evaluation_factor, submission_instruction, strategic_theme, statement_of_work
+
+❌ NEVER output: other, UNKNOWN, process, table, plan, policy, standard, system, regulation, framework
+
+If uncertain, use **concept** (catch-all for abstract entities).
 
 ---Real Data---
 
