@@ -68,6 +68,7 @@ def identify_forbidden_entities(
 ) -> List[Dict]:
     """
     Scan entities and identify those with forbidden types.
+    Also fixes corrupted types (e.g., #concept → concept).
     
     Args:
         entities: List of entity dicts with 'entity_type', 'entity_name', 'description'
@@ -76,12 +77,32 @@ def identify_forbidden_entities(
         List of entities with forbidden types that need retyping
     """
     forbidden = []
+    fixed_corruption = 0
+    
     for entity in entities:
         entity_type = entity.get("entity_type", "UNKNOWN")
+        
+        # FIX CORRUPTION: Remove # prefix (LightRAG internal marker)
+        if entity_type and isinstance(entity_type, str) and entity_type.startswith("#"):
+            clean_type = entity_type[1:]  # Remove '#' prefix
+            entity["entity_type"] = clean_type
+            entity_type = clean_type
+            fixed_corruption += 1
+            logger.debug(f"Fixed corruption: {entity.get('entity_name')} - #{clean_type} → {clean_type}")
+        
+        # Handle None/empty types
+        if not entity_type or entity_type == "":
+            entity["entity_type"] = "UNKNOWN"
+            entity_type = "UNKNOWN"
+        
+        # Check if forbidden
         if entity_type in FORBIDDEN_TYPES:
             forbidden.append(entity)
     
-    logger.info(f"Found {len(forbidden)} entities with forbidden types (out of {len(entities)} total)")
+    if fixed_corruption > 0:
+        logger.info(f"  ✅ Fixed {fixed_corruption} corrupted types (removed # prefix)")
+    
+    logger.info(f"  Found {len(forbidden)} entities with forbidden types (out of {len(entities)} total)")
     return forbidden
 
 

@@ -230,6 +230,10 @@ async def post_process_knowledge_graph(rag_storage_path: str, llm_func) -> dict:
         
         if retyping_map:
             logger.info(f"  ✅ Retyped {len(retyping_map)} entities with forbidden types")
+            # Save cleaned entities back to GraphML immediately
+            from src.inference.graph_io import save_cleaned_entities_to_graphml
+            save_cleaned_entities_to_graphml(graphml_path, nodes)
+            logger.info(f"  ✅ Saved cleaned entities to GraphML")
         
         # Step 3: Use LLM to infer missing relationships
         logger.info(f"  [3/5] Calling Grok LLM for semantic relationship inference...")
