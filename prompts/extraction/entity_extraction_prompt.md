@@ -186,18 +186,6 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
       - Agency supplements: AFFARS, NMCARS, DARS, TRANSFARS, etc.
       - Always extract as CLAUSE type, preserve full citation in entity_name
 
-      **Uniform Contract Format (UCF) Sections:**
-
-      - Section A: Solicitation/Contract Form (cover, dates, contact info)
-      - Section B: Supplies/Services & Prices (CLINs, pricing)
-      - Section C: Statement of Work (SOW/PWS location varies - may be Section C or attachment)
-      - Section H: Special Requirements (security, key personnel)
-      - Section I: Contract Clauses (FAR/DFARS - extract individual clauses)
-      - Section J: Attachments (various naming: J-0001, Attachment 1, Annex A, Exhibit B)
-      - Section L: Instructions to Offerors (page limits - SUBMISSION_INSTRUCTION)
-      - Section M: Evaluation Factors (scoring - EVALUATION_FACTOR)
-      - Note: Extract SOW/PWS as STATEMENT_OF_WORK regardless of location (section or attachment)
-
       **Deliverable Patterns (CDRL):**
 
       - Contract Data Requirements List items: CDRL A001, CDRL 6022, etc.

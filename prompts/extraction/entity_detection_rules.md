@@ -25,6 +25,134 @@ section_origin = detect_section(context)  # Could be L, M, or custom
 
 ---
 
+## Uniform Contract Format (UCF) Reference
+
+### Standard Federal RFP Structure (FAR 15.210)
+
+Federal solicitations use standard lettered sections A-M. **Note**: Extract entities based on CONTENT, not just section labels.
+
+| Section       | Purpose                    | Common Entity Types                                  | Content Signals                                                                          |
+| ------------- | -------------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| **Section A** | Solicitation/Contract Form | section, organization, person, event                 | SF 1449, cover page, solicitation number, POCs, Q&A deadline                             |
+| **Section B** | Supplies/Services & Prices | section, concept, program                            | CLIN/SLIN structure, pricing tables, line items, unit prices                             |
+| **Section C** | Statement of Work          | section, statement_of_work, requirement, deliverable | "contractor shall", task descriptions, performance objectives, work scope                |
+| **Section H** | Special Requirements       | section, requirement, person, location               | Security clearances, key personnel, organizational conflicts, facility requirements      |
+| **Section I** | Contract Clauses           | section, clause                                      | FAR/DFARS citations, "52.###-##" patterns, "incorporated by reference"                   |
+| **Section J** | Attachments                | section, document, statement_of_work                 | "Attachment", "Annex", "Exhibit", "J-####", referenced documents                         |
+| **Section L** | Instructions to Offerors   | section, submission_instruction                      | Page limits, font requirements, "proposal shall", volume structure, submission deadlines |
+| **Section M** | Evaluation Factors         | section, evaluation_factor                           | "will be evaluated", factor hierarchy, relative importance, adjectival ratings           |
+
+### Non-Standard Label Mapping
+
+Task Orders and Fair Opportunity Requests often use different terminology:
+
+| Non-Standard Label            | Standard Equivalent | Detection Strategy                       |
+| ----------------------------- | ------------------- | ---------------------------------------- |
+| Request for Quote (RFQ)       | Section A           | Cover page content signals               |
+| Technical Requirements        | Section C           | Task descriptions, requirements language |
+| Work Requirements             | Section C           | "shall perform" statements               |
+| Statement of Objectives (SOO) | Section C           | Outcome-based language                   |
+| Proposal Instructions         | Section L           | Page limits, format requirements         |
+| Submission Requirements       | Section L           | Submission deadlines, volume structure   |
+| Selection Criteria            | Section M           | Evaluation factor language               |
+| Evaluation Methodology        | Section M           | Adjectival ratings, scoring methodology  |
+| Source Selection Plan         | Section M           | Tradeoff approach, best value language   |
+
+### Agency-Specific Variations
+
+Different agencies use custom terminology:
+
+| Agency Term                      | Standard Equivalent | Entity Type Guidance                 |
+| -------------------------------- | ------------------- | ------------------------------------ |
+| Scope of Work                    | Section C           | Extract as statement_of_work         |
+| Performance Work Statement (PWS) | Section C           | Extract as statement_of_work         |
+| Special Contract Requirements    | Section H           | Extract requirements as requirement  |
+| Applicable Clauses               | Section I           | Extract individual clauses as clause |
+| Required Certifications          | Section K           | Extract as requirement (compliance)  |
+
+### Content-Based Detection Rules
+
+When section labels are ambiguous or missing:
+
+**EVALUATION_FACTOR Detection Signals:**
+
+- "will be evaluated", "evaluation factor", "most important"
+- "adjectival rating", "source selection", "significantly more important"
+- Factor numbering (M1, M2, M2.1), Point scores (100 points total)
+
+**SUBMISSION_INSTRUCTION Detection Signals:**
+
+- "page limit", "font size", "proposal shall", "volume structure"
+- "submit by", "electronic submission", "format requirements"
+- "Times New Roman 12pt", "1-inch margins"
+
+**CLAUSE Detection Signals:**
+
+- FAR/DFARS/AFFARS/NMCARS patterns: "52.###-##", "252.###-####"
+- "incorporated by reference", "clause title", "full text"
+
+**STATEMENT_OF_WORK Detection Signals:**
+
+- Task descriptions, performance objectives, deliverables lists
+- "contractor shall perform", Task numbering (1.0, 1.1, 1.1.1)
+- "SOW", "PWS", "SOO" labels
+
+### Mixed Content Handling
+
+Some sections contain multiple entity types:
+
+**Example 1: Section M with Embedded Instructions**
+
+```
+Section M: Evaluation Factors
+
+Factor 1: Technical Approach (Most Important)
+[Evaluation criteria...]
+The Technical Volume shall be limited to 25 pages...
+```
+
+**Extract**:
+
+- EVALUATION_FACTOR: "Factor 1: Technical Approach"
+- SUBMISSION_INSTRUCTION: "Technical Volume page limit"
+- Link them: SUBMISSION_INSTRUCTION --EVALUATED_BY--> EVALUATION_FACTOR
+
+**Example 2: Section C as Attachment**
+
+```
+Section C: Description/Specifications/Data
+See Attachment J-0200000-18 for Performance Work Statement.
+```
+
+**Extract**:
+
+- SECTION: "Section C"
+- DOCUMENT: "Attachment J-0200000-18"
+- STATEMENT_OF_WORK: "Performance Work Statement"
+- Link them: SECTION --REFERENCES--> DOCUMENT --CONTAINS--> STATEMENT_OF_WORK
+
+### Section Attribution for Ambiguous Entities
+
+**Clause Attribution:**
+
+- All FAR/DFARS clauses → Section I (Contract Clauses)
+- Representations/certifications (52.2##-## series) → Section K
+
+**Annex Attribution (Prefix-Based):**
+
+- `J-######` → Section J
+- `Attachment #` → Section J
+- `Annex ##` → Section J or standalone
+- Letter prefix → Corresponding section (A-#### → Section A)
+
+**Requirement Attribution:**
+
+- Default to Section C (SOW)
+- Unless labeled "Section H" → Special Requirements
+- Or part of Section I/K → Clauses/Certifications
+
+---
+
 ## Entity Type 1: EVALUATION_FACTOR
 
 ### Content Signals
@@ -55,23 +183,9 @@ section_origin = detect_section(context)  # Could be L, M, or custom
 - **Alternate**: Section L (sometimes embedded)
 - **Non-standard**: "Selection Criteria", "Source Selection Plan"
 
-### Metadata to Extract
+### Basic Attributes
 
-```json
-{
-  "factor_id": "M1" | "M2.1" | "M2.1.1",
-  "factor_name": "Technical Approach" | "Staffing Plan" | "Management Approach",
-  "relative_importance": "Most Important" | "Significantly More Important" | "Equal" | "Less Important",
-  "subfactors": ["M2.1 Staffing", "M2.2 Maintenance", "M2.3 Transition"],
-  "section_l_reference": "L.3.1" (link to submission instructions),
-  "page_limits": "25 pages" (from Section L cross-reference),
-  "format_requirements": "12pt Times New Roman, 1-inch margins",
-  "tradeoff_methodology": "Best Value" | "LPTA" | "Cost/Technical Tradeoff",
-  "evaluated_by_rating": "Adjectival" | "Point Score" | "Pass/Fail",
-  "section_origin": "Section M.2" | "Selection Criteria",
-  "contains_submission_instructions": true | false
-}
-```
+Capture entity_name, entity_type, and description. Additional structured metadata (factor_id, relative_importance, subfactors) can be enriched during query-time operations.
 
 ### Examples from Real RFPs
 
@@ -190,20 +304,9 @@ in separate sections.
 SUBMISSION_INSTRUCTION "Technical Volume Format" → GUIDES → EVALUATION_FACTOR "Factor 1"
 ```
 
-### Metadata to Extract
+### Basic Attributes
 
-```json
-{
-  "guides_factor": "M2" (which evaluation factor this instructs),
-  "volume_name": "Technical Volume" | "Management Volume" | "Cost Volume",
-  "page_limits": "25 pages" | "50 pages maximum" | "No limit",
-  "format_requirements": "12pt Times New Roman, 1-inch margins, single-spaced",
-  "section_origin": "Section L.3.1" | "Section M.2 (embedded)",
-  "delivery_method": "Electronic via email" | "Hard copy + electronic" | "Electronic portal",
-  "deadline": "2025-03-15T14:00:00-05:00" (ISO 8601),
-  "file_format": "PDF" | "MS Word" | "Both"
-}
-```
+Capture entity_name, entity_type, and description. Additional structured metadata (page_limits, format_requirements, deadlines) can be enriched during query-time operations.
 
 ### Examples from Real RFPs
 
@@ -365,19 +468,9 @@ organizational chart, resumes for key personnel, and project schedule.
   - "Peer code review required"
   - "User acceptance testing (UAT)"
 
-### Metadata to Extract
+### Basic Attributes
 
-```json
-{
-  "requirement_type": "FUNCTIONAL" | "PERFORMANCE" | "INTERFACE" | "DESIGN" | "SECURITY" | "TECHNICAL" | "MANAGEMENT" | "QUALITY",
-  "criticality_level": "MANDATORY" | "IMPORTANT" | "OPTIONAL" | "INFORMATIONAL",
-  "priority_score": 0-100 (auto-calculated: MANDATORY=100, IMPORTANT=75, OPTIONAL=25, INFORMATIONAL=0),
-  "section_origin": "Section C.3.1.2" | "PWS Task 1.2.3",
-  "semantic_context": "Performance requirement within maintenance SOW",
-  "modal_verb": "shall" | "should" | "may" | "will",
-  "subject": "Contractor" | "Offeror" | "Government" | "Agency"
-}
-```
+Capture entity_name, entity_type, and description. Requirement criticality (SHALL/SHOULD/MAY) and modal verb context can be enriched during query-time operations.
 
 ### Examples from Real RFPs
 
@@ -500,18 +593,9 @@ PROGRAM → CONTAINS → DELIVERABLE (program expects deliverables)
 - Capitalized or emphasized as primary subject
 - Referenced throughout document as umbrella
 
-### Metadata to Extract
+### Basic Attributes
 
-```json
-{
-  "program_name": "Marine Corps Prepositioning Program II",
-  "program_acronym": "MCPP II",
-  "program_scope": "Organic ground support equipment maintenance for USMC prepositioned equipment",
-  "parent_organization": "Marine Corps" | "Navy" | "Air Force",
-  "section_origin": "Section C" | "Document Title",
-  "program_type": "Major Acquisition" | "IT Modernization" | "Facility Maintenance"
-}
-```
+Capture entity_name, entity_type, and description. Program acronyms and scope details can be enriched during query-time operations.
 
 ### Example from Navy MBOS RFP
 
@@ -604,17 +688,16 @@ The entity type `STATEMENT_OF_WORK` represents **ANY** of these three formats:
 - Performance standards and metrics
 - Deliverable schedules
 
-### Metadata to Extract
+### Basic Attributes
 
-```json
-{
-  "work_type": "PWS" | "SOW" | "SOO",
-  "location": "Section C" | "Attachment J-1234567" | "Annex 5",
-  "hierarchical_structure": true | false,
-  "task_count": 12 (if hierarchical),
-  "performance_standards": true | false (PWS-specific),
-  "prescription_level": "High (SOW)" | "Medium (PWS)" | "Low (SOO)"
+Capture entity_name, entity_type, and description. Work statement location and task structure can be enriched during query-time operations.
+
+### Examples from Real RFPs
+
+"performance_standards": true | false (PWS-specific),
+"prescription_level": "High (SOW)" | "Medium (PWS)" | "Low (SOO)"
 }
+
 ```
 
 ### Examples from Real RFPs
@@ -622,18 +705,21 @@ The entity type `STATEMENT_OF_WORK` represents **ANY** of these three formats:
 **Example 1: PWS (Performance-Based)**
 
 ```
+
 Attachment J-0200000-18: Performance Work Statement
 
 3.1 MAINTENANCE SERVICES
 
 The Contractor shall perform scheduled and unscheduled maintenance
 on all GSE to achieve:
+
 - 95% equipment availability
 - 98% first-time fix rate
 - Mean time between failures (MTBF) ≥ 500 hours
 
 Performance shall be measured monthly against these standards.
-```
+
+````
 
 **Extracted Entity**:
 
@@ -646,7 +732,7 @@ Performance shall be measured monthly against these standards.
   "performance_standards": true,
   "prescription_level": "Medium (PWS)"
 }
-```
+````
 
 **Example 2: SOW (Prescriptive)**
 
@@ -705,21 +791,24 @@ An annex/attachment can contain:
 - Sample documents
 - Contract clauses
 
-### Metadata to Extract
+### Basic Attributes
 
-```json
-{
-  "original_numbering": "J-0200000-18" | "Attachment 5" | "Annex 17",
-  "prefix_pattern": "J-" | "Attachment " | "Annex " | "A-",
-  "content_type": "SOW" | "Specifications" | "Maps" | "Data" | "Sample" | "Clauses",
-  "parent_section": "Section J" (inferred from prefix),
-  "file_reference": "Equipment_List.pdf" (if separate file)
+Capture entity_name, entity_type, and description. Attachment numbering and parent section linkage can be inferred during relationship inference.
+
+### Examples from Real RFPs
+
+"prefix_pattern": "J-" | "Attachment " | "Annex " | "A-",
+"content_type": "SOW" | "Specifications" | "Maps" | "Data" | "Sample" | "Clauses",
+"parent_section": "Section J" (inferred from prefix),
+"file_reference": "Equipment_List.pdf" (if separate file)
 }
+
 ```
 
 ### Example from Navy MBOS
 
 ```
+
 Section J: List of Attachments
 
 The following documents are incorporated by reference:
@@ -727,7 +816,8 @@ The following documents are incorporated by reference:
 J-0200000-18: Performance Work Statement (PWS)
 J-0300000-12: Equipment List and Specifications
 J-0400000-05: Site Layout and Facility Maps
-```
+
+````
 
 **Extracted Entities** (3 annexes):
 
@@ -758,7 +848,7 @@ J-0400000-05: Site Layout and Facility Maps
     "parent_section": "Section J"
   }
 ]
-```
+````
 
 ---
 
@@ -796,22 +886,26 @@ Even if not adjacent in document:
 - All FAR 52.3##-# (Delivery) together
 - All security clauses together
 
-### Metadata to Extract
+### Basic Attributes
 
-```json
-{
-  "clause_number": "FAR 52.212-4" | "DFARS 252.204-7012",
-  "agency_supplement": "FAR" | "DFARS" | "AFFARS" | "NMCARS",
-  "clause_title": "Contract Terms and Conditions—Commercial Products and Commercial Services",
-  "section_attribution": "Section I" | "Section K",
-  "incorporation_method": "Full Text" | "By Reference",
-  "date": "JAN 2024" (clause effective date)
+Capture entity_name, entity_type, and description. Clause supplements (FAR/DFARS/AFFARS) and parent section clustering are handled during relationship inference.
+
+### Examples from Real RFPs
+
+"clause_number": "FAR 52.212-4" | "DFARS 252.204-7012",
+"agency_supplement": "FAR" | "DFARS" | "AFFARS" | "NMCARS",
+"clause_title": "Contract Terms and Conditions—Commercial Products and Commercial Services",
+"section_attribution": "Section I" | "Section K",
+"incorporation_method": "Full Text" | "By Reference",
+"date": "JAN 2024" (clause effective date)
 }
+
 ```
 
 ### Example from Navy RFP
 
 ```
+
 Section I: Contract Clauses
 
 52.212-4 Contract Terms and Conditions—Commercial Products
@@ -823,7 +917,8 @@ Commercial Services (JAN 2024)
 
 252.204-7012 Safeguarding Covered Defense Information and
 Cyber Incident Reporting (DEC 2019)
-```
+
+````
 
 **Extracted Entities** (3 clauses):
 
@@ -855,7 +950,7 @@ Cyber Incident Reporting (DEC 2019)
     "date": "DEC 2019"
   }
 ]
-```
+````
 
 ---
 
@@ -907,18 +1002,9 @@ Some sections contain multiple content types:
 }
 ```
 
-### Metadata to Extract
+### Basic Attributes
 
-```json
-{
-  "structural_label": "Section M.2.1" | "Selection Criteria",
-  "semantic_type": "EVALUATION_CRITERIA" | "SUBMISSION_INSTRUCTIONS" | "DESCRIPTION_SPECS",
-  "also_contains": ["SUBMISSION_INSTRUCTION", "REQUIREMENT"],
-  "confidence": 0.0-1.0,
-  "page_range": "15-25",
-  "subsections": ["M.1", "M.2", "M.2.1", "M.2.2"]
-}
-```
+Capture entity_name, entity_type, and description. Section semantic types and subsection structures can be enriched during relationship inference.
 
 ---
 
@@ -979,18 +1065,9 @@ PROOF POINT: "Reduced unscheduled downtime 40% on similar contract"
 CUSTOMER BENEFIT: "Ensures aircraft availability for critical missions"
 ```
 
-### Metadata to Extract
+### Basic Attributes
 
-```json
-{
-  "theme_type": "CUSTOMER_HOT_BUTTON" | "DISCRIMINATOR" | "PROOF_POINT" | "WIN_THEME",
-  "theme_statement": "Full description of strategic theme",
-  "competitive_context": "Incumbent advantage" | "New entrant gap" | "Competitive parity",
-  "evidence": "Supporting proof points, metrics, past performance",
-  "customer_benefit": "Mission outcome, agency value proposition",
-  "related_factors": ["M2", "M3"] (which evaluation factors this supports)
-}
-```
+Capture entity_name, entity_type, and description. Theme classification (hot button/discriminator/proof point) and competitive context are advanced analysis best performed during query-time.
 
 ---
 

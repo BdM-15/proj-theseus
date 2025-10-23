@@ -180,22 +180,21 @@ async def initialize_raganything():
         func=safe_embed_func,
     )
     
-    # Load ALL entity extraction prompts and concatenate
-    # Branch 009: Activating 3,000+ lines of unused ontology knowledge
-    # Philosophy: Prompts are training data, not code (2M context = detailed examples)
+    # Load entity extraction prompts with clear separation of concerns
+    # Branch 009: Quality-first refactoring (extraction excellence → query excellence)
+    # Philosophy: Thorough extraction enables powerful queries (2M context window)
+    # Folder structure: prompts/extraction/ (ingestion-time) vs prompts/query/ (query-time)
     entity_extraction_prompts = [
-        load_prompt("entity_extraction/entity_extraction_prompt"),      # 1,460 lines - Main extraction rules
-        load_prompt("entity_extraction/entity_detection_rules"),        # 1,103 lines - Semantic-first detection
-        load_prompt("entity_extraction/section_normalization"),         # 321 lines - UCF structure mapping
-        load_prompt("entity_extraction/metadata_extraction"),           # 554 lines - Field-level extraction
+        load_prompt("extraction/entity_extraction_prompt"),      # ~1,450 lines - WHAT to extract (rules, types, examples)
+        load_prompt("extraction/entity_detection_rules"),        # ~1,155 lines - HOW to detect (semantic signals, UCF)
     ]
     custom_entity_extraction_prompt = "\n\n---\n\n".join(entity_extraction_prompts)
     
-    logger.info(f"📚 Loaded 4 entity extraction prompts (~3,438 lines total)")
-    logger.info(f"   → Main extraction rules (1,460 lines)")
-    logger.info(f"   → Semantic detection patterns (1,103 lines)")
-    logger.info(f"   → UCF section normalization (321 lines)")
-    logger.info(f"   → Metadata extraction rules (554 lines)")
+    logger.info(f"📚 Loaded 2 entity extraction prompts (~2,605 lines total)")
+    logger.info(f"   → Core extraction rules: WHAT to extract (1,450 lines)")
+    logger.info(f"   → Semantic detection: HOW to detect (1,155 lines)")
+    logger.info(f"   → Metadata enrichment: Moved to prompts/query/ (Branch 010)")
+    logger.info(f"   → Separation of concerns: Extraction (ingestion) vs. Query (intelligence)")
 
     # Initialize RAG-Anything with custom configuration
     # IMPORTANT: LightRAG reads chunk_token_size from environment at import time
