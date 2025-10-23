@@ -27,6 +27,75 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
       - `entity_name`: The name of the entity. If the entity name is case-insensitive, capitalize the first letter of each significant word (title case). Ensure **consistent naming** across the entire extraction process.
       - `entity_type`: Categorize the entity using ONE of these exact types from the list below.
 
+        **CRITICAL ENTITY NAMING NORMALIZATION RULES:**
+
+        **Prevent duplicate entities due to formatting variations!** Government RFPs use inconsistent formatting:
+
+        - Page titles: "SECTION C.4 - SUPPLY" (ALL CAPS)
+        - Text references: "Section C.4" (Title Case)
+        - Inline mentions: "section c.4" (lowercase)
+        - Cross-references: "Sec C.4", "C.4", "Section C-4"
+
+        **YOU MUST extract these as ONE entity, not multiple!**
+
+        **Normalization Rules:**
+
+        1. **Section Names**: Always use Title Case with periods
+
+           - ✅ CORRECT: "Section C.4 Supply"
+           - ❌ WRONG: "SECTION C.4", "section c.4", "Sec C.4", "Section C-4"
+           - If section has a title (e.g., "- SUPPLY"), include it in normalized form
+
+        2. **FAR/DFARS Clauses**: Always use exact citation format
+
+           - ✅ CORRECT: "FAR 52.212-1"
+           - ❌ WRONG: "far 52.212-1", "FAR 52.212.1", "FAR52.212-1"
+
+        3. **CDRL/Deliverables**: Always use uppercase identifier + descriptive name
+
+           - ✅ CORRECT: "CDRL A001 Monthly Status Report"
+           - ❌ WRONG: "CDRL a001", "Cdrl A001", "cdrl A001"
+
+        4. **Organizations/Programs**: Use official capitalization from context
+
+           - ✅ CORRECT: "Marine Corps Prepositioning Program" or "MCPP II"
+           - ❌ WRONG: "MARINE CORPS PREPOSITIONING PROGRAM", "mcpp ii"
+
+        5. **When you see multiple formatting variations**:
+           - Identify they refer to the same entity
+           - Extract ONCE using the most complete, properly formatted version
+           - Merge descriptions from all mentions using <SEP> separator
+
+        **Example - Section with Multiple Formats:**
+
+        Text contains:
+
+        - Page 15 title: "SECTION C.4 - SUPPLY"
+        - Page 27 reference: "per Section C.4"
+        - Page 45 mention: "section c.4 requirements"
+
+        Extract ONCE as:
+
+        ```
+        entity|Section C.4 Supply|section|Supply section defining materiel requirements per Section C subsection 4
+        ```
+
+        NOT three separate entities!
+
+        **Example - Clause with Variations:**
+
+        Text contains:
+
+        - "FAR 52.212-1 Instructions to Offerors"
+        - "far 52.212-1"
+        - "FAR clause 52.212-1"
+
+        Extract ONCE as:
+
+        ```
+        entity|FAR 52.212-1|clause|Instructions to Offerors—Commercial Products and Commercial Services
+        ```
+
         **CRITICAL ENTITY TYPE RULES:**
 
         1. **Entity types MUST be lowercase with underscores** (e.g., evaluation_factor, statement_of_work)

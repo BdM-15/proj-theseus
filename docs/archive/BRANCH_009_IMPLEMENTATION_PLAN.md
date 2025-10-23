@@ -438,4 +438,62 @@ Edge keys (d6-d11):
 
 - ⏸️ HOLD merge to main until prompt refinement validated
 - 🔄 Test iteration required before production use
+
+---
+
+## 🔄 **Iteration 5: Multi-Prompt Loading + Entity Deduplication** (January 23, 2025)
+
+**Objectives**:
+
+1. ✅ Activate 3 unused entity extraction prompts (3,000+ lines of ontology knowledge)
+2. 🎯 Test entity deduplication (Algorithm 0 - hybrid LLM approach)
+3. 📊 Validate isolated nodes fix (SECTION C.4 → Section C.4 merge)
+
+**Changes Implemented**:
+
+- **Multi-Prompt Loading** (`src/server/initialization.py`):
+  - Load and concatenate all 4 entity extraction prompts
+  - Total: ~3,438 lines (~20K tokens, ~1% of 2M context)
+  - Files: entity_extraction_prompt (1,460) + entity_detection_rules (1,103) + section_normalization (321) + metadata_extraction (554)
+- **Entity Deduplication** (`src/inference/engine.py`):
+  - Algorithm 0: LLM-powered semantic duplicate detection
+  - Hybrid approach: Fuzzy matching heuristic + batch LLM verification
+  - Merges formatting variations (SECTION C.4 vs Section C.4 vs section c.4)
+  - Cost: ~$0.01/RFP for duplicate resolution
+
+**Expected Results**:
+
+- **Entity Count**: Expect slight reduction due to deduplication (merge SECTION C.4 duplicates)
+- **Edge/Node Ratio**: Maintain or improve 1.72 ratio (deduplication should increase by merging isolated nodes)
+- **UNKNOWN**: Maintain ~35 entities (98.8% custom coverage)
+- **Isolated Nodes**: Section C.4 edge count should increase (0 or 1 → multiple after merge)
+- **Custom Coverage**: Potential improvement with semantic detection rules active
+
+**Test Plan**:
+
+1. Clear `rag_storage/default/` directory
+2. Restart server (confirm 4 prompts loaded in logs)
+3. Process MCPP II RFP (425 pages, 69-second baseline)
+4. Measure: nodes, edges, ratio, UNKNOWN, Section C.4 edges
+5. Compare vs Iteration 4 baseline
+
+**Success Criteria**:
+
+- ✅ Server starts without errors (4 prompts concatenated)
+- ✅ Processing completes successfully
+- ✅ Edge/node ratio ≥ 1.5 (maintain quality)
+- ✅ UNKNOWN ≤ 50 entities (no regression)
+- ✅ Section C.4 has >1 edge (deduplication worked)
+
+**Next Steps After Success**:
+
+1. Document Iteration 5 metrics in this file
+2. Commit changes: "Branch 009: Activate multi-prompt loading + entity deduplication"
+3. Merge to main
+4. Open Branch 010: Query-Time Intelligence (user_prompt injection, intent classification)
+
+---
+
+**Status**: 🟡 **ITERATION 5 READY FOR TESTING**
+
 - ✅ GraphML schema and configuration cleanup remain solid
