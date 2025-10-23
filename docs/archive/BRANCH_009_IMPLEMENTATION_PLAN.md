@@ -278,17 +278,18 @@ Edge keys (d6-d11):
 
 ### Metrics Comparison Across All Iterations
 
-| Metric | Baseline | Iter 2 | Iter 3 | **Iter 4** | Change vs Iter 3 |
-|--------|----------|--------|--------|------------|------------------|
-| **Nodes** | 2,856 | 3,462 | 4,061 | **2,874** | -1,187 (-29%) ✅ |
-| **Edges** | 3,633 | 4,202 | 3,854 | **4,932** | +1,078 (+28%) 🚀 |
-| **Edge/Node Ratio** | 1.27 | 1.21 | 0.95 ⚠️ | **1.72** | +81% 🎯 |
-| **UNKNOWN** | 23 (0.8%) | 113 (3.3%) | 51 (1.3%) | **35 (1.2%)** | -31% ✅ |
-| **Custom Coverage** | 92.5% | 92.6% | ~94% | **~98.8%** | +4.8% ✅ |
+| Metric              | Baseline  | Iter 2     | Iter 3    | **Iter 4**    | Change vs Iter 3 |
+| ------------------- | --------- | ---------- | --------- | ------------- | ---------------- |
+| **Nodes**           | 2,856     | 3,462      | 4,061     | **2,874**     | -1,187 (-29%) ✅ |
+| **Edges**           | 3,633     | 4,202      | 3,854     | **4,932**     | +1,078 (+28%) 🚀 |
+| **Edge/Node Ratio** | 1.27      | 1.21       | 0.95 ⚠️   | **1.72**      | +81% 🎯          |
+| **UNKNOWN**         | 23 (0.8%) | 113 (3.3%) | 51 (1.3%) | **35 (1.2%)** | -31% ✅          |
+| **Custom Coverage** | 92.5%     | 92.6%      | ~94%      | **~98.8%**    | +4.8% ✅         |
 
 ### Entity Type Distribution (Iteration 4)
 
 **Custom Ontology Types** (2,774 entities - 96.5%):
+
 - document: 462 (16.1%)
 - deliverable: 441 (15.3%)
 - section: 301 (10.5%)
@@ -308,6 +309,7 @@ Edge keys (d6-d11):
 - statement_of_work: 6 (0.2%)
 
 **Problematic/Generic Types** (100 entities - 3.5%):
+
 - other: 63 (2.2%) - down from 70
 - table: 40 (1.4%) - stable (stubborn issue)
 - UNKNOWN: 35 (1.2%) - best result yet!
@@ -318,6 +320,7 @@ Edge keys (d6-d11):
 ### 🚀 What Worked - Solutions 1 & 2
 
 **Solution 1: Ontology-Grounded Relationship Examples**
+
 - Added 10 concrete relationship extraction patterns to prompt
 - Taught LLM WHEN to extract (semantic similarity, naming patterns, hierarchy)
 - Taught LLM WHEN NOT to extract (Payment ≠ Cybersecurity example)
@@ -325,6 +328,7 @@ Edge keys (d6-d11):
 - Result: Better relationship quality, no fake/forced connections
 
 **Solution 2: Type-Based Heuristics (Algorithm 6)**
+
 - Added deterministic structural relationships based on UCF standards:
   - DELIVERABLE → Section J (confidence 0.90)
   - CLAUSE → Section I (confidence 0.95)
@@ -334,6 +338,7 @@ Edge keys (d6-d11):
 - Result: ~200-300 guaranteed structural relationships per RFP
 
 **Combined Impact:**
+
 - Edge/Node ratio: 0.95 → 1.72 (**+81% improvement, exceeded 1.2 target!**)
 - Fewer but higher-quality entities (4,061 → 2,874 nodes)
 - Best custom type coverage yet (98.8%)
@@ -342,17 +347,20 @@ Edge keys (d6-d11):
 ### Issues Identified
 
 **1. Isolated Nodes Problem (CRITICAL)**
+
 - Many entities appear isolated in knowledge graph visualization
 - Example: "Section C.4" has no relationships despite being important section
 - High edge/node ratio (1.72) but visual clustering suggests connectivity issues
 - **Root Cause TBD**: Need to investigate if relationships exist but aren't visualized correctly
 
 **2. Stubborn Generic Types**
+
 - `table`: 40 entities (unchanged from Iter 3) - may need explicit example
 - `other`: 63 entities (improved from 70) - acceptable fallback rate
 - `contract`: 1 entity (new) - edge case
 
 **3. Minor Issues**
+
 - `#requirement`, `#concept`: 2 entities with # prefix (typos in extraction)
 - `image`: 3 entities (MinerU multimodal artifacts)
 
@@ -391,7 +399,7 @@ Edge keys (d6-d11):
    - Review `src/server/initialization.py` for unnecessary complexity
    - Evaluate RAG-Anything compatibility shim (required for stability - keep but document)
    - Remove dead code and unused imports (if any remain)
-5. 🚀 **READY FOR POSTGRESQL MIGRATION**
+7. 🚀 **READY FOR POSTGRESQL MIGRATION**
    - Schema is clean and verified
    - Custom ontology performing at 92.5% accuracy
    - Knowledge graph quality validated
