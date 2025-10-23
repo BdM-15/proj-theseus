@@ -1071,77 +1071,317 @@ Capture entity_name, entity_type, and description. Theme classification (hot but
 
 ---
 
-## Entity Type 10-12: Standard Entities
+## Entity Type 10: DELIVERABLE
 
-### ORGANIZATION
+### Content Signals
 
-Companies, agencies, departments, commands
+- **CDRL References**: "CDRL A001", "CDRL 6022", "DD Form 1423"
+- **Report Types**: "Monthly Status Report", "Quarterly Review", "Final Report"
+- **Documentation**: "System Design Document", "Technical Manual", "User Guide"
+- **Work Products**: "Deployed Application", "Training Materials", "Test Results"
+- **Submission Language**: "shall submit", "shall deliver", "shall provide"
 
-**Examples**:
+### Structural Patterns
 
-- "Naval Air Systems Command (NAVAIR)"
-- "General Dynamics Information Technology"
-- "Small Business Administration"
+- CDRL numbering: A001, B012, 6022
+- Series references: "8000 Series deliverables"
+- Explicit labels: "Deliverable 1.2", "Work Product 3"
 
-### CONCEPT
+### Context Clues
 
-CLINs, budget items, technical concepts, definitions
+- Near submission schedules ("due 5th business day")
+- Listed in "List of Deliverables" sections
+- Referenced in SOW tasks ("Task 1.2 deliverable")
+- DD Form 1423 mentions (official CDRL form)
 
-**Examples**:
+### Location
 
-- "CLIN 0001 Base Year Services"
-- "Total Small Business Set-Aside"
-- "Agile Software Development"
+- **Primary**: Section J attachments (CDRL lists)
+- **Alternate**: Section C SOW (embedded in tasks)
+- **Embedded**: Requirements text ("contractor shall deliver...")
 
-### EVENT
+### Basic Attributes
 
-Milestones, delivery dates, reviews, meetings
+Capture entity_name, entity_type, and description. CDRL identifiers and due dates preserved in natural language.
 
-**Examples**:
+---
 
-- "Kickoff Meeting (30 days after award)"
-- "Monthly Progress Review"
-- "Final Delivery: September 30, 2026"
+## Entity Type 11: DOCUMENT
 
-### TECHNOLOGY
+### Content Signals
 
-Systems, tools, platforms, equipment
+- **Attachment References**: "Attachment 1", "J-0200000-18", "Annex A", "Exhibit B"
+- **Referenced Documents**: "See Section X for...", "Incorporated by reference"
+- **Standards**: "MIL-STD-882E", "ISO 9001", "NIST SP 800-53"
+- **Forms**: "SF 1449", "DD Form 254", "Standard Form 30"
+- **Prior Documents**: "Previous contract N00024-18-C-1234"
 
-**Examples**:
+### Structural Patterns
 
-- "SINCGARS Radio System"
-- "AWS GovCloud Platform"
-- "ServiceNow ITSM"
+- Attachment numbering: J-####, Attachment #, Annex ##
+- Standard identifiers: MIL-STD-###, ISO ####, NIST SP ###-##
+- Form numbers: SF ###, DD ###
 
-### PERSON
+### Context Clues
 
-POCs, contracting officers, key personnel
+- "See Attachment X for details"
+- "Incorporated by reference"
+- "Listed in Section J"
+- "Reference documents include..."
 
-**Examples**:
+### Location
 
-- "Contracting Officer: Jane Smith"
-- "Program Manager: John Doe"
-- "COR: Technical Officer Name"
+- **Primary**: Section J (List of Attachments)
+- **Alternate**: Throughout RFP (referenced documents)
+- **Embedded**: Requirements citing standards
 
-### LOCATION
+### Basic Attributes
 
-Performance locations, delivery sites, facilities
+Capture entity_name, entity_type, and description. Document numbers and reference locations preserved.
 
-**Examples**:
+---
 
-- "Naval Air Station Pensacola, FL"
-- "Pentagon, Arlington, VA"
-- "CONUS (Continental United States)"
+## Entity Type 12: CONCEPT
 
-### DELIVERABLE
+### Content Signals
 
-Contract deliverables, work products, reports
+- **Budget/Pricing**: "CLIN 0001", "Base Year Services", "Option Period 2"
+- **Technical Concepts**: "Agile Development", "DevSecOps", "Zero Trust Architecture"
+- **Business Concepts**: "Small Business Set-Aside", "Joint Venture", "Teaming Arrangement"
+- **Processes**: "Change Control Process", "Risk Management", "Quality Assurance"
+- **Abstract Ideas**: "Readiness", "Sustainability", "Interoperability"
+- **Definitions**: Terms being defined in glossary or text
 
-**Examples**:
+### Structural Patterns
 
-- "Monthly Status Report"
-- "System Design Document"
-- "Deployed Application"
+- CLIN/SLIN numbering: "CLIN 0001", "SLIN 0001AA"
+- Abstract nouns (no physical form)
+- Process names ending in "-ing" or "Process"
+- Methodologies and frameworks
+
+### Context Clues
+
+- Near definitions ("means", "defined as", "refers to")
+- In glossary sections
+- Pricing tables (CLINs)
+- Conceptual discussions (not physical items)
+
+### Detection: Differentiation
+
+**NOT concept if**:
+
+- Physical item with model number → equipment
+- Scheduled activity → event
+- Named military unit → organization
+- Software with version → technology
+
+**IS concept if**:
+
+- Abstract idea or process
+- Business term or methodology
+- CLIN/budget line item
+- Term being defined
+
+### Basic Attributes
+
+Capture entity_name, entity_type, and description. Abstract nature preserved in description.
+
+---
+
+## Entity Type 13: EQUIPMENT
+
+### Content Signals
+
+- **Model Numbers**: "M1A1 Tank", "Concorde RG-24", "6200 Tennant Floor Scrubber"
+- **Military Equipment**: "TAMCN numbers", "End Item codes", "NSN (National Stock Number)"
+- **Physical Assets**: "Generator Set", "HVAC System", "Forklift", "Test Equipment"
+- **Vehicles**: "HMMWV", "MRAP", "Aircraft", "Ships"
+- **Hardware**: "Servers", "Workstations", "Network Equipment"
+
+### Structural Patterns
+
+- Model numbers with alphanumerics: "M1A1", "RG-24", "6200"
+- TAMCN format: 5-character codes
+- NSN format: ####-##-###-####
+- Make/model format: "Manufacturer ModelNumber"
+
+### Context Clues
+
+- Near maintenance language
+- In equipment lists or inventories
+- Quantities specified ("100 each", "12 units")
+- Physical descriptions (weight, dimensions, specifications)
+
+### Detection: Equipment vs Technology
+
+**EQUIPMENT**: Physical item you can touch
+
+- "M1A1 Tank" → equipment
+- "Generator Set" → equipment
+- "Server Hardware" → equipment
+
+**TECHNOLOGY**: Software, system, or platform
+
+- "Windows Server 2022" → technology
+- "ServiceNow Platform" → technology
+- "SINCGARS Radio System" → technology (if referring to system concept)
+
+### Basic Attributes
+
+Capture entity_name, entity_type, and description. Model numbers and specifications preserved.
+
+---
+
+## Entity Type 14: TECHNOLOGY
+
+### Content Signals
+
+- **Software**: "Windows Server 2022", "Oracle Database 19c", "Python 3.11"
+- **Platforms**: "AWS GovCloud", "Azure Government", "ServiceNow"
+- **Systems**: "SINCGARS Radio System", "GCSS-MC", "TBMCS"
+- **Protocols**: "TLS 1.3", "HTTPS", "SFTP"
+- **Standards**: "IPv6", "802.11ac", "Ethernet"
+
+### Structural Patterns
+
+- Version numbers: "Windows 10", "Python 3.11", "TLS 1.3"
+- Acronyms for systems: "GCSS-MC", "TBMCS", "DEERS"
+- Platform names: "AWS", "Azure", "ServiceNow"
+
+### Context Clues
+
+- Near technical requirements
+- In system architecture descriptions
+- Software stack discussions
+- IT infrastructure sections
+
+### Detection: Technology vs Equipment
+
+**TECHNOLOGY**: Software, logical system, protocol
+
+- "AWS GovCloud" → technology
+- "SINCGARS System" → technology (system concept)
+- "Windows Server" → technology
+
+**EQUIPMENT**: Physical hardware
+
+- "Dell Server" → equipment
+- "SINCGARS Radio Unit" → equipment (physical radio)
+- "Network Switch" → equipment
+
+### Basic Attributes
+
+Capture entity_name, entity_type, and description. Versions and platforms preserved.
+
+---
+
+## Entity Type 15: ORGANIZATION
+
+### Content Signals
+
+- **Companies**: "General Dynamics IT", "Lockheed Martin", "Small Business Name"
+- **Agencies**: "Department of Defense", "GSA", "DLA"
+- **Military Units**: "Marine Corps", "NAVAIR", "SPAWAR", "I MEF"
+- **Commands**: "Naval Air Systems Command", "Marine Corps Logistics Command"
+- **Departments**: "Contracting Office", "Program Management Office"
+
+### Structural Patterns
+
+- Acronyms: "NAVAIR", "SPAWAR", "GSA", "DLA"
+- "Inc.", "LLC", "Corp." suffixes
+- Military designations: "I MEF", "3rd Battalion"
+- Command structures
+
+### Context Clues
+
+- Near organizational roles
+- In past performance descriptions
+- Teaming arrangements
+- Points of contact affiliations
+
+### Basic Attributes
+
+Capture entity_name, entity_type, and description. Acronyms and full names preserved.
+
+---
+
+## Entity Type 16: EVENT
+
+### Content Signals
+
+- **Milestones**: "Kickoff Meeting", "Final Delivery", "Contract Award"
+- **Scheduled Activities**: "Monthly Review", "Quarterly Assessment", "Annual Update"
+- **Deadlines**: "Q&A Deadline: March 15, 2025", "Proposal Due Date"
+- **Periods**: "Base Period", "Option Year 2", "Ship Availability"
+- **Processes with Timing**: "CAL Signing", "Annual Inspection"
+
+### Structural Patterns
+
+- Dates: "March 15, 2025", "30 days after award"
+- Recurring patterns: "Monthly", "Quarterly", "Annual"
+- Event + timing: "Review (15 days)", "Meeting (30 days after award)"
+
+### Context Clues
+
+- Calendar dates
+- Time-bound language ("within X days", "by date")
+- Scheduling sections
+- Milestone charts
+
+### Detection: Event vs Concept
+
+**EVENT**: Scheduled, time-bound activity
+
+- "Monthly Review" → event (scheduled)
+- "Kickoff Meeting" → event (scheduled)
+- "Annual Update" → event (recurring)
+
+**CONCEPT**: Process without schedule
+
+- "Review Process" → concept (methodology)
+- "Meeting Protocol" → concept (procedure)
+- "Update Procedure" → concept (process)
+
+### Basic Attributes
+
+Capture entity_name, entity_type, and description. Dates and frequencies preserved in description.
+
+---
+
+## Entity Type 17: PERSON and LOCATION
+
+### PERSON: Content Signals
+
+- **Names**: "Jane Smith", "John Doe", "CDR Michael Johnson"
+- **Titles**: "Contracting Officer", "Program Manager", "COR", "Technical POC"
+- **Roles**: "Key Personnel", "Project Lead", "Security Officer"
+- **Contact Info**: Near email, phone, office
+
+### PERSON: Context Clues
+
+- "Contact: Name"
+- "POC: Title/Name"
+- Signature blocks
+- Key personnel sections
+
+### LOCATION: Content Signals
+
+- **Bases**: "Naval Air Station Pensacola", "Camp Lejeune", "Fort Bragg"
+- **Cities/States**: "Arlington, VA", "San Diego, CA"
+- **Facilities**: "Building 123", "Warehouse 5", "Depot Maintenance"
+- **Geographic Areas**: "CONUS", "OCONUS", "PACOM AOR"
+- **Countries**: "Host Nation", "Japan", "Germany"
+
+### LOCATION: Context Clues
+
+- Near performance location language
+- Delivery addresses
+- Site visit information
+- Geographic scoping
+
+### Basic Attributes
+
+Capture entity_name, entity_type, and description. Contact details and addresses preserved in description.
 
 ---
 
