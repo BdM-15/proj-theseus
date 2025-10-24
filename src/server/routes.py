@@ -134,6 +134,24 @@ async def process_document_with_semantic_inference(
     logger.info(f"🤖 Running LLM-powered relationship inference (5 algorithms)...")
     inference_result = await post_process_knowledge_graph(global_args.working_dir, llm_func)
     
+    # Step 4.5: Optional metadata enrichment (Phase 7)
+    # Extracts structured metadata from entity descriptions WITHOUT modifying descriptions
+    logger.info(f"📊 Running metadata enrichment (Phase 7)...")
+    from src.inference.phase7_metadata_enrichment import enrich_entities_with_metadata, save_metadata_to_graphml
+    
+    # Parse current nodes
+    nodes_for_enrichment, _ = parse_graphml(graphml_path)
+    
+    # Enrich entities (evaluation_factor, submission_instruction, requirement)
+    enrichment_counts = await enrich_entities_with_metadata(nodes_for_enrichment, llm_func)
+    
+    # Save metadata back to GraphML
+    if sum(enrichment_counts.values()) > 0:
+        metadata_saved = save_metadata_to_graphml(graphml_path, nodes_for_enrichment)
+        logger.info(f"✅ Phase 7 complete: {metadata_saved} entities enriched with metadata")
+    else:
+        logger.info(f"⏭️  Phase 7: No entities enriched (no matching types found)")
+    
     # Step 5: Validate AFTER state
     nodes_after, edges_after = parse_graphml(graphml_path)
     actual_new_rels = len(edges_after) - len(edges_before)
