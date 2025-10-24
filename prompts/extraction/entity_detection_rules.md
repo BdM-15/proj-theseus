@@ -856,12 +856,37 @@ J-0400000-05: Site Layout and Facility Maps
 
 ### Patterns (26+ Agency Supplements)
 
-- **FAR**: `FAR 52.###-##` (Federal Acquisition Regulation)
+**Major Federal Agencies**:
+
+- **FAR**: `FAR 52.###-##` (Federal Acquisition Regulation - Base regulation)
 - **DFARS**: `DFARS 252.###-####` (Defense FAR Supplement)
 - **AFFARS**: `AFFARS 5352.###-##` (Air Force FAR Supplement)
-- **NMCARS**: `NMCARS 5252.###-####` (Navy/Marine Corps)
-- **HSAR**: `HSAR 3052.###-##` (Homeland Security)
-- **Plus**: DOSAR, GSAM, VAAR, DEAR, NFS, AIDAR, CAR, DIAR, DOLAR, EDAR, EPAAR, FEHBAR, HHSAR, HUDAR, IAAR, JAR, LIFAR, NRCAR, SOFARS, TAR
+- **NMCARS**: `NMCARS 5252.###-####` (Navy/Marine Corps FAR Supplement)
+
+**Other Agency Supplements** (22+ additional):
+
+- **HSAR**: Homeland Security
+- **DOSAR**: State Department
+- **GSAM**: General Services Administration
+- **VAAR**: Veterans Affairs
+- **DEAR**: Energy
+- **NFS**: NASA
+- **AIDAR**: USAID
+- **CAR**: Commerce
+- **DIAR**: USDA
+- **DOLAR**: Labor
+- **EDAR**: Education
+- **EPAAR**: EPA
+- **FEHBAR**: Health/Human Services (Federal Employees)
+- **HHSAR**: Health/Human Services
+- **HUDAR**: HUD
+- **IAAR**: Interior
+- **JAR**: Justice
+- **LIFAR**: Broadcasting Board of Governors
+- **NRCAR**: Nuclear Regulatory Commission
+- **SOFARS**: State/Broadcasting
+- **TAR**: Treasury
+- **Plus others**: Check clause number prefix pattern
 
 ### Agency Supplement Recognition
 
@@ -1416,5 +1441,47 @@ Before finalizing entity extraction, validate:
 
 ---
 
-**Last Updated**: January 2025 (Branch 004)  
-**Version**: 2.0 (Enhanced from phase6_prompts.py with examples and clarity improvements)
+## Entity Extraction Quality Validation
+
+Before finalizing entity extraction for a document chunk:
+
+### 1. Required Field Validation
+
+- ✅ `entity_name`: Present and descriptive (not generic)
+- ✅ `entity_type`: Valid type from 17-type ontology
+- ✅ `description`: Natural language context (min 20 chars)
+- ✅ `section_origin`: Traceable location reference
+
+### 2. Format Validation
+
+- ✅ Dates: ISO 8601 format (YYYY-MM-DDTHH:MM:SS±HH:MM)
+- ✅ Numbers: Numeric values (not strings for scores/counts)
+- ✅ Booleans: true/false (not "yes"/"no" strings)
+- ✅ Arrays: Properly formatted JSON arrays
+
+### 3. Cross-Reference Integrity
+
+- ✅ EVALUATION_FACTOR.factor_id → SUBMISSION_INSTRUCTION.guides_factor
+- ✅ REQUIREMENT → EVALUATION_FACTOR relationship exists
+- ✅ ANNEX prefix → Parent SECTION linkage valid
+- ✅ CLAUSE → SECTION attribution consistent
+
+### 4. Enum Validation
+
+- ✅ criticality_level ∈ {MANDATORY, IMPORTANT, OPTIONAL, INFORMATIONAL}
+- ✅ theme_type ∈ {CUSTOMER_HOT_BUTTON, DISCRIMINATOR, PROOF_POINT, WIN_THEME}
+- ✅ modal_verb ∈ {shall, should, may, must, will, can, encouraged}
+- ✅ work_type ∈ {SOW, PWS, SOO}
+- ✅ agency_supplement ∈ {FAR, DFARS, AFFARS, NMCARS, HSAR, DOSAR, GSAM, VAAR, DEAR, NFS, AIDAR, CAR, DIAR, DOLAR, EDAR, EPAAR, FEHBAR, HHSAR, HUDAR, IAAR, JAR, LIFAR, NRCAR, SOFARS, TAR} (26+ total)
+
+### 5. Consistency Checks
+
+- ✅ Same entity referenced with consistent naming across chunks
+- ✅ Section numbering follows document hierarchy
+- ✅ Requirement IDs unique within document
+- ✅ Modal verb matches criticality level (shall=MANDATORY, should=IMPORTANT, may=OPTIONAL)
+
+---
+
+**Last Updated**: January 2025 (Branch 010 - Added quality validation rules)  
+**Version**: 3.1 (Enhanced with metadata validation and agency supplement enumeration)

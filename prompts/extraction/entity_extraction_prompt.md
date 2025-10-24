@@ -301,6 +301,67 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
 
     - **Annotated RFP Examples:**
 
+      **CRITICAL METADATA EXTRACTION REQUIREMENTS:**
+
+      **For EVALUATION_FACTOR entities - ALWAYS extract:**
+
+      1. **Relative importance hierarchy**: "Most Important", "Significantly More Important", "More Important", "Least Important"
+      2. **Numerical weight (CRITICAL)**: Extract exact percentage or points if stated (e.g., "40%", "25 points", "300 points out of 1000")
+      3. **Subfactor structure**: List subfactors with their individual weights if hierarchical (e.g., "B.1 Architecture 20%, B.2 Integration 15%")
+      4. **Evaluation criteria**: What aspects/capabilities are evaluated (technical proficiency, past performance quality, staffing approach, etc.)
+
+      **Examples of CORRECT evaluation factor descriptions:**
+
+      - ✅ "Factor A Management Methodology worth 25% (Most Important) evaluating program management, staffing, and quality approach"
+      - ✅ "Factor B USMC Technical worth 40% with subfactors: B.1 Architecture 20%, B.2 Integration 20%"
+      - ✅ "Factor D Past Performance worth 300 points evaluating relevancy and confidence based on similar contracts"
+      - ❌ "Technical approach factor" (missing weight, hierarchy, and evaluation criteria)
+
+      **For SUBMISSION_INSTRUCTION entities - ALWAYS extract:**
+
+      1. **Page limit**: Exact number with unit (e.g., "25 pages", "30 slides", "unlimited pages", "no page limit")
+      2. **Format requirements**: Font size/type, margins, line spacing (e.g., "12-point Times New Roman, 1-inch margins, single-spaced")
+      3. **Volume identifier**: Which volume/section this applies to (e.g., "Technical Volume", "Volume II Management Proposal")
+      4. **Addressed factors**: Which evaluation factors this instruction guides (e.g., "addresses Factors 1 and 2")
+      5. **Special constraints**: Cross-reference prohibitions, standalone requirements, submission format (e.g., "no cross-referencing", "PDF format")
+
+      **Examples of CORRECT submission instruction descriptions:**
+
+      - ✅ "Technical Approach Volume limited to 25 pages, 12-point Times New Roman font, 1-inch margins, must address Factors 1 and 2 (Technical and Maintenance Approach), standalone without cross-referencing other volumes"
+      - ✅ "Management Volume limited to 15 pages addressing Factor A Management Methodology, font 12pt Times New Roman, margins 1-inch all sides"
+      - ✅ "Oral Presentation limited to 30 slides, no additional materials, max 5 presenters, incorporated into Factors A-C evaluation"
+      - ❌ "Technical volume requirements" (missing all structured metadata)
+
+      **For REQUIREMENT entities - ALWAYS extract structured metadata:**
+
+      **Criticality Classification (MANDATORY - include in every requirement description):**
+
+      - **MANDATORY**: SHALL/MUST/WILL (with contractor/offeror as subject) - Zero defects, non-negotiable compliance
+      - **IMPORTANT**: SHOULD (with contractor/offeror as subject) - High priority, best practice, expected but not absolute
+      - **OPTIONAL**: MAY (with contractor/offeror as subject) - Contractor discretion, alternative approaches acceptable
+      - **INFORMATIONAL**: SHALL/MUST with Government as subject - NOT a contractor requirement, skip extraction or extract as CONCEPT
+
+      **Description Format Template:**
+      "[CRITICALITY: MANDATORY|IMPORTANT|OPTIONAL] [Modal verb: shall|should|may|must|will] [Subject: Contractor/Offeror/Personnel] - [Requirement text with context] - [Rationale or evaluation linkage if stated]"
+
+      **Examples of CORRECT requirement descriptions:**
+
+      - ✅ "[MANDATORY] Contractor shall maintain ISO 9001:2015 certification throughout contract period - Quality assurance requirement for all deliverables"
+      - ✅ "[IMPORTANT] Contractor should implement automated monitoring tools for system anomaly detection - Best practice for operational excellence"
+      - ✅ "[OPTIONAL] Contractor may use commercial off-the-shelf (COTS) solutions where appropriate - Flexibility in technical approach"
+      - ✅ "[MANDATORY] Personnel shall comply with 29 CFR 1910 safety standards - Safety requirement for all explosive handling operations"
+      - ❌ "Maintain ISO certification" (missing criticality, modal verb, and subject context)
+      - ❌ "Government shall provide GFE within 30 days" (Government obligation - DO NOT extract as REQUIREMENT)
+
+      **Extraction Decision Tree for Requirements:**
+
+      1. Identify modal verb: shall/should/may/must/will
+      2. Identify subject: Who has the obligation?
+         - If Contractor/Offeror/Personnel → Extract as REQUIREMENT with appropriate criticality
+         - If Government/Agency → Skip (informational context only) OR extract as CONCEPT if significant
+      3. Map criticality: shall/must/will → MANDATORY, should → IMPORTANT, may → OPTIONAL
+      4. Structure description with bracketed metadata prefix
+
       **Example 1: Section L ↔ Section M Mapping**
 
       Input Text:
@@ -327,9 +388,9 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
       Extracted Entities:
 
       ```
-      entity|Technical Volume|SUBMISSION_INSTRUCTION|Proposal section limited to 25 pages, 12-point Times New Roman font, must address Technical Approach and Maintenance Approach factors
-      entity|Factor 1 Technical Approach|EVALUATION_FACTOR|Most Important factor worth 40% evaluating technical understanding, system architecture, and integration methodology
-      entity|Factor 2 Maintenance Approach|EVALUATION_FACTOR|Significantly More Important factor worth 30% evaluating maintenance strategy and sustainment plans
+      entity|Technical Volume|SUBMISSION_INSTRUCTION|25 pages|12pt Times New Roman, 1-inch margins|Must address Factors 1 and 2 (Technical Approach and Maintenance Approach), include system architecture diagrams and integration plans
+      entity|Factor 1 Technical Approach|EVALUATION_FACTOR|40%|Most Important|Evaluating technical understanding, system architecture, and integration methodology
+      entity|Factor 2 Maintenance Approach|EVALUATION_FACTOR|30%|Significantly More Important|Evaluating maintenance strategy and sustainment plans
       ```
 
       Extracted Relationships:
@@ -350,17 +411,26 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
       time under 4 hours for Priority 1 incidents. The Contractor should implement
       automated monitoring tools to detect system anomalies. The Contractor may
       use commercial off-the-shelf (COTS) solutions where appropriate.
+
+      The Government shall provide access to existing system documentation within
+      10 business days of contract award.
       ```
 
       Extracted Entities:
 
       ```
-      entity|24/7 Help Desk Support|REQUIREMENT|Mandatory requirement (shall) to provide round-the-clock help desk with 4-hour average response time for Priority 1 incidents
-      entity|Automated Monitoring Tools|REQUIREMENT|Important requirement (should) to implement automated monitoring for system anomaly detection
-      entity|COTS Solutions|CONCEPT|Optional approach (may) allowing use of commercial off-the-shelf solutions where appropriate
+      entity|24/7 Help Desk Support|REQUIREMENT|MANDATORY|shall|Contractor shall provide round-the-clock help desk support with 4-hour average response time for Priority 1 incidents - Critical operational requirement
+      entity|Automated Monitoring Tools|REQUIREMENT|IMPORTANT|should|Contractor should implement automated monitoring tools to detect system anomalies - Best practice for proactive system management
+      entity|COTS Solutions Usage|REQUIREMENT|OPTIONAL|may|Contractor may use commercial off-the-shelf solutions where appropriate - Flexibility in technical approach and tool selection
+      entity|System Documentation Access|CONCEPT|Government shall provide access to existing system documentation within 10 business days of contract award - Government-furnished information for contractor use
       ```
 
-      Note: "shall" = REQUIREMENT (mandatory), "should" = REQUIREMENT (important), "may" = CONCEPT (option, not requirement)
+      Note:
+
+      - "Contractor shall" → REQUIREMENT with MANDATORY criticality, modal_verb "shall"
+      - "Contractor should" → REQUIREMENT with IMPORTANT criticality
+      - "Contractor may" → REQUIREMENT with OPTIONAL criticality (still a requirement, just optional)
+      - "Government shall" → CONCEPT (not a contractor requirement)
 
       **Example 3: Attachment Structure (Section J)**
 
@@ -494,14 +564,14 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
         1.3 Integration Methodology (10%)
       ```
 
-      Extracted Entities:
+      Extracted Entities (WITH ENHANCED METADATA):
 
       ```
-      entity|Technical Volume|SUBMISSION_INSTRUCTION|Proposal section limited to 20 pages addressing system architecture, cybersecurity, and integration methodology
-      entity|Factor 1 Technical Approach|EVALUATION_FACTOR|Most Important factor worth 45% evaluating technical solution including architecture, security, and integration
-      entity|Subfactor 1.1 System Architecture|EVALUATION_FACTOR|Subfactor worth 20% evaluating system design and architecture approach
-      entity|Subfactor 1.2 Cybersecurity Approach|EVALUATION_FACTOR|Subfactor worth 15% evaluating security architecture and NIST SP 800-171 compliance
-      entity|Subfactor 1.3 Integration Methodology|EVALUATION_FACTOR|Subfactor worth 10% evaluating integration strategy with government systems
+      entity|Technical Volume|SUBMISSION_INSTRUCTION|20 pages|12pt Times New Roman, 1-inch margins|Must address Factor 1 Technical Approach, include system architecture diagrams, cybersecurity controls mapping to NIST SP 800-171, and integration methodology with government systems
+      entity|Factor 1 Technical Approach|EVALUATION_FACTOR|45%|Most Important|Evaluating technical solution including system design, security architecture, and integration strategy - Subfactors: 1.1 Architecture 20%, 1.2 Cybersecurity 15%, 1.3 Integration 10%
+      entity|Subfactor 1.1 System Architecture|EVALUATION_FACTOR|20%|subfactor|Evaluating system design and architecture approach (20% of Factor 1's 45%)
+      entity|Subfactor 1.2 Cybersecurity Approach|EVALUATION_FACTOR|15%|subfactor|Evaluating security architecture and NIST SP 800-171 compliance (15% of Factor 1's 45%)
+      entity|Subfactor 1.3 Integration Methodology|EVALUATION_FACTOR|10%|subfactor|Evaluating integration strategy with government systems (10% of Factor 1's 45%)
       ```
 
       Extracted Relationships (IMPLICIT - based on topic matching):
@@ -535,13 +605,13 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
       performance on quality will be heavily weighted.
       ```
 
-      Extracted Entities:
+      Extracted Entities (WITH ENHANCED METADATA):
 
       ```
-      entity|ISO 9001:2015 Certification Requirement|REQUIREMENT|Mandatory requirement (shall) to maintain ISO 9001:2015 certification throughout contract period
-      entity|Quality Management System|REQUIREMENT|Mandatory requirement (shall) to implement QMS with defect tracking, root cause analysis, and corrective action procedures
-      entity|On-Time Delivery Rate|REQUIREMENT|Important requirement (should) to achieve 98% on-time delivery performance target
-      entity|Factor 3 Quality Assurance|EVALUATION_FACTOR|Significantly Important factor worth 25% evaluating quality management capabilities, ISO certification, and performance metrics
+      entity|ISO 9001:2015 Certification Requirement|REQUIREMENT|MANDATORY|shall|Contractor shall maintain ISO 9001:2015 certification throughout contract period - Quality assurance requirement evaluated in Factor 3
+      entity|Quality Management System|REQUIREMENT|MANDATORY|shall|Contractor shall implement quality management system with documented procedures for defect tracking, root cause analysis, and corrective action - QMS implementation requirement supporting quality assurance evaluation
+      entity|On-Time Delivery Rate Target|REQUIREMENT|IMPORTANT|should|Contractor should achieve 98% on-time delivery rate - Performance metric target demonstrating quality execution
+      entity|Factor 3 Quality Assurance|EVALUATION_FACTOR|25%|Significantly Important|Evaluating quality management capabilities, ISO certification, quality processes, and performance metrics - Past performance on quality heavily weighted
       ```
 
       Extracted Relationships (IMPLICIT - semantic keyword matching):
@@ -1193,12 +1263,44 @@ Algorithm: Extract section number from requirement source, map section to factor
 
       - `entity_description`: Provide a concise yet comprehensive description of the entity's attributes and activities, based _solely_ on the information present in the input text.
 
-    - **Output Format - Entities:** Output 4 fields for each entity on a single line. The first field must be the word entity.
+    - **Output Format - Entities:** Output fields for each entity on a single line. The first field must be the word entity.
 
-    **Entity Output Format:**
+    **CRITICAL: Entity types EVALUATION_FACTOR, SUBMISSION_INSTRUCTION, and REQUIREMENT require additional structured metadata fields.**
+
+    **Standard Entity Output Format (for most entity types):**
 
     Four fields separated by the pipe character (|):
-    entity | entity_name | ENTITY_TYPE | description
+    entity|entity_name|ENTITY_TYPE|description
+
+    **Special Format for EVALUATION_FACTOR entities (7 fields REQUIRED):**
+
+    entity|entity_name|EVALUATION_FACTOR|weight|hierarchy|description
+
+    - **weight**: Numerical value with unit (e.g., "40%", "25 points", "300/1000 points"). Use "unknown" if not stated.
+    - **hierarchy**: Relative importance (e.g., "Most Important", "Significantly More Important", "More Important", "Important", "Least Important"). Use "unknown" if not stated.
+    - **description**: Full description including evaluation criteria and subfactors if applicable.
+
+    **Special Format for SUBMISSION_INSTRUCTION entities (6 fields REQUIRED):**
+
+    entity|entity_name|SUBMISSION_INSTRUCTION|page_limit|format_requirements|description
+
+    - **page_limit**: Exact page count with unit (e.g., "25 pages", "30 slides", "unlimited"). Use "unknown" if not stated.
+    - **format_requirements**: Font, margins, spacing (e.g., "12pt Times New Roman, 1-inch margins"). Use "standard" if not specified.
+    - **description**: Full description including volume identifier, addressed factors, and special constraints.
+
+    **Special Format for REQUIREMENT entities (6 fields REQUIRED):**
+
+    entity|entity_name|REQUIREMENT|criticality|modal_verb|description
+
+    - **criticality**: One of: MANDATORY, IMPORTANT, OPTIONAL. Derive from modal verb and subject.
+    - **modal_verb**: Extract exact modal verb used (e.g., "shall", "must", "should", "may", "will"). Use "none" if descriptive requirement.
+    - **description**: Full requirement description. DO NOT prepend [MANDATORY] brackets - criticality is in separate field.
+
+    **Criticality Derivation Rules for REQUIREMENT entities:**
+    - **MANDATORY**: modal_verb is "shall", "must", or "will" AND subject is Contractor/Offeror/Personnel
+    - **IMPORTANT**: modal_verb is "should" AND subject is Contractor/Offeror/Personnel
+    - **OPTIONAL**: modal_verb is "may" AND subject is Contractor/Offeror/Personnel
+    - **EXCLUDE**: If subject is "Government" - extract as CONCEPT, NOT REQUIREMENT
 
     **Correct Examples:**
 
@@ -1216,8 +1318,12 @@ Algorithm: Extract section number from requirement source, map section to factor
     entity|Navy MBOS|PROGRAM|Navy Maintenance Base Operating Support program for facilities maintenance.
     entity|Concorde RG-24 Battery|EQUIPMENT|12-volt battery for aircraft generators and ground support equipment.
     entity|6200 Tennant Floor Sweeper|EQUIPMENT|Commercial floor cleaning equipment for warehouse maintenance.
-    entity|Technical Approach Volume|SUBMISSION_INSTRUCTION|Proposal section limited to 25 pages addressing technical methodology.
-    entity|Past Performance Factor|EVALUATION_FACTOR|Evaluation criterion worth 30 points assessing contractor experience.
+    entity|Technical Approach Volume|SUBMISSION_INSTRUCTION|25 pages|12pt Times New Roman, 1-inch margins|Proposal section addressing technical methodology evaluated in Factor 1.
+    entity|Past Performance Factor|EVALUATION_FACTOR|30 points|Most Important|Evaluation criterion assessing contractor experience on similar contracts.
+    entity|Factor 1 Technical Approach|EVALUATION_FACTOR|40%|Most Important|Evaluating technical solution including system architecture, integration methodology, and cybersecurity approach.
+    entity|ISO 9001 Certification|REQUIREMENT|MANDATORY|shall|Contractor shall maintain ISO 9001:2015 certification throughout contract period.
+    entity|Automated Monitoring Tools|REQUIREMENT|IMPORTANT|should|Contractor should implement automated monitoring tools to detect system anomalies for proactive management.
+    entity|COTS Solutions Usage|REQUIREMENT|OPTIONAL|may|Contractor may use commercial off-the-shelf solutions where appropriate for technical approach flexibility.
     entity|Integrated Logistics Support|STRATEGIC_THEME|Cross-cutting capability for supply chain and maintenance coordination.
     entity|Performance Work Statement|STATEMENT_OF_WORK|Detailed task descriptions and performance objectives for contract execution.
 
@@ -1313,8 +1419,8 @@ Algorithm: Extract section number from requirement source, map section to factor
 
       Entities extracted:
 
-      - entity|Technical Approach Volume|submission_instruction|Proposal section limited to 25 pages addressing system architecture and integration methodology
-      - entity|Factor 1 Technical Approach|evaluation_factor|Most Important factor worth 40% evaluating technical solution and system design
+      - entity|Technical Approach Volume|submission_instruction|25 pages|12pt Times New Roman, 1-inch margins|Proposal section addressing system architecture and integration methodology
+      - entity|Factor 1 Technical Approach|evaluation_factor|40%|Most Important|Evaluating technical solution and system design
 
       Relationships to extract:
 
@@ -1328,8 +1434,8 @@ Algorithm: Extract section number from requirement source, map section to factor
 
       Entities extracted:
 
-      - entity|ISO 9001 Certification Requirement|requirement|Contractor shall maintain ISO 9001:2015 certification throughout contract period
-      - entity|Factor 3 Quality Assurance|evaluation_factor|Evaluation factor assessing quality management capabilities including ISO certification and quality processes
+      - entity|ISO 9001 Certification Requirement|requirement|MANDATORY|shall|Contractor shall maintain ISO 9001:2015 certification throughout contract period
+      - entity|Factor 3 Quality Assurance|evaluation_factor|unknown|unknown|Evaluation factor assessing quality management capabilities including ISO certification and quality processes
 
       Relationships to extract:
 
@@ -1437,6 +1543,45 @@ Algorithm: Extract section number from requirement source, map section to factor
       ```
 
       Why NOT extract: Payment and cybersecurity have NO semantic connection - different topics, no shared keywords, no logical relationship. DO NOT create relationships just to connect isolated entities.
+
+    ***
+
+    **METADATA EXTRACTION SUMMARY - CRITICAL REMINDERS:**
+
+    Before proceeding to relationship extraction, verify you have extracted ALL required metadata:
+
+    **✅ For EVERY EVALUATION_FACTOR entity:**
+
+    - [ ] Numerical weight extracted (percentage, points, or fraction)
+    - [ ] Relative importance hierarchy stated (Most Important, Significantly More Important, etc.)
+    - [ ] Subfactors listed with individual weights if hierarchical
+    - [ ] Evaluation criteria described (what aspects are evaluated)
+
+    **✅ For EVERY SUBMISSION_INSTRUCTION entity:**
+
+    - [ ] Page limit specified (exact number or "unlimited")
+    - [ ] Format requirements detailed (font, margins, spacing)
+    - [ ] Volume identifier clear (which volume/section)
+    - [ ] Addressed evaluation factors listed (which factors this guides)
+    - [ ] Special constraints noted (cross-reference rules, standalone requirements)
+
+    **✅ For EVERY REQUIREMENT entity:**
+
+    - [ ] Criticality bracketed: [MANDATORY], [IMPORTANT], or [OPTIONAL]
+    - [ ] Modal verb preserved: shall, should, may, must, will
+    - [ ] Subject identified: Contractor, Offeror, Personnel, etc.
+    - [ ] Government obligations excluded (Government shall = CONCEPT, not REQUIREMENT)
+    - [ ] Context/rationale included in description
+
+    **Common Extraction Errors to AVOID:**
+
+    - ❌ Missing weights: "Factor 1 Technical Approach" → Should include "worth 40%"
+    - ❌ Missing page limits: "Technical Volume" → Should include "limited to 25 pages"
+    - ❌ Missing criticality: "Maintain ISO certification" → Should start with "[MANDATORY]"
+    - ❌ Extracting Government obligations: "Government shall provide GFE" → Extract as CONCEPT, NOT REQUIREMENT
+    - ❌ Vague descriptions: "Technical factor" → Should detail what's evaluated and weight
+
+    ***
 
     - **Identification:** Identify ALL direct and implicit relationships between previously extracted entities.
     - **N-ary Relationship Decomposition:** If a single statement describes a relationship involving more than two entities (an N-ary relationship), decompose it into multiple binary (two-entity) relationship pairs for separate description.

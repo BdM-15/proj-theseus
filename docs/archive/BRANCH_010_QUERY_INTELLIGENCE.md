@@ -1,16 +1,31 @@
-# Branch 010: Query-Time Intelligence Layer
+# Branch 010: Query-Time Intelligence - Phase 1 (Core Prompts)
 
 **Date**: January 23, 2025  
-**Branch**: `010-query-time-intelligence` (NOT YET CREATED)  
-**Goal**: Implement query-time intelligence using LightRAG's `user_prompt` parameter for Shipley-based capture intelligence
+**Branch**: `010-query-prompts-integration` (ACTIVE)  
+**Goal**: Implement 4 core user query prompts for Shipley-based capture intelligence  
+**Scope**: Phase 1 ONLY - Defer intent classification and multi-agent synthesis to future branches
 
 ---
 
 ## 🎯 **Overview**
 
-Branch 009 established the **extraction foundation** (17 entity types, 4 concatenated prompts, entity deduplication). Branch 010 adds the **query-time intelligence layer** that transforms the knowledge graph into actionable capture intelligence.
+Branch 009 established the **extraction foundation** (17 entity types, 4 concatenated prompts, entity deduplication). Branch 010 Phase 1 adds **4 essential query prompts** that transform the knowledge graph into actionable capture intelligence.
 
 **Core Innovation**: LightRAG's `user_prompt` parameter allows injecting domain-specific prompts AFTER retrieval but BEFORE LLM response generation, enabling specialized analysis without affecting retrieval quality.
+
+**Phase 1 Scope** (This Branch):
+
+- ✅ Create `prompts/user_queries/` directory structure
+- ✅ Implement 4 core prompts (compliance, QFG, win themes, proposal outline)
+- ✅ Update `prompt_loader.py` to support user_queries category
+- ✅ Test with existing LightRAG `/query` endpoint
+- ✅ Document usage patterns and examples
+
+**Deferred to Future Branches**:
+
+- ⏸️ Phase 2: Intent classification and auto-routing
+- ⏸️ Phase 3: Advanced specialized prompts
+- ⏸️ Phase 4: Multi-agent synthesis orchestration
 
 ---
 
@@ -69,9 +84,31 @@ response = await rag.aquery(
 
 ---
 
-## 📋 **Implementation Phases**
+## 📋 **Implementation Tasks (Phase 1 Only)**
 
-### **Phase 1: Core Query Prompts** (Immediate - Week 1)
+### **Task 1: Directory Structure Setup**
+
+**Goal**: Create organized prompt storage with clear separation of concerns
+
+**Actions**:
+
+```powershell
+# Create user queries directory
+New-Item -ItemType Directory -Path prompts/user_queries -Force
+
+# Verify directory structure
+Get-ChildItem -Path prompts -Directory
+# Expected output:
+#   extraction/
+#   relationship_inference/
+#   user_queries/  ← NEW
+```
+
+**Deliverable**: `prompts/user_queries/` directory exists
+
+---
+
+### **Task 2: Core Query Prompts Implementation**
 
 **Goal**: Implement 4 essential capture intelligence prompts
 
@@ -213,13 +250,281 @@ user_prompt = load_prompt("user_queries/proposal_outline_generation")
 - ✅ Embeds strategic guidance (win themes, hot buttons)
 - ✅ Saves 10-20 hours of manual outline development
 
+**Deliverable**: 4 prompt files in `prompts/user_queries/`
+
 ---
 
-### **Phase 2: Intent Classification** (Week 2)
+### **Task 3: Prompt Loader Enhancement**
 
-**Goal**: Automatic routing to appropriate prompt based on query text
+**Goal**: Enable `prompt_loader.py` to load user query prompts
 
-#### **2.1 Lightweight Intent Classifier**
+**Current Implementation** (`src/core/prompt_loader.py`):
+
+```python
+def load_prompt(prompt_name: str, category: str = "extraction") -> str:
+    """
+    Load prompt template from prompts/ directory
+
+    Args:
+        prompt_name: Name of prompt file (with or without .md extension)
+        category: Subdirectory ('extraction', 'relationship_inference')
+    """
+```
+
+**Required Change**:
+
+```python
+def load_prompt(prompt_name: str, category: str = "extraction") -> str:
+    """
+    Load prompt template from prompts/ directory
+
+    Args:
+        prompt_name: Name of prompt file (with or without .md extension)
+        category: Subdirectory ('extraction', 'relationship_inference', 'user_queries')
+    """
+    # Add validation for user_queries category
+    VALID_CATEGORIES = ["extraction", "relationship_inference", "user_queries"]
+    if category not in VALID_CATEGORIES:
+        raise ValueError(f"Invalid category: {category}. Must be one of {VALID_CATEGORIES}")
+
+    # Rest of implementation remains unchanged
+```
+
+**Deliverable**: `prompt_loader.py` updated with `user_queries` category support
+
+---
+
+### **Task 4: Testing and Documentation**
+
+**Goal**: Validate prompts work with existing LightRAG `/query` endpoint
+
+**Test Script** (`tests/test_user_prompts.py`):
+
+```python
+"""
+Test user query prompts with LightRAG
+Phase 1: Manual testing via existing /query endpoint
+"""
+import asyncio
+from lightrag.base import QueryParam
+from src.core.prompt_loader import load_prompt
+
+async def test_compliance_assessment():
+    """Test compliance assessment prompt"""
+    prompt = load_prompt("compliance_assessment", category="user_queries")
+
+    # Simulate API call to existing /query endpoint
+    import requests
+    response = requests.post(
+        "http://localhost:9621/query",
+        json={
+            "query": "What are the evaluation factors and their weights?",
+            "mode": "hybrid",
+            "user_prompt": prompt
+        }
+    )
+
+    print("Compliance Assessment Response:")
+    print(response.json())
+
+    # Validate response format (should include Shipley scoring)
+    assert "compliance" in response.text.lower()
+    assert "score" in response.text.lower()
+
+async def test_proposal_outline():
+    """Test proposal outline generation prompt"""
+    prompt = load_prompt("proposal_outline_generation", category="user_queries")
+
+    response = requests.post(
+        "http://localhost:9621/query",
+        json={
+            "query": "Generate complete proposal outline with page allocations",
+            "mode": "hybrid",
+            "user_prompt": prompt
+        }
+    )
+
+    print("Proposal Outline Response:")
+    print(response.json())
+
+    # Validate response format (should include page limits, sections)
+    assert "page" in response.text.lower()
+    assert "section" in response.text.lower()
+
+if __name__ == "__main__":
+    asyncio.run(test_compliance_assessment())
+    asyncio.run(test_proposal_outline())
+```
+
+**Usage Documentation** (`prompts/user_queries/README.md`):
+
+````markdown
+# User Query Prompts - Usage Guide
+
+## Overview
+
+User query prompts enable specialized capture intelligence analysis by injecting
+domain-specific instructions into LightRAG queries AFTER retrieval but BEFORE
+LLM response generation.
+
+## Available Prompts (Phase 1)
+
+### 1. Compliance Assessment (`compliance_assessment.md`)
+
+**Purpose**: Shipley-based compliance scoring of proposal drafts  
+**Input**: Proposal section + RFP requirements  
+**Output**: 0-100 scoring with gap analysis
+
+**Example Usage**:
+
+```bash
+curl -X POST http://localhost:9621/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "Assess compliance of our technical approach against Section C requirements",
+    "mode": "hybrid",
+    "user_prompt": "$(cat prompts/user_queries/compliance_assessment.md)"
+  }'
+```
+````
+
+### 2. Questions for Government (`generate_qfg.md`)
+
+**Purpose**: Identify ambiguities and conflicts requiring clarification  
+**Input**: RFP knowledge graph  
+**Output**: 5-7 high-impact questions with RFP citations
+
+### 3. Win Theme Identification (`win_theme_identification.md`)
+
+**Purpose**: Strategic opportunity analysis based on evaluation factors  
+**Input**: RFP knowledge graph + evaluation criteria  
+**Output**: Discriminators, hot buttons, proof point requirements
+
+### 4. Proposal Outline Generation (`proposal_outline_generation.md`) ⭐
+
+**Purpose**: Complete proposal structure with compliance checklist  
+**Input**: Section L + M + requirements  
+**Output**: Page allocations, must-address checklist, strategic guidance
+
+## Integration with Existing Systems
+
+### Python Client
+
+```python
+from lightrag.base import QueryParam
+from src.core.prompt_loader import load_prompt
+
+# Load specialized prompt
+compliance_prompt = load_prompt("compliance_assessment", category="user_queries")
+
+# Execute query with specialized analysis
+query_param = QueryParam(mode="hybrid", user_prompt=compliance_prompt)
+response = await rag_instance.lightrag.aquery(
+    "What are the evaluation factors?",
+    param=query_param
+)
+```
+
+### REST API
+
+```bash
+# Requires reading prompt file content into request
+PROMPT=$(cat prompts/user_queries/compliance_assessment.md)
+
+curl -X POST http://localhost:9621/query \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"query\": \"What are the evaluation factors?\",
+    \"mode\": \"hybrid\",
+    \"user_prompt\": \"$PROMPT\"
+  }"
+```
+
+## Cost Estimates
+
+**Per Query**:
+
+- User Query: 50 tokens
+- Retrieved Context: 5,000 tokens (entities + relationships + chunks)
+- User Prompt: 2,000 tokens (specialized instructions)
+- LLM Response: 1,000 tokens
+
+**Total**: ~$0.008 per specialized query (Grok-beta pricing)
+
+**Comparison**:
+
+- RFP Ingestion: $0.042 (one-time)
+- 100 specialized queries: $0.80 (ongoing analysis)
+- **Total project cost**: ~$1.00 for comprehensive capture intelligence
+
+## Future Enhancements (Deferred)
+
+- ⏸️ **Auto-routing**: Intent classification to select appropriate prompt automatically
+- ⏸️ **Advanced prompts**: Page allocation optimizer, section analyzer, proof points mapper
+- ⏸️ **Multi-agent synthesis**: Orchestrate multiple prompts for comprehensive reports
+
+See `docs/archive/BRANCH_010_QUERY_INTELLIGENCE.md` for full roadmap.
+
+````
+
+**Deliverable**: Test script + usage documentation completed
+
+---
+
+## 🚀 **Phase 1 Implementation Checklist**
+
+### Setup (Day 1)
+- [ ] Create `prompts/user_queries/` directory
+- [ ] Update `src/core/prompt_loader.py` with user_queries category
+- [ ] Create `prompts/user_queries/README.md` usage guide
+
+### Prompt Development (Days 2-4)
+- [ ] **Priority 1**: `proposal_outline_generation.md` (highest ROI)
+- [ ] **Priority 2**: `compliance_assessment.md` (Shipley scoring)
+- [ ] **Priority 3**: `generate_qfg.md` (customer shaping)
+- [ ] **Priority 4**: `win_theme_identification.md` (strategic analysis)
+
+### Testing (Day 5)
+- [ ] Test each prompt with existing `/query` endpoint
+- [ ] Validate response formats match expected outputs
+- [ ] Document actual vs expected costs
+- [ ] Create example queries for each prompt type
+
+### Documentation (Day 5)
+- [ ] Complete usage guide with curl/Python examples
+- [ ] Document integration patterns
+- [ ] Update main README.md with Phase 1 capabilities
+
+---
+
+## 📊 **Success Criteria (Phase 1)**
+
+✅ **Functional Requirements**:
+- 4 prompt files created and tested
+- `prompt_loader.py` supports `user_queries` category
+- All prompts work with existing LightRAG `/query` endpoint
+- Documentation enables users to execute specialized queries
+
+✅ **Quality Requirements**:
+- Proposal outline generates complete structure with page allocations
+- Compliance assessment produces Shipley-compatible 0-100 scoring
+- QFG identifies 5-7 high-impact questions with citations
+- Win themes align with evaluation factor weights
+
+✅ **Cost Requirements**:
+- Per-query cost <$0.01 (measured via actual usage)
+- No increase to ingestion costs
+- No performance degradation for standard queries
+
+---
+
+## 🔄 **Deferred to Future Branches**
+
+### Branch 011 (Future): Intent Classification & Auto-Routing
+
+**Scope**: Lightweight intent classification for automatic prompt routing
+
+**Key Features**:
 
 ```python
 # Intent classification prompt (100 tokens, $0.0001 cost)
@@ -257,134 +562,83 @@ async def intelligent_query(query: str, mode: str = "hybrid"):
     # Execute query with specialized prompt
     query_param = QueryParam(mode=mode, user_prompt=user_prompt)
     return await rag.aquery(query, param=query_param)
-```
+````
 
-**Benefits**:
-
-- Automatic prompt selection
-- No user training required
-- Minimal cost (~$0.0001 per query)
-- Fallback to general queries if intent unclear
+**Why Deferred**: Phase 1 testing will reveal actual query patterns and whether
+auto-routing provides sufficient value vs manual prompt selection.
 
 ---
 
-#### **2.2 Explicit Query Type Parameter**
+### Branch 012 (Future): Advanced Query Prompts
 
-For users who want control:
+**Scope**: Additional specialized prompts based on Phase 1 usage patterns
+
+**Candidate Prompts**:
+
+#### Page Allocation Optimizer
+
+- **Input**: Page limit + evaluation factors with weights
+- **Output**: Optimal page distribution per section
+- **Use case**: "How should I allocate 25 technical pages?"
+
+#### Section Requirements Analyzer
+
+- **Input**: Specific proposal section (e.g., "Management Approach")
+- **Output**: Must-address checklist, evaluation criteria, page limits
+- **Use case**: "What must I address in Management Approach?"
+
+#### Critical Theme Analysis
+
+- **Input**: Full RFP knowledge graph
+- **Output**: High-priority issues requiring attention
+- **Use case**: "What are the critical themes I need to address?"
+
+#### Proof Points Mapper
+
+- **Input**: Win themes + evaluation factors
+- **Output**: Evidence requirements per theme
+- **Use case**: "What proof points do I need for our discriminators?"
+
+**Why Deferred**: Phase 1 will reveal which specialized analyses provide most value.
+User feedback will drive priority order for advanced prompts.
+
+---
+
+### Branch 013 (Future): Multi-Agent Synthesis Orchestration
+
+**Scope**: Orchestrate multiple specialized prompts for comprehensive analysis
+
+**Architecture Considerations**:
+
+- Parallel vs sequential query execution
+- Context sharing between queries
+- Result synthesis patterns
+- Cost optimization strategies
+
+**Why Deferred**: Significant architectural complexity. Requires clear user demand
+for synthesized reports vs individual analyses. Consider PydanticAI framework
+(already documented in `docs/agents/`) if this capability is needed.
+
+**Example Pattern** (if implemented):
 
 ```python
-# API endpoint with explicit type
-POST /query
-{
-    "query": "What are Section M evaluation factors?",
-    "query_type": "compliance_assessment",  # Optional explicit control
-    "mode": "hybrid"
-}
+# Parallel execution pattern
+results = await asyncio.gather(
+    query_with_prompt(query, "compliance_assessment"),
+    query_with_prompt(query, "generate_qfg"),
+    query_with_prompt(query, "win_themes"),
+    query_with_prompt(query, "proposal_outline"),
+)
 
-# Backend routing
-if query_type:
-    user_prompt = load_prompt(f"user_queries/{query_type}")
-else:
-    # Use intent classification
-    intent = await classify_intent(query)
-    user_prompt = load_prompt(f"user_queries/{intent}")
+# Synthesis logic
+synthesized_report = synthesize_capture_intelligence(results)
 ```
 
 ---
 
-### **Phase 3: Advanced Query Prompts** (Week 3)
+## 🔧 **Phase 1 Technical Details**
 
-Additional specialized prompts for power users:
-
-#### **3.1 Page Allocation Optimizer** (`user_queries/page_allocation_optimizer.md`)
-
-- Input: Page limit + evaluation factors with weights
-- Output: Optimal page distribution per section
-- Use case: "How should I allocate 25 technical pages?"
-
-#### **3.2 Section Requirements Analyzer** (`user_queries/section_requirements_analyzer.md`)
-
-- Input: Specific proposal section (e.g., "Management Approach")
-- Output: Must-address checklist, evaluation criteria, page limits
-- Use case: "What must I address in Management Approach?"
-
-#### **3.3 Critical Theme Analysis** (`user_queries/critical_theme_analysis.md`)
-
-- Input: Full RFP knowledge graph
-- Output: High-priority issues requiring attention
-- Use case: "What are the critical themes I need to address?"
-
-#### **3.4 Proof Points Mapper** (`user_queries/proof_points_mapper.md`)
-
-- Input: Win themes + evaluation factors
-- Output: Evidence requirements per theme
-- Use case: "What proof points do I need for our discriminators?"
-
----
-
-### **Phase 4: Multi-Agent Synthesis** (Week 4+)
-
-**Goal**: Orchestrate multiple prompts for comprehensive analysis
-
-#### **4.1 Parallel Query Execution**
-
-```python
-async def comprehensive_rfp_analysis(rfp_query: str):
-    """Run multiple analyses in parallel"""
-    results = await asyncio.gather(
-        intelligent_query(rfp_query, query_type="compliance_assessment"),
-        intelligent_query(rfp_query, query_type="generate_qfg"),
-        intelligent_query(rfp_query, query_type="win_themes"),
-        intelligent_query(rfp_query, query_type="proposal_outline"),
-    )
-
-    compliance, qfg, themes, outline = results
-
-    # Synthesize into unified report
-    return {
-        "compliance_analysis": compliance,
-        "questions_for_government": qfg,
-        "win_strategy": themes,
-        "proposal_outline": outline,
-    }
-```
-
-#### **4.2 Sequential Query Chaining**
-
-```python
-async def iterative_capture_planning(rfp_file: str):
-    """Multi-stage capture intelligence workflow"""
-
-    # Stage 1: Extract critical themes
-    themes = await intelligent_query(
-        "What are the critical evaluation factors?",
-        query_type="critical_theme_analysis"
-    )
-
-    # Stage 2: Generate win strategy based on themes
-    strategy = await intelligent_query(
-        f"Develop win themes for these factors: {themes}",
-        query_type="win_themes"
-    )
-
-    # Stage 3: Generate outline incorporating strategy
-    outline = await intelligent_query(
-        f"Generate proposal outline emphasizing: {strategy}",
-        query_type="proposal_outline"
-    )
-
-    return {
-        "critical_themes": themes,
-        "win_strategy": strategy,
-        "proposal_outline": outline,
-    }
-```
-
----
-
-## 🔧 **Technical Implementation**
-
-### **Directory Structure**
+### **Directory Structure (Final State)**
 
 ```
 prompts/
@@ -485,56 +739,89 @@ async def intelligent_query_endpoint(
 
 ---
 
-## 🚀 **Getting Started (After Branch 009 Merge)**
+## 🚀 **Getting Started (Phase 1 Implementation)**
 
-1. **Create Branch 010**:
+### Prerequisites
 
-   ```powershell
-   git checkout main
-   git pull origin main
-   git checkout -b 010-query-time-intelligence
-   ```
+- ✅ Branch 009 merged to main (17 entity types, semantic extraction)
+- ✅ Working RAG-Anything + LightRAG server
+- ✅ Test RFP processed with full knowledge graph
 
-2. **Create user_queries/ directory**:
+### Day 1: Setup
 
-   ```powershell
-   New-Item -ItemType Directory -Path prompts/user_queries
-   ```
+```powershell
+# 1. Ensure on correct branch
+git checkout 010-query-prompts-integration
+git pull origin 010-query-prompts-integration
 
-3. **Implement Phase 1 prompts** (based on Branch 002 artifacts):
+# 2. Create directory structure
+New-Item -ItemType Directory -Path prompts/user_queries -Force
 
-   - Copy `docs/archive/prompts_branch_002/*.txt` as starting templates
-   - Adapt for `user_prompt` parameter (post-retrieval context)
-   - Add knowledge graph query patterns
+# 3. Verify setup
+Get-ChildItem -Path prompts -Directory
+# Expected: extraction/, relationship_inference/, user_queries/
+```
 
-4. **Test with manual prompt injection**:
+### Days 2-4: Prompt Development
 
-   ```python
-   from lightrag.base import QueryParam
-   from src.core.prompt_loader import load_prompt
+**Priority Order** (implement in this sequence):
 
-   compliance_prompt = load_prompt("user_queries/compliance_assessment")
-   query_param = QueryParam(mode="hybrid", user_prompt=compliance_prompt)
-   response = await rag.aquery("What are the evaluation factors?", param=query_param)
-   ```
+1. **Day 2**: `proposal_outline_generation.md`
 
-5. **Implement intent classification** (Phase 2)
+   - Highest ROI (saves 10-20 hours per RFP)
+   - Source: Capture manager prompts Query 3.1
+   - Test query: "Generate proposal outline with page allocations"
 
-6. **Add advanced prompts** (Phase 3)
+2. **Day 3**: `compliance_assessment.md`
 
-7. **Build multi-agent orchestration** (Phase 4)
+   - Source: `docs/archive/prompts_branch_002/assess_compliance_prompt.txt`
+   - Adapt for post-retrieval context
+   - Test query: "Assess compliance of technical approach against requirements"
+
+3. **Day 4 AM**: `generate_qfg.md`
+
+   - Source: `docs/archive/prompts_branch_002/generate_qfg_prompt.txt`
+   - Focus on ambiguity detection
+   - Test query: "What questions should we ask the government?"
+
+4. **Day 4 PM**: `win_theme_identification.md`
+   - Source: Shipley Capture Guide patterns
+   - Focus on discriminator identification
+   - Test query: "Identify win themes based on evaluation factors"
+
+### Day 5: Testing & Documentation
+
+```powershell
+# 1. Test each prompt
+python tests/test_user_prompts.py
+
+# 2. Validate cost per query
+# Expected: ~$0.008 per specialized query
+
+# 3. Complete usage guide
+# Edit: prompts/user_queries/README.md
+
+# 4. Update main documentation
+# Edit: README.md (add Phase 1 capabilities section)
+```
 
 ---
 
-## 🎯 **Priority Order**
+## 🎯 **Phase 1 Priority Order**
 
-1. 🔥 **CRITICAL**: Proposal outline generation (saves 10-20 hours per RFP)
-2. 🔥 **CRITICAL**: Compliance assessment (Shipley methodology validation)
-3. 🟡 **HIGH**: QFG generation (customer shaping opportunity)
-4. 🟡 **HIGH**: Win theme identification (strategic differentiation)
-5. 🟢 **MEDIUM**: Intent classification (UX improvement)
-6. 🟢 **MEDIUM**: Advanced prompts (power user features)
-7. 🔵 **LOW**: Multi-agent synthesis (nice-to-have orchestration)
+**Implementation Sequence**:
+
+1. 🔥 **Day 2**: Proposal outline generation (saves 10-20 hours per RFP)
+2. 🔥 **Day 3**: Compliance assessment (Shipley methodology validation)
+3. 🟡 **Day 4 AM**: QFG generation (customer shaping opportunity)
+4. 🟡 **Day 4 PM**: Win theme identification (strategic differentiation)
+5. ✅ **Day 5**: Testing + documentation
+
+**Deferred to Future Branches**:
+
+- ⏸️ Intent classification (Branch 011)
+- ⏸️ Advanced prompts (Branch 012)
+- ⏸️ Multi-agent synthesis (Branch 013)
 
 ---
 
