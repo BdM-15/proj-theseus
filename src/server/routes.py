@@ -65,7 +65,6 @@ async def process_document_with_semantic_inference(
     """
     logger.info(f"📄 Processing {file_name}")
     logger.info(f"🔧 Using RAG-Anything + LLM semantic inference (format-agnostic)")
-    print(f"DEBUG: About to call process_document_complete()...")
     
     # Step 1: Multimodal extraction + entity extraction
     # Use process_document_complete() which handles multimodal content separately
@@ -76,9 +75,6 @@ async def process_document_with_semantic_inference(
         parse_method="auto"
     )
     
-    print(f"DEBUG: process_document_complete() returned successfully!")
-    print(f"DEBUG: Now checking for GraphML file...")
-    
     # Step 2: ROBUST - Wait for GraphML with exponential backoff
     # CRITICAL: LightRAG writes to default/ subdirectory, not root working_dir
     graphml_path = Path(global_args.working_dir) / "default" / "graph_chunk_entity_relation.graphml"
@@ -88,16 +84,10 @@ async def process_document_with_semantic_inference(
     
     for attempt, wait_time in enumerate(wait_times):
         await asyncio.sleep(wait_time)
-        print(f"DEBUG: Checking GraphML (attempt {attempt+1}/{max_retries})...")
-        print(f"DEBUG: Path: {graphml_path}")
-        print(f"DEBUG: Exists: {graphml_path.exists()}")
-        if graphml_path.exists():
-            print(f"DEBUG: Size: {graphml_path.stat().st_size} bytes")
         
         if graphml_path.exists() and graphml_path.stat().st_size > 100:
             total_wait = sum(wait_times[:attempt+1])
-            logger.info(f"✅ GraphML ready after {total_wait}s total wait")
-            print(f"DEBUG: GraphML ready! Proceeding to semantic inference...")
+            logger.info(f"✅ GraphML ready after {total_wait}s wait")
             break
         
         logger.warning(
@@ -111,17 +101,14 @@ async def process_document_with_semantic_inference(
             f"❌ GraphML never populated after {total_wait}s total wait. "
             f"This indicates RAG-Anything processing failed."
         )
-        print(f"DEBUG: GraphML never appeared - returning early!")
         return {
             "relationships_inferred": 0,
             "error": "GraphML file not created"
         }
     
     # Step 3: Capture BEFORE state for validation
-    print(f"DEBUG: About to parse GraphML for BEFORE state...")
     nodes_before, edges_before = parse_graphml(graphml_path)
     logger.info(f"📊 PRE-INFERENCE: {len(nodes_before)} entities, {len(edges_before)} relationships")
-    print(f"DEBUG: Parsed {len(nodes_before)} nodes, {len(edges_before)} edges BEFORE inference")
     
     # Step 4: Run LLM-powered relationship inference (ALWAYS - no toggle)
     if not llm_func:
@@ -320,7 +307,6 @@ def create_insert_endpoint(app, rag_instance):
         app: FastAPI application instance
         rag_instance: Initialized RAGAnything instance
     """
-    print("DEBUG: Inside create_insert_endpoint(), about to define async function...")
     
     async def insert_with_semantic_processing(file: UploadFile = File(...)):
         """
@@ -328,7 +314,6 @@ def create_insert_endpoint(app, rag_instance):
         
         API clients use this endpoint directly.
         """
-        print(f"🔔🔔🔔 CUSTOM ENDPOINT CALLED: /insert with file: {file.filename}")
         logger.info(f"🔔 ENDPOINT CALLED: /insert with file: {file.filename}")
         try:
             # Save uploaded file with original filename to temp directory
@@ -365,14 +350,12 @@ def create_insert_endpoint(app, rag_instance):
             return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
     
     # Register the route explicitly (decorator doesn't work when called after app init)
-    print("DEBUG: About to call app.add_api_route() for /insert...")
     app.add_api_route(
         "/insert",
         insert_with_semantic_processing,
         methods=["POST"],
         response_class=JSONResponse
     )
-    print("DEBUG: app.add_api_route() for /insert completed successfully")
 
 
 def create_documents_upload_endpoint(app, rag_instance):
@@ -386,7 +369,6 @@ def create_documents_upload_endpoint(app, rag_instance):
         app: FastAPI application instance
         rag_instance: Initialized RAGAnything instance
     """
-    print("DEBUG: Inside create_documents_upload_endpoint(), about to define async function...")
     
     async def documents_upload_with_raganything(file: UploadFile = File(...)):
         """
@@ -407,14 +389,11 @@ def create_documents_upload_endpoint(app, rag_instance):
                 shutil.copyfileobj(file.file, f)
             
             logger.info(f"📄 Processing {file.filename} via WebUI /documents/upload endpoint")
-            print(f"DEBUG: About to call process_document_with_semantic_inference() with file: {file_path}")
             
             # Integrated processing: Entity extraction + relationship inference in one pipeline
             processing_result = await process_document_with_semantic_inference(
                 file_path, file.filename, rag_instance, rag_instance.llm_model_func
             )
-            
-            print(f"DEBUG: process_document_with_semantic_inference() returned: {processing_result}")
             
             logger.info(f"✅ Processing complete for {file.filename}")
             logger.info(f"   Relationships inferred: {processing_result['relationships_inferred']}")
@@ -436,11 +415,9 @@ def create_documents_upload_endpoint(app, rag_instance):
             return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
     
     # Register the route explicitly (decorator doesn't work when called after app init)
-    print("DEBUG: About to call app.add_api_route() for /documents/upload...")
     app.add_api_route(
         "/documents/upload",
         documents_upload_with_raganything,
         methods=["POST"],
         response_class=JSONResponse
     )
-    print("DEBUG: app.add_api_route() for /documents/upload completed successfully")
