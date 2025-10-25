@@ -22,6 +22,18 @@ import asyncio
 import sys
 from pathlib import Path
 
+# Set up logging FIRST before any imports that use logging
+from src.utils.logging_config import setup_logging
+
+# Initialize logging with rotating files
+log_info = setup_logging(
+    log_level="INFO",
+    log_dir="logs",
+    max_file_size=10 * 1024 * 1024,  # 10MB per file
+    backup_count=5,  # Keep 5 backup files per log
+    console_output=True  # Also show in terminal (filtered)
+)
+
 # Import LightRAG and RAG-Anything from pip BEFORE adding src to path
 # This prevents any old fork from shadowing the pip package
 from raganything import RAGAnything
