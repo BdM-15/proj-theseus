@@ -290,19 +290,20 @@ def save_metadata_to_graphml(graphml_path: Path, nodes: List[Dict]) -> int:
         existing_keys.add(key_elem.get('id'))
     
     # Metadata attribute definitions we might need
+    # NOTE: LightRAG uses d0-d5 for nodes, d6-d11 for edges, so start at d12
     metadata_keys = {
         # Evaluation factor metadata
-        'd10': ('metadata_weight', 'node', 'Evaluation factor weight (percentage or points)'),
-        'd11': ('metadata_importance', 'node', 'Relative importance hierarchy'),
-        'd12': ('metadata_subfactors', 'node', 'List of subfactors with weights'),
+        'd12': ('metadata_weight', 'node', 'Evaluation factor weight (percentage or points)'),
+        'd13': ('metadata_importance', 'node', 'Relative importance hierarchy'),
+        'd14': ('metadata_subfactors', 'node', 'List of subfactors with weights'),
         # Submission instruction metadata
-        'd13': ('metadata_page_limit', 'node', 'Page limit for submission'),
-        'd14': ('metadata_format', 'node', 'Format requirements (font, margins, spacing)'),
-        'd15': ('metadata_addressed_factors', 'node', 'Evaluation factors addressed by instruction'),
+        'd15': ('metadata_page_limit', 'node', 'Page limit for submission'),
+        'd16': ('metadata_format', 'node', 'Format requirements (font, margins, spacing)'),
+        'd17': ('metadata_addressed_factors', 'node', 'Evaluation factors addressed by instruction'),
         # Requirement metadata
-        'd16': ('metadata_criticality', 'node', 'Requirement criticality (MANDATORY/IMPORTANT/OPTIONAL)'),
-        'd17': ('metadata_modal_verb', 'node', 'Modal verb used (shall/should/may)'),
-        'd18': ('metadata_subject', 'node', 'Subject with obligation (Contractor/Offeror/Government)'),
+        'd18': ('metadata_criticality', 'node', 'Requirement criticality (MANDATORY/IMPORTANT/OPTIONAL)'),
+        'd19': ('metadata_modal_verb', 'node', 'Modal verb used (shall/should/may)'),
+        'd20': ('metadata_subject', 'node', 'Subject with obligation (Contractor/Offeror/Government)'),
     }
     
     # Add missing key definitions
