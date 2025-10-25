@@ -5,8 +5,10 @@ Captures all processing and server activity with automatic rotation (10MB files,
 ## Log Files
 
 ### `processing.log`
+
 **Purpose**: Complete RFP processing history  
 **Contains**:
+
 - Document upload and parsing (RAG-Anything, MinerU)
 - Entity extraction counts by type
 - Relationship inference (Phase 6) results
@@ -15,12 +17,14 @@ Captures all processing and server activity with automatic rotation (10MB files,
 - LLM calls for extraction/inference
 
 **Use Cases**:
+
 - Review overnight RFP processing results
 - Debug extraction quality issues
 - Track Phase 6/7 execution
 - Analyze entity/relationship counts over time
 
 **Example Entries**:
+
 ```
 2025-01-25 14:30:15 | INFO | src.server.routes | 📄 Processing M6700425R0007 MCPP II DRAFT RFP 23 MAY 25.pdf
 2025-01-25 14:30:45 | INFO | src.server.routes | 📊 PRE-INFERENCE: 4793 entities, 5932 relationships
@@ -31,8 +35,10 @@ Captures all processing and server activity with automatic rotation (10MB files,
 ---
 
 ### `server.log`
+
 **Purpose**: Server operations and configuration  
 **Contains**:
+
 - Server startup and initialization
 - Configuration settings (LLM models, embeddings, chunk sizes)
 - API endpoint registrations
@@ -40,12 +46,14 @@ Captures all processing and server activity with automatic rotation (10MB files,
 - Health checks (if not filtered)
 
 **Use Cases**:
+
 - Verify server started correctly
 - Check configuration values
 - Monitor API endpoint usage
 - Debug server issues
 
 **Example Entries**:
+
 ```
 2025-01-25 14:29:50 | INFO | raganything_server | 🚀 RAG-Anything Server Starting
 2025-01-25 14:29:51 | INFO | raganything_server | LLM: grok-4-fast-reasoning via https://api.x.ai/v1
@@ -56,20 +64,24 @@ Captures all processing and server activity with automatic rotation (10MB files,
 ---
 
 ### `errors.log`
+
 **Purpose**: All errors from any component  
 **Contains**:
+
 - Processing errors (parsing, extraction, inference)
 - Server errors (API failures, config issues)
 - LLM errors (rate limits, API failures)
 - GraphML errors (schema conflicts, file corruption)
 
 **Use Cases**:
+
 - Debug failed RFP processing
 - Identify recurring issues
 - Track error patterns
 - Monitor system health
 
 **Example Entries**:
+
 ```
 2025-01-25 14:35:22 | ERROR | lightrag | ValueError: invalid literal for int() with base 10: 'Significantly More Important'
 2025-01-25 14:35:22 | ERROR | src.server.routes | ❌ GraphML never populated after 15s total wait
@@ -85,6 +97,7 @@ Captures all processing and server activity with automatic rotation (10MB files,
 **Rotation Trigger**: Automatic when file reaches 10MB
 
 When a log file reaches 10MB:
+
 1. `processing.log` → `processing.log.1`
 2. `processing.log.1` → `processing.log.2`
 3. ... (up to `processing.log.5`)
@@ -96,6 +109,7 @@ When a log file reaches 10MB:
 ## Console Output
 
 Terminal still shows important messages, but **filtered** to remove noise:
+
 - ✅ **Shows**: RFP processing progress, entity counts, Phase 6/7 results, errors
 - ❌ **Filters**: HTTP health checks, uvicorn access logs, localhost requests
 
@@ -106,26 +120,31 @@ This prevents terminal buffer overflow during overnight processing while keeping
 ## Viewing Logs
 
 ### Tail Live Processing
+
 ```powershell
 Get-Content logs/processing.log -Wait -Tail 50
 ```
 
 ### Check Recent Errors
+
 ```powershell
 Get-Content logs/errors.log | Select-Object -Last 20
 ```
 
 ### Search for Specific RFP
+
 ```powershell
 Select-String -Path logs/processing.log -Pattern "MCPP II"
 ```
 
 ### View All Entity Counts
+
 ```powershell
 Select-String -Path logs/processing.log -Pattern "entities, .* relationships"
 ```
 
 ### Monitor Phase 7 Enrichment
+
 ```powershell
 Select-String -Path logs/processing.log -Pattern "Phase 7"
 ```
@@ -135,6 +154,7 @@ Select-String -Path logs/processing.log -Pattern "Phase 7"
 ## Troubleshooting
 
 ### "Log files too large"
+
 Logs auto-rotate at 10MB with 5 backups (~50MB total per log). If you need more history, increase `backup_count` in `app.py`:
 
 ```python
@@ -144,12 +164,15 @@ log_info = setup_logging(
 ```
 
 ### "Can't find processing details"
+
 Processing logs are in `processing.log`, not `server.log`. Use:
+
 ```powershell
 Get-Content logs/processing.log -Wait -Tail 100
 ```
 
 ### "Terminal still showing health checks"
+
 Console filtering only removes HTTP GET/POST patterns. If health checks still appear, update `HTTPFilter` in `src/utils/logging_config.py`.
 
 ---

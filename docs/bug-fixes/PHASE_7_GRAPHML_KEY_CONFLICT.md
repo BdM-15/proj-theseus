@@ -55,11 +55,13 @@ metadata_keys = {
 ### 2. Repair Existing GraphML
 
 Created `repair_graphml_keys.py` to:
+
 1. Remap data elements: d10→d12, d11→d13, d12→d14, d13→d15, d14→d16, d15→d17, d16→d18, d17→d19, d18→d20
 2. Remove old conflicting key definitions (d12-d18 with wrong positions)
 3. Add new key definitions (d12-d20 with correct descriptions)
 
 **Results**:
+
 - ✅ 52 data elements remapped in 40 nodes
 - ✅ 7 old key definitions removed
 - ✅ 9 new key definitions added
@@ -98,6 +100,7 @@ for key in root.findall('.//graphml:key', ns):
 ### 2. LightRAG Key Allocation Pattern
 
 LightRAG uses a **consistent numbering scheme**:
+
 - Node keys: d0-d5 (6 attributes)
 - Edge keys: d6-d11 (6 attributes)
 - **Safe range for custom node metadata: d12+**
@@ -105,6 +108,7 @@ LightRAG uses a **consistent numbering scheme**:
 ### 3. GraphML Key Scope Matters
 
 Key definitions specify `for="node"` or `for="edge"`. You **can** reuse the same key ID (e.g., d10) for both nodes and edges, but:
+
 - Each must have separate `<key>` definitions
 - Data type must match the usage
 - Mixing causes NetworkX parse errors
@@ -125,6 +129,7 @@ Don't rely solely on WebUI - it may mask errors until visualization time.
 ### 5. Repair Strategy for Corrupted GraphML
 
 If GraphML is corrupted with conflicting keys:
+
 1. Parse XML with ElementTree (not NetworkX - it will fail)
 2. Remap data element keys to non-conflicting IDs
 3. Update/add correct key definitions
@@ -142,16 +147,16 @@ def validate_key_allocation(graphml_path: Path) -> bool:
     tree = ET.parse(graphml_path)
     root = tree.getroot()
     ns = {'graphml': 'http://graphml.graphdrawing.org/xmlns'}
-    
+
     # Get existing node keys
     node_keys = {k.get('id') for k in root.findall('.//graphml:key[@for="node"]', ns)}
-    
+
     # Check our metadata keys are in safe range (d12+)
     for key_id in ['d12', 'd13', 'd14', 'd15', 'd16', 'd17', 'd18', 'd19', 'd20']:
         if key_id in node_keys and int(key_id[1:]) < 12:
             logger.error(f"❌ Key conflict: {key_id} overlaps with LightRAG reserved range")
             return False
-    
+
     return True
 ```
 
@@ -160,6 +165,7 @@ def validate_key_allocation(graphml_path: Path) -> bool:
 Added to `copilot-instructions.md`:
 
 > **GraphML Key Allocation**:
+>
 > - LightRAG reserves d0-d5 (nodes), d6-d11 (edges)
 > - Phase 7 metadata uses d12-d20 (custom node attributes)
 > - Always validate key definitions before adding new attributes
@@ -181,6 +187,7 @@ Fix Phase 7 GraphML key conflict: remap d10-d18 to d12-d20
 ```
 
 **Files Changed**:
+
 - `src/inference/phase7_metadata_enrichment.py`: Updated key allocation (d12-d20)
 - `repair_graphml_keys.py`: One-time repair script for corrupted GraphML
 - `docs/bug-fixes/PHASE_7_GRAPHML_KEY_CONFLICT.md`: This document
