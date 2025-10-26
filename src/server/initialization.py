@@ -180,21 +180,26 @@ async def initialize_raganything():
         func=safe_embed_func,
     )
     
-    # Load entity extraction prompts with clear separation of concerns
-    # Branch 009: Quality-first refactoring (extraction excellence → query excellence)
-    # Philosophy: Thorough extraction enables powerful queries (2M context window)
-    # Folder structure: prompts/extraction/ (ingestion-time) vs prompts/query/ (query-time)
+    # Load entity extraction prompts with domain-specific intelligence
+    # Branch 011: Option A - Lean extraction patterns (modular domain files)
+    # Philosophy: Rich upfront extraction (2M context window) → rich knowledge graph → powerful agentic reasoning
+    # Architecture: Core extraction (WHAT/HOW) + Domain patterns (FAR/Evaluation/Proposal)
     entity_extraction_prompts = [
-        load_prompt("extraction/entity_extraction_prompt"),      # ~1,450 lines - WHAT to extract (rules, types, examples)
-        load_prompt("extraction/entity_detection_rules"),        # ~1,155 lines - HOW to detect (semantic signals, UCF)
+        load_prompt("extraction/entity_extraction_prompt"),              # ~1,450 lines - WHAT to extract (rules, types, examples)
+        load_prompt("extraction/entity_detection_rules"),                # ~1,155 lines - HOW to detect (semantic signals, UCF)
+        load_prompt("extraction/far_dfars_extraction_patterns"),         # ~400 lines - FAR/DFARS operational intelligence
+        load_prompt("extraction/evaluation_factor_extraction"),          # ~450 lines - Evaluation factor patterns (DoD vs civilian)
+        load_prompt("extraction/proposal_intelligence_extraction"),      # ~550 lines - Win themes, discriminators, competitive intel
     ]
     custom_entity_extraction_prompt = "\n\n---\n\n".join(entity_extraction_prompts)
     
-    logger.info(f"📚 Loaded 2 entity extraction prompts (~2,605 lines total)")
+    logger.info(f"📚 Loaded 5 entity extraction prompts (~4,005 lines total)")
     logger.info(f"   → Core extraction rules: WHAT to extract (1,450 lines)")
     logger.info(f"   → Semantic detection: HOW to detect (1,155 lines)")
-    logger.info(f"   → Metadata enrichment: Moved to prompts/query/ (Branch 010)")
-    logger.info(f"   → Separation of concerns: Extraction (ingestion) vs. Query (intelligence)")
+    logger.info(f"   → FAR/DFARS patterns: Compliance intelligence (400 lines)")
+    logger.info(f"   → Evaluation factors: Scoring methodologies, agency tendencies (450 lines)")
+    logger.info(f"   → Proposal intelligence: Win themes, discriminators, competitive intel (550 lines)")
+    logger.info(f"   → Architecture: Modular domain files (Option A - lean extraction patterns)")
 
     # Initialize RAG-Anything with custom configuration
     # IMPORTANT: LightRAG reads chunk_token_size from environment at import time
