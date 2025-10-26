@@ -1,28 +1,31 @@
-# Shipley Methodology Patterns for Federal Proposals
+# Federal Proposal Best Practices & Capture Intelligence
 
 **Purpose**: Win theme development, compliance matrix design, and proposal structure patterns  
 **Usage**: Referenced during entity extraction and query responses for proposal intelligence  
-**Scope**: Shipley Associates methodologies from _Winning Government Business_ and _Proposal Guide_  
+**Scope**: Industry-standard federal proposal methodologies and capture management best practices  
+**Philosophy**: **These are FLEXIBLE PATTERNS and EXAMPLES, not rigid templates. Adapt to each RFP's unique requirements.**  
 **Size**: ~15,000 tokens (best practices investment)  
-**Last Updated**: January 26, 2025 (Branch 011 - Prompt Enhancements)
+**Last Updated**: January 26, 2025 (Branch 011 - Prompt Enhancements - Flexibility Emphasis)
 
 ---
 
 ## How to Use This Library
 
-**During Extraction**: When LLM encounters evaluation factors, requirements, or Section L/M content, use Shipley patterns to:
+> **CRITICAL**: These patterns represent COMMON industry best practices observed across federal proposals, NOT universal requirements. Every RFP is different. **Use LLM semantic understanding** to recognize WHEN and HOW to apply these patterns based on specific RFP language, evaluation factors, and agency culture. **ADAPT rather than force-fit.**
+
+**During Extraction**: When LLM encounters evaluation factors, requirements, or Section L/M content, use these patterns to:
 
 1. **Identify win themes** - Transform features into customer-focused benefits (FAB: Feature-Advantage-Benefit)
 2. **Build compliance matrices** - Map requirements to proposal sections using 4-level scoring
-3. **Structure proposals** - Apply Shipley outline templates for Sections L/M alignment
+3. **Structure proposals** - Apply standard outline templates for Sections L/M alignment
 4. **Develop discriminators** - Identify competitive advantages vs "me too" approaches
-5. **Assess risk** - Use Shipley risk rating methodology (probability × impact)
+5. **Assess risk** - Use probability × impact risk rating methodology
 
-**NOT a replacement** for Shipley training - this is **operational pattern recognition** for automated proposal development.
+**NOT a replacement** for formal proposal training - this is **operational pattern recognition** for automated proposal development.
 
 ---
 
-## Section 1: Win Theme Development (Shipley Feature-Advantage-Benefit)
+## Section 1: Win Theme Development (FAB Framework)
 
 ### The FAB Framework
 
@@ -30,7 +33,7 @@
 **Advantage**: Why it's better than competitors (faster, cheaper, more experienced, lower risk)  
 **Benefit**: What the customer gains (mission success, cost savings, reduced risk, faster delivery)
 
-**Shipley Rule**: Every proposal claim must answer "So what?" from the customer's perspective.
+**Best Practice**: Every proposal claim must answer "So what?" from the customer's perspective.
 
 ### FAB Formula Templates
 
@@ -124,7 +127,7 @@ established relationships with SPAWAR stakeholders, ensuring seamless transition
 productivity without the 6-month relationship-building typical of new PMs.
 ```
 
-### Win Theme Development Process (Shipley Capture Management)
+### Win Theme Development Process (Capture Management)
 
 **Step 1: Identify Customer Hot Buttons** (from pre-RFP intel):
 
@@ -163,7 +166,7 @@ $2M in lost productivity    | contract (zero learning curve) |
 - **Key Personnel**: Lead with personnel win theme (expertise/relationships)
 - **Price Volume**: Lead with value win theme (cost savings/efficiency)
 
-**Step 5: Validate Win Themes** (Shipley Red Team Review):
+**Step 5: Validate Win Themes** (Red Team Review):
 
 - Does it answer "So what?" from customer perspective?
 - Is it provable? (past performance data, metrics, testimonials)
@@ -211,7 +214,7 @@ Why: Specific person, quantified past performance, customer benefit (zero learni
 
 ```
 Bad: "Unlike our competitors who use offshore support, we use 100% US-based technicians."
-Why: Shipley rule: Never mention competitors. Focus on your strengths.
+Why: best practice: Never mention competitors. Focus on your strengths.
 ```
 
 ✅ **Positive Discriminator**:
@@ -225,9 +228,9 @@ Why: Highlights your advantage without naming competitors. Quantifies customer b
 
 ---
 
-## Section 2: Compliance Matrix (Shipley 4-Level Scoring)
+## Section 2: Compliance Matrix (4-Level Scoring)
 
-### The Shipley Compliance Matrix
+### The Standard Compliance Matrix
 
 **Purpose**: Map every RFP requirement to a proposal section, ensuring 100% coverage and traceability.
 
@@ -237,7 +240,7 @@ Why: Highlights your advantage without naming competitors. Quantifies customer b
 Requirement ID | RFP Section | Requirement Text (abbreviated) | Proposal Section | Compliance Level | Page Ref
 ```
 
-**4-Level Compliance Scoring** (Shipley standard):
+**4-Level Compliance Scoring** (industry standard):
 
 **C (Compliant)**: Fully addresses requirement with proof (past performance, technical approach, management plan)  
 **PC (Partially Compliant)**: Addresses requirement but lacks some details or proof  
@@ -265,7 +268,7 @@ Requirement ID | RFP Section | Requirement Text (abbreviated) | Proposal Section
 - Non-Compliant (NC): 0
 - Not Addressed (NA): 0
 
-**Shipley Rule**: Aim for 100% Compliant (C). Any PC/NC/NA = risk of "Unacceptable" rating.
+**Best Practice**: Aim for 100% Compliant (C). Any PC/NC/NA = risk of "Unacceptable" rating.
 
 ### Requirement Types (Extract Carefully!)
 
@@ -344,7 +347,7 @@ Req ID: R-089 | Compliance: C (exceeds) | Discriminator: 3 value-adds at no cost
 
 ### Cross-Reference Matrix (Section L ↔ M Alignment)
 
-**Shipley Best Practice**: Build a matrix linking Section L instructions → Section M evaluation factors → Proposal sections.
+**Industry Best Practice**: Build a matrix linking Section L instructions → Section M evaluation factors → Proposal sections.
 
 **Example**:
 
@@ -361,9 +364,9 @@ Req ID: R-089 | Compliance: C (exceeds) | Discriminator: 3 value-adds at no cost
 
 ---
 
-## Section 3: Proposal Structure (Shipley Outline Templates)
+## Section 3: Proposal Structure (Standard Outline Templates)
 
-### Technical Volume Outline (Typical Shipley Structure)
+### Technical Volume Outline (Standard Federal Proposal Structure)
 
 ```
 1. EXECUTIVE SUMMARY (2-3 pages - READ LAST, WRITE LAST)
@@ -409,7 +412,7 @@ Req ID: R-089 | Compliance: C (exceeds) | Discriminator: 3 value-adds at no cost
        - Incident response procedures
        - Media sanitization processes
 
-4. RISK MANAGEMENT (Shipley Risk Rating Methodology)
+4. RISK MANAGEMENT (Risk Rating Methodology)
    4.1 Risk Identification
        - Technical risks (10-15 risks typical)
        - Schedule risks
@@ -438,7 +441,7 @@ Req ID: R-089 | Compliance: C (exceeds) | Discriminator: 3 value-adds at no cost
        - Risk mitigation (avoid service disruptions)
 ```
 
-**Shipley Page Allocation Rule** (for 50-page limit):
+**Page Allocation Best Practice** (for 50-page limit):
 
 - Executive Summary: 2-3 pages (5%)
 - Understanding & Approach: 25-30 pages (55%)
@@ -447,7 +450,7 @@ Req ID: R-089 | Compliance: C (exceeds) | Discriminator: 3 value-adds at no cost
 - Transition Plan: 4-6 pages (10%)
 - **Total**: 47-50 pages (leave 0-3 page buffer for formatting)
 
-### Management Volume Outline (Typical Shipley Structure)
+### Management Volume Outline (Standard Federal Proposal Structure)
 
 ```
 1. MANAGEMENT APPROACH (30-40% of management volume)
@@ -521,7 +524,7 @@ Req ID: R-089 | Compliance: C (exceeds) | Discriminator: 3 value-adds at no cost
        - Processes documented (SOPs, work instructions)
 ```
 
-**Shipley Page Allocation Rule** (for 30-page limit):
+**Page Allocation Best Practice** (for 30-page limit):
 
 - Management Approach: 12-14 pages (42%)
 - Performance Management: 8-10 pages (30%)
@@ -531,7 +534,7 @@ Req ID: R-089 | Compliance: C (exceeds) | Discriminator: 3 value-adds at no cost
 
 ---
 
-## Section 4: Discriminators vs "Me Too" (Shipley Competitive Analysis)
+## Section 4: Discriminators vs "Me Too" (Competitive Analysis)
 
 ### What is a Discriminator?
 
@@ -548,7 +551,7 @@ Req ID: R-089 | Compliance: C (exceeds) | Discriminator: 3 value-adds at no cost
 - Generic claim (no proof, no specifics)
 - Doesn't answer "So what?" (no customer benefit)
 
-### Discriminator Categories (Shipley Framework)
+### Discriminator Categories (Industry Framework)
 
 #### 1. Past Performance Discriminators
 
@@ -669,7 +672,7 @@ Why it's a discriminator:
 - Customer benefit (predictable delivery, low risk)
 ```
 
-### Discriminator Development Process (Shipley Capture)
+### Discriminator Development Process (Capture Management)
 
 **Step 1: Competitive Analysis**
 
@@ -702,11 +705,11 @@ Past Performance        | 30%    | Incumbent PM, 100% Exceptional | CPARS, same 
 
 ---
 
-## Section 5: Shipley Risk Rating Methodology
+## Section 5: Risk Rating Methodology
 
 ### Risk Assessment Framework
 
-**Shipley Risk Formula**: Risk Score = Probability × Impact
+**Risk Formula**: Risk Score = Probability × Impact
 
 **Probability** (How likely to occur?):
 
@@ -730,7 +733,7 @@ Med (2)    2        4           6      ← Yellow (monitor closely)
 Low (1)    1        2           3      ← Green (accept)
 ```
 
-**Shipley Risk Management**:
+**Risk Management**:
 
 - **Red (7-9)**: MUST have mitigation plan + contingency plan
 - **Yellow (4-6)**: SHOULD have mitigation plan
@@ -906,7 +909,7 @@ page limits and format.
 **Enhanced Response** (with Shipley library):
 
 ```
-Based on Shipley methodology for federal proposals, structure your technical volume as follows
+Based on industry-standard methodologies for federal proposals, structure your technical volume as follows
 for the 50-page limit (excluding resumes):
 
 **EXECUTIVE SUMMARY (2-3 pages, 5%)**
@@ -977,24 +980,24 @@ for the 50-page limit (excluding resumes):
 - AI SIEM validated by MITRE ATT&CK (40% better detection)
 ```
 
-**Benefit**: 10-15 hours of Shipley-trained proposal management time saved per RFP!
+**Benefit**: 10-15 hours of experienced proposal management time saved per RFP!
 
 ---
 
 ## Conclusion
 
-This Shipley Methodology Patterns library transforms proposal development from "write what the RFP asks for" into **strategic win theme deployment**. By embedding 15K tokens of Shipley best practices, the LLM can:
+This Federal Proposal Best Practices library transforms proposal development from "write what the RFP asks for" into **strategic win theme deployment**. By embedding 15K tokens of Shipley best practices, the LLM can:
 
 1. **Develop win themes** - Transform features into customer benefits using FAB framework
 2. **Build compliance matrices** - Map 100% of requirements with 4-level scoring (C/PC/NC/NA)
 3. **Structure proposals** - Apply Shipley outline templates with proper page allocation
 4. **Identify discriminators** - Distinguish competitive advantages from "me too" claims
 5. **Assess risks** - Use Probability × Impact scoring with mitigation/contingency plans
-6. **Guide proposal teams** - Provide Shipley-trained PM-level intelligence automatically
+6. **Guide proposal teams** - Provide experienced PM-level intelligence automatically
 
 **Integration**: Append this library to `entity_extraction_prompt.md` as Section 9 reference material (after FAR/DFARS library).
 
-**Cost Justification**: 15K tokens = 0.75% of 2M budget, but automates 10-15 hours of Shipley-trained proposal management per RFP.
+**Cost Justification**: 15K tokens = 0.75% of 2M budget, but automates 10-15 hours of experienced proposal management per RFP.
 
 **Next**: Create Agency Evaluation Precedents library (10K tokens) for Navy/USAF/Army-specific evaluation patterns.
 

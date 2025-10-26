@@ -3,12 +3,15 @@
 **Purpose**: Operational context for federal acquisition clauses beyond basic extraction  
 **Usage**: Referenced during entity extraction to understand clause implications  
 **Scope**: Core FAR 52.2## series + critical DFARS 252.2## cybersecurity/supply chain clauses  
+**Philosophy**: **Provides TYPICAL operational context - specific RFP language always takes precedence over general patterns**  
 **Size**: ~30,000 tokens (domain expertise investment)  
-**Last Updated**: January 26, 2025 (Branch 011 - Prompt Enhancements)
+**Last Updated**: January 26, 2025 (Branch 011 - Prompt Enhancements - Flexibility Emphasis)
 
 ---
 
 ## How to Use This Library
+
+> **IMPORTANT**: This library describes COMMON implications and operational patterns for federal clauses based on historical observation. Specific RFPs may have unique requirements, amendments, or agency-specific interpretations. **Always prioritize the actual RFP language** over these general patterns. Use this library for CONTEXT, not as authoritative guidance.
 
 **During Extraction**: When LLM encounters a clause (FAR/DFARS pattern), use this library to:
 

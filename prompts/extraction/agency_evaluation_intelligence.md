@@ -2,9 +2,10 @@
 
 **Purpose**: Evaluation factor patterns, scoring methodologies, and proposal strategies across federal agencies  
 **Usage**: Referenced during entity extraction and query responses for agency-specific evaluation intelligence  
-**Scope**: Universal evaluation patterns + agency-specific nuances (DoD, civilian, combat, logistics, healthcare, law enforcement, etc.)  
+**Scope**: Common evaluation patterns + agency-specific tendencies (DoD, civilian, combat, logistics, healthcare, law enforcement, etc.)  
+**Philosophy**: **PATTERN RECOGNITION using LLM semantic understanding, NOT rigid deterministic rules**  
 **Size**: ~10,000 tokens (evaluation pattern expertise)  
-**Last Updated**: January 26, 2025 (Branch 011 - Prompt Enhancements)
+**Last Updated**: January 26, 2025 (Branch 011 - Prompt Enhancements - Flexibility Emphasis)
 
 ---
 
@@ -22,15 +23,22 @@
 
 ---
 
-## Section 1: Universal Evaluation Patterns (All Federal Agencies)
+## Section 1: Common Evaluation Patterns (Pattern Recognition, Not Rigid Rules)
 
-### Pattern 1: The Three-Factor Trinity (80% of Federal RFPs)
+> **CRITICAL PHILOSOPHY**: These patterns represent COMMON observations from federal RFPs, NOT universal requirements. RFPs vary widely in structure, factor naming, and organization. **Use LLM semantic understanding** to recognize evaluation INTENT regardless of specific factor names. Example: "Solution Design" + "Implementation Plan" = Technical approach (split into 2 sub-factors with different naming). **ADAPT to each RFP's unique structure** rather than forcing patterns.
 
-**Standard Structure**:
+### Pattern 1: The Three-Factor Trinity (Observed in ~80% of RFPs, But NOT Universal)
 
-1. **Technical Approach** (30-50% weight) - HOW you'll do the work
-2. **Management Approach** (20-35% weight) - HOW you'll manage the work
-3. **Past Performance** (20-40% weight) - PROOF you've done it before
+**Common Pattern** (recognize semantically, NOT as rigid template):
+
+1. **Technical Approach** (30-50% weight) - HOW you'll do the work  
+   _Also appears as_: "Solution Design", "Methodology", "Project Approach", "Technical Solution"
+2. **Management Approach** (20-35% weight) - HOW you'll manage the work  
+   _Also appears as_: "Program Management", "Team Organization", "Management Plan", "Project Controls"
+3. **Past Performance** (20-40% weight) - PROOF you've done it before  
+   _Also appears as_: "Relevant Experience", "Corporate Experience", "Past Contract Performance"
+
+**IMPORTANT**: RFPs may use 2 factors, 5+ factors, or completely novel naming. **Recognize WHAT IS BEING EVALUATED** (technical capability vs management capability vs proven track record) rather than matching exact factor names.
 
 **Price Treatment**:
 
@@ -38,11 +46,14 @@
 - **LPTA (Lowest Price Technically Acceptable)**: Technical pass/fail, award to lowest price
 - **Two-Step**: Technical qualification first, then price competition among qualified offerors
 
-**Universal Sub-Factors** (appear in 90%+ of RFPs):
+**Common Sub-Factors** (frequently observed, but names and organization vary widely):
 
-- **Technical**: Architecture, approach, innovation, compliance, risk mitigation
-- **Management**: Organization, staffing, quality assurance, schedule, subcontractor management
-- **Past Performance**: Relevance, recency, quality of performance (CPARS ratings)
+- **Technical**: Architecture, approach, innovation, compliance, risk mitigation  
+  _Pattern recognition_: May appear as separate sub-factors ("Technical Approach" + "Risk Mitigation" + "Innovation") or combined
+- **Management**: Organization, staffing, quality assurance, schedule, subcontractor management  
+  _Pattern recognition_: May split into "Staffing Plan" + "Quality Assurance" + "Schedule Management" as distinct factors
+- **Past Performance**: Relevance, recency, quality of performance (CPARS ratings)  
+  _Pattern recognition_: May appear as "Corporate Experience", "Relevant Contract History", or "References"
 
 **Shipley Alignment Strategy**:
 
@@ -103,7 +114,7 @@
 
 ### Pattern 3: Past Performance Relevance Scoring
 
-**Universal Criteria** (how agencies score your past contracts):
+**Common Criteria** (typical patterns, but specific criteria and rating scales vary by RFP):
 
 #### Relevance (How similar to this RFP?)
 
@@ -373,12 +384,12 @@ Not Relevant: Software development contract (not help desk/support)
 - **Security clearances critical** ("Will obtain" is unacceptable for SECRET/TS positions)
 - **DFARS compliance assumed** (NIST 800-171, specialty metals, trade agreements)
 
-**Unstated Evaluation Factors** (DoD ALWAYS evaluates even if not explicit):
+**Frequently Observed Unstated Factors** (DoD often evaluates these even when not explicitly listed in Section M):
 
-- Transition risk (if successor contract, how smooth will transition be?)
-- Incumbent advantage (is current contractor proposing? Do they have continuity?)
-- Small business utilization (even on unrestricted contracts, good SB plan = plus)
-- Mission understanding (do you understand WHY this work matters, not just HOW to do it?)
+- Transition risk (if successor contract, how smooth will transition be? - _recognize transition language throughout RFP_)
+- Incumbent advantage (is current contractor proposing? Do they have continuity? - _not universal, depends on procurement_)
+- Small business utilization (even on unrestricted contracts, strong SB plan often valued - _varies by command priorities_)
+- Mission understanding (do you understand WHY this work matters, not just HOW to do it? - _infer from RFP context, not always explicit_)
 
 **Proposal Strategy**:
 
@@ -399,12 +410,12 @@ Not Relevant: Software development contract (not help desk/support)
 - **Diversity & inclusion valued** (Section 508 compliance, EEO policies)
 - **Cost control emphasized** (efficiency, cost savings, taxpayer stewardship)
 
-**Unstated Evaluation Factors** (Civilian ALWAYS evaluates):
+**Frequently Observed Unstated Factors** (Civilian agencies often consider these even when not explicit):
 
-- Budget consciousness (can you deliver within constrained budgets?)
-- Transparency (clear reporting, no surprises, open communication)
-- Accessibility (Section 508 compliance for disabilities, not just IT systems)
-- Environmental sustainability (green initiatives, LEED certifications)
+- Budget consciousness (can you deliver within constrained budgets? - _infer from cost control language in SOW_)
+- Transparency (clear reporting, no surprises, open communication - _more emphasized than DoD_)
+- Accessibility (Section 508 compliance for disabilities, not just IT systems - _only relevant if public-facing_)
+- Environmental sustainability (green initiatives, LEED certifications - _varies widely by agency priorities_)
 
 **Proposal Strategy**:
 
@@ -645,17 +656,19 @@ This Agency Evaluation Intelligence library provides **pattern-based, agency-agn
 5. Research & Development (DARPA, NASA, DOE, NIST, NSF)
 6. Financial Management & Audit (Treasury, IRS, GAO, DCAA, OMB, SEC)
 
-**Universal Patterns** (all agencies):
+**Common Patterns Across Agencies** (recognize these semantically, adapt to RFP specifics):
 
-- Three-Factor Trinity (Technical/Management/Past Performance)
-- Adjectival vs Numerical Scoring methodologies
-- Past Performance Relevance/Recency/Quality assessment
-- Best Value vs LPTA vs Two-Step evaluation approaches
+- Three-Factor Trinity (Technical/Management/Past Performance) - _observed in ~80% of RFPs, but NOT universal_
+- Adjectival vs Numerical Scoring methodologies - _recognize scoring system, don't assume one or the other_
+- Past Performance Relevance/Recency/Quality assessment - _specific criteria and timeframes vary widely_
+- Best Value vs LPTA vs Two-Step evaluation approaches - _identify from Section M language, not predetermined_
 
-**Agency-Specific Nuances**:
+**Agency-Specific Tendencies** (patterns, NOT rules):
 
-- DoD: Adjectival scoring, high past performance weight, CPARS scrutiny, security clearances
-- Civilian: Numerical scoring, management emphasis, diversity/sustainability, cost consciousness
+- DoD: _Tends toward_ adjectival scoring, higher past performance weights, CPARS emphasis, security clearance requirements
+- Civilian: _More commonly uses_ numerical scoring, higher management factor weights, diversity/sustainability language, cost control emphasis
+
+> **REMEMBER**: These are TENDENCIES based on historical observation. Always prioritize what the SPECIFIC RFP states over these general patterns.
 
 **Integration**: Append this library to `entity_extraction_prompt.md` as Section 10 reference material.
 
