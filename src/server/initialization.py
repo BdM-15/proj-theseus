@@ -180,26 +180,40 @@ async def initialize_raganything():
         func=safe_embed_func,
     )
     
-    # Load entity extraction prompts with domain-specific intelligence
-    # Branch 011: Option A - Lean extraction patterns (modular domain files)
-    # Philosophy: Rich upfront extraction (2M context window) → rich knowledge graph → powerful agentic reasoning
-    # Architecture: Core extraction (WHAT/HOW) + Domain patterns (FAR/Evaluation/Proposal)
-    entity_extraction_prompts = [
-        load_prompt("extraction/entity_extraction_prompt"),              # ~1,450 lines - WHAT to extract (rules, types, examples)
-        load_prompt("extraction/entity_detection_rules"),                # ~1,155 lines - HOW to detect (semantic signals, UCF)
-        load_prompt("extraction/far_dfars_extraction_patterns"),         # ~400 lines - FAR/DFARS operational intelligence
-        load_prompt("extraction/evaluation_factor_extraction"),          # ~450 lines - Evaluation factor patterns (DoD vs civilian)
-        load_prompt("extraction/proposal_intelligence_extraction"),      # ~550 lines - Win themes, discriminators, competitive intel
-    ]
-    custom_entity_extraction_prompt = "\n\n---\n\n".join(entity_extraction_prompts)
+    # Load entity extraction prompts with hierarchical execution framework
+    # Branch 011: 5-Layer Hierarchical Execution Framework (~8,210 lines)
+    # Philosophy: Structured execution (WHO/WHAT/WHY) → Domain intelligence (§4.x) → Decision-making context
+    # Architecture: Layers 1-4 (execution framework) + Layer 5 (domain knowledge base)
     
-    logger.info(f"📚 Loaded 5 entity extraction prompts (~4,005 lines total)")
-    logger.info(f"   → Core extraction rules: WHAT to extract (1,450 lines)")
-    logger.info(f"   → Semantic detection: HOW to detect (1,155 lines)")
-    logger.info(f"   → FAR/DFARS patterns: Compliance intelligence (400 lines)")
-    logger.info(f"   → Evaluation factors: Scoring methodologies, agency tendencies (450 lines)")
-    logger.info(f"   → Proposal intelligence: Win themes, discriminators, competitive intel (550 lines)")
-    logger.info(f"   → Architecture: Modular domain files (Option A - lean extraction patterns)")
+    # Layer 1-4: Execution Framework (3,060 lines)
+    execution_framework_prompts = [
+        load_prompt("extraction/1_system_role"),                         # ~190 lines - WHO/WHAT/WHY
+        load_prompt("extraction/2_execution_framework"),                 # ~470 lines - 5-step process with IF-THEN steering
+        load_prompt("extraction/3_entity_specifications"),               # ~1,200 lines - 17 entity types
+        load_prompt("extraction/4_relationship_patterns"),               # ~1,000 lines - 7 relationship types
+    ]
+    
+    # Layer 5: Domain Knowledge Base (5,350 lines) - §4.x IF-THEN consultation targets
+    domain_knowledge_prompts = [
+        load_prompt("extraction/domain_knowledge/4.1_far_dfars_comprehensive"),         # ~700 lines
+        load_prompt("extraction/domain_knowledge/4.2_evaluation_comprehensive"),        # ~1,000 lines
+        load_prompt("extraction/domain_knowledge/4.3_proposal_comprehensive"),          # ~1,100 lines
+        load_prompt("extraction/domain_knowledge/4.4_requirement_classification"),      # ~900 lines
+        load_prompt("extraction/domain_knowledge/4.5_section_pattern_library"),         # ~850 lines
+        load_prompt("extraction/domain_knowledge/4.6_procurement_vehicle_intelligence"), # ~800 lines
+    ]
+    
+    # Concatenate all layers into system prompt
+    custom_entity_extraction_prompt = "\n\n---\n\n".join(execution_framework_prompts + domain_knowledge_prompts)
+    
+    logger.info(f"📚 Loaded 10 prompts in 5-layer hierarchical framework (~8,210 lines total)")
+    logger.info(f"   → Layer 1: System Role - WHO/WHAT/WHY (190 lines)")
+    logger.info(f"   → Layer 2: Execution Framework - 5-step process with IF-THEN steering (470 lines)")
+    logger.info(f"   → Layer 3: Entity Specifications - 17 entity types (1,200 lines)")
+    logger.info(f"   → Layer 4: Relationship Patterns - 7 relationship types (1,000 lines)")
+    logger.info(f"   → Layer 5: Domain Knowledge Base - §4.1-4.6 IF-THEN targets (5,350 lines)")
+    logger.info(f"   → Decision-making framing: Cost impacts, staffing, bid/no-bid throughout")
+    logger.info(f"   → Quality standard: 150-250 char entity enrichment with operational context")
 
     # Initialize RAG-Anything with custom configuration
     # IMPORTANT: LightRAG reads chunk_token_size from environment at import time
