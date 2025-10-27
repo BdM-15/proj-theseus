@@ -2142,10 +2142,10 @@ from lightrag.lightrag import LightRAG
 
 ```powershell
 # Check server logs for this line:
-# "lightrag.govcon.ontology_integration | __init__ | Ontology injector initialized with 12 entity types"
+# "Loaded 17 entity types" or similar message in initialization logs
 
-# This module ONLY exists in forked library, NOT pip package
-# If you don't see this, server is using wrong library!
+# Verify entity types in src/server/initialization.py lines 60-90
+# Current: 17 specialized entity types (semantic-first detection)
 ```
 
 #### **Worker Refresh Not Appearing**

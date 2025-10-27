@@ -105,7 +105,7 @@ from lightrag.llm.openai import openai_complete_if_cache # Cloud LLM wrapper
    RFP Upload → RAG-Anything (MinerU parser)
    → 4096-token chunks (5x larger than local)
    → 32 parallel requests
-   → Extract 12 entity types (REQUIREMENT, CLAUSE, etc.)
+   → Extract 17 entity types (semantic-first detection)
    → Save to ./rag_storage/graph_chunk_entity_relation.graphml
 
 2. POST-PROCESSING (Local - Phase 6 Pipeline)
@@ -116,38 +116,52 @@ from lightrag.llm.openai import openai_complete_if_cache # Cloud LLM wrapper
    → Save enhanced graph → LightRAG WebUI
 ```
 
-**Result**: 69 seconds processing (Navy MBOS 71 pages), 594 entities, $0.042 cost.
+**Result**: Processing times vary by RFP (MCPP ~45 min, $0.65-$1.00 typical).
 
 ---
 
 ## Government Contracting Domain Knowledge
 
-### The 12 Entity Types (Core Ontology)
+### The 17 Entity Types (Core Ontology)
 
-Hardcoded in `configure_raganything_args()` - these transform generic LightRAG into domain-specific intelligence:
+Defined in `src/server/initialization.py` - these transform generic LightRAG into domain-specific intelligence:
 
 ```python
-# Core entities
-ORGANIZATION      # Contractors, agencies, departments
-CONCEPT           # CLINs, budget items, technical concepts
-EVENT             # Milestones, delivery dates, reviews
-TECHNOLOGY        # Systems, tools, platforms
-PERSON            # POCs, contracting officers
-LOCATION          # Performance locations, delivery sites
+# Core entities (LightRAG defaults)
+organization           # Contractors, agencies, departments
+concept                # CLINs, budget items, technical concepts
+event                  # Milestones, delivery dates, reviews
+technology             # Systems, tools, platforms
+person                 # POCs, contracting officers
+location               # Performance locations, delivery sites
 
 # Government contracting specific (critical differentiators)
-REQUIREMENT       # Must/should/may obligations (Shipley methodology)
-CLAUSE            # FAR/DFARS/AFFARS clauses (regulatory compliance)
-SECTION           # RFP sections A-M, J attachments (UCF structure)
-DOCUMENT          # Referenced specs, standards, attachments
-DELIVERABLE       # Contract deliverables, work products
-EVALUATION_FACTOR # Section M scoring criteria, Section L instructions
+requirement            # Must/should/may obligations (Shipley methodology)
+clause                 # FAR/DFARS/agency supplement clauses (regulatory compliance)
+section                # RFP sections (UCF A-M structure or semantic detection)
+document               # Referenced specs, standards, attachments, annexes
+deliverable            # Contract deliverables, work products, CDRLs
+evaluation_factor      # Section M scoring criteria (semantic detection, RFP-agnostic)
+submission_instruction # Section L format/page limits (semantic detection, RFP-agnostic)
+strategic_theme        # Win themes, hot buttons, discriminators, proof points
+statement_of_work      # PWS/SOW/SOO content (semantic detection, location-agnostic)
+program                # Major programs (MCPP II, Navy MBOS, etc.)
+equipment              # Physical items (batteries, vehicles, tools, NSE)
 ```
 
 ### Why These Entity Types Matter
 
 **Generic LightRAG extracts**: "person", "location", "organization"  
-**Our system extracts**: "REQUIREMENT" (must vs should), "CLAUSE" (FAR applicability), "EVALUATION_FACTOR" (Section M weights)
+**Our system extracts**: Domain-specific intelligence with semantic understanding:
+
+- **requirement** (must vs should vs may - criticality levels)
+- **clause** (FAR/DFARS applicability, flowdown obligations, cost impacts)
+- **evaluation_factor** (Section M weights, scoring methodology - semantic detection works for UCF and non-UCF RFPs)
+- **submission_instruction** (page limits, format requirements - semantic detection regardless of section label)
+- **strategic_theme** (win themes, hot buttons, discriminators - capture intelligence)
+- **statement_of_work** (semantic detection whether in Section C, attachment, or embedded)
+
+**Key Innovation**: Semantic-first detection means content determines entity type, not structural labels. Works for UCF (Section A-M), non-UCF (grants, simplified acquisitions), and hybrid (IDIQ task orders) RFPs.
 
 **Example**: Section L states "Technical approach limited to 10 pages" + Section M says "Factor 1: Technical Approach (40% weight)"  
 → Phase 6 LLM inference creates: `SUBMISSION_INSTRUCTION --EVALUATED_BY--> EVALUATION_FACTOR`  

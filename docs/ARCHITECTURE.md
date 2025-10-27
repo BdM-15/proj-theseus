@@ -259,13 +259,13 @@ main (production releases only)
 **Date**: October 5, 2025  
 **Status**: Accepted
 
-**Context**: Need multimodal parsing (tables, images, equations) while preserving govcon-specific ontology (12 entity types).
+**Context**: Need multimodal parsing (tables, images, equations) while preserving govcon-specific ontology (17 entity types).
 
 **Decision**: Use RAG-Anything as **library wrapper** around LightRAG, NOT as replacement or fork.
 
 **Rationale**:
 
-- ✅ **Preserve ontology**: 12 entity types remain intact
+- ✅ **Preserve ontology**: 17 entity types remain intact
 - ✅ **Multimodal capabilities**: MinerU parsing for tables/images
 - ✅ **Non-invasive**: Pass LightRAG instance via `lightrag=govcon_rag` parameter
 - ✅ **Maintainable**: `pip install --upgrade` gets updates without merge conflicts
@@ -277,10 +277,11 @@ main (production releases only)
 from raganything import RAGAnything, RAGAnythingConfig
 from lightrag import LightRAG
 
-# Standard LightRAG with govcon ontology
+# Standard LightRAG with govcon ontology (17 entity types)
 govcon_rag = LightRAG(
     working_dir="./rag_storage",
-    entity_types=["ORGANIZATION", "CONCEPT", "REQUIREMENT", ...],
+    entity_types=["organization", "concept", "requirement", "clause",
+                  "evaluation_factor", "strategic_theme", ...],  # 17 types total
     llm_model_func=xai_grok_func
 )
 
@@ -503,7 +504,7 @@ VALID_RELATIONSHIPS = {
 **Entity Extraction**:
 
 - ✅ Average 39 entities/chunk (excellent density)
-- ✅ 12 entity types properly classified
+- ✅ 17 entity types properly classified (semantic-first detection)
 - ✅ Only 3 minor entity type formatting warnings
 - ✅ Zero contamination (no fictitious entities)
 
