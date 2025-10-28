@@ -142,6 +142,7 @@ Assign each candidate to ONE of 17 entity types using semantic meaning (not loca
 #### **Example 1: Section L↔M Mapping (Evaluation Entities)**
 
 **RFP Text**:
+
 ```
 Section L.3.1 Technical Approach Volume
 
@@ -185,6 +186,7 @@ Relationship: GUIDES
 #### **Example 2: Requirements Extraction (Obligation Entities)**
 
 **RFP Text**:
+
 ```
 Section C.4.2 Status Reporting
 
@@ -235,8 +237,9 @@ Relationship: EVALUATED_BY
 ```
 
 **Key Takeaways**:
+
 - SHALL/MUST with contractor = MANDATORY requirement
-- SHOULD with contractor = IMPORTANT requirement  
+- SHOULD with contractor = IMPORTANT requirement
 - MAY with contractor = OPTIONAL requirement
 - SHALL/MUST with Government = concept (informational, NOT requirement)
 - Extract criticality metadata for EVERY requirement
@@ -246,6 +249,7 @@ Relationship: EVALUATED_BY
 #### **Example 3: Clause Clustering (Regulatory Entities)**
 
 **RFP Text**:
+
 ```
 Section I: Contract Clauses
 
@@ -307,6 +311,7 @@ Relationships: CHILD_OF (clause clustering)
 ```
 
 **Key Takeaways**:
+
 - FAR 52.###-# pattern = clause type (not requirement)
 - DFARS 252.###-#### pattern = clause type (DoD supplement)
 - NMCARS, AFFARS, GSAM, VAAR, etc. = 26+ agency supplements (all clause type)
@@ -317,6 +322,7 @@ Relationships: CHILD_OF (clause clustering)
 #### **Example 4: Annex Linking (Document Hierarchy)**
 
 **RFP Text**:
+
 ```
 Section J: List of Attachments
 
@@ -384,6 +390,7 @@ Relationships:
 ```
 
 **Key Takeaways**:
+
 - J-###### pattern → document type + ATTACHMENT_OF → Section J
 - A-###### pattern → document type + ATTACHMENT_OF → Section A
 - H-###### pattern → document type + ATTACHMENT_OF → Section H
@@ -395,6 +402,7 @@ Relationships:
 #### **Example 5: Deliverable Mapping (Work Products)**
 
 **RFP Text**:
+
 ```
 Section C.6 Reporting Requirements
 
@@ -465,6 +473,7 @@ Relationships:
 ```
 
 **Key Takeaways**:
+
 - CDRL A###/DD Form 1423 = deliverable type (work products)
 - "Contractor shall submit [work product]" = requirement type (obligation)
 - Requirement PRODUCES deliverable (work → product relationship)
@@ -1062,21 +1071,231 @@ Identify meaningful connections between entities that represent **decision pathw
 - Pattern: "See Attachment J-0005", "IAW MIL-STD-882"
 - Example: "Section C SOW" --REFERENCES--> "Attachment J-0005 PWS"
 
-### Relationship Inference Patterns
+### Learning from Patterns: Six Core Inference Algorithms
 
-**Consult §5 Relationship Patterns** for detailed detection rules, then apply:
+**Pattern recognition principle**: Apply proven algorithms with confidence thresholds (≥0.70) to create ONLY allowed relationship types.
 
-**For each entity pair**, ask:
+---
 
-1. **Topical proximity**: Do they appear in same/adjacent paragraphs?
-2. **Semantic connection**: Does one constrain, evaluate, require, or define the other?
-3. **Structural linkage**: Are they parent-child, cross-referenced, or co-located by design?
+#### Algorithm 1: Attachment → Section Linking (ATTACHMENT_OF)
 
-**If YES to any**, create relationship:
+**Purpose**: Connect annexes, appendices, and J-attachments to parent sections
 
+**Pattern Recognition**:
+
+- **HIGH confidence (1.00)**: Naming convention match
+  - `J-0005 Performance Work Statement` → Section J Attachments
+  - `Appendix B Risk Management Plan` → Section C Statement of Work
+  - **Signal**: Prefix matches section letter OR explicitly states "Attachment to Section X"
+
+- **MEDIUM confidence (0.95)**: Explicit citation
+  - Text: "See Attachment J-0005 for detailed PWS" → creates ATTACHMENT_OF to Section J
+  - Text: "Annex A (Data Requirements)" cited in Section C → ATTACHMENT_OF to Section C
+  - **Signal**: Cross-reference with section number in same paragraph
+
+- **LOW confidence (0.70)**: Content alignment
+  - Attachment discusses "security controls" + Section H is "Special Contract Requirements" → potential ATTACHMENT_OF
+  - **Signal**: Semantic overlap between attachment topic and section scope
+  - **Validation**: Requires topical proximity (within 3 paragraphs of section mention)
+
+**Output**:
 ```
-relationship|[source entity]|[relationship type]|[target entity]|[description explaining WHY they're connected]
+relationship|Attachment J-0005 PWS|ATTACHMENT_OF|Section J Attachments|J-0005 naming convention (J-#### format) indicates attachment to Section J per UCF structure.
 ```
+
+---
+
+#### Algorithm 2: Clause → Section Clustering (CHILD_OF)
+
+**Purpose**: Group regulatory clauses under parent sections (typically Section I)
+
+**Pattern Recognition**:
+
+- **HIGH confidence (0.95)**: Series numbering
+  - `FAR 52.204-21` + `FAR 52.222-26` + `FAR 52.232-40` all co-located → CHILD_OF Section I
+  - **Signal**: Multiple clauses with same prefix (FAR 52.###, DFARS 252.###) in contiguous paragraphs
+  - **Coverage**: 26+ agency supplements (FAR, DFARS, AFFARS, NMCARS, GSAM, HSAR, TRANSFARS, AIDAR, etc.)
+
+- **MEDIUM confidence (0.90)**: Explicit labeling
+  - Text: "Section I Contract Clauses. The following clauses apply: FAR 52.204-21..." → CHILD_OF Section I
+  - **Signal**: Section header followed by numbered list of clauses
+
+- **LOW confidence (0.70)**: Structural position
+  - Clause appears between "Section H Special Requirements" and "Section J Attachments" → likely CHILD_OF Section I
+  - **Signal**: Positional inference based on UCF standard order (H → I → J)
+
+**Output**:
+```
+relationship|FAR 52.204-21 NIST 800-171|CHILD_OF|Section I Contract Clauses|FAR 52.### series clause appearing in Section I clause listing.
+```
+
+---
+
+#### Algorithm 3: Document Hierarchy (CHILD_OF)
+
+**Purpose**: Identify parent-child relationships between sections, subsections, and paragraphs
+
+**Pattern Recognition**:
+
+- **Pattern A (0.95)**: Prefix + Delimiter
+  - `Section C.3.2.1` → CHILD_OF `Section C.3.2` → CHILD_OF `Section C.3` → CHILD_OF `Section C`
+  - **Signal**: Numerical or alphanumeric nesting (C.3.2.1, 4.2.1, III.A.2)
+
+- **Pattern B (0.90)**: Standard + Subsection
+  - `Factor 1.2: Innovation` → CHILD_OF `Factor 1: Technical Approach`
+  - **Signal**: "Factor X.Y" where Y = subfactor number
+
+- **Pattern C (0.85)**: Clause + Paragraph
+  - `FAR 52.204-21(b)(1)(ii)` → CHILD_OF `FAR 52.204-21(b)(1)` → CHILD_OF `FAR 52.204-21(b)` → CHILD_OF `FAR 52.204-21`
+  - **Signal**: Regulatory citation with paragraph nesting (a)(1)(i), (b)(2)(ii))
+
+- **Pattern D (0.80)**: Explicit Labeling
+  - Text: "Factor 1: Technical Approach includes three subfactors: 1.1 Solution Architecture, 1.2 Innovation, 1.3 Risk Mitigation"
+  - **Signal**: "includes", "consists of", "comprises" with enumeration
+
+**Output**:
+```
+relationship|Factor 1.1: Solution Architecture|CHILD_OF|Factor 1: Technical Approach|Subfactor 1.1 is hierarchical component of parent Factor 1 evaluation criterion.
+```
+
+---
+
+#### Algorithm 4: Submission Instruction ↔ Evaluation Factor (GUIDES)
+
+**Purpose**: Map Section L formatting requirements to Section M scoring criteria
+
+**Pattern Recognition**:
+
+- **HIGH confidence (0.95)**: Explicit cross-reference
+  - Text: "Section L: Technical volume (Factor 1) limited to 25 pages, excluding cover sheet"
+  - **Signal**: Direct mention of factor number + page limit in same sentence
+
+- **MEDIUM confidence (0.80)**: Co-location with structure match
+  - Text: "Technical Approach volume shall not exceed 25 pages" + Section M lists "Factor 1: Technical Approach"
+  - **Signal**: Instruction label matches factor label (case-insensitive, normalized)
+
+- **LOW confidence (0.70)**: Implicit alignment
+  - Text: "Management volume shall address past performance, key personnel, and project controls (15-page limit)"
+  - Section M: "Factor 2: Management Approach (subfactors: Past Performance, Key Personnel, Project Controls)"
+  - **Signal**: Instruction mentions same subfactor topics as evaluation factor
+
+**Special Cases**:
+- **One instruction → Multiple factors**: Create separate GUIDES relationships for each factor
+  - "Combined Technical/Management volume (40 pages)" → GUIDES Factor 1 AND Factor 2
+- **Embedded in Section M**: Page limit stated within factor description counts as GUIDES
+- **No explicit mapping**: If Section L uses generic "proposal" without factor reference, skip GUIDES (confidence <0.70)
+
+**Output**:
+```
+relationship|Technical Volume Page Limit|GUIDES|Factor 1: Technical Approach|Section L instruction limiting technical proposal volume to 25 pages directly constrains Factor 1 evaluation response.
+```
+
+---
+
+#### Algorithm 5: Requirement → Evaluation Factor (EVALUATED_BY)
+
+**Purpose**: Link SOW/PWS requirements to Section M scoring criteria
+
+**Pattern Recognition**:
+
+- **HIGH confidence (0.95)**: Explicit evaluation statement
+  - Text: "Weekly status reports (REQUIREMENT) will be evaluated under Factor 2: Management Approach"
+  - **Signal**: "evaluated under", "scored in", "assessed via" + factor reference
+
+- **MEDIUM-HIGH confidence (0.80)**: Topic alignment with citation
+  - Text: "Contractor SHALL deliver AI/ML threat detection prototype (Section C.3.2)" + Section M: "Factor 1.2: Innovation in Cybersecurity"
+  - **Signal**: Requirement topic matches factor/subfactor topic + explicit cross-reference
+
+- **MEDIUM confidence (0.75)**: Strong semantic overlap
+  - Use topic alignment table below to map requirement domain to likely evaluation factor
+
+- **LOW confidence (0.70)**: Weak semantic overlap
+  - Requirement mentions "reporting" → could map to Management OR Past Performance factor
+  - **Validation**: Requires additional context (paragraph proximity, subfactor details)
+
+**Topic Alignment Categories** (confidence = 0.75):
+
+| Requirement Domain | Likely Evaluation Factor | Example Keywords |
+|---|---|---|
+| Solution architecture, design, methodology | Technical Approach | system design, architecture, integration, CONOPS |
+| Innovation, R&D, emerging tech | Technical Approach (Innovation subfactor) | AI/ML, prototype, novel, cutting-edge, patent |
+| Risk mitigation, security, safety | Technical Approach (Risk subfactor) | cybersecurity, OPSEC, safety plan, risk register |
+| Project management, staffing, controls | Management Approach | schedule, budget, EVMS, org chart, key personnel |
+| Past contracts, references, lessons learned | Past Performance | similar projects, CPARS, customer references |
+| Subcontractor management, teaming | Management Approach | small business, SDVOSB, subcontractor plan |
+| Pricing strategy, cost realism | Cost/Price | labor rates, ODCs, fee structure, basis of estimate |
+
+**If NO clear alignment** (confidence <0.70): Skip EVALUATED_BY. Requirement may be pass/fail compliance, not scored.
+
+**Output**:
+```
+relationship|Weekly Status Reports|EVALUATED_BY|Factor 2: Management Approach|Management deliverable (weekly status reports) demonstrates project control capability, scored under Factor 2 per Section M evaluation criteria.
+```
+
+---
+
+#### Algorithm 6: Work Statement → Deliverable (PRODUCES)
+
+**Purpose**: Link SOW/PWS sections to contract deliverables (CDRLs, work products)
+
+**Pattern Recognition**:
+
+- **HIGH confidence (0.96)**: Explicit CDRL reference
+  - Text: "Section C.3.2 AI Prototype Development. Deliverable: AI/ML Threat Detection Prototype (CDRL A001)"
+  - **Signal**: "Deliverable:", "CDRL", "DID" mentioned in same paragraph as work description
+
+- **MEDIUM confidence (0.74)**: Semantic overlap
+  - Text: "Contractor shall develop comprehensive cybersecurity training program (Section C.4)"
+  - Text: "CDRL A005: Cybersecurity Training Materials (DID DI-MISC-80508)"
+  - **Signal**: Training program (work) + Training Materials (deliverable) = semantic match
+
+- **LOW confidence (0.70)**: Timeline correlation
+  - Text: "Phase 1 (Months 1-6): Requirements analysis and design" + "Deliverable: System Requirements Document (due Month 6)"
+  - **Signal**: Work phase timeframe matches deliverable due date
+
+**Output**:
+```
+relationship|Section C.3.2 AI Prototype Development|PRODUCES|AI/ML Threat Detection Prototype (CDRL A001)|Section C.3.2 work statement produces deliverable CDRL A001 per contract data requirements.
+```
+
+---
+
+### Allowed Relationship Types (EXACTLY 13)
+
+**🚨 CRITICAL**: Use ONLY these relationship types. NO custom types, NO comma-separated types, NO lowercase variants.
+
+1. **EVALUATED_BY** - Requirement/deliverable scored under evaluation factor
+2. **GUIDES** - Submission instruction constrains evaluation response
+3. **REQUIRES** - Clause/requirement mandates deliverable/document
+4. **CHILD_OF** - Hierarchical parent-child (subfactor, subsection, paragraph)
+5. **FLOWS_TO** - Clause/requirement flows down to subcontractor
+6. **REFERENCES** - Cross-document citation
+7. **ATTACHMENT_OF** - Annex/appendix linked to parent section
+8. **PRODUCES** - Work statement yields deliverable
+9. **IMPACTS** - Strategic theme affects requirement/factor (reserved for themes only)
+10. **APPLIES_TO** - Clause applicability to specific work/location
+11. **DEFINES** - Document establishes requirement/standard
+12. **SUPPORTS** - Technology/capability enables requirement
+13. **LOCATED_AT** - Work performed at specific location
+
+**Forbidden Types** (map to allowed types instead):
+
+- ❌ `informs`, `impacts` (non-theme) → Use **REFERENCES** or **GUIDES**
+- ❌ `belongs_to`, `contained_in`, `part_of` → Use **CHILD_OF**
+- ❌ `determines`, `influences`, `affects` → Use **EVALUATED_BY** or **REQUIRES**
+- ❌ `flow_down`, `flowdown` → Use **FLOWS_TO**
+- ❌ Comma-separated types (e.g., `belongs_to,part_of`) → Choose single best match
+- ❌ Lowercase custom types (e.g., `evaluated_by_factor`) → Use **EVALUATED_BY**
+
+### Relationship Inference Workflow
+
+**For each entity pair**, apply algorithms in order:
+
+1. Check naming convention patterns (Algorithm 1, 2, 3) - **structural signals**
+2. Check explicit cross-references (Algorithm 4, 5, 6) - **semantic signals**
+3. Check topic alignment tables (Algorithm 5) - **domain knowledge**
+4. **If confidence ≥ 0.70**: Create relationship using allowed type
+5. **If confidence < 0.70**: Skip relationship (better to omit than create low-quality link)
 
 **Example**:
 
