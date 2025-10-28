@@ -1,375 +1,205 @@
-# Submission Instructions ↔ Evaluation Criteria Linking
+# Instruction-Evaluation Linking: Section L↔M Relationship Inference
 
-**Purpose**: Link submission instructions to their corresponding evaluation factors/criteria  
-**Entity Types**: SUBMISSION_INSTRUCTION --GUIDES--> EVALUATION_FACTOR  
-**Why This Matters**: Proposal teams need to know which format requirements (page limits, volumes, fonts)
-apply to which evaluation factors to optimize compliance and scoring.
-
-**Common Locations**:
-
-- **Federal UCF**: Instructions in Section L, Evaluation in Section M
-- **Task Orders**: "Proposal Instructions" → "Selection Criteria"
-- **Quotes**: "Response Format" → "Award Methodology"
-- **Embedded**: Instructions within evaluation factor descriptions
-
-**Method**: LLM-powered semantic inference (format-agnostic, works across all RFP structures)
+**Purpose**: Map submission instructions (Section L) to evaluation factors (Section M)  
+**Focus**: GUIDES relationships (Submission Instruction → Evaluation Factor)  
+**Confidence Target**: ≥0.80 for all relationships  
+**Pattern**: Explicit cross-references and topic alignment  
+**Last Updated**: October 28, 2025 (Proven Patterns)
 
 ---
 
-## Core Relationship Pattern
+## The Core Pattern: GUIDES
 
 ```
 SUBMISSION_INSTRUCTION --GUIDES--> EVALUATION_FACTOR
 ```
 
-**Meaning**: This submission instruction guides how to respond to this evaluation factor
+This maps how submission instructions (page limits, format rules) guide and constrain evaluation factors.
 
-**Example**:
+---
+
+## Pattern 1: Explicit Cross-Reference (Confidence: 0.98)
+
+**Rule**: Section L explicitly references Section M factors
+
+### Examples
 
 ```
-SUBMISSION_INSTRUCTION "Technical Volume Format" (25 pages, 12pt font)
-  --GUIDES-->
-EVALUATION_FACTOR "Factor 1: Technical Approach"
+"Technical Volume limited to 25 pages, addressing Section M Factors 1.1, 1.2, and 1.3"
+→ GUIDES (Confidence 0.98)
+
+"Volume addressing Section M.1 (Technical Approach) shall not exceed 30 pages"
+→ GUIDES (Confidence 0.98)
+
+"See Section L.3.2 for page limits applicable to Section M.2 evaluation"
+→ GUIDES (Confidence 0.98)
+```
+
+**Extraction**:
+```
+Source: "Technical Volume Page Limit: 25 pages"
+Target: "Section M.1: Technical Approach (40% weight)"
+Type: GUIDES
+Confidence: 0.98
+Reasoning: "Explicit: 'addressing Section M Factors 1.1, 1.2, and 1.3'"
 ```
 
 ---
 
-## Three Inference Patterns
+## Pattern 2: Topic Alignment (Confidence: 0.85-0.90)
 
-### Pattern 1: Explicit Cross-Reference (Confidence: 0.95)
+**Rule**: Submission instruction topic matches evaluation factor topic
 
-**Signal**: Direct mention of factor in instruction
+### Topic Matching Table
+
+| Submission Topic              | Evaluation Topic           | Relationship | Confidence |
+| ----------------------------- | -------------------------- | ------------ | ---------- |
+| Technical volume format       | Technical Approach factor  | GUIDES       | 0.90       |
+| Management volume format      | Management Approach factor | GUIDES       | 0.90       |
+| Page limit for proposal       | Primary evaluation factor  | GUIDES       | 0.90       |
+| Font/margin requirements      | All factors in that volume | GUIDES       | 0.85       |
+| Cost volume format            | Cost/Price factor          | GUIDES       | 0.85       |
+| Past Performance volume       | Past Performance factor    | GUIDES       | 0.90       |
+| Executive Summary format      | Overall evaluation         | GUIDES       | 0.80       |
 
 **Examples**:
-
-- "Technical Volume addresses Factor 2"
-- "Management proposal (L.3.2) responds to Factors 3-4"
-- "Volume I shall address evaluation criteria M1-M3"
-
-**Extraction**:
-
-```json
-{
-  "source_id": "submission_instruction_tech_volume",
-  "target_id": "evaluation_factor_m2",
-  "relationship_type": "GUIDES",
-  "confidence": 0.95,
-  "reasoning": "Explicit cross-reference: 'addresses Factor 2'"
-}
 ```
-
-### Pattern 2: Implicit Co-Location (Confidence: 0.80)
-
-**Signal**: Page limit mentioned near factor description (same paragraph/section)
-
-**Example**:
-
-```
-M.2 Management Approach (Most Important)
-
-The Government will evaluate the offeror's management plan...
-
-The Management Volume shall not exceed 15 pages.
-```
-
-**Extraction**:
-
-```json
-{
-  "source_id": "submission_instruction_mgmt_volume",
-  "target_id": "evaluation_factor_m2",
-  "relationship_type": "GUIDES",
-  "confidence": 0.8,
-  "reasoning": "Submission instruction embedded within Factor M.2 description"
-}
-```
-
-### Pattern 3: Content Alignment (Confidence: 0.70)
-
-**Signal**: Instruction topic matches factor topic
-
-**Example**:
-
-```
-Section L.3.1: Technical Volume
-- Describe your technical approach...
-- Include system architecture diagrams...
-
-Section M.1: Technical Approach
-- The Government will evaluate the offeror's technical solution...
-```
-
-**Extraction**:
-
-```json
-{
-  "source_id": "submission_instruction_tech_volume",
-  "target_id": "evaluation_factor_m1",
-  "relationship_type": "GUIDES",
-  "confidence": 0.7,
-  "reasoning": "Topic alignment: both reference 'technical approach' and 'system architecture'"
-}
-```
-
----
-
-## LLM Inference Prompt Template
-
-Use this prompt structure when calling LLM for instruction-evaluation inference:
-
-```
-You are analyzing submission instructions and evaluation criteria/factors
-to determine which instructions guide which evaluation factors.
-
-NOTE: Instructions may be labeled as "Section L", "Proposal Instructions",
-"Response Format", or embedded within factor descriptions depending on RFP structure.
-
-SUBMISSION INSTRUCTIONS:
-{json_list_of_submission_instructions}
-
-EVALUATION CRITERIA/FACTORS:
-{json_list_of_evaluation_factors}
-
-TASK:
-For each submission instruction, determine which evaluation factor(s) it guides based on:
-
-1. EXPLICIT CROSS-REFERENCES (Confidence 0.95):
-   - Direct mentions: "Volume addresses Factor X"
-   - Factor IDs in text: "M1", "M2.1"
-
-2. IMPLICIT CO-LOCATION (Confidence 0.80):
-   - Instructions embedded within factor description
-   - Same paragraph or section
-
-3. CONTENT ALIGNMENT (Confidence 0.70):
-   - Topic matching: "Technical Volume" → "Technical Approach factor"
-   - Keyword overlap: "staffing", "maintenance", "transition"
-
-OUTPUT FORMAT:
-Return JSON array of relationships with confidence ≥ 0.70:
-
-[
-  {
-    "source_id": "submission_instruction_id",
-    "target_id": "evaluation_factor_id",
-    "relationship_type": "GUIDES",
-    "confidence": 0.70-0.95,
-    "reasoning": "Brief explanation (1-2 sentences)"
-  }
-]
-```
-
----
-
-## Special Cases
-
-### Case 1: One Instruction → Multiple Factors
-
-**Example**:
-
-```
-L.3.1 Technical Volume (50 pages)
-- Address Factors 1-3
-```
-
-**Solution**: Create 3 separate relationships
-
-```json
-[
-  { "source": "tech_volume", "target": "factor_1", "confidence": 0.95 },
-  { "source": "tech_volume", "target": "factor_2", "confidence": 0.95 },
-  { "source": "tech_volume", "target": "factor_3", "confidence": 0.95 }
-]
-```
-
-### Case 2: Embedded Instructions (Section M)
-
-**Example**:
-
-```
-M.2 Management Approach
-
-[Evaluation criteria...]
-
-The Management Volume shall be limited to 15 pages...
-```
-
-**Solution**:
-
-1. Extract SUBMISSION_INSTRUCTION entity "Management Volume Format"
-2. Create GUIDES relationship to Factor M.2
-3. Mark section M.2 with `contains_submission_instructions: true`
-
-### Case 3: No Clear Mapping
-
-**When**: Instruction has no clear factor match OR confidence < 0.70
-
-**Solution**: Do NOT create relationship (better to have no link than wrong link)
-
-**Example**:
-
-```
-L.2.1 Proposal Delivery
-- Submit via email to contracting.officer@navy.mil
-- Due date: March 15, 2025, 2:00 PM EST
-```
-
-**Analysis**: This is administrative instruction, not tied to specific evaluation factor  
-**Action**: No GUIDES relationship created
-
----
-
-## Quality Validation
-
-### Validation Rules
-
-1. ✅ **Confidence threshold**: Only create relationships with confidence ≥ 0.70
-2. ✅ **Reasoning required**: Every relationship must have explanation
-3. ✅ **No circular references**: A→B and B→A is invalid
-4. ✅ **Valid entity IDs**: Source and target must exist in graph
-
-### Expected Relationship Counts (Baseline)
-
-**Navy MBOS (71-page RFP)**:
-
-- Submission instructions: ~10 entities
-- Evaluation factors: ~8 entities (including subfactors)
-- Expected L↔M relationships: ~15 (some instructions guide multiple factors)
-
-**Quality Metric**: If relationship count is 0 or >30, investigate extraction issues
-
----
-
-## Examples from Navy MBOS RFP
-
-### Example 1: Explicit Mapping
-
-```
-L.3.1 Technical Volume
-
-The Technical Volume shall address Evaluation Factors 1 and 2
-(Technical Approach and Maintenance Approach) and shall not exceed
-25 pages.
-```
-
-**Extracted Relationships**:
-
-```json
-[
-  {
-    "source_id": "submission_instruction_tech_volume",
-    "target_id": "evaluation_factor_m1_technical",
-    "relationship_type": "GUIDES",
-    "confidence": 0.95,
-    "reasoning": "Explicit: 'shall address Evaluation Factor 1'"
-  },
-  {
-    "source_id": "submission_instruction_tech_volume",
-    "target_id": "evaluation_factor_m2_maintenance",
-    "relationship_type": "GUIDES",
-    "confidence": 0.95,
-    "reasoning": "Explicit: 'shall address Evaluation Factor 2'"
-  }
-]
-```
-
-### Example 2: Embedded Instructions
-
-```
-M.2 Management Approach (Significantly More Important)
-
-The Government will evaluate the offeror's management plan including:
-- Staffing approach
-- Training program
+"Management Volume shall address the following key areas:
+- Staffing plan
 - Quality assurance
+- Risk management"
 
-Offerors shall limit the Management Volume to 15 pages, 12-point font.
+→ Links to "Section M.2: Management Approach"
 ```
 
 **Extraction**:
-
-1. Create EVALUATION_FACTOR "Factor M.2: Management Approach"
-2. Create SUBMISSION_INSTRUCTION "Management Volume Format"
-3. Create relationship:
-
-```json
-{
-  "source_id": "submission_instruction_mgmt_volume",
-  "target_id": "evaluation_factor_m2_management",
-  "relationship_type": "GUIDES",
-  "confidence": 0.8,
-  "reasoning": "Embedded instruction within Factor M.2 description paragraph"
-}
 ```
-
-### Example 3: Topic Alignment
-
-```
-Section L.3.3: Past Performance Volume
-- Provide 3 relevant contracts from last 5 years
-- Include CPARS ratings
-
-Section M.3: Past Performance
-- The Government will evaluate relevance and quality of past performance
-```
-
-**Extracted Relationship**:
-
-```json
-{
-  "source_id": "submission_instruction_past_perf_volume",
-  "target_id": "evaluation_factor_m3_past_perf",
-  "relationship_type": "GUIDES",
-  "confidence": 0.7,
-  "reasoning": "Topic alignment: both sections reference 'past performance' and 'relevant contracts'"
-}
+Source: "Management Volume Submission Format"
+Target: "Section M.2: Management Approach (35% weight)"
+Type: GUIDES
+Confidence: 0.85
+Reasoning: "Topic alignment: Management volume format guides Management factor evaluation"
 ```
 
 ---
 
-## Error Patterns to Avoid
+## Pattern 3: Embedded Evaluation Criteria (Confidence: 0.80-0.85)
 
-### ❌ Error 1: Linking Administrative Instructions
+**Rule**: Section M criteria embedded within Section L submission instructions
 
-```
-WRONG:
-L.2.1 Proposal Delivery --GUIDES--> M.1 Technical Approach
-```
-
-Delivery instructions don't guide technical evaluation
-
-### ❌ Error 2: Linking Unrelated Topics
+### Examples
 
 ```
-WRONG:
-L.3.1 Cost Volume --GUIDES--> M.2 Technical Approach
+"Section L.2: Technical Volume
+
+The Technical Volume shall demonstrate:
+1. Solution Architecture and Design
+2. Innovation and Advanced Capabilities
+3. Risk Management Strategy
+
+[These subfactors are defined in Section M.1.1, M.1.2, M.1.3]"
 ```
 
-Cost instructions don't guide technical factor
-
-### ❌ Error 3: Creating Duplicate Relationships
-
+**Extraction**:
 ```
-WRONG:
-Tech_Volume --GUIDES--> Factor_1 (confidence: 0.95)
-Tech_Volume --GUIDES--> Factor_1 (confidence: 0.70)
+Source: "Technical Volume Submission Instructions"
+Target: "Solution Architecture Subfactor (Section M.1.1)"
+Type: GUIDES
+Confidence: 0.85
+Reasoning: "Submission instructions specify subfactor requirements"
 ```
-
-Only keep highest-confidence relationship
 
 ---
 
-## Success Criteria
+## Pattern 4: Implicit Format Constraints (Confidence: 0.75-0.80)
 
-A successful L↔M inference run should:
+**Rule**: Page limit implicitly guides evaluation strategy
 
-1. ✅ Cover ≥80% of evaluation factors with at least one GUIDES relationship
-2. ✅ Have average confidence ≥0.80
-3. ✅ Contain no administrative instruction links (delivery, format-only)
-4. ✅ Match manual review (spot-check 5 random relationships)
+### Examples
+
+```
+"Technical Approach limited to 15 pages"
++ "Technical Approach is 40% of evaluation"
+
+→ GUIDES relationship (high weight × tight page limit = constrained evaluation)
+```
+
+**Extraction**:
+```
+Source: "Technical Approach Volume: 15 pages maximum"
+Target: "Section M.1: Technical Approach (40% weight)"
+Type: GUIDES
+Confidence: 0.75
+Reasoning: "Page constraint implicitly guides proposal strategy for 40% weight factor"
+```
 
 ---
 
-**Last Updated**: January 2025 (Branch 004)  
-**Version**: 2.0 (Enhanced from regex patterns to LLM semantic inference)  
-**Replaces**: Brittle Jaccard similarity regex (Phase 6.0) with LLM understanding
+## Special Cases: Multiple Targets
+
+### Rule: One instruction may guide multiple factors
+
+```
+"Total volume (Technical + Management) limited to 50 pages"
+→ GUIDES Section M.1 (Technical)
+→ GUIDES Section M.2 (Management)
+
+Extract BOTH relationships:
+```
+
+**Extraction**:
+```
+Source: "Combined Technical-Management Volume: 50 pages"
+Target 1: "Section M.1: Technical Approach"
+Type: GUIDES
+Confidence: 0.80
+
+Target 2: "Section M.2: Management Approach"
+Type: GUIDES
+Confidence: 0.80
+```
+
+---
+
+## When to Create vs Reject
+
+### ✅ CREATE
+
+```
+Source: "Technical Volume Format (Section L.3): 25 pages"
+Target: "Factor 1: Technical Approach (Section M.1)"
+Type: GUIDES
+Confidence: 0.98
+Reasoning: "Explicit: 'Technical Volume limited to 25 pages, 
+evaluates Section M Technical Approach'"
+```
+
+```
+Source: "Cost Volume Format (Section L.2.2)"
+Target: "Factor 4: Cost/Price"
+Type: GUIDES
+Confidence: 0.90
+Reasoning: "Topic alignment: Cost submission format guides cost evaluation"
+```
+
+### ❌ REJECT (< 0.70)
+
+```
+Source: "General Submission Instructions"
+Target: "Some evaluation factor"
+Confidence: 0.50 [TOO LOW]
+Reason: "No clear connection between instructions and specific factor"
+```
+
+---
+
+## Output Checklist
+
+✅ Source is a SUBMISSION_INSTRUCTION entity  
+✅ Target is an EVALUATION_FACTOR entity  
+✅ Type is exactly `GUIDES`  
+✅ Confidence ≥ 0.70 (use patterns above)  
+✅ Reasoning explains which pattern was used  
+✅ Multiple targets handled correctly (separate relationships)  
+✅ No duplicate relationships (same source/target)  
+✅ Directional: Instruction → Factor (not reversed)

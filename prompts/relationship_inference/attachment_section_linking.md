@@ -1,52 +1,214 @@
-# Attachment Section Linking Rules
+# Attachment Section Linking: Agency-Specific Patterns
 
 **Purpose**: Link top-level attachments/annexes to their parent RFP sections  
-**Why This Matters**: Enables section-based navigation (find all Section J attachments)  
-**Method**: LLM-powered semantic inference (agency-agnostic)
+**Focus**: ATTACHMENT_OF relationships (Annex → Section parent)  
+**Confidence Target**: ≥0.85 for all relationships  
+**Coverage**: DoD, GSA, NASA, NOAA, FAA agency conventions  
+**Last Updated**: October 28, 2025 (Proven Patterns from Production)
 
 ---
 
-## Core Relationship Pattern
+## The Core Pattern: ATTACHMENT_OF
 
 ```
-ANNEX/DOCUMENT --ATTACHMENT_OF--> SECTION
+DOCUMENT/ANNEX --ATTACHMENT_OF--> SECTION
 ```
 
-**Meaning**: This attachment/document is listed under this parent section
+This relationship maps WHERE an attachment is officially listed in the RFP structure.
 
-**Example**:
-
-```
-ANNEX "J-02000000 Performance Work Statement"
-  --ATTACHMENT_OF-->
-SECTION "Section J: List of Attachments"
-```
-
-**Note**: This is DIFFERENT from document hierarchy (CHILD_OF)
-
-- ATTACHMENT_OF: Top-level annex → RFP section (J-02000000 → Section J)
-- CHILD_OF: Sub-annex → Parent annex (J-02000000-10 → J-02000000)
+**NOT the same as CHILD_OF** (which is internal hierarchy):
+- ATTACHMENT_OF: "J-02000000 PWS is listed in Section J"
+- CHILD_OF: "J-02000000-Sec-2.3 is subsection 2.3 within J-02000000 PWS"
 
 ---
 
-## Three Inference Patterns
+## Pattern 1: Naming Convention (Confidence: 1.0)
 
-### Pattern 1: Naming Convention (Confidence: 1.0)
+**Rule**: Prefix letter indicates parent section (universal across all agencies)
 
-**Signal**: Prefix matches section letter
-
-**Patterns**:
+### DoD/Navy/Air Force (Standard)
 
 ```
-J-######        → Section J (List of Attachments)
-A-######        → Section A (Solicitation/Contract Form)
-H-######        → Section H (Special Requirements)
-Attachment #    → Section J (default)
-Annex ##        → Section J (default)
-Exhibit X       → Section J (default for DoD) OR Section B (GSA pricing)
+J-XXXXXXXX     → Section J (List of Attachments) [UNIVERSAL]
+A-XXXXXXXX     → Section A (Solicitation/Contract Form)
+B-XXXXXXXX     → Section B (Supplies/Services & Prices)
+H-XXXXXXXX     → Section H (Special Requirements)
+I-XXXXXXXX     → Section I (Contract Clauses)
 ```
 
 **Examples**:
+- `J-02000000 Performance Work Statement` → Section J
+- `J-03000000 Quality Assurance Surveillance Plan` → Section J
+- `J-04000000 Contract Data Requirements List` → Section J
+- `A-0001 DD Form 1449` → Section A
+- `H-0005 Key Personnel Requirements` → Section H
+
+### GSA (Exhibit Convention)
+
+```
+Exhibit A      → Section B (Pricing) [GSA Schedule default]
+Exhibit B      → Section B (Pricing)
+Exhibit C      → Section B (Pricing)
+Exhibit G      → Section G (Evaluation Factors)
+```
+
+**Examples**:
+- `Exhibit A: Pricing Schedule` → Section B
+- `Exhibit G: Evaluation Criteria` → Section G
+
+### NASA (Exhibit Convention)
+
+```
+Exhibit A      → Section A (RFP Cover/Instructions)
+Exhibit B      → Section B (Statement of Work)
+Exhibit C      → Section C (Technical Requirements)
+```
+
+**Examples**:
+- `Exhibit A: RFP Instructions` → Section A
+- `Exhibit B: Space Vehicle PWS` → Section B
+
+---
+
+## Pattern 2: Explicit Section J Listing (Confidence: 0.95)
+
+**Rule**: If document appears in "Section J: List of Attachments" table, it MUST map to Section J
+
+### Signal: Attachment List Format
+
+```
+Section J List of Attachments:
+
+J-02000000    Performance Work Statement (PWS)
+J-03000000    Quality Assurance Surveillance Plan (QASP)
+J-04000000    Contract Data Requirements List (CDRL)
+J-05000000    DD Form 254 (Security Requirements)
+```
+
+**Extraction**:
+- Source: Each listed attachment (J-02000000, J-03000000, etc.)
+- Target: Section J
+- Type: ATTACHMENT_OF
+- Confidence: 0.95 (explicit listing)
+- Reasoning: "Listed under Section J: List of Attachments in official RFP structure"
+
+---
+
+## Pattern 3: Agency Supplement Location (Confidence: 0.90)
+
+**Rule**: Some agencies use non-standard locations; infer from section mentions
+
+### FAR vs Agency Supplement
+
+| Agency                  | Section | Attachments Location | Typical Files                  |
+| ----------------------- | ------- | -------------------- | ------------------------------ |
+| DoD/Navy (DFARS)        | J       | Section J            | J-02, J-03, J-04, J-05         |
+| GSA (GSAM)              | G       | Section G            | Exhibits for pricing/evals     |
+| NASA (NFS)              | B       | Section B or H       | Exhibits A-C, sometimes H      |
+| EPA (EPAAR)             | J       | Section J            | Standard DoD convention        |
+| HUD (HUDAR)             | J       | Section J            | Standard DoD convention        |
+| Interior (DIAR)         | J       | Section J            | Standard DoD convention        |
+| Commerce (CAR)          | J       | Section J            | Standard DoD convention        |
+| DOT (TAR)               | J       | Section J            | Standard DoD convention        |
+| FAA (FAR + TBD)         | J       | Section J            | Standard DoD convention        |
+| NOAA (FAR + NOAA supplements) | J | Section J            | Standard DoD convention        |
+
+**Inference**:
+- If document NOT found in expected Section J → Check if agency uses alternative
+- Example: GSA RFP with "Exhibit G" → Likely Section G, not Section J
+- Signal: Agency prefix in document name (GSAM = GSA, NFS = NASA, CAR = Commerce)
+
+---
+
+## Pattern 4: Content-Based Inference (Confidence: 0.80-0.85)
+
+**Rule**: Infer section when naming convention doesn't clearly signal
+
+### Technical Content Matching
+
+| Document Content Type        | Likely Section | Confidence |
+| ---------------------------- | -------------- | ---------- |
+| Performance work statement   | Section J      | 0.95       |
+| Quality assurance plan       | Section J      | 0.95       |
+| CDRL / Deliverable list      | Section J      | 0.95       |
+| Security requirements (DD254) | Section J      | 0.95       |
+| Key personnel requirements   | Section H      | 0.90       |
+| Travel/location specs        | Section H      | 0.90       |
+| Pricing schedule             | Section B      | 0.90       |
+| Evaluation factors detail    | Section M      | 0.90       |
+| Technical specifications     | Section C      | 0.85       |
+| Past performance template    | Section M      | 0.85       |
+| Training curriculum          | Section J      | 0.80       |
+| Sample contract docs         | Section J      | 0.75       |
+
+**Decision Tree**:
+1. Does document have J-, A-, B-, H- prefix? → Use Pattern 1 (Confidence 1.0)
+2. Is document listed in Section J table? → Use Pattern 2 (Confidence 0.95)
+3. Does agency use non-standard locations? → Use Pattern 3 (Confidence 0.90)
+4. Match document content to section type → Use Pattern 4 (Confidence 0.75-0.90)
+5. Confidence < 0.70 → DO NOT CREATE relationship (too speculative)
+
+---
+
+## Special Cases: When to Create vs Reject
+
+### ✅ CREATE ATTACHMENT_OF Relationship
+
+```
+Source: "J-02000000 Performance Work Statement"
+Target: "Section J"
+Type: ATTACHMENT_OF
+Confidence: 1.0
+Reasoning: "J- prefix indicates Section J attachment"
+```
+
+```
+Source: "CDRL A001 Monthly Status Report"
+Target: "Section J"
+Type: ATTACHMENT_OF
+Confidence: 0.95
+Reasoning: "Explicitly listed in Section J: List of Attachments table"
+```
+
+```
+Source: "Quality Assurance Plan"
+Target: "Section J"
+Type: ATTACHMENT_OF
+Confidence: 0.85
+Reasoning: "Quality Assurance documents are standard Section J annexes"
+```
+
+### ❌ REJECT (Confidence < 0.70)
+
+```
+Source: "System Specification"
+Target: "Section J"
+Confidence: 0.60 [TOO LOW]
+Reason: "Specs could be in Section C (requirements), Section J (attachment), 
+or referenced from multiple locations. Cannot determine with confidence."
+```
+
+```
+Source: "Unknown Technical Document"
+Target: "Section J"
+Confidence: 0.50 [TOO LOW]
+Reason: "No clear signals about where this document is listed."
+```
+
+---
+
+## Output Checklist for ATTACHMENT_OF Relationships
+
+For each relationship, verify:
+
+✅ Source is a DOCUMENT or ANNEX entity
+✅ Target is a SECTION entity (A, B, C, H, J, etc.)
+✅ Type is exactly `ATTACHMENT_OF` (not variants)
+✅ Confidence ≥ 0.70 (use patterns above to justify)
+✅ Reasoning explains WHERE in RFP this appears
+✅ No duplicate relationships (same source/target pair)
+
+**Remember**: ATTACHMENT_OF is directional: Annex → Parent Section (not reversed)
 
 ```
 "J-02000000 PWS" → prefix "J-" → Section J (confidence: 1.0)

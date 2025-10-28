@@ -1,136 +1,230 @@
-# Work to Deliverables: STATEMENT_OF_WORK → DELIVERABLE
+# SOW-Deliverable Linking: Work Statement to Deliverable Mapping
 
-**Purpose**: Link work statements (SOW/PWS/SOO) to contract deliverables  
-**Relationship Type**: PRODUCES (directional)  
-**Pattern**: Task→deliverable mentions, work-product mapping, timeline alignment  
-**Last Updated**: October 10, 2025 (Branch 005 - MinerU Optimization)
+**Purpose**: Link Statement of Work (SOW) tasks to their corresponding deliverables  
+**Focus**: PRODUCES relationships (SOW Task → Deliverable)  
+**Confidence Target**: ≥0.80 for all relationships  
+**Pattern**: CDRL cross-references and task content matching  
+**Last Updated**: October 28, 2025 (Proven Patterns)
 
 ---
 
-## Context
+## The Core Pattern: PRODUCES
 
-Statement of Work (SOW), Performance Work Statement (PWS), and Statement of Objectives (SOO) define tasks/objectives that produce specific deliverables. These work statements may appear in Section C (inline), as attachments (Section J), or in technical annexes.
-
-**Location Variability**: SOW/PWS/SOO content location varies by agency and RFP structure:
-
-- **Section C**: Traditional inline SOW
-- **Attachment**: Separate PWS document (common in DoD - e.g., "J-02000000 PWS")
-- **Section H**: Special requirements that define work scope
-- **Technical Annexes**: Detailed task descriptions in appendices
-
-Understanding these relationships enables work planning and CDRL mapping regardless of document location.
-
-## SOW Type Variations
-
-### SOW (Prescriptive)
-
-- **Definition**: Detailed task descriptions with specific methods
-- **Example**: "Conduct weekly system backups using approved tools"
-- **Deliverable**: Backup logs, compliance reports
-
-### PWS (Performance-Based)
-
-- **Definition**: Performance objectives without prescribing methods
-- **Example**: "Maintain 99.9% system uptime"
-- **Deliverable**: Uptime reports, SLA compliance metrics
-
-### SOO (Objective-Based)
-
-- **Definition**: High-level mission objectives
-- **Example**: "Enhance cybersecurity posture"
-- **Deliverable**: Security assessment reports, remediation plans
-
-## Common Patterns
-
-### Explicit Task→Deliverable Mentions
-
-- **Work Statement**: "Prepare monthly status reports..." (may be in Section C, attachment, or Section H)
-- **Deliverable**: "CDRL A001 - Monthly Status Report"
-- **Relationship**: Direct text reference
-- **Location-agnostic**: Works regardless of where work statement appears
-
-### Work-Product Mapping
-
-- **PWS**: "Maintain facility infrastructure..."
-- **Deliverable**: "Maintenance logs, inspection reports"
-- **Relationship**: Implied work products
-
-### Timeline Alignment
-
-- **SOO**: "Complete Phase 1 objectives by Q2..."
-- **Deliverable**: "Phase 1 Summary Report (due June 30)"
-- **Relationship**: Temporal correlation
-
-## Detection Rules
-
-1. **Direct References**: Search for deliverable names/IDs in work statement text
-
-   - CDRL numbers (A001, B002)
-   - Report names (Status Report, Technical Manual)
-   - Works across Section C, attachments, and Section H content
-
-2. **Semantic Overlap**: Match work scope to deliverable descriptions
-
-   - Task keywords → Deliverable type
-   - Example: "testing" → "Test Report"
-
-3. **Timeline Correlation**: Match milestones to deliverable due dates
-   - Phase completion → Phase report
-   - Monthly tasks → Monthly deliverables
-
-## Confidence Thresholds
-
-- **HIGH (>0.8)**: Explicit CDRL reference in SOW text
-- **MEDIUM (0.5-0.8)**: Strong semantic overlap + terminology match
-- **LOW (0.3-0.5)**: Weak topic alignment only
-
-## Output Format
-
-Each relationship must include:
-
-- `source_id`: STATEMENT_OF_WORK entity ID
-- `target_id`: DELIVERABLE entity ID
-- `relationship_type`: "PRODUCES"
-- `confidence`: Float 0.0-1.0
-- `reasoning`: Explanation (1-2 sentences)
-
-## Examples
-
-```json
-[
-  {
-    "source_id": "sow_123",
-    "target_id": "deliverable_456",
-    "relationship_type": "PRODUCES",
-    "confidence": 0.96,
-    "reasoning": "Performance Work Statement explicitly references CDRL A001 Monthly Status Report as required deliverable."
-  },
-  {
-    "source_id": "sow_789",
-    "target_id": "deliverable_101",
-    "relationship_type": "PRODUCES",
-    "confidence": 0.74,
-    "reasoning": "Facility maintenance tasks semantically align with Maintenance Log deliverable (CDRL B003)."
-  }
-]
+```
+SOW_TASK --PRODUCES--> DELIVERABLE
 ```
 
-## Special Cases
+This maps what work is done (SOW) to what is delivered (CDRL/deliverables).
 
-### Multi-Deliverable Tasks
+---
 
-- One SOW section may produce multiple deliverables
-- Example: "System testing" → Test Plan + Test Report + Test Data
-- Create separate relationships for each
+## Pattern 1: Explicit CDRL Reference (Confidence: 0.98)
 
-### Deliverable Hierarchy
+**Rule**: SOW explicitly references CDRL item number
 
-- Parent SOW → Summary deliverables
-- Sub-tasks → Detailed deliverables
-- Preserve hierarchical relationships
+### Examples
 
-### CDRL Cross-References
+```
+"Section 2.3 AI Model Development. Deliverable: CDRL A001 - AI Model Package"
+→ PRODUCES (Confidence 0.98)
 
-- Look for Contract Data Requirements List (CDRL) item numbers
-- Pattern: `CDRL [A-Z]\d{3}`
-- High confidence when matched
+"Task 4.2 Testing Phase produces: CDRL B003 - Test Report and Metrics"
+→ PRODUCES (Confidence 0.98)
+
+"Performance testing (Section 3.1) results in: CDRL C001 Performance Data"
+→ PRODUCES (Confidence 0.98)
+```
+
+**Extraction**:
+```
+Source: "Section 2.3 AI Model Development"
+Target: "CDRL A001: AI Model Package"
+Type: PRODUCES
+Confidence: 0.98
+Reasoning: "Explicit: 'Deliverable: CDRL A001 - AI Model Package'"
+```
+
+---
+
+## Pattern 2: Task-to-Deliverable Content Matching (Confidence: 0.85-0.90)
+
+**Rule**: SOW task content matches deliverable description
+
+### Task-Deliverable Mapping Table
+
+| SOW Task Type              | Typical Deliverable         | Confidence |
+| -------------------------- | --------------------------- | ---------- |
+| Design phase               | Design Document (CDRL)      | 0.90       |
+| Testing/QA phase           | Test Report + Metrics       | 0.90       |
+| Implementation phase       | Software Build (code/docs)  | 0.90       |
+| Documentation              | Technical Manual/Guide      | 0.90       |
+| Training delivery          | Training Materials + Results | 0.85       |
+| Status reporting           | Monthly/Weekly Reports      | 0.90       |
+| Maintenance support        | Support Logs/Metrics        | 0.85       |
+| Integration testing        | Integration Test Report     | 0.90       |
+| Risk management            | Risk Register + Mitigation  | 0.85       |
+
+### Examples
+
+```
+SOW Task: "Phase 1: Design system architecture"
+Deliverable: "Design Document (CDRL A002)"
+Content match: Architecture design → design document
+Confidence: 0.90
+
+SOW Task: "Conduct system testing and validation"
+Deliverable: "Test Report with Metrics (CDRL B001)"
+Content match: Testing activity → test deliverable
+Confidence: 0.90
+```
+
+**Extraction**:
+```
+Source: "Phase 1: Design System Architecture"
+Target: "CDRL A002: System Design Document"
+Type: PRODUCES
+Confidence: 0.90
+Reasoning: "Content match: Design activity produces design document"
+```
+
+---
+
+## Pattern 3: Temporal/Sequential Correlation (Confidence: 0.75-0.80)
+
+**Rule**: SOW task occurs before and likely produces nearby deliverable
+
+### Examples
+
+```
+SOW Section 2.1 (Months 1-2): Requirements Analysis
+CDRL Due Month 3: Requirements Document (CDRL A001)
+Temporal signal: Analysis → Document delivery 1 month later
+Confidence: 0.80
+
+SOW Section 3.2 (Months 3-5): Integration Testing
+CDRL Due Month 6: Integration Test Report (CDRL B001)
+Temporal signal: Testing → Report delivery 1 month after testing
+Confidence: 0.75
+```
+
+**Extraction**:
+```
+Source: "Requirements Analysis (Months 1-2)"
+Target: "Requirements Document (CDRL A001, Due Month 3)"
+Type: PRODUCES
+Confidence: 0.80
+Reasoning: "Temporal correlation: Analysis work concludes, document delivered 1 month later"
+```
+
+---
+
+## Pattern 4: Recurring/Periodic Deliverables (Confidence: 0.90)
+
+**Rule**: Recurring SOW activities produce recurring deliverables
+
+### Examples
+
+```
+SOW: "Ongoing weekly status meetings and reporting"
+Deliverable: "Weekly Status Reports (CDRL C001, recurring)"
+Confidence: 0.95 (explicit recurring connection)
+
+SOW: "Monthly performance reviews and optimization"
+Deliverable: "Monthly Performance Report (CDRL D001, recurring)"
+Confidence: 0.90
+```
+
+**Extraction**:
+```
+Source: "Ongoing Monthly Performance Reviews"
+Target: "Monthly Performance Report (CDRL D001)"
+Type: PRODUCES
+Confidence: 0.90
+Reasoning: "Recurring SOW activity produces recurring monthly deliverable"
+```
+
+---
+
+## Special Cases: Multiple Deliverables from One Task
+
+### Rule: One SOW task may produce multiple deliverables
+
+```
+SOW Task: "System Testing and Quality Assurance"
+Deliverable 1: "Test Plan (CDRL B001)"
+Deliverable 2: "Test Results (CDRL B002)"
+Deliverable 3: "Defect Report (CDRL B003)"
+
+Extract MULTIPLE relationships:
+```
+
+**Extraction**:
+```
+Source: "System Testing and Quality Assurance (Section 3.0)"
+
+Target 1: "Test Plan (CDRL B001)"
+Type: PRODUCES
+Confidence: 0.95
+
+Target 2: "Test Results (CDRL B002)"
+Type: PRODUCES
+Confidence: 0.95
+
+Target 3: "Defect Report (CDRL B003)"
+Type: PRODUCES
+Confidence: 0.90
+```
+
+---
+
+## When to Create vs Reject
+
+### ✅ CREATE
+
+```
+Source: "Section 2.3: AI Model Development"
+Target: "CDRL A001: AI Model Package + Training Data"
+Type: PRODUCES
+Confidence: 0.98
+Reasoning: "Explicit CDRL reference: 'Deliverable: CDRL A001'"
+```
+
+```
+Source: "Phase 2: Integration Testing (Months 3-4)"
+Target: "Integration Test Report (CDRL B002, Due Month 5)"
+Type: PRODUCES
+Confidence: 0.85
+Reasoning: "Content match + temporal correlation: Testing produces report 1 month after completion"
+```
+
+### ❌ REJECT (< 0.70)
+
+```
+Source: "General SOW section"
+Target: "Unrelated deliverable"
+Confidence: 0.40 [TOO LOW]
+Reason: "No clear work-to-deliverable connection"
+```
+
+```
+Source: "Background/context information"
+Target: "Deliverable"
+Confidence: 0.50 [TOO LOW]
+Reason: "Background information doesn't produce formal deliverables"
+```
+
+---
+
+## Output Checklist
+
+✅ Source is a STATEMENT_OF_WORK (or SOW task entity)  
+✅ Target is a DELIVERABLE entity  
+✅ Type is exactly `PRODUCES`  
+✅ Confidence ≥ 0.70 (use patterns above)  
+✅ Reasoning explains which pattern was used  
+✅ Multiple deliverables per task handled correctly (separate relationships)  
+✅ Recurring deliverables properly identified  
+✅ No duplicate relationships  
+✅ Directional: SOW Task → Deliverable (not reversed)
+
+**Remember**: Every CDRL deliverable should be traced back to at least one SOW task (shows full traceability)

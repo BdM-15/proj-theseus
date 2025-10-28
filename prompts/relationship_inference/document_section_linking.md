@@ -1,102 +1,165 @@
-# Document Hierarchy: DOCUMENT → SECTION
+# Document Section Linking: Content-Based Section Inference
 
-**Purpose**: Link referenced documents (attachments, annexes, specs, standards, regulations) to their parent sections  
-**Relationship Type**: CHILD_OF (directional)  
-**Pattern**: Prefix matching, explicit naming, content similarity  
-**Last Updated**: October 10, 2025 (Branch 005 - Entity Type Consolidation)
+**Purpose**: Link referenced documents to the sections where they appear  
+**Focus**: REFERENCES relationships (Document → Referenced entity)  
+**Confidence Target**: ≥0.75 for all relationships  
+**Pattern**: Explicit citations and semantic matching  
+**Last Updated**: October 28, 2025 (Proven Patterns)
 
 ---
 
-## Context
+## The Core Pattern: REFERENCES
 
-Referenced documents (numbered attachments, annexes, specifications, standards, regulations) belong to parent sections in government solicitations. They follow naming conventions and content patterns that enable semantic linking across all agency types.
-
-## Common Patterns
-
-### Prefix Matching (Numbered Attachments)
-
-- **J-12345** → **Section J** (DoD/Navy common)
-- **C-0001** → **Section C**
-- **Attachment 17** → **Section J Attachments**
-- **Annex 17** → **Section J Annexes**
-
-### Explicit Naming
-
-- **Annex 17 Transportation** → **Section J Annexes**
-- **Appendix B Technical Specs** → **Section C Appendices**
-- **Exhibit 3 Past Performance** → **Section J Exhibits**
-
-### Referenced Standards/Regulations
-
-- **MIL-STD-882E** → **Section C** (SOW references)
-- **FAR 52.212-1** → **Section I** (Contract Clauses)
-- **Public Law 99-234** → **Section I** or **Section H** (Special Requirements)
-
-## Detection Rules
-
-1. **Numeric Prefixes**: Extract section letter from document identifier
-
-   - Pattern: `[A-Z]-\d+` → Parent section matches letter
-   - Example: `J-0005 PWS` → `Section J`
-   - Example: `Attachment 17` → `Section J Attachments`
-
-2. **Semantic Naming**: Match descriptive terms to section content
-
-   - "Transportation", "Logistics" → Section C (SOW)
-   - "Past Performance", "References" → Section L (Instructions)
-   - Standards/Specs → Section C (SOW) or Section J (References)
-
-3. **Explicit References**: Look for text mentions
-
-   - "Referenced in Section J" → Parent is Section J
-   - "See Attachment to Section C" → Parent is Section C
-   - "Incorporated by reference in Section I" → Parent is Section I
-
-4. **Document Type Patterns**: Match document types to typical sections
-   - Standards (MIL-STD, ISO) → Section C or Section J
-   - Regulations (FAR, DFARS, USC) → Section I or Section H
-   - Attachments/Annexes → Section J (primary)
-
-## Confidence Thresholds
-
-- **HIGH (>0.8)**: Exact prefix match (J-12345 → Section J)
-- **MEDIUM (0.5-0.8)**: Semantic overlap + standard naming
-- **LOW (0.3-0.5)**: Weak semantic similarity only
-
-## Output Format
-
-Each relationship must include:
-
-- `source_id`: Document entity ID
-- `target_id`: Section entity ID
-- `relationship_type`: "CHILD_OF"
-- `confidence`: Float 0.0-1.0
-- `reasoning`: Explanation (1-2 sentences)
-
-## Examples
-
-```json
-[
-  {
-    "source_id": "document_123",
-    "target_id": "section_456",
-    "relationship_type": "CHILD_OF",
-    "confidence": 0.95,
-    "reasoning": "Document J-0005 PWS follows standard prefix pattern linking to Section J Attachments."
-  },
-  {
-    "source_id": "document_789",
-    "target_id": "section_101",
-    "relationship_type": "CHILD_OF",
-    "confidence": 0.82,
-    "reasoning": "Annex 17 Transportation content semantically aligns with Section C Statement of Work."
-  },
-  {
-    "source_id": "document_234",
-    "target_id": "section_678",
-    "relationship_type": "CHILD_OF",
-    "confidence": 0.88,
-    "reasoning": "MIL-STD-882E is referenced in Section C Performance Work Statement as required standard."
-  }
-]
 ```
+DOCUMENT --REFERENCES--> DOCUMENT/STANDARD/SPECIFICATION
+```
+
+This maps when one document explicitly mentions or references another.
+
+---
+
+## Pattern 1: Explicit Citation (Confidence: 1.0)
+
+**Rule**: If text says "See Document X" or "References MIL-STD-882", create REFERENCES relationship
+
+### Examples
+
+```
+"The contractor shall comply with MIL-STD-882E as specified in Section J-02000000 Annex 7"
+→ REFERENCES (Confidence 1.0)
+
+"Section C.2 shall be implemented per IEEE 1028 (see Attachment J-05)"
+→ REFERENCES (Confidence 1.0)
+
+"Requirements defined in API 654 (Shell Inspection and Rating Code)"
+→ REFERENCES (Confidence 1.0)
+```
+
+**Extraction**:
+```
+Source: "Section C"
+Target: "MIL-STD-882E"
+Type: REFERENCES
+Confidence: 1.0
+Reasoning: "Explicit citation: 'comply with MIL-STD-882E'"
+```
+
+---
+
+## Pattern 2: Implicit Standard Reference (Confidence: 0.90)
+
+**Rule**: Technical terminology signals standards without explicit naming
+
+### Examples
+
+```
+"NIST SP 800-171 compliance" → Reference to NIST standards
+"ISO 9001 certified" → Reference to ISO standards
+"CMMI Level 3" → Reference to CMMI methodology
+"IEEE 802.11 secure networks" → Reference to IEEE standards
+```
+
+**Extraction**:
+```
+Source: "Security Requirements (Section H)"
+Target: "NIST SP 800-171"
+Type: REFERENCES
+Confidence: 0.90
+Reasoning: "Reference to NIST standard: 'NIST 800-171 compliance required'"
+```
+
+---
+
+## Pattern 3: Cross-Section References (Confidence: 0.95)
+
+**Rule**: One section explicitly references another
+
+### Examples
+
+```
+"See Section J for attachments" → Section I REFERENCES Section J
+"As defined in Section B Statement of Work" → Section C REFERENCES Section B
+"Per evaluation criteria in Section M" → Section L REFERENCES Section M
+```
+
+**Extraction**:
+```
+Source: "Section L (Submission Instructions)"
+Target: "Section M (Evaluation Factors)"
+Type: REFERENCES
+Confidence: 0.95
+Reasoning: "Explicit cross-reference: 'See Section M evaluation criteria'"
+```
+
+---
+
+## Pattern 4: Industry/Regulatory Standards (Confidence: 0.85)
+
+**Rule**: References to well-known standards/regulations
+
+### Common Standards
+
+| Standard          | Type              | Confidence |
+| ----------------- | ----------------- | ---------- |
+| FAR 15.209        | Regulation        | 1.0        |
+| DFARS 224         | Regulation        | 1.0        |
+| NIST SP 800-171   | Standard          | 0.95       |
+| ISO 9001          | Certification     | 0.90       |
+| IEEE 802.11       | Standard          | 0.90       |
+| MIL-STD-882E      | Military standard | 0.95       |
+| IEEE 1028         | Software standard | 0.90       |
+| CMMI              | Maturity model    | 0.90       |
+| SOC 2 Type II     | Compliance        | 0.90       |
+| ITIL v4           | Framework         | 0.85       |
+
+**Extraction**:
+```
+Source: "Quality Assurance Plan"
+Target: "ISO 9001"
+Type: REFERENCES
+Confidence: 0.90
+Reasoning: "Quality standard referenced in proposal context"
+```
+
+---
+
+## When to Create vs Reject
+
+### ✅ CREATE
+
+```
+Source: "Performance Work Statement"
+Target: "IEEE 1028 Software Reviews and Audits"
+Type: REFERENCES
+Confidence: 0.95
+Reasoning: "Explicit citation in PWS: 'Code reviews per IEEE 1028'"
+```
+
+```
+Source: "Section C (SOW)"
+Target: "MIL-STD-882E"
+Type: REFERENCES
+Confidence: 0.90
+Reasoning: "Risk management approach per MIL-STD-882E standard"
+```
+
+### ❌ REJECT (< 0.70)
+
+```
+Source: "Security"
+Target: "Best Practices"
+Confidence: 0.40 [TOO LOW]
+Reason: "Generic terms, no specific standard referenced"
+```
+
+---
+
+## Output Checklist
+
+✅ Source is a DOCUMENT entity  
+✅ Target is a DOCUMENT/STANDARD/SPECIFICATION entity  
+✅ Type is `REFERENCES`  
+✅ Confidence ≥ 0.70  
+✅ Reasoning includes the explicit citation or semantic inference  
+✅ Target entity exists in knowledge graph  
+✅ No duplicate relationships
