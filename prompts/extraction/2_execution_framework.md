@@ -673,35 +673,285 @@ Relationships:
 
 ---
 
-### Disambiguation Rules
+### Disambiguation Rules: The Decision Tree
 
-**When multiple types could apply**, use these tiebreakers:
+**When multiple types could apply**, follow this hierarchical decision tree:
 
-**CLAUSE vs REQUIREMENT**:
+---
 
-- If text matches FAR/DFARS/agency pattern → **clause**
-- If text describes obligation but no regulatory reference → **requirement**
+#### Decision 1: CLAUSE vs REQUIREMENT
 
-**EVALUATION_FACTOR vs SUBMISSION_INSTRUCTION**:
+**Test Pattern Recognition:**
 
-- If describes WHAT is scored (criteria, methodology) → **evaluation_factor**
-- If describes HOW to submit (format, limits) → **submission_instruction**
-- If BOTH in same sentence → create TWO entities
+- Does text match FAR/DFARS/agency pattern (XX.XXX-XX or XXX.XXX-XXXX)?
+- Is there explicit regulatory citation?
 
-**CONCEPT vs PROGRAM**:
+**Decision Logic:**
 
-- If proper noun for named program (MCPP II, NGEN) → **program**
-- If abstract methodology (Agile, DevSecOps) → **concept**
+```
+IF matches pattern (FAR 52.###, DFARS 252.###, etc.)
+  → clause
+ELSE IF describes contractor obligation ("shall", "must", "will")
+  → requirement
+ELSE IF describes government action ("Government will provide")
+  → concept (informational)
+```
 
-**DELIVERABLE vs REQUIREMENT**:
+**Examples:**
 
-- If tangible work product (report, plan, software) → **deliverable**
-- If ongoing obligation (shall maintain, shall comply) → **requirement**
+- "FAR 52.204-21 Basic Safeguarding" → **clause** (pattern match)
+- "Contractor shall implement NIST 800-171" → **requirement** (obligation, no FAR citation)
+- "NMCARS 5252.232-9106" → **clause** (Navy supplement pattern)
 
-**DOCUMENT vs SECTION**:
+---
 
-- If external reference (MIL-STD-882, NIST 800-171) → **document**
-- If internal RFP structure (Section C, Attachment J) → **section**
+#### Decision 2: EVALUATION_FACTOR vs SUBMISSION_INSTRUCTION
+
+**Test Semantic Function:**
+
+- Does text describe WHAT is scored (evaluation criteria, methodology)?
+- Does text describe HOW to submit (format, page limits, volumes)?
+
+**Decision Logic:**
+
+```
+IF describes scoring criteria, weights, or methodology
+  → evaluation_factor
+ELSE IF describes format requirements, page limits, or submission process
+  → submission_instruction
+ELSE IF BOTH in same sentence
+  → Create TWO separate entities (one of each type)
+```
+
+**Examples:**
+
+- "Factor 1: Technical Approach (40% weight)" → **evaluation_factor** (scoring)
+- "Technical volume limited to 25 pages" → **submission_instruction** (format)
+- "Factor 1 Technical Approach (25-page limit)" → **BOTH** (create 2 entities)
+
+---
+
+#### Decision 3: CONCEPT vs PROGRAM
+
+**Test Proper Noun Status:**
+
+- Is this a named program with budget, timeline, and stakeholders?
+- Is this an abstract methodology, framework, or idea?
+
+**Decision Logic:**
+
+```
+IF proper noun for funded program (MCPP II, NGEN, JEDI Cloud)
+  → program
+ELSE IF abstract methodology (Agile, DevSecOps, Six Sigma)
+  → concept
+ELSE IF commercial product/service (Microsoft Azure, AWS)
+  → concept
+```
+
+**Examples:**
+
+- "Marine Corps Prepositioning Program II (MCPP II)" → **program** (proper noun, funded)
+- "DevSecOps methodology" → **concept** (abstract approach)
+- "Agile development framework" → **concept** (methodology)
+
+---
+
+#### Decision 4: DELIVERABLE vs REQUIREMENT
+
+**Test Tangibility:**
+
+- Is this a discrete work product with completion criteria?
+- Is this an ongoing obligation or continuous compliance?
+
+**Decision Logic:**
+
+```
+IF tangible work product (report, plan, software, training)
+  → deliverable
+ELSE IF ongoing obligation ("shall maintain", "shall comply", "shall provide")
+  → requirement
+ELSE IF both aspects present
+  → Create TWO entities (requirement for obligation, deliverable for work product)
+```
+
+**Examples:**
+
+- "Monthly Status Report (CDRL A001)" → **deliverable** (tangible output)
+- "Contractor shall maintain ISO 9001 certification" → **requirement** (ongoing obligation)
+- "Weekly status reports required" → **BOTH**:
+  - REQUIREMENT: "Weekly status reporting requirement"
+  - DELIVERABLE: "Weekly Status Report"
+
+---
+
+#### Decision 5: DOCUMENT vs SECTION
+
+**Test Origin:**
+
+- Is this external to the RFP (standards, regulations, references)?
+- Is this internal RFP structure (sections, attachments, paragraphs)?
+
+**Decision Logic:**
+
+```
+IF external reference (MIL-STD-882, NIST 800-171, ISO 9001)
+  → document
+ELSE IF internal RFP structure (Section C, Attachment J, paragraph)
+  → section
+ELSE IF attached document (J-0005 PWS, Annex 17)
+  → section (attachment type)
+```
+
+**Examples:**
+
+- "MIL-STD-882E System Safety" → **document** (external standard)
+- "Section C Performance Work Statement" → **section** (internal RFP)
+- "Attachment J-0005 PWS" → **section** (RFP attachment)
+- "NIST SP 800-171 Rev 2" → **document** (external publication)
+
+---
+
+#### Decision 6: STRATEGIC_THEME vs CONCEPT
+
+**Test Strategic Value:**
+
+- Is this a win theme, discriminator, or competitive advantage?
+- Is this a general concept or technical term?
+
+**Decision Logic:**
+
+```
+IF explicitly frames competitive advantage or differentiator
+  → strategic_theme
+ELSE IF emphasizes customer pain point or hot button
+  → strategic_theme
+ELSE IF general domain knowledge or methodology
+  → concept
+```
+
+**Examples:**
+
+- "Veteran hiring initiatives as small business differentiator" → **strategic_theme** (competitive advantage)
+- "24/7 help desk support addressing customer downtime concerns" → **strategic_theme** (pain point solution)
+- "Help desk support" → **concept** (general service description)
+
+---
+
+#### Decision 7: REQUIREMENT vs CONCEPT (Government Actions)
+
+**Test Subject:**
+
+- Who performs the action - Contractor or Government?
+- Is this obligation or informational context?
+
+**Decision Logic:**
+
+```
+IF subject is "Contractor" with obligation verb (shall/must/will)
+  → requirement
+ELSE IF subject is "Government" (provides, reviews, evaluates)
+  → concept (informational, NOT requirement)
+ELSE IF passive voice without clear subject
+  → Analyze context to determine subject
+```
+
+**Examples:**
+
+- "Contractor shall provide weekly reports" → **requirement** (contractor obligation)
+- "Government will provide GFE laptops" → **concept** (government action, informational)
+- "System shall meet NIST 800-171 controls" → **requirement** (system = contractor responsibility)
+
+---
+
+#### Decision 8: EQUIPMENT vs CONCEPT (Physical Items)
+
+**Test Physical Existence:**
+
+- Is this a physical item that can be inventoried?
+- Is this an abstract capability or service?
+
+**Decision Logic:**
+
+```
+IF physical item (servers, vehicles, tools, NSE)
+  → equipment
+ELSE IF abstract capability (cloud computing, AI/ML)
+  → concept
+ELSE IF software (applications, operating systems)
+  → technology
+```
+
+**Examples:**
+
+- "MRAPs (Mine-Resistant Ambush Protected vehicles)" → **equipment** (physical vehicles)
+- "Servers and storage devices" → **equipment** (physical hardware)
+- "Cloud computing infrastructure" → **concept** (abstract capability)
+- "Microsoft Azure" → **technology** (software platform)
+
+---
+
+### Special Case Handling
+
+**Case A: Multi-Type Entities** (Same text triggers multiple types)
+
+Example: "Factor 1: Technical Approach (25-page limit, 40% weight)"
+
+**Extract as TWO entities:**
+
+1. EVALUATION_FACTOR: "Factor 1 Technical Approach" (40% weight)
+2. SUBMISSION_INSTRUCTION: "Technical Approach Volume Format" (25-page limit)
+
+**Create GUIDES relationship:** Submission instruction GUIDES evaluation factor
+
+---
+
+**Case B: Hierarchical Entities** (Parent-child within same type)
+
+Example: "Factor 1: Technical Approach includes 1.1 Solution Architecture, 1.2 Innovation"
+
+**Extract as THREE entities:**
+
+1. EVALUATION_FACTOR: "Factor 1 Technical Approach"
+2. EVALUATION_FACTOR: "Factor 1.1 Solution Architecture"
+3. EVALUATION_FACTOR: "Factor 1.2 Innovation"
+
+**Create CHILD_OF relationships:**
+
+- Factor 1.1 CHILD_OF Factor 1
+- Factor 1.2 CHILD_OF Factor 1
+
+---
+
+**Case C: Ambiguous References** (Unclear what entity type applies)
+
+Example: "See Attachment 5 for requirements"
+
+**Decision Logic:**
+
+1. If attachment number/name only → **section** (RFP structure)
+2. If attachment CONTENT visible → Extract content entities based on semantic meaning
+3. Do NOT create generic "requirements" entity - wait for specific requirement text
+
+---
+
+**Case D: Acronyms Without Expansion** (Unknown abbreviations)
+
+Example: "NSE maintenance required"
+
+**Decision Logic:**
+
+1. Search RFP for acronym expansion (glossary, first use)
+2. If found: Use expanded form as entity name with acronym in metadata
+3. If NOT found: Use acronym as-is, mark uncertainty in description
+4. Common DoD acronyms: Proceed with domain knowledge (NSE = Navy Support Equipment)
+
+**Example:**
+
+- Found: "NSE (Navy Support Equipment)" → entity_name: "Navy Support Equipment (NSE)"
+- Not found: "NSE" → entity_name: "NSE", description: "Referenced equipment (acronym not expanded in RFP)"
+
+---
 
 ### Classification Output
 
@@ -1084,11 +1334,13 @@ Identify meaningful connections between entities that represent **decision pathw
 **Pattern Recognition**:
 
 - **HIGH confidence (1.00)**: Naming convention match
+
   - `J-0005 Performance Work Statement` → Section J Attachments
   - `Appendix B Risk Management Plan` → Section C Statement of Work
   - **Signal**: Prefix matches section letter OR explicitly states "Attachment to Section X"
 
 - **MEDIUM confidence (0.95)**: Explicit citation
+
   - Text: "See Attachment J-0005 for detailed PWS" → creates ATTACHMENT_OF to Section J
   - Text: "Annex A (Data Requirements)" cited in Section C → ATTACHMENT_OF to Section C
   - **Signal**: Cross-reference with section number in same paragraph
@@ -1099,6 +1351,7 @@ Identify meaningful connections between entities that represent **decision pathw
   - **Validation**: Requires topical proximity (within 3 paragraphs of section mention)
 
 **Output**:
+
 ```
 relationship|Attachment J-0005 PWS|ATTACHMENT_OF|Section J Attachments|J-0005 naming convention (J-#### format) indicates attachment to Section J per UCF structure.
 ```
@@ -1112,11 +1365,13 @@ relationship|Attachment J-0005 PWS|ATTACHMENT_OF|Section J Attachments|J-0005 na
 **Pattern Recognition**:
 
 - **HIGH confidence (0.95)**: Series numbering
+
   - `FAR 52.204-21` + `FAR 52.222-26` + `FAR 52.232-40` all co-located → CHILD_OF Section I
   - **Signal**: Multiple clauses with same prefix (FAR 52.###, DFARS 252.###) in contiguous paragraphs
   - **Coverage**: 26+ agency supplements (FAR, DFARS, AFFARS, NMCARS, GSAM, HSAR, TRANSFARS, AIDAR, etc.)
 
 - **MEDIUM confidence (0.90)**: Explicit labeling
+
   - Text: "Section I Contract Clauses. The following clauses apply: FAR 52.204-21..." → CHILD_OF Section I
   - **Signal**: Section header followed by numbered list of clauses
 
@@ -1125,6 +1380,7 @@ relationship|Attachment J-0005 PWS|ATTACHMENT_OF|Section J Attachments|J-0005 na
   - **Signal**: Positional inference based on UCF standard order (H → I → J)
 
 **Output**:
+
 ```
 relationship|FAR 52.204-21 NIST 800-171|CHILD_OF|Section I Contract Clauses|FAR 52.### series clause appearing in Section I clause listing.
 ```
@@ -1138,14 +1394,17 @@ relationship|FAR 52.204-21 NIST 800-171|CHILD_OF|Section I Contract Clauses|FAR 
 **Pattern Recognition**:
 
 - **Pattern A (0.95)**: Prefix + Delimiter
+
   - `Section C.3.2.1` → CHILD_OF `Section C.3.2` → CHILD_OF `Section C.3` → CHILD_OF `Section C`
   - **Signal**: Numerical or alphanumeric nesting (C.3.2.1, 4.2.1, III.A.2)
 
 - **Pattern B (0.90)**: Standard + Subsection
+
   - `Factor 1.2: Innovation` → CHILD_OF `Factor 1: Technical Approach`
   - **Signal**: "Factor X.Y" where Y = subfactor number
 
 - **Pattern C (0.85)**: Clause + Paragraph
+
   - `FAR 52.204-21(b)(1)(ii)` → CHILD_OF `FAR 52.204-21(b)(1)` → CHILD_OF `FAR 52.204-21(b)` → CHILD_OF `FAR 52.204-21`
   - **Signal**: Regulatory citation with paragraph nesting (a)(1)(i), (b)(2)(ii))
 
@@ -1154,6 +1413,7 @@ relationship|FAR 52.204-21 NIST 800-171|CHILD_OF|Section I Contract Clauses|FAR 
   - **Signal**: "includes", "consists of", "comprises" with enumeration
 
 **Output**:
+
 ```
 relationship|Factor 1.1: Solution Architecture|CHILD_OF|Factor 1: Technical Approach|Subfactor 1.1 is hierarchical component of parent Factor 1 evaluation criterion.
 ```
@@ -1167,10 +1427,12 @@ relationship|Factor 1.1: Solution Architecture|CHILD_OF|Factor 1: Technical Appr
 **Pattern Recognition**:
 
 - **HIGH confidence (0.95)**: Explicit cross-reference
+
   - Text: "Section L: Technical volume (Factor 1) limited to 25 pages, excluding cover sheet"
   - **Signal**: Direct mention of factor number + page limit in same sentence
 
 - **MEDIUM confidence (0.80)**: Co-location with structure match
+
   - Text: "Technical Approach volume shall not exceed 25 pages" + Section M lists "Factor 1: Technical Approach"
   - **Signal**: Instruction label matches factor label (case-insensitive, normalized)
 
@@ -1180,12 +1442,14 @@ relationship|Factor 1.1: Solution Architecture|CHILD_OF|Factor 1: Technical Appr
   - **Signal**: Instruction mentions same subfactor topics as evaluation factor
 
 **Special Cases**:
+
 - **One instruction → Multiple factors**: Create separate GUIDES relationships for each factor
   - "Combined Technical/Management volume (40 pages)" → GUIDES Factor 1 AND Factor 2
 - **Embedded in Section M**: Page limit stated within factor description counts as GUIDES
 - **No explicit mapping**: If Section L uses generic "proposal" without factor reference, skip GUIDES (confidence <0.70)
 
 **Output**:
+
 ```
 relationship|Technical Volume Page Limit|GUIDES|Factor 1: Technical Approach|Section L instruction limiting technical proposal volume to 25 pages directly constrains Factor 1 evaluation response.
 ```
@@ -1199,14 +1463,17 @@ relationship|Technical Volume Page Limit|GUIDES|Factor 1: Technical Approach|Sec
 **Pattern Recognition**:
 
 - **HIGH confidence (0.95)**: Explicit evaluation statement
+
   - Text: "Weekly status reports (REQUIREMENT) will be evaluated under Factor 2: Management Approach"
   - **Signal**: "evaluated under", "scored in", "assessed via" + factor reference
 
 - **MEDIUM-HIGH confidence (0.80)**: Topic alignment with citation
+
   - Text: "Contractor SHALL deliver AI/ML threat detection prototype (Section C.3.2)" + Section M: "Factor 1.2: Innovation in Cybersecurity"
   - **Signal**: Requirement topic matches factor/subfactor topic + explicit cross-reference
 
 - **MEDIUM confidence (0.75)**: Strong semantic overlap
+
   - Use topic alignment table below to map requirement domain to likely evaluation factor
 
 - **LOW confidence (0.70)**: Weak semantic overlap
@@ -1215,19 +1482,20 @@ relationship|Technical Volume Page Limit|GUIDES|Factor 1: Technical Approach|Sec
 
 **Topic Alignment Categories** (confidence = 0.75):
 
-| Requirement Domain | Likely Evaluation Factor | Example Keywords |
-|---|---|---|
-| Solution architecture, design, methodology | Technical Approach | system design, architecture, integration, CONOPS |
-| Innovation, R&D, emerging tech | Technical Approach (Innovation subfactor) | AI/ML, prototype, novel, cutting-edge, patent |
-| Risk mitigation, security, safety | Technical Approach (Risk subfactor) | cybersecurity, OPSEC, safety plan, risk register |
-| Project management, staffing, controls | Management Approach | schedule, budget, EVMS, org chart, key personnel |
-| Past contracts, references, lessons learned | Past Performance | similar projects, CPARS, customer references |
-| Subcontractor management, teaming | Management Approach | small business, SDVOSB, subcontractor plan |
-| Pricing strategy, cost realism | Cost/Price | labor rates, ODCs, fee structure, basis of estimate |
+| Requirement Domain                          | Likely Evaluation Factor                  | Example Keywords                                    |
+| ------------------------------------------- | ----------------------------------------- | --------------------------------------------------- |
+| Solution architecture, design, methodology  | Technical Approach                        | system design, architecture, integration, CONOPS    |
+| Innovation, R&D, emerging tech              | Technical Approach (Innovation subfactor) | AI/ML, prototype, novel, cutting-edge, patent       |
+| Risk mitigation, security, safety           | Technical Approach (Risk subfactor)       | cybersecurity, OPSEC, safety plan, risk register    |
+| Project management, staffing, controls      | Management Approach                       | schedule, budget, EVMS, org chart, key personnel    |
+| Past contracts, references, lessons learned | Past Performance                          | similar projects, CPARS, customer references        |
+| Subcontractor management, teaming           | Management Approach                       | small business, SDVOSB, subcontractor plan          |
+| Pricing strategy, cost realism              | Cost/Price                                | labor rates, ODCs, fee structure, basis of estimate |
 
 **If NO clear alignment** (confidence <0.70): Skip EVALUATED_BY. Requirement may be pass/fail compliance, not scored.
 
 **Output**:
+
 ```
 relationship|Weekly Status Reports|EVALUATED_BY|Factor 2: Management Approach|Management deliverable (weekly status reports) demonstrates project control capability, scored under Factor 2 per Section M evaluation criteria.
 ```
@@ -1241,10 +1509,12 @@ relationship|Weekly Status Reports|EVALUATED_BY|Factor 2: Management Approach|Ma
 **Pattern Recognition**:
 
 - **HIGH confidence (0.96)**: Explicit CDRL reference
+
   - Text: "Section C.3.2 AI Prototype Development. Deliverable: AI/ML Threat Detection Prototype (CDRL A001)"
   - **Signal**: "Deliverable:", "CDRL", "DID" mentioned in same paragraph as work description
 
 - **MEDIUM confidence (0.74)**: Semantic overlap
+
   - Text: "Contractor shall develop comprehensive cybersecurity training program (Section C.4)"
   - Text: "CDRL A005: Cybersecurity Training Materials (DID DI-MISC-80508)"
   - **Signal**: Training program (work) + Training Materials (deliverable) = semantic match
@@ -1254,6 +1524,7 @@ relationship|Weekly Status Reports|EVALUATED_BY|Factor 2: Management Approach|Ma
   - **Signal**: Work phase timeframe matches deliverable due date
 
 **Output**:
+
 ```
 relationship|Section C.3.2 AI Prototype Development|PRODUCES|AI/ML Threat Detection Prototype (CDRL A001)|Section C.3.2 work statement produces deliverable CDRL A001 per contract data requirements.
 ```
