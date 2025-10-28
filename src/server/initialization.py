@@ -152,32 +152,18 @@ async def initialize_raganything():
         else:
             return await llm_model_func(prompt, system_prompt, history_messages, **kwargs)
     
-    # Define embedding function with safety truncation (8K chunks can slightly exceed 8192 due to overlap)
-    async def safe_embed_func(texts):
-        """Truncate texts to 8192 tokens before embedding to handle edge cases"""
-        import tiktoken
-        enc = tiktoken.get_encoding("cl100k_base")  # OpenAI tokenizer
-        
-        truncated_texts = []
-        for text in texts:
-            tokens = enc.encode(text)
-            if len(tokens) > 8192:
-                # Truncate to 8192 tokens and decode back to text
-                truncated_tokens = tokens[:8192]
-                truncated_text = enc.decode(truncated_tokens)
-                truncated_texts.append(truncated_text)
-            else:
-                truncated_texts.append(text)
-        
-        return await openai_embed(truncated_texts, model="text-embedding-3-large", api_key=openai_api_key)
+    # Use LightRAG's native embedding function directly
+    # CRITICAL: Do NOT wrap openai_embed with custom async functions
+    # LightRAG's EmbeddingFunc handles async internally
+    # max_token_size parameter handles truncation automatically
     
     # Get embedding dimension from environment (flexibility for different models)
     embedding_dim = int(os.getenv("EMBEDDING_DIM", "3072"))
     
     embedding_func = EmbeddingFunc(
         embedding_dim=embedding_dim,
-        max_token_size=8192,  # OpenAI text-embedding-3-large limit
-        func=safe_embed_func,
+        max_token_size=8192,  # OpenAI text-embedding-3-large limit - LightRAG auto-truncates
+        func=lambda texts: openai_embed(texts, model="text-embedding-3-large", api_key=openai_api_key),
     )
     
     # Load entity extraction prompts with hierarchical execution framework
