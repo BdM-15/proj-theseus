@@ -4,9 +4,7 @@
 
 **Ontology-based RAG system** for federal RFP analysis that transforms generic document processing into specialized government contracting intelligence. Uses **RAG-Anything** (multimodal ingestion) + **LightRAG** (knowledge graph/queries) with **xAI Grok** cloud processing for 417x speedup over local processing.
 
-**Core Innovation**: Government contracting entity types (12 types: REQUIREMENT, CLAUSE, EVALUATION_FACTOR, etc.) + LLM-powered relationship inference enables Section L↔M mapping, requirement traceability, and Shipley methodology compliance.
-
-**Current Status** (Branch 004): Performance-based refactoring - optimizing for minimal code footprint while maintaining 69-second RFP processing (Navy MBOS: 594 entities, $0.042 cost).
+**Core Innovation**: Government contracting entity types + LLM-powered relationship inference enables Section L↔M mapping, requirement traceability, and Shipley methodology compliance.
 
 ---
 
@@ -64,162 +62,39 @@ python -m pytest
 
 **Why This Matters**: PowerShell file operations bypass workspace tracking and can cause sync issues with the editor. Always use workspace tools for file I/O.
 
----
+### Rule 3: Application Management & Environment
 
-## Architecture Essentials
+**NEVER start the application yourself** - only the user can run the app. The application server (`python app.py`) must be started by the user in their own terminal session.
 
-### The Minimal Active Codebase (~790 lines post-cleanup)
+**ALWAYS ensure the virtual environment is active** before any Python operations. Check that the terminal prompt shows `(.venv)` before proceeding with Python commands.
 
-```
-app.py (40 lines)                     # Entry point - imports RAG-Anything/LightRAG from pip
-└── src/raganything_server.py (790)  # Main server wrapping RAG-Anything + LightRAG
-    ├── configure_raganything_args()  # 12 govcon entity types + cloud config
-    ├── initialize_raganything()      # RAG-Anything instance with custom prompts
-    ├── Custom /insert endpoint       # Phase 6 post-processing pipeline
-    └── Phase 6 pipeline:
-        ├── ucf_detector.py           # Uniform Contract Format detection
-        ├── ucf_section_processor.py  # Section-aware extraction prompts
-        └── llm_relationship_inference.py # LLM-powered L↔M/annex linking
-```
+**STOP creating documents for everything** - focus on code changes and direct implementation. Only create documentation when explicitly requested or when it serves a critical architectural purpose.
 
-**Key Insight**: We use **pip-installed libraries** (`raganything[all]`, `lightrag-hku`) and wrap them with ~790 lines of domain logic. NO forked libraries in the codebase.
+### Rule 4: Stay Grounded in Core Libraries
 
-### Critical Dependencies (External Libraries)
+**ALL actions must stay grounded in LightRAG and RAG-Anything repos and libraries**. Do not invent APIs, methods, or capabilities that don't exist in these core libraries. Reference the actual source code and documentation from:
 
-```python
-# These come from pip, NOT local code:
-from raganything import RAGAnything, RAGAnythingConfig  # Multimodal parsing (MinerU)
-from lightrag import LightRAG                            # Knowledge graph + WebUI
-from lightrag.llm.openai import openai_complete_if_cache # Cloud LLM wrapper
+- [LightRAG GitHub](https://github.com/HKUDS/LightRAG)
+- [RAG-Anything GitHub](https://github.com/HKUDS/RAG-Anything)
 
-# Our 790-line customization wraps these with:
-# - 12 government contracting entity types
-# - Phase 6 LLM relationship inference
-# - UCF structure detection
-```
-
-### The Two-Stage Processing Flow
-
-```
-1. INGESTION (Cloud - xAI Grok)
-   RFP Upload → RAG-Anything (MinerU parser)
-   → 4096-token chunks (5x larger than local)
-   → 32 parallel requests
-   → Extract 12 entity types (REQUIREMENT, CLAUSE, etc.)
-   → Save to ./rag_storage/graph_chunk_entity_relation.graphml
-
-2. POST-PROCESSING (Local - Phase 6 Pipeline)
-   Load GraphML → LLM relationship inference
-   → Section L↔M mapping (evaluation instructions)
-   → Annex linkage (J-#### → parent sections)
-   → Requirement→Evaluation factor mapping
-   → Save enhanced graph → LightRAG WebUI
-```
-
-**Result**: 69 seconds processing (Navy MBOS 71 pages), 594 entities, $0.042 cost.
+**Do not** propose solutions that require modifications to these external libraries unless they are already implemented in the forked versions within this project.
 
 ---
 
-## Government Contracting Domain Knowledge
+## Essential Architecture
 
-### The 12 Entity Types (Core Ontology)
+**Two-Stage Processing Flow**:
 
-Hardcoded in `configure_raganything_args()` - these transform generic LightRAG into domain-specific intelligence:
+1. **INGESTION** (Cloud - xAI Grok): RFP → RAG-Anything multimodal parsing → entity extraction → GraphML storage
+2. **POST-PROCESSING** (Local - Phase 6): GraphML → LLM relationship inference → enhanced knowledge graph → LightRAG WebUI
 
-```python
-# Core entities
-ORGANIZATION      # Contractors, agencies, departments
-CONCEPT           # CLINs, budget items, technical concepts
-EVENT             # Milestones, delivery dates, reviews
-TECHNOLOGY        # Systems, tools, platforms
-PERSON            # POCs, contracting officers
-LOCATION          # Performance locations, delivery sites
+**Key Components**:
 
-# Government contracting specific (critical differentiators)
-REQUIREMENT       # Must/should/may obligations (Shipley methodology)
-CLAUSE            # FAR/DFARS/AFFARS clauses (regulatory compliance)
-SECTION           # RFP sections A-M, J attachments (UCF structure)
-DOCUMENT          # Referenced specs, standards, attachments
-DELIVERABLE       # Contract deliverables, work products
-EVALUATION_FACTOR # Section M scoring criteria, Section L instructions
-```
+- `app.py` (40 lines): Entry point importing pip-installed libraries
+- `src/raganything_server.py` (790 lines): Main server wrapping RAG-Anything + LightRAG with government contracting ontology
+- Phase 6 pipeline: LLM-powered relationship inference for Section L↔M mapping and annex linkage
 
-### Why These Entity Types Matter
-
-**Generic LightRAG extracts**: "person", "location", "organization"  
-**Our system extracts**: "REQUIREMENT" (must vs should), "CLAUSE" (FAR applicability), "EVALUATION_FACTOR" (Section M weights)
-
-**Example**: Section L states "Technical approach limited to 10 pages" + Section M says "Factor 1: Technical Approach (40% weight)"  
-→ Phase 6 LLM inference creates: `SUBMISSION_INSTRUCTION --EVALUATED_BY--> EVALUATION_FACTOR`  
-→ Enables query: "What page limits affect Technical Approach scoring?"
-
-### Uniform Contract Format (UCF) Detection
-
-Federal RFPs follow standard structure (FAR 15.210):
-
-```
-Section A: Solicitation/Contract Form (cover page, deadlines)
-Section B: Supplies/Services & Prices (CLINs)
-Section C: Statement of Work (SOW) - often references J attachments
-Section H: Special Requirements (security, key personnel)
-Section I: Contract Clauses (FAR/DFARS)
-Section J: Attachments (PWS, deliverables, sample docs)
-Section L: Instructions to Offerors (page limits, format)
-Section M: Evaluation Factors (scoring criteria, weights)
-```
-
-**UCF Detection** (`ucf_detector.py`): Analyzes first 5 pages for section patterns → triggers section-aware extraction prompts that preserve structure.
-
----
-
-## Phase 6: LLM-Powered Relationship Inference
-
-### The Critical Innovation (December 2024 → January 2025)
-
-**Problem**: Initial Phase 6 used regex patterns for L↔M mapping and annex linking. Result: 84.6% annex coverage, brittle patterns, zero agency adaptability.
-
-**Solution**: Replace 295 lines of regex with 550 lines of **LLM-powered semantic inference** (`llm_relationship_inference.py`).
-
-### Four Inference Algorithms
-
-```python
-# 1. Section L↔M Mapping (evaluation instructions)
-infer_section_l_m_relationships(entities, relationships)
-# Finds: SUBMISSION_INSTRUCTION (page limits) --EVALUATED_BY--> EVALUATION_FACTOR
-# Result: Proposal outline optimization based on scoring weights
-
-# 2. Annex Linkage (J-#### → parent section)
-infer_annex_relationships(entities, relationships)
-# Links: ANNEX "J-0005 PWS" --ATTACHMENT_OF--> SECTION "Section J Attachments"
-# Result: 100% coverage (vs 84.6% regex), works for ANY naming convention
-
-# 3. Clause Clustering (FAR → parent section)
-infer_clause_relationships(entities, relationships)
-# Groups: CLAUSE "FAR 52.222-6" --CHILD_OF--> SECTION "Section I"
-# Works for 26+ agency supplements (FAR, DFARS, AFFARS, NMCARS, etc.)
-
-# 4. Requirement→Evaluation Mapping (SOW → scoring)
-infer_requirement_evaluation_relationships(entities, relationships)
-# Links: REQUIREMENT "Weekly status reports" --EVALUATED_BY--> EVALUATION_FACTOR "Management Approach"
-# Result: Effort allocation guidance for proposal teams
-```
-
-### Implementation Pattern
-
-```python
-# Load existing graph from RAG-Anything processing
-entities, relationships = parse_graphml("./rag_storage/graph_chunk_entity_relation.graphml")
-
-# Run all four inference algorithms
-new_relationships = await infer_all_relationships(entities, relationships, llm_func)
-
-# Save enhanced graph back to LightRAG storage
-save_relationships_to_graphml(new_relationships, graphml_path)
-save_relationships_to_kv_store(new_relationships, kv_store_path)
-```
-
-**Cost**: ~$0.01 per RFP (5,000-token context to Grok-beta)  
-**Benefit**: 100% annex linkage, agency-agnostic patterns, semantic understanding
+**Dependencies**: Uses `raganything[all]` and `lightrag-hku` from pip - NO forked libraries in codebase.
 
 ---
 
@@ -227,103 +102,70 @@ save_relationships_to_kv_store(new_relationships, kv_store_path)
 
 ### Starting the Server
 
-```powershell
-# 1. Activate venv (separate command!)
-.venv\Scripts\Activate.ps1
+**IMPORTANT**: Never start the application yourself. The user must run the app in their terminal.
 
-# 2. Start server (uses pip-installed RAG-Anything + LightRAG)
+```powershell
+# User must activate venv and start server themselves
+.venv\Scripts\Activate.ps1
 python app.py
 # Server ready at http://localhost:9621
 ```
 
-### Processing an RFP (Phase 6 Pipeline)
+### Processing an RFP
 
 ```powershell
 # Upload via WebUI: http://localhost:9621/webui
 # OR use custom endpoint with auto Phase 6:
-
 curl -X POST http://localhost:9621/insert \
   -F "file=@navy_rfp.pdf" \
   -F "mode=auto"  # Triggers Phase 6 post-processing
-
-# Result: 69 seconds later, 594 entities in ./rag_storage/
 ```
 
-### Inspecting Knowledge Graph
-
-```powershell
-# Load GraphML for analysis (PowerShell syntax)
-python -c "from llm_relationship_inference import parse_graphml; entities, rels = parse_graphml('./rag_storage/graph_chunk_entity_relation.graphml'); print(f'{len(entities)} entities, {len(rels)} relationships')"
-```
-
-### Branch Strategy (Production)
+### Branch Strategy
 
 ```
 main                                   # Production releases only
-├── 002-lighRAG-govcon-ontology        # ARCHIVED: Fully local (8 hours/RFP)
-├── 003-ontology-lightrag-cloud        # STABLE: Cloud processing (69s/RFP)
-└── 004-code-optimization (ACTIVE)     # Performance refactoring
+├── 002-lighRAG-govcon-ontology        # ARCHIVED: Fully local
+├── 003-ontology-lightrag-cloud        # STABLE: Cloud processing
+├── 004-code-optimization             # ARCHIVED: Performance refactoring
+├── 005-entity-type-expansion         # ARCHIVED: Added entity types
+├── 006-phase6-llm-inference          # ARCHIVED: LLM relationship inference
+├── 007-postgresql-integration        # ARCHIVED: Data warehouse foundation
+├── 008-knowledge-graph-enhancement  # ARCHIVED: Multi-workspace graphs
+├── 009-cross-rfp-intelligence        # ARCHIVED: Competitive analytics
+└── 010-pivot-enterprise-platform     # ACTIVE: Enterprise Neo4j evolution
 ```
 
 **Never merge directly to main** - use feature branches, PR when stable.
 
 ---
 
-## Configuration Essentials (.env)
+## Configuration (.env)
 
 ```bash
 # xAI Grok LLM (OpenAI-compatible API)
 LLM_BINDING=openai
 LLM_BINDING_HOST=https://api.x.ai/v1
 LLM_MODEL=grok-4-fast-reasoning
-LLM_BINDING_API_KEY=xai-your-key  # Get from https://console.x.ai
+LLM_BINDING_API_KEY=xai-your-key
 
 # OpenAI Embeddings (CRITICAL: Use OpenAI endpoint, NOT xAI!)
 EMBEDDING_BINDING=openai
-EMBEDDING_BINDING_HOST=https://api.openai.com/v1  # NOT api.x.ai!
+EMBEDDING_BINDING_HOST=https://api.openai.com/v1
 EMBEDDING_MODEL=text-embedding-3-large
 EMBEDDING_BINDING_API_KEY=sk-proj-your-key
 
-# Cloud optimization (5x larger chunks, 32 parallel)
+# Processing optimization
 CHUNK_SIZE=4096
 MAX_ASYNC=32
-LLM_MODEL_TEMPERATURE=0.1  # Deterministic extraction
+LLM_MODEL_TEMPERATURE=0.1
 ```
 
 **Security**: Only use cloud processing for PUBLIC government RFPs. Proprietary queries stay 100% local.
 
 ---
 
-## Branch 004: Performance-Based Refactoring
-
-**Charter**: `docs/BRANCH_004_CODE_OPTIMIZATION.md` (non-prescriptive constraints)
-
-**Constraints**:
-
-- Net LOC ≤ baseline (target negative delta)
-- No startup time increase
-- No p95 latency regression on /health or /query
-- No breaking API changes
-- Minimize dependencies unless they reduce net code
-
-**Measurement Baseline**:
-
-```powershell
-# LOC count
-(Get-ChildItem -Recurse -File -Include *.py src/,app.py).ForEach{$_.Length} | Measure-Object -Sum
-
-# Startup time: app launch → "ready" log
-Measure-Command { python app.py }
-
-# p95 latency: /health and representative /query
-Invoke-RestMethod http://localhost:9621/health
-```
-
-**Workflow**: Propose → Implement → Re-measure → Commit (atomic). Revert if any metric regresses.
-
----
-
-## Common Pitfalls & Solutions
+## Common Pitfalls
 
 ### ❌ Importing from Non-Existent Local Packages
 
@@ -336,16 +178,6 @@ from lightrag import LightRAG           # From pip package
 from raganything import RAGAnything     # From pip package
 ```
 
-### ❌ Modifying Entity Types Without Understanding Impact
-
-```python
-# WRONG: Adding entity types without relationship constraints
-entity_types = [..., "NEW_TYPE"]  # Creates orphaned entities
-
-# CORRECT: Define valid relationships in Phase 6 inference
-# See llm_relationship_inference.py for relationship patterns
-```
-
 ### ❌ Processing Large RFPs Without Phase 6
 
 ```python
@@ -356,124 +188,37 @@ rag.insert(file_path)  # Misses L↔M relationships, annex linkage
 POST /insert with mode=auto  # Triggers post-processing pipeline
 ```
 
----
-
-## Key File Reference Guide
-
-| File                                     | Purpose                       | Lines | When to Edit                                 |
-| ---------------------------------------- | ----------------------------- | ----- | -------------------------------------------- |
-| `app.py`                                 | Entry point                   | 40    | Never (minimal by design)                    |
-| `src/raganything_server.py`              | Main server                   | 790   | Entity types, cloud config, Phase 6 pipeline |
-| `src/llm_relationship_inference.py`      | Phase 6 inference (in `src/`) | 550   | Add new relationship inference algorithms    |
-| `src/ucf_detector.py`                    | UCF format detection          | ~200  | Enhance section pattern recognition          |
-| `src/ucf_extractor.py`                   | UCF entity extraction         | ~150  | Refine UCF-specific entity extraction        |
-| `src/ucf_section_processor.py`           | Section-aware extraction      | ~150  | Refine section detection prompts             |
-| `src/phase6_prompts.py`                  | LLM prompt templates          | ~300  | Refine inference prompts for quality         |
-| `src/phase6_validation.py`               | Phase 6 validation            | ~200  | Add new validation checks                    |
-| `.env`                                   | Cloud configuration           | N/A   | API keys, chunk sizes, concurrency           |
-| `docs/ARCHITECTURE.md`                   | Complete architecture         | ~1000 | Major architectural changes                  |
-| `docs/PHASE_6_IMPLEMENTATION_HISTORY.md` | Phase 6 development record    | ~600  | Historical reference only                    |
-
----
-
-## External Resources
-
-**Required Reading**:
-
-- **[LightRAG GitHub](https://github.com/HKUDS/LightRAG)** - Core knowledge graph engine
-- **[RAG-Anything GitHub](https://github.com/HKUDS/RAG-Anything)** - Multimodal document parsing
-- **[xAI Grok Docs](https://docs.x.ai)** - Cloud LLM API reference
-
-**Domain Knowledge**:
-
-- **Shipley Guides** (in `docs/`) - Requirements analysis methodology
-- **FAR 15.210** - Uniform Contract Format specification
-- **[Awesome Procurement Data](https://github.com/makegov/awesome-procurement-data)** - Government contracting terminology
-- **[AI RFP Simulator](https://github.com/felixlkw/ai-rfp-simulator)** - Entity relationship patterns (Chinese - use translation)
-
----
-
-## Shipley Methodology Integration
-
-### Prompt Templates Archive
-
-Historical prompt templates used to build the ontology (now integrated into Phase 6 LLM inference):
-
-**Requirements Extraction** (`shipley_requirements_extraction.txt`):
-
-- Shipley 4-level compliance scale: Compliant/Partial/Non-Compliant/Not Addressed
-- Must/Should/May requirement classification (Shipley criticality)
-- Evaluation factor mapping (Section L↔M relationships)
-- Gap analysis framework (Shipley Capture Guide p.85-90)
-
-**Compliance Assessment** (`assess_compliance_prompt.txt`):
-
-- Coverage scoring: 0-100 scale with gradations (0/10/30/50/70/85/95/100)
-- High priority logic: Critical themes from RFP analysis
-- Proposal evidence mapping with page references
-- Risk assessment based on factor weights
-
-**Questions for Government** (`generate_qfg_prompt.txt`):
-
-- Shipley Capture Guide p.25: Intel gathering via clarification questions
-- Ambiguity detection: Page limits, evaluation weights, scope conflicts
-- Q&A period identification (Section A/L deadlines)
-- Max 7 high-impact questions with RFP section references
-
-**Generic Requirements** (`extract_requirements_prompt.txt`):
-
-- Structured attribute extraction (20+ standard RFP fields)
-- Evaluation factors with sub-factors and relative importance
-- Requirement→Factor mapping for traceability
-- Critical summary with top themes prioritization
-
-### Integration into Phase 6
-
-These prompt patterns are now **embedded in LLM-powered inference**:
+### ❌ Starting Application Without User Permission
 
 ```python
-# src/llm_relationship_inference.py uses Shipley patterns for:
-infer_section_l_m_relationships()      # Section L↔M mapping (Shipley compliance matrix)
-infer_requirement_evaluation_relationships()  # Requirement→Factor linkage
-infer_clause_relationships()           # FAR/DFARS clause clustering
-infer_annex_relationships()            # Attachment→Section mapping
+# WRONG: Never start the app yourself
+python app.py  # Only user can do this
+
+# CORRECT: Guide user to start app in their terminal
+# Tell user: "Please run: .venv\Scripts\Activate.ps1; python app.py"
 ```
 
-**Key Transformation**: Regex patterns → Semantic LLM inference with Shipley methodology grounding.
+### ❌ Creating Documentation for Everything
+
+```python
+# WRONG: Creating docs for every minor change
+# Don't create README updates, architecture docs, etc. unless explicitly requested
+
+# CORRECT: Focus on code implementation
+# Only create docs when they serve critical architectural purpose
+```
 
 ---
 
-## Branch 004 Measurement Guide
+## Key Files
 
-### Establishing Baseline Metrics
-
-```powershell
-# 1. LOC count (src/ + app.py)
-$files = Get-ChildItem -Recurse -File -Include *.py src/,app.py
-$totalLines = ($files | ForEach-Object { (Get-Content $_.FullName).Count } | Measure-Object -Sum).Sum
-Write-Host "Total LOC: $totalLines"
-
-# 2. Startup time (app launch to ready)
-Measure-Command {
-    $process = Start-Process -FilePath "python" -ArgumentList "app.py" -PassThru -NoNewWindow
-    Start-Sleep -Seconds 5  # Wait for "ready" log
-    Stop-Process -Id $process.Id -Force
-}
-
-# 3. Health endpoint latency (p95 approximation)
-$times = 1..10 | ForEach-Object {
-    (Measure-Command { Invoke-RestMethod http://localhost:9621/health }).TotalMilliseconds
-}
-$p95 = ($times | Sort-Object)[-2]  # Rough p95 (2nd highest)
-Write-Host "p95 latency: $p95 ms"
-
-# 4. Memory usage (steady-state RSS)
-Get-Process python | Select-Object WorkingSet64 | Format-List
-```
-
-**Note**: These measurement scripts are temporary - delete after Branch 004 completion per charter guidelines.
+| File                                | Purpose                      |
+| ----------------------------------- | ---------------------------- |
+| `app.py`                            | Entry point                  |
+| `src/raganything_server.py`         | Main server with ontology    |
+| `src/llm_relationship_inference.py` | Phase 6 inference algorithms |
+| `.env`                              | Cloud configuration          |
 
 ---
 
-**Last Updated**: January 2025 (Branch 004 - Performance Refactoring)  
-**Key Metric**: 69 seconds processing time, 594 entities, $0.042 cost (Navy MBOS baseline)
+**Last Updated**: October 2025 (Branch 010 - Enterprise Neo4j Evolution)
