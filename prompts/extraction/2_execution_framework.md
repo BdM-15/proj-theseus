@@ -1,26 +1,82 @@
-# Execution Framework: Discrete Task Steps
+# Execution Framework: Organizing Information for Decision Making
 
-**Version**: 2.0 (Branch 011 - Execution Framework Architecture)  
-**Last Updated**: January 27, 2025  
-**Purpose**: Define HOW to execute extraction with discrete, ordered steps to build **decision-ready intelligence**
+**Version**: 3.0 (Branch 011 - Ontology-Focused Extraction)  
+**Last Updated**: January 28, 2025  
+**Purpose**: Define HOW to organize RFP information using ontology to enable quality decision making
 
 ---
 
-## Overview: Five-Step Extraction Process
+## Your Mission: Build a Logically Organized Foundation
 
-You will process each RFP chunk through **five discrete steps** in this exact order, with each step building toward the ultimate goal: **quality intelligence for informed decision making**.
+**You are NOT analyzing strategic implications** - you are **organizing information by type and relationship** so strategic analysis can happen during queries.
+
+### The Two-Phase Architecture (Review)
+
+**PHASE 1 (Your Job - Extraction)**:
+
+- Organize RFP content into 17 entity types
+- Map connections using 13 relationship types
+- Add operational context from domain knowledge
+- **Output**: Structured knowledge graph
+
+**PHASE 2 (Query Phase - Decision Making)**:
+
+- Use organized foundation for deep reasoning
+- Synthesize competitive intelligence
+- Generate strategic recommendations
+- **Output**: Informed decisions
+
+**Connection**: Your ontological organization ENABLES reasoning. Without logical structure, reasoning produces generic insights.
+
+---
+
+## Five-Step Extraction Process
+
+Process each RFP chunk through **five discrete steps** in this exact order:
 
 ```
-STEP 1: Scan & Detect    → Identify decision-critical entity candidates
-STEP 2: Classify         → Assign entity type (17 types) with precision
-STEP 3: Enrich          → Add operational context that enables decisions
-STEP 4: Relate          → Map decision pathways between entities
-STEP 5: Output          → Validate decision-making value and format
+STEP 1: Scan & Detect    → Identify entity candidates using semantic patterns
+STEP 2: Classify         → Assign 1 of 17 entity types (strict rules)
+STEP 3: Enrich          → Add operational context from domain knowledge (contextual consultation)
+STEP 4: Relate          → Map connections using 1 of 13 relationship types (strict rules)
+STEP 5: Output & Validate → Enforce ontology compliance before output (hard constraints)
 ```
 
-**Each step builds on the previous** - do not skip or reorder steps.
+**Each step follows strict rules** - this is instruction following, not creative analysis.
 
-**Why this matters**: Speed and scale advantages only create competitive edge when extraction quality enables informed decisions. Generic entities → generic insights → uninformed decisions. Decision-ready entities → strategic insights → informed decisions.
+### Why Ontological Organization Matters
+
+**Without ontology** (just text extraction):
+
+- Query: "What evaluation factors have high weights?" → Can't answer (no classification)
+- Query: "Which clauses affect pricing?" → Can't answer (no relationships)
+
+**With ontology** (logical organization):
+
+- `evaluation_factor` entities → Query finds all factors, filters by weight
+- `REQUIRES` relationships → Query traces clause→pricing connections
+
+**Your classification determines what questions can be answered.**
+
+---
+
+## Instruction Following vs. Strategic Reasoning
+
+**✅ YOUR JOB (Extraction Phase)**:
+
+- Follow classification rules: "Scoring criteria → `evaluation_factor` type"
+- Apply relationship rules: "Clause mandates requirement → `REQUIRES` relationship"
+- Consult domain knowledge: "IF clause → Add FAR patterns to description"
+- Enforce constraints: "MUST use 1 of 17 entity types, 1 of 13 relationship types"
+
+**❌ NOT YOUR JOB (Save for Query Phase)**:
+
+- Analyze competitive implications
+- Synthesize win strategies
+- Evaluate proposal tradeoffs
+- Generate recommendations
+
+**Reasoning power is FOR organizing correctly, NOT for strategic analysis during extraction.**
 
 ---
 
@@ -77,43 +133,536 @@ Assign each candidate to ONE of 17 entity types using semantic meaning (not loca
 
 **Decision-making value**: Correct classification determines which domain knowledge to apply and which relationships to infer. Misclassification of an evaluation factor as a requirement = wrong proposal strategy. Precision here enables accurate downstream intelligence.
 
-### The 17 Entity Types (with Semantic Definitions)
+### Learning from Examples: How Expert Analysts Classify
+
+**Humans learn by pattern recognition** - seeing examples, not just reading definitions. Study these 5 annotated scenarios to internalize the 17 entity types:
+
+---
+
+#### **Example 1: Section L↔M Mapping (Evaluation Entities)**
+
+**RFP Text**:
+```
+Section L.3.1 Technical Approach Volume
+
+The Technical Approach Volume shall not exceed 25 pages and shall address
+Factor 1: Technical Approach (40% weight) as described in Section M.2.
+
+Section M.2 Factor 1: Technical Approach (Most Important - 40%)
+
+The Government will evaluate the offeror's proposed technical solution,
+including system architecture, integration approach, and risk mitigation.
+```
+
+**Expert Classification**:
+
+```
+Entity 1: Technical Approach Volume Format
+├─ Type: submission_instruction (format/page limit signals)
+├─ Signals: "shall not exceed 25 pages", "shall address Factor 1"
+├─ Metadata: {page_limit: "25 pages", addresses: "Factor 1"}
+└─ Description: "Technical Approach Volume limited to 25 pages, 12-point font,
+   addressing Factor 1 Technical Approach evaluation criteria per Section M.2"
+
+Entity 2: Factor 1: Technical Approach
+├─ Type: evaluation_factor (evaluation/scoring signals)
+├─ Signals: "will evaluate", "40% weight", "Most Important"
+├─ Metadata: {weight: "40%", hierarchy: "Most Important"}
+└─ Description: "Factor 1: Technical Approach worth 40% (Most Important)
+   evaluating proposed technical solution including system architecture,
+   integration approach, and risk mitigation strategies"
+
+Relationship: GUIDES
+├─ Source: Technical Approach Volume Format (submission_instruction)
+├─ Target: Factor 1: Technical Approach (evaluation_factor)
+└─ Reasoning: "Page limit guides how to respond to evaluation factor"
+```
+
+**Key Takeaway**: Submission instructions (format/limits) are DIFFERENT from evaluation factors (scoring criteria). Create TWO entities + GUIDES relationship.
+
+---
+
+#### **Example 2: Requirements Extraction (Obligation Entities)**
+
+**RFP Text**:
+```
+Section C.4.2 Status Reporting
+
+The contractor shall provide weekly status reports to the COR NLT COB Friday.
+Reports should include milestones, risks, and budget variance. The contractor
+may use templates from the Government or develop custom formats.
+
+The Government shall provide GFE (Government Furnished Equipment) within 30
+days of contract award.
+```
+
+**Expert Classification**:
+
+```
+Entity 1: Weekly Status Reports
+├─ Type: requirement (SHALL + contractor subject = MANDATORY)
+├─ Signals: "contractor shall provide", obligation marker "shall"
+├─ Metadata: {criticality: "MANDATORY", modal_verb: "shall"}
+└─ Description: "[MANDATORY] Contractor shall provide weekly status reports
+   to COR NLT COB Friday - Management reporting requirement likely evaluated
+   under Management Approach factor"
+
+Entity 2: Status Report Content Guidance
+├─ Type: requirement (SHOULD + contractor subject = IMPORTANT)
+├─ Signals: "should include", advisory marker "should"
+├─ Metadata: {criticality: "IMPORTANT", modal_verb: "should"}
+└─ Description: "[IMPORTANT] Reports should include milestones, risks, and
+   budget variance - Best practice guidance for comprehensive reporting"
+
+Entity 3: Template Flexibility
+├─ Type: requirement (MAY + contractor subject = OPTIONAL)
+├─ Signals: "may use", permissive marker "may"
+├─ Metadata: {criticality: "OPTIONAL", modal_verb: "may"}
+└─ Description: "[OPTIONAL] Contractor may use Government templates or develop
+   custom formats - Flexibility in reporting format approach"
+
+Entity 4: GFE Provision
+├─ Type: concept (Government obligation - NOT contractor requirement)
+├─ Signals: "Government shall provide" (Government as subject, not contractor)
+└─ Description: "Government shall provide GFE within 30 days of award -
+   Informational context for transition planning (NOT contractor requirement)"
+
+Relationship: EVALUATED_BY
+├─ Source: Weekly Status Reports (requirement)
+├─ Target: Factor 2: Management Approach (evaluation_factor - from Section M)
+└─ Reasoning: "Management reporting requirement demonstrates project management
+   capability, likely scored under Management Approach evaluation factor"
+```
+
+**Key Takeaways**:
+- SHALL/MUST with contractor = MANDATORY requirement
+- SHOULD with contractor = IMPORTANT requirement  
+- MAY with contractor = OPTIONAL requirement
+- SHALL/MUST with Government = concept (informational, NOT requirement)
+- Extract criticality metadata for EVERY requirement
+
+---
+
+#### **Example 3: Clause Clustering (Regulatory Entities)**
+
+**RFP Text**:
+```
+Section I: Contract Clauses
+
+The following FAR clauses are incorporated by reference:
+
+52.212-1 Instructions to Offerors—Commercial Products
+52.212-4 Contract Terms and Conditions—Commercial Products
+52.204-21 Basic Safeguarding of Covered Contractor Information Systems
+
+DFARS Supplement:
+
+252.204-7012 Safeguarding Covered Defense Information and Cyber Incident Reporting
+252.225-7001 Buy American and Balance of Payments Program
+```
+
+**Expert Classification**:
+
+```
+Entity 1: FAR 52.212-1
+├─ Type: clause (FAR citation pattern)
+├─ Signals: "FAR 52.###-#" pattern, "incorporated by reference"
+└─ Description: "FAR 52.212-1 Instructions to Offerors—Commercial Products.
+   Provides standard instructions for commercial item acquisitions including
+   submission requirements and evaluation methodology"
+
+Entity 2: FAR 52.212-4
+├─ Type: clause (FAR citation pattern)
+├─ Signals: "FAR 52.###-#" pattern
+└─ Description: "FAR 52.212-4 Contract Terms and Conditions—Commercial Products.
+   Standard T&Cs for commercial contracts including inspection, acceptance,
+   payment, and warranty provisions"
+
+Entity 3: FAR 52.204-21
+├─ Type: clause (FAR citation pattern with cybersecurity keyword)
+├─ Signals: "FAR 52.###-#" pattern, "Safeguarding" keyword
+└─ Description: "FAR 52.204-21 Basic Safeguarding requires NIST 800-171
+   implementation for CUI systems. Deliverables: SSP, POAM. Cost: $50K-$500K.
+   Non-compliance = contract ineligibility"
+
+Entity 4: DFARS 252.204-7012
+├─ Type: clause (DFARS citation pattern)
+├─ Signals: "DFARS 252.###-####" pattern, DoD-specific supplement
+└─ Description: "DFARS 252.204-7012 Safeguarding Covered Defense Information
+   enhances FAR 52.204-21 for DoD contracts. Requires incident reporting to
+   DoD Cyber Crime Center within 72 hours. SPRS score minimum 110 required"
+
+Entity 5: Section I: Contract Clauses
+├─ Type: section (RFP structural section)
+├─ Signals: "Section I" label, UCF standard section
+└─ Description: "Section I Contract Clauses containing FAR/DFARS regulatory
+   provisions incorporated by reference, defining compliance obligations and
+   contract terms"
+
+Relationships: CHILD_OF (clause clustering)
+├─ FAR 52.212-1 --CHILD_OF--> Section I (listed under this section)
+├─ FAR 52.212-4 --CHILD_OF--> Section I
+├─ FAR 52.204-21 --CHILD_OF--> Section I
+└─ DFARS 252.204-7012 --CHILD_OF--> Section I
+```
+
+**Key Takeaways**:
+- FAR 52.###-# pattern = clause type (not requirement)
+- DFARS 252.###-#### pattern = clause type (DoD supplement)
+- NMCARS, AFFARS, GSAM, VAAR, etc. = 26+ agency supplements (all clause type)
+- Group scattered clauses under parent section using CHILD_OF
+
+---
+
+#### **Example 4: Annex Linking (Document Hierarchy)**
+
+**RFP Text**:
+```
+Section J: List of Attachments
+
+The following documents are incorporated by reference:
+
+J-0200000-18 Performance Work Statement (PWS)
+J-0300000-12 Quality Assurance Surveillance Plan (QASP)
+J-0400000-09 Contract Data Requirements List (CDRL)
+
+...
+
+Attachment J-0200000-18: Performance Work Statement
+
+1.0 Scope of Work
+The contractor shall provide maintenance services for Maritime Prepositioning
+Force (MPF) equipment across 6 global locations...
+```
+
+**Expert Classification**:
+
+```
+Entity 1: Section J: List of Attachments
+├─ Type: section (RFP structural section)
+├─ Signals: "Section J" label, UCF standard attachment section
+└─ Description: "Section J List of Attachments containing incorporated
+   documents including PWS, QASP, and CDRL governing contract execution"
+
+Entity 2: J-0200000-18 Performance Work Statement
+├─ Type: document (attached PWS document)
+├─ Signals: "J-######" naming pattern, "PWS" descriptor
+└─ Description: "J-0200000-18 Performance Work Statement defining maintenance
+   services for Maritime Prepositioning Force equipment across 6 global
+   locations. Contains detailed task descriptions, performance standards, and
+   acceptance criteria"
+
+Entity 3: J-0300000-12 QASP
+├─ Type: document (attached quality plan)
+├─ Signals: "J-######" naming pattern, "QASP" descriptor
+└─ Description: "J-0300000-12 Quality Assurance Surveillance Plan defining
+   Government inspection methods, performance thresholds, and corrective action
+   procedures for contract oversight"
+
+Entity 4: J-0400000-09 CDRL
+├─ Type: document (attached deliverables list)
+├─ Signals: "J-######" naming pattern, "CDRL" descriptor
+└─ Description: "J-0400000-09 Contract Data Requirements List specifying all
+   required deliverables including reports, plans, and technical documentation
+   with submission frequencies and approval authorities"
+
+Entity 5: Maintenance Services Scope
+├─ Type: statement_of_work (work narrative from PWS)
+├─ Signals: "contractor shall provide", work description narrative
+└─ Description: "Contractor shall provide maintenance services for Maritime
+   Prepositioning Force equipment across 6 global locations - Core performance
+   requirement defining contract scope"
+
+Relationships:
+├─ ATTACHMENT_OF (annex → section linkage)
+│  ├─ J-0200000-18 PWS --ATTACHMENT_OF--> Section J (naming convention)
+│  ├─ J-0300000-12 QASP --ATTACHMENT_OF--> Section J
+│  └─ J-0400000-09 CDRL --ATTACHMENT_OF--> Section J
+│
+└─ REFERENCES (section → document cross-reference)
+   └─ Section J --REFERENCES--> J-0200000-18 PWS (explicit listing)
+```
+
+**Key Takeaways**:
+- J-###### pattern → document type + ATTACHMENT_OF → Section J
+- A-###### pattern → document type + ATTACHMENT_OF → Section A
+- H-###### pattern → document type + ATTACHMENT_OF → Section H
+- Work narratives INSIDE attachments = statement_of_work type
+- Agency-agnostic: Works for DoD, GSA, NASA, DoE naming conventions
+
+---
+
+#### **Example 5: Deliverable Mapping (Work Products)**
+
+**RFP Text**:
+```
+Section C.6 Reporting Requirements
+
+The contractor shall submit the following deliverables:
+
+CDRL A001: Monthly Status Report - Due 5th business day of each month
+CDRL A002: Quarterly Financial Report - Due 15 days after quarter end
+CDRL A003: Annual Performance Assessment - Due 30 days after period of performance
+
+Section M.2 Factor A: Management Methodology (25% weight)
+
+The Government will evaluate the offeror's approach to program management,
+including reporting processes, schedule management, and cost control.
+```
+
+**Expert Classification**:
+
+```
+Entity 1: CDRL A001 Monthly Status Report
+├─ Type: deliverable (work product with CDRL reference)
+├─ Signals: "CDRL A###" pattern, "shall submit", periodic report
+├─ Metadata: {frequency: "monthly", due_date: "5th business day"}
+└─ Description: "CDRL A001 Monthly Status Report documenting project progress,
+   milestones, risks, and budget variance. Due 5th business day of each month
+   to COR for management oversight"
+
+Entity 2: CDRL A002 Quarterly Financial Report
+├─ Type: deliverable (work product with CDRL reference)
+├─ Signals: "CDRL A###" pattern, financial reporting
+├─ Metadata: {frequency: "quarterly", due_date: "15 days after quarter end"}
+└─ Description: "CDRL A002 Quarterly Financial Report providing detailed cost
+   analysis, variance explanations, and forecast updates. Due 15 days after
+   quarter end for financial tracking"
+
+Entity 3: CDRL A003 Annual Performance Assessment
+├─ Type: deliverable (work product with CDRL reference)
+├─ Signals: "CDRL A###" pattern, performance evaluation
+├─ Metadata: {frequency: "annual", due_date: "30 days after PoP"}
+└─ Description: "CDRL A003 Annual Performance Assessment summarizing contract
+   performance against metrics, lessons learned, and improvement recommendations.
+   Due 30 days after period of performance"
+
+Entity 4: Monthly Reporting Requirement
+├─ Type: requirement (SHALL obligation for deliverable)
+├─ Signals: "contractor shall submit", MANDATORY obligation
+├─ Metadata: {criticality: "MANDATORY", produces: "CDRL A001"}
+└─ Description: "[MANDATORY] Contractor shall submit monthly status reports
+   (CDRL A001) by 5th business day - Core management reporting requirement"
+
+Entity 5: Factor A: Management Methodology
+├─ Type: evaluation_factor (scoring criteria)
+├─ Signals: "will evaluate", "25% weight", factor structure
+├─ Metadata: {weight: "25%", hierarchy: "Important"}
+└─ Description: "Factor A Management Methodology worth 25% evaluating program
+   management approach including reporting processes, schedule management, and
+   cost control capabilities"
+
+Relationships:
+├─ PRODUCES (requirement → deliverable)
+│  ├─ Monthly Reporting Requirement --PRODUCES--> CDRL A001 (requirement creates deliverable)
+│  ├─ Quarterly Reporting Requirement --PRODUCES--> CDRL A002
+│  └─ Annual Assessment Requirement --PRODUCES--> CDRL A003
+│
+└─ EVALUATED_BY (deliverable → factor)
+   ├─ CDRL A001 --EVALUATED_BY--> Factor A (reporting demonstrates management capability)
+   ├─ CDRL A002 --EVALUATED_BY--> Factor A (financial tracking demonstrates cost control)
+   └─ CDRL A003 --EVALUATED_BY--> Factor A (performance assessment demonstrates oversight)
+```
+
+**Key Takeaways**:
+- CDRL A###/DD Form 1423 = deliverable type (work products)
+- "Contractor shall submit [work product]" = requirement type (obligation)
+- Requirement PRODUCES deliverable (work → product relationship)
+- Deliverable EVALUATED_BY evaluation_factor (product demonstrates capability)
+- Extract frequency/due date metadata for deliverables
+
+---
+
+### The 17 Entity Types (Semantic Definitions + Signals)
+
+**Now that you've seen examples**, here are the formal definitions with detection signals:
 
 **Core Entities** (generic, useful for baseline connectivity):
 
 1. **organization**: Companies, agencies, departments, teams, prime/sub contractors
+   - Signals: Proper names of entities, "Inc.", "LLC", "Department of", organizational units
 2. **concept**: Abstract ideas, methodologies, frameworks, budget concepts, CLINs
+   - Signals: Abstract nouns, "CLIN", "methodology", "approach", "framework"
 3. **event**: Milestones, deadlines, reviews, site visits, orals, phase gates
+   - Signals: Dates, "NLT", "by [date]", "milestone", "phase", "review"
 4. **technology**: Systems, platforms, software, hardware, tools
+   - Signals: Software names, "system", "platform", "tool", IT infrastructure
 5. **person**: POCs, CORs, contracting officers, key personnel
+   - Signals: Names, titles ("COR", "KO", "Program Manager"), contact information
 6. **location**: Performance sites, delivery locations, geographic areas
+   - Signals: Addresses, cities, states, "FOB", geographic references
 
-**Contracting Entities** (government-specific operational content): 7. **requirement**: Obligations with criticality levels (MANDATORY/SHOULD/MAY)
+**Contracting Entities** (government-specific operational content):
 
-- Semantic signals: "shall", "must", "is required to", "should", "may", "optionally"
-
+7. **requirement**: Obligations with criticality levels (MANDATORY/SHOULD/MAY)
+   - Signals: "shall", "must", "is required to" (contractor subject), "should", "may"
+   - Extract criticality: SHALL/MUST = MANDATORY, SHOULD = IMPORTANT, MAY = OPTIONAL
 8. **clause**: FAR/DFARS/agency supplement regulatory clauses
-   - Semantic signals: "FAR 52.xxx", "DFARS 252.xxx", "NMCARS 5252.xxx", regulatory reference patterns
+   - Signals: "FAR 52.###-#", "DFARS 252.###-####", "NMCARS 5252.###-####", 26+ supplement patterns
 9. **section**: RFP structural sections (UCF A-M or semantic equivalent)
-   - Semantic signals: "Section [letter/number]", "Part", "Volume", "Attachment", "Annex"
+   - Signals: "Section [letter/number]", "Part", "Volume", structured headings
 10. **document**: Referenced external documents (specs, standards, manuals, regulations)
-    - Semantic signals: "MIL-STD-", "ISO ", "NIST ", "in accordance with [doc name]"
+    - Signals: "MIL-STD-", "ISO ", "NIST ", "DD Form", "in accordance with"
 11. **deliverable**: Contract work products, reports, CDRLs
-    - Semantic signals: "shall deliver", "shall provide", "submit [report/plan/product]"
+    - Signals: "CDRL", "shall deliver", "shall submit", periodic reports, work products
 
-**Evaluation Entities** (scoring and submission): 12. **evaluation_factor**: Scoring criteria, weights, subfactors - Semantic signals: "will be evaluated", "Factor [X]", "criterion", "scoring", "weight", "%"
+**Evaluation Entities** (scoring and submission):
 
+12. **evaluation_factor**: Scoring criteria, weights, subfactors
+    - Signals: "will be evaluated", "Factor [X]", "criterion", "%", "weight", adjectival ratings
 13. **submission_instruction**: Format, page limits, proposal structure requirements
-    - Semantic signals: "shall submit", "page limit", "font size", "format", "organize as follows"
+    - Signals: "page limit", "font size", "shall organize", "volume structure", "format"
 
-**Strategic Entities** (capture intelligence): 14. **strategic_theme**: Win themes, mission priorities, discriminators, customer hot buttons - Semantic signals: "mission", "priority", "critical to", "maximize", "emphasis on"
+**Strategic Entities** (capture intelligence):
 
-**Work Scope** (semantic detection regardless of location): 15. **statement_of_work**: PWS/SOW/SOO narrative content describing work to be performed - Semantic signals: Work descriptions, "contractor shall perform", scope narratives
+14. **strategic_theme**: Win themes, mission priorities, discriminators, customer hot buttons
+    - Signals: "mission", "priority", "critical", "readiness", "emphasis", discriminators
 
-**Programs & Equipment**: 16. **program**: Named major programs, initiatives, systems-of-systems - Semantic signals: "MCPP II", "Navy MBOS", proper nouns for programs
+**Work Scope** (semantic detection regardless of location):
 
+15. **statement_of_work**: PWS/SOW/SOO narrative content describing work to be performed
+    - Signals: Work descriptions, "contractor shall perform", task narratives, scope definitions
+
+**Programs & Equipment**:
+
+16. **program**: Named major programs, initiatives, systems-of-systems
+    - Signals: Proper nouns for programs ("MCPP II", "Navy MBOS", "NGEN")
 17. **equipment**: Physical items, materials, tools, vehicles, assets
-    - Semantic signals: Concrete physical objects, quantities, NSNs
+    - Signals: Concrete physical objects, NSNs, quantities, tangible items
+
+---
+
+## 🚨 CRITICAL: STRICT ENTITY TYPE ENFORCEMENT
+
+**YOU MUST use EXACTLY ONE of these 17 types for EVERY entity - NO EXCEPTIONS:**
+
+- organization, concept, event, technology, person, location
+- requirement, clause, section, document, deliverable
+- evaluation_factor, submission_instruction, strategic_theme
+- statement_of_work, program, equipment
+
+**STRICTLY FORBIDDEN entity types - NEVER USE THESE (56 total):**
+
+❌ **other** → USE **concept** INSTEAD  
+❌ **UNKNOWN** → USE **concept** INSTEAD  
+❌ **unknown** → USE **concept** INSTEAD  
+❌ **process** → USE **concept** INSTEAD  
+❌ **table** → USE **concept** INSTEAD  
+❌ **image** → Skip extraction (not text entity)  
+❌ **plan** → USE **document** INSTEAD  
+❌ **policy** → USE **document** INSTEAD  
+❌ **standard** → USE **document** INSTEAD  
+❌ **instruction** → USE **document** INSTEAD  
+❌ **system** → USE **technology** INSTEAD  
+❌ **regulation** → USE **document** INSTEAD  
+❌ **framework** → USE **concept** INSTEAD  
+❌ **objective** → USE **concept** INSTEAD  
+❌ **methodology** → USE **concept** INSTEAD  
+❌ **approach** → USE **concept** INSTEAD  
+❌ **strategy** → USE **concept** INSTEAD  
+❌ **model** → USE **concept** INSTEAD  
+❌ **role** → USE **person** OR **organization** INSTEAD  
+❌ **matrix** → USE **concept** INSTEAD  
+❌ **schedule** → USE **concept** INSTEAD  
+❌ **workflow** → USE **concept** INSTEAD  
+❌ **diagram** → Skip extraction (visual element)  
+❌ **figure** → Skip extraction (visual element)  
+❌ **chart** → Skip extraction (visual element)  
+❌ **template** → USE **document** INSTEAD  
+❌ **form** → USE **document** INSTEAD  
+❌ **guideline** → USE **document** INSTEAD  
+❌ **procedure** → USE **concept** INSTEAD  
+❌ **specification** → USE **document** INSTEAD  
+❌ **requirement_type** → USE **requirement** INSTEAD  
+❌ **contract_type** → USE **concept** INSTEAD  
+❌ **pricing_model** → USE **concept** INSTEAD  
+❌ **award_type** → USE **concept** INSTEAD  
+❌ **vehicle** → USE **concept** INSTEAD  
+❌ **method** → USE **concept** INSTEAD  
+❌ **tool** → USE **technology** INSTEAD  
+❌ **platform** → USE **technology** INSTEAD  
+❌ **application** → USE **technology** INSTEAD  
+❌ **software** → USE **technology** INSTEAD  
+❌ **hardware** → USE **equipment** INSTEAD  
+❌ **device** → USE **equipment** INSTEAD  
+❌ **asset** → USE **equipment** INSTEAD  
+❌ **facility** → USE **location** INSTEAD  
+❌ **site** → USE **location** INSTEAD  
+❌ **area** → USE **location** INSTEAD  
+❌ **region** → USE **location** INSTEAD  
+❌ **unit** → USE **organization** INSTEAD  
+❌ **team** → USE **organization** INSTEAD  
+❌ **group** → USE **organization** INSTEAD  
+❌ **department** → USE **organization** INSTEAD  
+❌ **office** → USE **organization** INSTEAD  
+❌ **agency** → USE **organization** INSTEAD  
+❌ **entity** → USE **organization** INSTEAD  
+❌ **contractor** → USE **organization** INSTEAD  
+❌ **vendor** → USE **organization** INSTEAD  
+❌ **supplier** → USE **organization** INSTEAD  
+❌ **partner** → USE **organization** INSTEAD  
+❌ **milestone** → USE **event** INSTEAD  
+❌ **deadline** → USE **event** INSTEAD  
+❌ **phase** → USE **event** INSTEAD  
+❌ **period** → USE **event** INSTEAD  
+❌ **list** → USE **concept** INSTEAD  
+❌ **report** → USE **deliverable** INSTEAD  
+❌ **code** → USE **concept** INSTEAD  
+❌ **certification** → USE **document** INSTEAD  
+❌ **status** → USE **concept** INSTEAD  
+❌ **message** → USE **concept** INSTEAD  
+❌ **activity** → USE **event** INSTEAD  
+❌ **assessment** → USE **concept** INSTEAD  
+❌ **test** → USE **event** INSTEAD  
+❌ **contract** → USE **document** OR **concept** INSTEAD  
+❌ **support** → USE **concept** INSTEAD  
+❌ **agreement** → USE **document** INSTEAD  
+❌ **investigation** → USE **event** INSTEAD  
+❌ **cycle** → USE **concept** INSTEAD  
+❌ **force** → USE **organization** INSTEAD  
+❌ **request** → USE **deliverable** INSTEAD  
+❌ **executive_order** → USE **document** INSTEAD  
+❌ **inventory** → USE **concept** INSTEAD  
+❌ **analysis** → USE **concept** INSTEAD  
+❌ **file** → USE **document** INSTEAD  
+❌ **directive** → USE **document** INSTEAD  
+❌ **workforce** → USE **organization** INSTEAD  
+❌ **inspection** → USE **event** INSTEAD  
+❌ **control** → USE **concept** INSTEAD  
+❌ **packaging** → USE **concept** INSTEAD  
+❌ **service** → USE **concept** INSTEAD  
+❌ **review** → USE **event** INSTEAD  
+❌ **summary** → USE **concept** INSTEAD  
+❌ **standard** → USE **document** INSTEAD  
+❌ **instruction** → USE **document** INSTEAD  
+❌ **system** → USE **technology** INSTEAD  
+❌ **regulation** → USE **document** INSTEAD  
+❌ **framework** → USE **concept** INSTEAD  
+❌ **objective** → USE **concept** INSTEAD  
+❌ **methodology** → USE **concept** INSTEAD  
+❌ **approach** → USE **concept** INSTEAD  
+❌ **strategy** → USE **concept** INSTEAD  
+❌ **model** → USE **concept** INSTEAD
+
+**FALLBACK MAPPING** (when entity type is unclear):
+
+- Plans, policies, standards, regulations, manuals → **document**
+- Systems, tools, software, platforms → **technology**
+- Reports, forms, deliverables with reference numbers → **deliverable**
+- CLINs, SLINs, contract line items → **concept**
+- DoD codes, activity codes, identifiers → **organization** (if unit) OR **concept** (if account)
+- Abstract ideas, processes, methodologies → **concept**
+- **IF STILL UNCLEAR**: Default to **concept** (catch-all for abstract entities)
+
+**Example Classifications**:
+
+- "Safety Plan" → **document** (NOT "plan")
+- "WAWF System" → **technology** (NOT "system")
+- "Table 1: Deliverables" → **concept** (NOT "table")
+- "Risk Matrix" → **concept** (NOT "matrix")
+- "Weekly Status Report" → **deliverable** (NOT "report")
+
+---
 
 ### Disambiguation Rules
 
@@ -148,6 +697,215 @@ Assign each candidate to ONE of 17 entity types using semantic meaning (not loca
 ### Classification Output
 
 **For each candidate**, record:
+
+```
+entity_name (normalized), entity_type (one of 17), confidence_score
+```
+
+---
+
+## CRITICAL ENTITY NAMING NORMALIZATION RULES
+
+**Prevent duplicate entities due to formatting variations!** Government RFPs use inconsistent formatting.
+
+**YOU MUST extract these as ONE entity, not multiple!**
+
+### Normalization Rules
+
+**1. Section Names**: Always use Title Case with periods
+
+- ✅ CORRECT: "Section C.4 Supply"
+- ❌ WRONG: "SECTION C.4", "section c.4", "Sec C.4", "Section C-4"
+- If section has title (e.g., "- SUPPLY"), include it in normalized form
+
+**2. FAR/DFARS Clauses**: Always use exact citation format
+
+- ✅ CORRECT: "FAR 52.212-1"
+- ❌ WRONG: "far 52.212-1", "FAR 52.212.1", "FAR52.212-1"
+
+**3. CDRL/Deliverables**: Always use uppercase identifier + descriptive name
+
+- ✅ CORRECT: "CDRL A001 Monthly Status Report"
+- ❌ WRONG: "CDRL a001", "Cdrl A001", "cdrl A001"
+
+**4. Organizations/Programs**: Use official capitalization from context
+
+- ✅ CORRECT: "Marine Corps Prepositioning Program" or "MCPP II"
+- ❌ WRONG: "MARINE CORPS PREPOSITIONING PROGRAM", "mcpp ii"
+
+**5. When you see multiple formatting variations**:
+
+- Identify they refer to the same entity
+- Extract ONCE using the most complete, properly formatted version
+- Merge descriptions from all mentions using <SEP> separator
+
+### Normalization Examples
+
+**Example 1: Section with Multiple Formats**
+
+Text contains:
+
+- Page 15 title: "SECTION C.4 - SUPPLY"
+- Page 27 reference: "per Section C.4"
+- Page 45 mention: "section c.4 requirements"
+
+Extract ONCE as:
+
+```
+entity|Section C.4 Supply|section|Supply section defining materiel requirements per Section C subsection 4
+```
+
+NOT three separate entities!
+
+**Example 2: Clause with Variations**
+
+Text contains:
+
+- "FAR 52.212-1 Instructions to Offerors"
+- "far 52.212-1"
+- "FAR clause 52.212-1"
+
+Extract ONCE as:
+
+```
+entity|FAR 52.212-1|clause|Instructions to Offerors—Commercial Products and Commercial Services
+```
+
+**Example 3: CDRL Variations**
+
+Text contains:
+
+- "CDRL A001"
+- "Cdrl a001 monthly status report"
+- "CDRL A001 - Monthly Status Report"
+
+Extract ONCE as:
+
+```
+entity|CDRL A001 Monthly Status Report|deliverable|Monthly status report due 5th business day of following month
+```
+
+---
+
+## CRITICAL METADATA EXTRACTION REQUIREMENTS
+
+### For EVALUATION_FACTOR Entities (7 fields REQUIRED)
+
+**ALWAYS extract these structured metadata fields:**
+
+1. **weight**: Numerical value with unit (e.g., "40%", "25 points", "300/1000 points"). Use "unknown" if not stated.
+2. **hierarchy**: Relative importance (e.g., "Most Important", "Significantly More Important", "More Important", "Important", "Least Important"). Use "unknown" if not stated.
+3. **description**: Full description including evaluation criteria and subfactors if applicable.
+
+**Output Format**:
+
+```
+entity|entity_name|evaluation_factor|weight|hierarchy|description
+```
+
+**Examples of CORRECT evaluation factor descriptions**:
+
+- ✅ "Factor A Management Methodology worth 25% (Most Important) evaluating program management, staffing, and quality approach"
+- ✅ "Factor B USMC Technical worth 40% with subfactors: B.1 Architecture 20%, B.2 Integration 20%"
+- ✅ "Factor D Past Performance worth 300 points evaluating relevancy and confidence based on similar contracts"
+- ❌ "Technical approach factor" (missing weight, hierarchy, and evaluation criteria)
+
+### For SUBMISSION_INSTRUCTION Entities (6 fields REQUIRED)
+
+**ALWAYS extract these structured metadata fields:**
+
+1. **page_limit**: Exact number with unit (e.g., "25 pages", "30 slides", "unlimited pages", "no page limit")
+2. **format_requirements**: Font size/type, margins, line spacing (e.g., "12-point Times New Roman, 1-inch margins, single-spaced")
+3. **volume_identifier**: Which volume/section this applies to (e.g., "Technical Volume", "Volume II Management Proposal")
+4. **addressed_factors**: Which evaluation factors this instruction guides (e.g., "addresses Factors 1 and 2")
+5. **special_constraints**: Cross-reference prohibitions, standalone requirements, submission format (e.g., "no cross-referencing", "PDF format")
+
+**Output Format**:
+
+```
+entity|entity_name|submission_instruction|page_limit|format_requirements|description
+```
+
+**Examples of CORRECT submission instruction descriptions**:
+
+- ✅ "Technical Approach Volume limited to 25 pages, 12-point Times New Roman font, 1-inch margins, must address Factors 1 and 2 (Technical and Maintenance Approach), standalone without cross-referencing other volumes"
+- ✅ "Management Volume limited to 15 pages addressing Factor A Management Methodology, font 12pt Times New Roman, margins 1-inch all sides"
+- ✅ "Oral Presentation limited to 30 slides, no additional materials, max 5 presenters, incorporated into Factors A-C evaluation"
+- ❌ "Technical volume requirements" (missing all structured metadata)
+
+### For REQUIREMENT Entities (6 fields REQUIRED)
+
+**ALWAYS extract structured metadata:**
+
+**Criticality Classification (MANDATORY - include in every requirement description)**:
+
+- **MANDATORY**: SHALL/MUST/WILL (with contractor/offeror as subject) - Zero defects, non-negotiable compliance
+- **IMPORTANT**: SHOULD (with contractor/offeror as subject) - High priority, best practice, expected but not absolute
+- **OPTIONAL**: MAY (with contractor/offeror as subject) - Contractor discretion, alternative approaches acceptable
+- **INFORMATIONAL**: SHALL/MUST with Government as subject - NOT a contractor requirement, skip extraction or extract as CONCEPT
+
+**Output Format**:
+
+```
+entity|entity_name|requirement|criticality|modal_verb|description
+```
+
+**Description Format Template**:
+"[CRITICALITY: MANDATORY|IMPORTANT|OPTIONAL] [Modal verb: shall|should|may|must|will] [Subject: Contractor/Offeror/Personnel] - [Requirement text with context] - [Rationale or evaluation linkage if stated]"
+
+**Examples of CORRECT requirement descriptions**:
+
+- ✅ "[MANDATORY] Contractor shall maintain ISO 9001:2015 certification throughout contract period - Quality assurance requirement for all deliverables"
+- ✅ "[IMPORTANT] Contractor should implement automated monitoring tools for system anomaly detection - Best practice for operational excellence"
+- ✅ "[OPTIONAL] Contractor may use commercial off-the-shelf (COTS) solutions where appropriate - Flexibility in technical approach"
+- ✅ "[MANDATORY] Personnel shall comply with 29 CFR 1910 safety standards - Safety requirement for all explosive handling operations"
+- ❌ "Maintain ISO certification" (missing criticality, modal verb, and subject context)
+- ❌ "Government shall provide GFE within 30 days" (Government obligation - DO NOT extract as REQUIREMENT)
+
+**Extraction Decision Tree for Requirements**:
+
+1. Identify modal verb: shall/should/may/must/will
+2. Identify subject: Who has the obligation?
+   - If Contractor/Offeror/Personnel → Extract as REQUIREMENT with appropriate criticality
+   - If Government/Agency → Skip (informational context only) OR extract as CONCEPT if significant
+3. Map criticality: shall/must/will → MANDATORY, should → IMPORTANT, may → OPTIONAL
+4. Structure description with bracketed metadata prefix
+
+---
+
+### Disambiguation Rules
+
+**When multiple types could apply**, use these tiebreakers:
+
+**CLAUSE vs REQUIREMENT**:
+
+- If text matches FAR/DFARS/agency pattern → **clause**
+- If text describes obligation but no regulatory reference → **requirement**
+
+**EVALUATION_FACTOR vs SUBMISSION_INSTRUCTION**:
+
+- If describes WHAT is scored (criteria, methodology) → **evaluation_factor**
+- If describes HOW to submit (format, limits) → **submission_instruction**
+- If BOTH in same sentence → create TWO entities
+
+**CONCEPT vs PROGRAM**:
+
+- If proper noun for named program (MCPP II, NGEN) → **program**
+- If abstract methodology (Agile, DevSecOps) → **concept**
+
+**DELIVERABLE vs REQUIREMENT**:
+
+- If tangible work product (report, plan, software) → **deliverable**
+- If ongoing obligation (shall maintain, shall comply) → **requirement**
+
+**DOCUMENT vs SECTION**:
+
+- If external reference (MIL-STD-882, NIST 800-171) → **document**
+- If internal RFP structure (Section C, Attachment J) → **section**
+
+### Classification Output (DEPRECATED - see Naming Normalization above)
+
+**For each candidate**, record (THIS SECTION SUPERSEDED BY NORMALIZATION RULES):
 
 ```
 Entity: [exact text]
@@ -355,10 +1113,18 @@ relationship|[source]|[relationship type]|[target]|[description]
 **Every entity MUST have**:
 
 - ✅ Unique name (exact text from RFP or normalized form)
-- ✅ Valid entity type (one of 17 types)
+- ✅ **Valid entity type (MUST be one of the 17 allowed types - NO other types permitted)**
 - ✅ Description ≥100 characters (target 150-250)
 - ✅ Operational context (not just definition)
 - ✅ **Decision-making value**: Does this description enable informed decisions? Would a capture manager understand implications?
+
+**🚨 CRITICAL VALIDATION: Entity Type Compliance**
+
+**Before outputting ANY entity, verify**:
+
+1. Entity type is EXACTLY one of these 17: organization, concept, event, technology, person, location, requirement, clause, section, document, deliverable, evaluation_factor, submission_instruction, strategic_theme, statement_of_work, program, equipment
+2. Entity type is in lowercase with underscores (e.g., evaluation_factor, statement_of_work)
+3. If you're tempted to use a forbidden type (role, list, report, etc.), map it to the correct allowed type using the FALLBACK MAPPING rules
 
 **Every relationship MUST have**:
 
@@ -414,24 +1180,95 @@ relationship|System Security Plan (SSP)|EVALUATED_BY|Factor 1: Technical Approac
    │  ├─ If connected, create relationship with description
    └─ Move to STEP 5
 
-5. OUTPUT
-   ├─ Quality check: All entities meet minimum standards
-   ├─ Quality check: All relationships have valid source/target
-   ├─ Format entities: entity|name|type|description
-   ├─ Format relationships: relationship|source|type|target|description
-   └─ Return structured output
+5. OUTPUT & VALIDATE
+   ├─ **HARD CONSTRAINT ENFORCEMENT** (These are RULES, not suggestions)
+   │  │
+   │  ├─ FOR EACH ENTITY:
+   │  │  │
+   │  │  ├─ RULE 1: Entity type MUST be EXACTLY one of these 17:
+   │  │  │           organization, concept, event, technology, person, location,
+   │  │  │           requirement, clause, section, document, deliverable,
+   │  │  │           evaluation_factor, submission_instruction, strategic_theme,
+   │  │  │           statement_of_work, program, equipment
+   │  │  │
+   │  │  │           → If type not in list: Use fallback mapping → Re-check
+   │  │  │           → If STILL not in list: DO NOT OUTPUT THIS ENTITY
+   │  │  │
+   │  │  ├─ RULE 2: Entity type MUST be lowercase_with_underscores
+   │  │  │           Example: evaluation_factor NOT Evaluation_Factor
+   │  │  │           → Wrong format: DO NOT OUTPUT THIS ENTITY
+   │  │  │
+   │  │  ├─ RULE 3: Entity name MUST be normalized (no duplicates from formatting)
+   │  │  │           "Section C.4" = "SECTION C.4" = "section c.4" → Use ONE form
+   │  │  │           → Duplicate detected: OUTPUT ONLY FIRST INSTANCE
+   │  │  │
+   │  │  ├─ RULE 4: Description MUST be ≥100 characters
+   │  │  │           → Shorter description: DO NOT OUTPUT THIS ENTITY
+   │  │  │
+   │  │  └─ RULE 5: IF entity is evaluation_factor OR submission_instruction OR requirement:
+   │  │              → MUST have complete metadata (weight/page_limit/criticality)
+   │  │              → Missing metadata: DO NOT OUTPUT THIS ENTITY
+   │  │
+   │  └─ FOR EACH RELATIONSHIP:
+   │     │
+   │     ├─ RULE 1: Relationship type MUST be EXACTLY one of these 13:
+   │     │           CHILD_OF, ATTACHMENT_OF, GUIDES, EVALUATED_BY, PRODUCES,
+   │     │           REFERENCES, CONTAINS, RELATED_TO, SUPPORTS, DEFINES,
+   │     │           TRACKED_BY, REQUIRES, FLOWS_TO
+   │     │
+   │     │           → If type not in list: DO NOT OUTPUT THIS RELATIONSHIP
+   │     │           → DO NOT create custom relationship types (e.g., "informs", "impacts", "flow_down")
+   │     │
+   │     ├─ RULE 2: Relationship type MUST be UPPERCASE_WITH_UNDERSCORES
+   │     │           Example: EVALUATED_BY NOT Evaluated_By
+   │     │           → Wrong format: DO NOT OUTPUT THIS RELATIONSHIP
+   │     │
+   │     ├─ RULE 3: Source entity MUST exist and passed all entity rules
+   │     │           → Source invalid: DO NOT OUTPUT THIS RELATIONSHIP
+   │     │
+   │     ├─ RULE 4: Target entity MUST exist and passed all entity rules
+   │     │           → Target invalid: DO NOT OUTPUT THIS RELATIONSHIP
+   │     │
+   │     └─ RULE 5: Description MUST explain WHY entities are connected
+   │     │           → Generic description ("they are related"): DO NOT OUTPUT THIS RELATIONSHIP
+   │
+   ├─ Format entities that PASSED all rules: entity|name|type|description
+   ├─ Format relationships that PASSED all rules: relationship|source|type|target|description
+   └─ Return ONLY output that PASSED validation (reject everything else)
+
+**🚨 THESE ARE HARD CONSTRAINTS, NOT GUIDELINES**
+
+- You CANNOT output entities/relationships that violate these rules
+- "Close enough" = REJECT (17 types means 17 types, not 19)
+- Custom types = SYSTEM FAILURE (breaks knowledge graph structure)
+- Rules are NOT flexible - they define ontology structure
+
+**WHY THESE CONSTRAINTS MATTER**:
+- Ontology = Logical organization by type
+- Custom types = Broken organization = Failed queries = Uninformed decisions
+- Your job is to FIT information INTO ontology, not CREATE new ontology
+
 ```
 
 ---
 
-## Remember
+## Remember: Your Role in Quality Intelligence for Decision Making
 
-- **Execute steps sequentially** - each builds on the previous toward decision-ready intelligence
-- **Consult domain knowledge contextually** - apply intelligence that enables decisions, not blanket patterns
-- **Prioritize decision-making value** - every entity should answer strategic questions, every relationship should map decision pathways
-- **Speed AND quality matter** - process 425-page RFPs in 45-60 minutes with comprehensive coverage competitors can't match manually
+**Your Mission**: Organize information logically using ontology (17 entity types, 13 relationship types)
 
-**Your extraction quality determines competitive advantage**: While others spend 8+ hours manually analyzing and miss critical details, you deliver complete intelligence for informed decision making.
+**NOT Your Mission**: Analyze strategic implications (happens during query phase)
+
+**Connecting Theme**: Quality Intelligence for Decision Making
+
+- **Quality** = Rich descriptions with operational context
+- **Intelligence** = Logical organization by entity type and relationship
+- **Decision Making** = Enabled by your foundation during query phase
+
+**Execute steps sequentially** - each builds toward organized foundation:
+
+1. Detect → 2. Classify → 3. Enrich → 4. Relate → 5. Validate & Output
+
+**Enforce constraints strictly** - ontology structure enables reasoning later
 
 ---
 
