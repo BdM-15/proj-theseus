@@ -109,6 +109,28 @@ async def process_document_with_semantic_inference(
     # Step 3: Capture BEFORE state for validation
     nodes_before, edges_before = parse_graphml(graphml_path)
     logger.info(f"📊 PRE-INFERENCE: {len(nodes_before)} entities, {len(edges_before)} relationships")
+    # Step 3.5: Strict validation gate using Pydantic models
+    # Build a payload expected by validate_extraction_payload and fail fast if invalid
+    try:
+        from src.models.rfp_models import validate_extraction_payload
+        payload = {"entities": nodes_before}
+        valid, details = validate_extraction_payload(payload)
+        if not valid:
+            logger.error(f"❌ Extraction validation failed: {details}")
+            # Return an error result so callers (e.g., /insert) can handle the failure.
+            return {"relationships_inferred": 0, "error": "extraction_validation_failed", "details": details}
+    except Exception:
+        # If the validator import or run errors, log and continue to auditing step
+        logger.debug("Pydantic extraction validator not available or failed; continuing to audit step")
+
+    # Ontology validation/audit (optional) - preserve for audit trail but run only after Pydantic gate
+    try:
+        from src.inference.graph_io import validate_and_audit_nodes
+        audit_file = Path(global_args.working_dir) / "default" / "invalid_entities_audit.json"
+        nodes_before = validate_and_audit_nodes(graphml_path, nodes_before, audit_file)
+    except Exception:
+        # Non-fatal: proceed even if validation/audit step fails
+        logger.debug("Ontology validation/audit step skipped due to import/error")
     
     # Step 4: Run LLM-powered relationship inference (ALWAYS - no toggle)
     if not llm_func:

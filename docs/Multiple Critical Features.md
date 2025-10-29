@@ -408,6 +408,10 @@ Success criteria
 - Add Pydantic models in `src/models/rfp_models.py` and always validate LLM
   outputs. If parsing fails, trigger a deterministic re-prompt or flag for
   human review.
+  - Note: This repo now standardizes on Pydantic v2 for validation models
+    (see `pyproject.toml`). Extraction outputs are validated against the
+    ontology and any invalid entities are audited to
+    `rag_storage/default/invalid_entities_audit.json` for human review.
 - Add integration tests in `tests/` that run a dry `process_document_complete`
   (mocked LLM) and assert schema validity.
 - Run performance and token tracking during experiments (LightRAG provides

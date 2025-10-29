@@ -10,6 +10,14 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import List, Dict, Tuple
 import logging
+import json
+from pathlib import Path
+
+try:
+    # Optional import for ontology validation
+    from src.models.rfp_models import EntityType
+except Exception:
+    EntityType = None
 
 logger = logging.getLogger(__name__)
 
@@ -360,3 +368,51 @@ def group_entities_by_type(nodes: List[Dict]) -> Dict[str, List[Dict]]:
         grouped[entity_type].append(node)
     
     return grouped
+
+
+def validate_and_audit_nodes(graphml_path: Path, nodes: List[Dict], audit_path: Path) -> List[Dict]:
+    """Validate node entity types against the ontology and audit invalid nodes.
+
+    - Nodes with unrecognized entity_type will be collected into an audit file
+      at `audit_path` for human review.
+    - The function will normalize invalid types to 'unknown' in the returned
+      nodes list and persist the cleaned types back to GraphML using
+      `save_cleaned_entities_to_graphml`.
+
+    Returns the cleaned nodes list.
+    """
+    if EntityType is None:
+        logger.debug("Pydantic/EntityType not available; skipping ontology validation")
+        return nodes
+
+    invalid_nodes = []
+    valid_type_values = {t.value for t in EntityType}
+
+    for n in nodes:
+        et = (n.get('entity_type') or '').strip()
+        if not et or et not in valid_type_values:
+            invalid_nodes.append({
+                'id': n.get('id'),
+                'entity_name': n.get('entity_name'),
+                'entity_type': et,
+                'description': n.get('description'),
+                'reason': 'unknown_or_invalid_type'
+            })
+            # Normalize to a safe fallback so downstream code can proceed
+            n['entity_type'] = 'unknown'
+
+    # Persist audit file if there are invalid nodes
+    try:
+        if invalid_nodes:
+            audit_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(audit_path, 'w', encoding='utf-8') as f:
+                json.dump({'invalid_nodes': invalid_nodes}, f, indent=2, ensure_ascii=False)
+            logger.info(f"  ⚠️  Audited {len(invalid_nodes)} invalid nodes to {audit_path}")
+
+            # Persist cleaned types back to GraphML so post-processing sees normalized types
+            save_cleaned_entities_to_graphml(graphml_path, nodes)
+            logger.info("  ✅ Persisted cleaned entity types to GraphML")
+    except Exception as e:
+        logger.error(f"Error writing audit file: {e}")
+
+    return nodes

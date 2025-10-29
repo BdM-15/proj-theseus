@@ -26,6 +26,12 @@ dependencies = [
     # Authentication (required by lightrag-hku API server)
     "PyJWT>=2.10.0",
     
+    # Use modern Pydantic v2 for validation models in this repo. Note: raganything
+    # bundles pydantic in some release combos; pinning here requests v2.x and may
+    # cause a resolver to upgrade/downgrade the transitive dependency. Verify
+    # after installing with `uv` and run tests.
+    "pydantic>=2.0,<3",
+    
     # ============================================================================
     # GPU Acceleration for MinerU (CRITICAL for performance)
     # ============================================================================
