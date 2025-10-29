@@ -376,8 +376,8 @@ def create_documents_upload_endpoint(app, rag_instance):
         
         This is the endpoint the WebUI actually uses (discovered via server logs).
         """
-        print(f"🔔🔔🔔 CUSTOM ENDPOINT CALLED: /documents/upload with file: {file.filename}")
-        logger.info(f"🔔 ENDPOINT CALLED: /documents/upload with file: {file.filename}")
+        # Use structured logging instead of print for consistency
+        logger.info(f"🔔🔔🔔 CUSTOM ENDPOINT CALLED: /documents/upload with file: {file.filename}")
         try:
             # Save uploaded file with original filename to temp directory
             # This preserves human-readable names in query citations

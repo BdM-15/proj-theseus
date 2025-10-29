@@ -113,23 +113,75 @@ async def initialize_raganything():
         enable_equation_processing=enable_equation,
     )
     
-    # Define LLM function (xAI Grok wrapper)
-    async def llm_model_func(prompt, system_prompt=None, history_messages=[], **kwargs):
+    # Read dual-LLM names from environment (do not hard-code models)
+    extraction_model_name = os.getenv("EXTRACTION_LLM_NAME", os.getenv("LLM_MODEL", "grok-4-fast-non-reasoning"))
+    reasoning_model_name = os.getenv("REASONING_LLM_NAME", os.getenv("LLM_MODEL", "grok-4-fast-reasoning"))
+
+    # Load extraction prompts from the prompts directory (do NOT hardcode prompts here)
+    # These prompts live under /prompts and are maintained by the prompts team.
+    entity_extraction_prompts = [
+        load_prompt("extraction/entity_extraction_prompt"),
+        load_prompt("extraction/entity_detection_rules"),
+    ]
+    custom_entity_extraction_prompt = "\n\n---\n\n".join(entity_extraction_prompts)
+
+    # Define extraction LLM function (deterministic, ingestion-time)
+    async def llm_extraction_func(prompt, system_prompt=None, history_messages=[], **kwargs):
+        # Enforce deterministic extraction defaults: low temperature
+        temp = float(os.getenv("EXTRACTION_LLM_TEMPERATURE", os.getenv("LLM_MODEL_TEMPERATURE", "0.0")))
+
+        # Use the maintained prompts from /prompts as the default system prompt.
+        # If a caller provides an explicit system_prompt, append it after the maintained prompt
+        if system_prompt:
+            combined_system_prompt = f"{custom_entity_extraction_prompt}\n\n{system_prompt}"
+        else:
+            combined_system_prompt = custom_entity_extraction_prompt
+
+        # Temporary per-call visibility for development: log which model and temperature are used
+        # Gate verbose per-call logs with LOG_LLM_CALLS env var to avoid noisy output in prod
+        if os.getenv("LOG_LLM_CALLS", "false").lower() in ("1", "true", "yes"):
+            msg = f"[LLM-EXTRACTION] model={extraction_model_name} temperature={temp} prompt_len={len(prompt)}"
+            logger.info(msg)
+
         return await openai_complete_if_cache(
-            "grok-4-fast-reasoning",
+            extraction_model_name,
+            prompt,
+            system_prompt=combined_system_prompt,
+            history_messages=history_messages,
+            api_key=xai_api_key,
+            base_url=xai_base_url,
+            temperature=temp,
+            **kwargs,
+        )
+
+    # Define reasoning LLM function (higher-capacity, query/multimodal-time)
+    async def llm_reasoning_func(prompt, system_prompt=None, history_messages=[], **kwargs):
+        # Allow an override for reasoning temperature if needed (defaults to configured model temp)
+        temp = float(os.getenv("REASONING_LLM_TEMPERATURE", os.getenv("LLM_MODEL_TEMPERATURE", "0.1")))
+
+        # Temporary per-call visibility for development: log which model and temperature are used
+        # Gate verbose per-call logs with LOG_LLM_CALLS env var to avoid noisy output in prod
+        if os.getenv("LOG_LLM_CALLS", "false").lower() in ("1", "true", "yes"):
+            msg = f"[LLM-REASONING] model={reasoning_model_name} temperature={temp} prompt_len={len(prompt)}"
+            logger.info(msg)
+
+        return await openai_complete_if_cache(
+            reasoning_model_name,
             prompt,
             system_prompt=system_prompt,
             history_messages=history_messages,
             api_key=xai_api_key,
             base_url=xai_base_url,
+            temperature=temp,
             **kwargs,
         )
     
     # Define vision function (multimodal Grok wrapper)
     async def vision_model_func(prompt, system_prompt=None, history_messages=[], image_data=None, messages=None, **kwargs):
+        # Route multimodal and message-rich requests to the reasoning model
         if messages:
             return await openai_complete_if_cache(
-                "grok-4-fast-reasoning", "", system_prompt=None, history_messages=[],
+                reasoning_model_name, "", system_prompt=None, history_messages=[],
                 messages=messages, api_key=xai_api_key, base_url=xai_base_url, **kwargs
             )
         elif image_data:
@@ -145,12 +197,12 @@ async def initialize_raganything():
             if system_prompt:
                 messages.insert(0, {"role": "system", "content": system_prompt})
             return await openai_complete_if_cache(
-                "grok-4-fast-reasoning", "", system_prompt=None, history_messages=[],
+                reasoning_model_name, "", system_prompt=None, history_messages=[],
                 messages=messages,
                 api_key=xai_api_key, base_url=xai_base_url, **kwargs
             )
         else:
-            return await llm_model_func(prompt, system_prompt, history_messages, **kwargs)
+            return await llm_extraction_func(prompt, system_prompt, history_messages, **kwargs)
     
     # Define embedding function with safety truncation (8K chunks can slightly exceed 8192 due to overlap)
     async def safe_embed_func(texts):
@@ -200,9 +252,9 @@ async def initialize_raganything():
     # IMPORTANT: LightRAG reads chunk_token_size from environment at import time
     # Don't override via lightrag_kwargs - let it use CHUNK_SIZE from .env
     _rag_anything = RAGAnything(
-        config=config,
-        llm_model_func=llm_model_func,
-        vision_model_func=vision_model_func,
+    config=config,
+    llm_model_func=llm_extraction_func,
+    vision_model_func=vision_model_func,
         embedding_func=embedding_func,
         lightrag_kwargs={
             "addon_params": {
@@ -307,15 +359,41 @@ async def initialize_raganything():
     _rag_anything.lightrag.doc_status.get_by_id = filtered_get_by_id
     _rag_anything.lightrag.doc_status.get_docs_paginated = filtered_get_docs_paginated
     # ═════════════════════════════════════════════════════════════════════════════
+
+    # ═════════════════════════════════════════════════════════════════════════════
+    # QUERY DEFAULT OVERRIDE: Ensure queries use the reasoning LLM by default
+    # - Wrap the LightRAG instance's aquery method at the instance level so
+    #   we don't modify library class internals (instance-level monkey-patch)
+    # - If a QueryParam is provided and already contains a model_func, respect it
+    # - Otherwise inject the llm_reasoning_func as the model_func for query-time
+    # Note: This is an instance-level wrapper similar to the doc_status compatibility
+    #       wrappers above and preserves backward compatibility.
+    from lightrag.base import QueryParam
+
+    original_aquery = _rag_anything.lightrag.aquery
+
+    async def wrapped_aquery(query: str, param: QueryParam = None, **kwargs):
+        # If user passed param explicitly, use it; otherwise create from kwargs
+        if param is None:
+            param = QueryParam(**kwargs)
+
+        # If no model_func specified on the QueryParam, set to reasoning callable
+        if getattr(param, "model_func", None) is None:
+            param.model_func = llm_reasoning_func
+
+        return await original_aquery(query, param=param)
+
+    _rag_anything.lightrag.aquery = wrapped_aquery
+    # ═════════════════════════════════════════════════════════════════════════════
     
-    # Use print() instead of logger to ensure output visibility during startup
-    print("✅ RAG-Anything initialized")
-    print(f"   Parser: MinerU ({parse_method}) - multimodal enabled")
-    print(f"   Device: {device.upper()} (GPU acceleration {'enabled' if device == 'cuda' else 'disabled'})")
-    print(f"   Entity types: {len(entity_types)} specialized types")
-    print(f"   LightRAG storages: Ready")
-    print(f"   LightRAG version: 1.4.9.3")
-    print(f"   Multimodal processing: Using process_document_complete() (separate text/multimodal paths) ✅")
+    # Startup summary - use structured logging rather than raw prints
+    logger.info("✅ RAG-Anything initialized")
+    logger.info(f"   Parser: MinerU ({parse_method}) - multimodal enabled")
+    logger.info(f"   Device: {device.upper()} (GPU acceleration {'enabled' if device == 'cuda' else 'disabled'})")
+    logger.info(f"   Entity types: {len(entity_types)} specialized types")
+    logger.info("   LightRAG storages: Ready")
+    logger.info("   LightRAG version: 1.4.9.3")
+    logger.info("   Multimodal processing: Using process_document_complete() (separate text/multimodal paths) ✅")
     
     return _rag_anything
 
