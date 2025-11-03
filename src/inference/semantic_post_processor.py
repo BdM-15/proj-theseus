@@ -23,7 +23,6 @@ import logging
 from typing import Dict, Callable, Awaitable
 from pathlib import Path
 
-from src.inference.batch_processor import BatchProcessor
 from src.inference.graph_io import parse_graphml, save_enhanced_graphml
 
 logger = logging.getLogger(__name__)
@@ -76,16 +75,14 @@ async def enhance_knowledge_graph(
             "processing_time": 0
         }
     
-    # Create batch processor
-    processor = BatchProcessor(llm_func=llm_func, batch_size=batch_size)
-    
     # Step 2: Entity Type Correction
     logger.info("\n  [2/3] Entity Type Correction...")
     from src.inference.entity_operations import correct_entity_types
     
     nodes, corrections = await correct_entity_types(
         entities=nodes,
-        processor=processor
+        llm_func=llm_func,
+        batch_size=batch_size
     )
     
     logger.info(f"    ✅ Corrected {len(corrections)} entity types")
@@ -102,7 +99,8 @@ async def enhance_knowledge_graph(
     new_relationships = await infer_relationships(
         entities=nodes,
         existing_relationships=edges,
-        processor=processor
+        llm_func=llm_func,
+        batch_size=batch_size
     )
     
     logger.info(f"    ✅ Inferred {len(new_relationships)} new relationships")
