@@ -37,6 +37,30 @@ def configure_raganything_args():
     global_args.working_dir = working_dir
     global_args.input_dir = os.getenv("INPUT_DIR", "./inputs/uploaded")
     
+    # Graph Storage Configuration - Neo4j vs NetworkX
+    graph_storage_type = os.getenv("GRAPH_STORAGE", "NetworkXStorage")
+    if graph_storage_type == "Neo4JStorage":
+        logger.info("🔧 Configuring Neo4j graph storage...")
+        from lightrag.kg.neo4j_impl import Neo4JStorage
+        
+        neo4j_config = {
+            "uri": os.getenv("NEO4J_URI", "neo4j://localhost:7687"),
+            "username": os.getenv("NEO4J_USERNAME", "neo4j"),
+            "password": os.getenv("NEO4J_PASSWORD"),
+            "database": os.getenv("NEO4J_DATABASE", "neo4j"),
+        }
+        
+        # Create Neo4j storage instance
+        global_args.graph_storage = "Neo4JStorage"  # Tell LightRAG to use Neo4j
+        global_args.neo4j_config = neo4j_config     # Pass Neo4j connection details
+        
+        logger.info(f"  ✅ Neo4j storage configured: {neo4j_config['uri']}")
+        logger.info(f"     Database: {neo4j_config['database']}")
+        logger.info(f"     Workspace: {os.getenv('NEO4J_WORKSPACE', 'default')}")
+    else:
+        logger.info("🔧 Using NetworkX file-based graph storage (default)")
+        global_args.graph_storage = "NetworkXStorage"
+    
     # Server configuration
     global_args.host = os.getenv("HOST", "localhost")
     global_args.port = int(os.getenv("PORT", "9621"))
@@ -106,6 +130,10 @@ def configure_raganything_args():
     logger.info("=" * 80)
     logger.info("⚙️  CONFIGURATION SUMMARY")
     logger.info("=" * 80)
+    logger.info(f"  Graph Storage: {global_args.graph_storage}")
+    if global_args.graph_storage == "Neo4JStorage":
+        logger.info(f"  Neo4j URI: {os.getenv('NEO4J_URI', 'neo4j://localhost:7687')}")
+        logger.info(f"  Neo4j Workspace: {os.getenv('NEO4J_WORKSPACE', 'default')}")
     logger.info(f"  LLM: grok-4-fast-reasoning (2M context)")
     logger.info(f"  Embeddings: text-embedding-3-large (3072-dim, auto-truncate at 8192 tokens)")
     logger.info(f"  Chunking: {global_args.chunk_token_size} tokens (overlap: {global_args.chunk_overlap_token_size})")
