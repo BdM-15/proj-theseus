@@ -314,7 +314,7 @@ async def initialize_raganything():
     print(f"   Device: {device.upper()} (GPU acceleration {'enabled' if device == 'cuda' else 'disabled'})")
     print(f"   Entity types: {len(entity_types)} specialized types")
     print(f"   LightRAG storages: Ready")
-    print(f"   LightRAG version: 1.4.9.3")
+    print(f"   LightRAG version: 1.4.9.7")
     print(f"   Multimodal processing: Using process_document_complete() (separate text/multimodal paths) ✅")
     
     return _rag_anything
