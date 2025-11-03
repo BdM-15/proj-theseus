@@ -473,12 +473,34 @@ async def infer_all_relationships(
     if 'requirement' in grouped and 'evaluation_factor' in grouped:
         logger.info(f"\n  [4/7] Requirement Evaluation: REQUIREMENT → EVALUATION_FACTOR...")
         relationship_context = load_prompt("relationship_inference/requirement_evaluation")
-        requirement_factor_rels = await infer_relationships_batch(
-            source_entities=grouped['requirement'],
-            target_entities=grouped['evaluation_factor'],
-            relationship_context=relationship_context,
-            llm_func=llm_func
-        )
+        
+        # Batch processing for large requirement sets (prevents LLM timeout/token limits)
+        requirements = grouped['requirement']
+        evaluation_factors = grouped['evaluation_factor']
+        BATCH_SIZE = 50  # Process 50 requirements at a time
+        
+        requirement_factor_rels = []
+        total_batches = (len(requirements) + BATCH_SIZE - 1) // BATCH_SIZE
+        
+        if len(requirements) > BATCH_SIZE:
+            logger.info(f"    📦 Processing {len(requirements)} requirements in {total_batches} batches of {BATCH_SIZE}")
+        
+        for batch_idx in range(0, len(requirements), BATCH_SIZE):
+            batch_reqs = requirements[batch_idx:batch_idx + BATCH_SIZE]
+            batch_num = (batch_idx // BATCH_SIZE) + 1
+            
+            if total_batches > 1:
+                logger.info(f"    🔄 Batch {batch_num}/{total_batches}: Processing {len(batch_reqs)} requirements...")
+            
+            batch_rels = await infer_relationships_batch(
+                source_entities=batch_reqs,
+                target_entities=evaluation_factors,  # Always use full evaluation_factor list
+                relationship_context=relationship_context,
+                llm_func=llm_func
+            )
+            requirement_factor_rels.extend(batch_rels)
+        
+        logger.info(f"    ✅ Total requirement→factor relationships: {len(requirement_factor_rels)}")
         all_new_relationships.extend(requirement_factor_rels)
     
     # Algorithm 5: STATEMENT_OF_WORK → DELIVERABLE (Work to Deliverables)
