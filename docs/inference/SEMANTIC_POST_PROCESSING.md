@@ -48,6 +48,7 @@ results = await processor.process_batches(
 ```
 
 **Benefits**:
+
 - Single batching implementation (DRY principle)
 - Consistent progress logging across all operations
 - Configurable batch size (default: 50 items per LLM call)
@@ -96,6 +97,7 @@ new_relationships = await infer_relationships(
 ```
 
 **Algorithms**:
+
 1. **Document Hierarchy**: DOCUMENT → SECTION (CHILD_OF)
 2. **Clause Clustering**: CLAUSE → SECTION (CHILD_OF)
 3. **Instruction↔Factor Mapping**: SUBMISSION_INSTRUCTION ↔ EVALUATION_FACTOR (CORRESPONDS_TO)
@@ -123,6 +125,7 @@ src/inference/
 ```
 
 **Problems**:
+
 - Duplicate batching logic (2 implementations)
 - Confusing "Phase 6/7" terminology
 - Scattered batch size configuration
@@ -140,6 +143,7 @@ src/inference/
 ```
 
 **Benefits**:
+
 - Single source of truth for batching
 - Self-documenting operation names
 - Centralized configuration (BATCH_SIZE)
@@ -152,6 +156,7 @@ src/inference/
 The original `post_process_knowledge_graph()` function in `routes.py` is **deprecated but preserved** for backward compatibility. It will be removed in a future release.
 
 **Migration**:
+
 ```python
 # OLD (deprecated)
 from src.server.routes import post_process_knowledge_graph
@@ -167,6 +172,7 @@ result = await enhance_knowledge_graph(rag_storage_path, llm_func, batch_size=50
 ## Configuration
 
 **Environment Variables**:
+
 ```bash
 # Batch size for all LLM operations (default: 50)
 INFERENCE_BATCH_SIZE=50
@@ -176,6 +182,7 @@ REASONING_LLM_NAME=grok-4-fast-reasoning
 ```
 
 **Performance Tuning**:
+
 - **Small RFPs (<50 pages)**: batch_size=25 (faster turnaround)
 - **Large RFPs (>400 pages)**: batch_size=100 (better throughput)
 - **Default**: batch_size=50 (balanced cost/performance)
@@ -199,12 +206,14 @@ python -m src.inference.semantic_post_processor \
 ## Cost Estimation
 
 **Entity Type Correction**:
+
 - Input: ~1000 entities with forbidden types
 - Batches: 1000 / 50 = 20 batches
 - Cost per batch: ~$0.0005 (Grok)
 - Total: ~$0.01
 
 **Relationship Inference**:
+
 - Algorithms: 7 (5 LLM-powered + 2 heuristic)
 - Batches per algorithm: ~10 (for 500 entities)
 - Cost per batch: ~$0.006 (Grok)
@@ -217,6 +226,7 @@ python -m src.inference.semantic_post_processor \
 ## Monitoring
 
 **Progress Logging**:
+
 ```
 🤖 SEMANTIC POST-PROCESSING: Knowledge Graph Enhancement
   [1/3] Loading GraphML: graph_chunk_entity_relation.graphml
