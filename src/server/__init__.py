@@ -19,5 +19,6 @@ __all__ = [
     "create_insert_endpoint",
     "create_documents_upload_endpoint",
     "process_document_with_ucf_detection",
+    # Legacy function (deprecated - use semantic_post_processor.enhance_knowledge_graph)
     "post_process_knowledge_graph",
 ]

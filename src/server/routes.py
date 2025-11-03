@@ -118,8 +118,14 @@ async def process_document_with_semantic_inference(
             "error": "No LLM function"
         }
     
-    logger.info(f"🤖 Running LLM-powered relationship inference (5 algorithms)...")
-    inference_result = await post_process_knowledge_graph(global_args.working_dir, llm_func)
+    logger.info(f"🤖 Running semantic knowledge graph enhancement...")
+    # Use new semantic post-processor (consolidates entity type correction + relationship inference)
+    from src.inference.semantic_post_processor import enhance_knowledge_graph
+    inference_result = await enhance_knowledge_graph(
+        rag_storage_path=global_args.working_dir,
+        llm_func=llm_func,
+        batch_size=50
+    )
     
     # Step 4.5: Optional metadata enrichment (Phase 7)
     # Extracts structured metadata from entity descriptions WITHOUT modifying descriptions

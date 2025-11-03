@@ -9,9 +9,11 @@
 ## Problem
 
 From user feedback during MCPP DRAFT RFP processing:
+
 > "I want to turn off the non-reasoning model for the extraction and just have grok4 reasoning for both extraction and query llms"
 
-**Root Cause**: 
+**Root Cause**:
+
 - Branch 011 introduced dual-LLM split: non-reasoning for extraction, reasoning for queries
 - Non-reasoning model struggles with nuanced government contracting entity relationships
 - Deep domain knowledge requires reasoning capabilities even during extraction
@@ -25,12 +27,14 @@ From user feedback during MCPP DRAFT RFP processing:
 ### .env Changes
 
 **BEFORE (Dual-LLM Split)**:
+
 ```bash
 EXTRACTION_LLM_NAME=grok-4-fast-non-reasoning
 REASONING_LLM_NAME=grok-4-fast-reasoning
 ```
 
 **AFTER (Unified Model)**:
+
 ```bash
 # Dual-LLM split (ingestion vs query)
 # UNIFIED MODEL: Use reasoning model for all operations (extraction + query)
@@ -44,12 +48,14 @@ REASONING_LLM_NAME=grok-4-fast-reasoning
 
 ## Why This Approach
 
-**Keeps Toggle Capability**: 
+**Keeps Toggle Capability**:
+
 - Infrastructure remains intact (can re-enable dual-LLM later if needed)
 - Simple configuration change (no code modifications)
 - Easy to test different models for extraction in the future
 
-**Alternative Rejected**: 
+**Alternative Rejected**:
+
 - Complete removal of dual-LLM infrastructure would require code changes
 - User may want to experiment with different models later
 - Configuration-based approach is more flexible
@@ -59,12 +65,14 @@ REASONING_LLM_NAME=grok-4-fast-reasoning
 ## Impact
 
 ### Performance
+
 - ✅ Better entity extraction accuracy (reasoning improves relationship detection)
 - ✅ Consistent model behavior across all operations
 - ⚠️ Slightly higher API costs (reasoning model ~30% more expensive than non-reasoning)
 - ⚠️ Marginally slower extraction (~10-15% increase in processing time)
 
 ### Quality
+
 - ✅ More accurate Section L ↔ M relationship mapping
 - ✅ Better detection of nuanced requirement types
 - ✅ Improved clause linkage to evaluation factors
@@ -76,17 +84,20 @@ REASONING_LLM_NAME=grok-4-fast-reasoning
 ### Before Processing New RFPs
 
 1. **Verify .env updated**:
+
    ```bash
    grep "EXTRACTION_LLM_NAME" .env
    # Should show: EXTRACTION_LLM_NAME=grok-4-fast-reasoning
    ```
 
 2. **Restart server** (required for config to take effect):
+
    ```bash
    python app.py
    ```
 
 3. **Test with small RFP** (5-10 pages):
+
    - Upload via WebUI
    - Verify no errors in logs
    - Check entity types are correct (no UNKNOWN)
@@ -102,6 +113,7 @@ REASONING_LLM_NAME=grok-4-fast-reasoning
 **Status**: ✅ Already integrated from branch 012a
 
 The batching code in `src/inference/forbidden_type_cleanup.py` handles large entity sets:
+
 - Processes 50 entities per LLM call (configurable)
 - Prevents token limit errors on large RFPs (400+ pages)
 - Integrated into Phase 6 pipeline in `src/server/routes.py`
