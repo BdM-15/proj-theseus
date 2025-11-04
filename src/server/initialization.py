@@ -199,21 +199,32 @@ async def initialize_raganything():
     # Initialize RAG-Anything with custom configuration
     # IMPORTANT: LightRAG reads chunk_token_size from environment at import time
     # Don't override via lightrag_kwargs - let it use CHUNK_SIZE from .env
+    
+    # Build lightrag_kwargs with Neo4j configuration if enabled
+    lightrag_kwargs = {
+        "addon_params": {
+            "entity_types": entity_types,
+            "entity_extraction_system_prompt": custom_entity_extraction_prompt,
+        },
+        # Chunking configuration comes from environment variables:
+        # - CHUNK_SIZE controls chunk_token_size (default: 8192)
+        # - CHUNK_OVERLAP_SIZE controls chunk_overlap_token_size (default: 1200)
+        # LightRAG reads these at dataclass field initialization time
+    }
+    
+    # Add Neo4j configuration if enabled (from config.py global_args setup)
+    # Note: Neo4j connection details come from environment variables (NEO4J_URI, etc.)
+    # LightRAG reads these automatically - we only need to specify graph_storage type
+    if hasattr(global_args, 'graph_storage') and global_args.graph_storage == "Neo4JStorage":
+        lightrag_kwargs["graph_storage"] = global_args.graph_storage
+        logger.info(f"📊 Configuring RAG-Anything to use Neo4j storage...")
+    
     _rag_anything = RAGAnything(
         config=config,
         llm_model_func=llm_model_func,
         vision_model_func=vision_model_func,
         embedding_func=embedding_func,
-        lightrag_kwargs={
-            "addon_params": {
-                "entity_types": entity_types,
-                "entity_extraction_system_prompt": custom_entity_extraction_prompt,
-            },
-            # Chunking configuration comes from environment variables:
-            # - CHUNK_SIZE controls chunk_token_size (default: 8192)
-            # - CHUNK_OVERLAP_SIZE controls chunk_overlap_token_size (default: 1200)
-            # LightRAG reads these at dataclass field initialization time
-        },
+        lightrag_kwargs=lightrag_kwargs,
     )
     
     # CRITICAL: Ensure LightRAG is initialized BEFORE any document processing

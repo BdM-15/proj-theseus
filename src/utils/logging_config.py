@@ -5,14 +5,14 @@ Sets up structured logging with both file and console output.
 Prevents terminal overflow by using rotating log files.
 
 Features:
-- Dedicated processing.log for RFP processing (RAG-Anything, LightRAG, Phase 6, Phase 7)
+- Dedicated processing.log for RFP processing (RAG-Anything, LightRAG, semantic inference)
 - Filtered console output (no HTTP health check spam)
 - Separate error logging
 - Automatic log rotation (10MB files, 5 backups per log)
 - No duplicate log entries
 
 Log Files Created:
-    logs/processing.log - RFP extraction, entity/relationship counts, Phase 6/7 progress
+    logs/processing.log - RFP extraction, entity/relationship counts, semantic inference progress
     logs/server.log - Server startup, API calls, configuration
     logs/errors.log - All errors from any component
 """
@@ -51,7 +51,7 @@ class HTTPFilter(logging.Filter):
 
 
 class ProcessingFilter(logging.Filter):
-    """Filter to capture RFP processing logs (RAG-Anything, LightRAG, Phase 6/7)"""
+    """Filter to capture RFP processing logs (RAG-Anything, LightRAG, semantic inference)"""
     
     def filter(self, record):
         # Capture logs from processing components
@@ -59,7 +59,7 @@ class ProcessingFilter(logging.Filter):
             "lightrag",
             "raganything",
             "src.server.routes",  # Our processing pipeline
-            "src.inference",  # Phase 6 and Phase 7
+            "src.inference",  # Semantic inference (entity correction, relationship inference, metadata enrichment)
             "src.ingestion",  # Document ingestion
         ]
         
@@ -72,9 +72,9 @@ class ProcessingFilter(logging.Filter):
             "Processing",
             "entities",
             "relationships",
-            "Phase 6",
-            "Phase 7",
+            "semantic",
             "GraphML",
+            "Neo4j",
             "inference",
             "enrichment",
             "parsing",
@@ -118,7 +118,7 @@ def setup_logging(
     Set up comprehensive logging with clean separation of concerns.
     
     Log Files:
-        - processing.log: RFP extraction, entities, relationships, Phase 6/7 details
+        - processing.log: RFP extraction, entities, relationships, semantic inference details
         - server.log: Server startup, initialization, API endpoints
         - errors.log: All errors from any source
     
@@ -217,7 +217,7 @@ def setup_logging(
     logger.info("📋 GovCon Capture Vibe - Logging Initialized")
     logger.info("=" * 70)
     logger.info(f"📂 Log Directory: {log_path.absolute()}")
-    logger.info(f"📄 Processing Log: {processing_log_file.name} (RFP extraction, Phase 6/7)")
+    logger.info(f"📄 Processing Log: {processing_log_file.name} (RFP extraction, semantic inference)")
     logger.info(f"🖥️  Server Log: {server_log_file.name} (startup, API calls)")
     logger.info(f"❌ Error Log: {error_log_file.name} (all errors)")
     logger.info(f"📦 Max File Size: {max_file_size / 1024 / 1024:.1f}MB per file")

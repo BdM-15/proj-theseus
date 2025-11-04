@@ -338,6 +338,41 @@ def save_relationships_to_kv_store(
     logger.info(f"  💾 Saved {len(new_relationships)} relationships to kv_store (individual records + relation_pairs)")
 
 
+def save_enhanced_graphml(
+    graphml_path: Path,
+    nodes: List[Dict],
+    new_relationships: List[Dict]
+) -> None:
+    """
+    Save enhanced knowledge graph with cleaned entities and new relationships to GraphML.
+    
+    This is the main function called after semantic post-processing to persist
+    both entity type corrections and inferred relationships.
+    
+    Args:
+        graphml_path: Path to graph_chunk_entity_relation.graphml file
+        nodes: List of cleaned entity dicts with updated entity_type fields
+        new_relationships: List of inferred relationship dicts
+        
+    Example:
+        save_enhanced_graphml(
+            Path("./rag_storage/graph_chunk_entity_relation.graphml"),
+            cleaned_nodes,
+            inferred_relationships
+        )
+    """
+    logger.info(f"  💾 Saving enhanced graph to GraphML...")
+    
+    # Step 1: Update entity types
+    save_cleaned_entities_to_graphml(graphml_path, nodes)
+    
+    # Step 2: Add new relationships
+    if new_relationships:
+        save_relationships_to_graphml(graphml_path, new_relationships, nodes)
+    
+    logger.info(f"  ✅ Enhanced GraphML saved successfully")
+
+
 def group_entities_by_type(nodes: List[Dict]) -> Dict[str, List[Dict]]:
     """
     Group entities by type for efficient batching.

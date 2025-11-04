@@ -75,7 +75,38 @@ async def process_document_with_semantic_inference(
         parse_method="auto"
     )
     
-    # Step 2: ROBUST - Wait for GraphML with exponential backoff
+    # Check if Neo4j storage is enabled - proceed with Neo4j-aware post-processing
+    import os
+    if os.getenv("GRAPH_STORAGE") == "Neo4JStorage":
+        logger.info("📊 Neo4j storage detected - running Neo4j-native semantic enhancement")
+        
+        # Skip GraphML wait and validation - proceed directly to semantic enhancement
+        # The Neo4j post-processor will read/write directly from/to Neo4j
+        logger.info(f"🤖 Running Neo4j-native semantic knowledge graph enhancement...")
+        from src.inference.semantic_post_processor import enhance_knowledge_graph
+        
+        # Get LLM function - Neo4j processor will use it
+        if not llm_func:
+            logger.error("❌ No LLM function available for semantic enhancement")
+            return {
+                "relationships_inferred": 0,
+                "error": "No LLM function"
+            }
+        
+        inference_result = await enhance_knowledge_graph(
+            rag_storage_path=global_args.working_dir,
+            llm_func=llm_func,
+            batch_size=50
+        )
+        
+        logger.info(f"✅ Neo4j semantic enhancement complete")
+        logger.info(f"   Entities corrected: {inference_result.get('entities_corrected', 0)}")
+        logger.info(f"   Relationships inferred: {inference_result.get('relationships_inferred', 0)}")
+        logger.info(f"   View results in Neo4j Browser: http://localhost:7474")
+        
+        return inference_result
+    
+    # Step 2: ROBUST - Wait for GraphML with exponential backoff (NetworkX storage only)
     # CRITICAL: LightRAG writes to default/ subdirectory, not root working_dir
     graphml_path = Path(global_args.working_dir) / "default" / "graph_chunk_entity_relation.graphml"
     
@@ -127,9 +158,9 @@ async def process_document_with_semantic_inference(
         batch_size=50
     )
     
-    # Step 4.5: Optional metadata enrichment (Phase 7)
+    # Step 4.5: Optional metadata enrichment
     # Extracts structured metadata from entity descriptions WITHOUT modifying descriptions
-    logger.info(f"📊 Running metadata enrichment (Phase 7)...")
+    logger.info(f"📊 Running metadata enrichment...")
     from src.inference.phase7_metadata_enrichment import enrich_entities_with_metadata, save_metadata_to_graphml
     
     # Parse current nodes
@@ -141,9 +172,9 @@ async def process_document_with_semantic_inference(
     # Save metadata back to GraphML
     if sum(enrichment_counts.values()) > 0:
         metadata_saved = save_metadata_to_graphml(graphml_path, nodes_for_enrichment)
-        logger.info(f"✅ Phase 7 complete: {metadata_saved} entities enriched with metadata")
+        logger.info(f"✅ Metadata enrichment complete: {metadata_saved} entities enriched with metadata")
     else:
-        logger.info(f"⏭️  Phase 7: No entities enriched (no matching types found)")
+        logger.info(f"⏭️  Metadata enrichment: No entities enriched (no matching types found)")
     
     # Step 5: Validate AFTER state
     nodes_after, edges_after = parse_graphml(graphml_path)
