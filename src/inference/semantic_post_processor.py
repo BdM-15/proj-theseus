@@ -179,9 +179,18 @@ async def _semantic_post_processor_neo4j(
         entity_updates = []
         grouped = group_entities_by_type(entities)
         
+        # Normalize FORBIDDEN_TYPES to lowercase for case-insensitive matching
+        forbidden_types_lower = [t.lower() for t in FORBIDDEN_TYPES]
+        
         for entity_type, entity_group in grouped.items():
-            # Only process UNKNOWN or forbidden types
-            if entity_type in ['unknown', 'event', 'concept']:
+            entity_type_clean = entity_type.lower()
+            
+            # Strip # prefix if present (LightRAG internal marker)
+            if entity_type_clean.startswith('#'):
+                entity_type_clean = entity_type_clean[1:]
+            
+            # Process UNKNOWN or any forbidden types (table, other, etc.)
+            if entity_type_clean == 'unknown' or entity_type_clean in forbidden_types_lower:
                 logger.info(f"  Processing {len(entity_group)} {entity_type} entities...")
                 
                 for entity in entity_group:
@@ -193,7 +202,7 @@ async def _semantic_post_processor_neo4j(
                         temperature=temperature
                     )
                     
-                    if new_type and new_type.lower() != entity_type:
+                    if new_type and new_type.lower() != entity_type_clean:
                         entity_updates.append({
                             'id': entity['id'],
                             'new_entity_type': new_type
