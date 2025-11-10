@@ -74,62 +74,117 @@ Return ONLY the entity type (lowercase with underscores). No explanation."""
 
 
 async def _infer_relationships_batch(entities: List[Dict], existing_rels: List[Dict], model: str, temperature: float) -> List[Dict]:
-    """Infer missing relationships between entities"""
-    # Build context of entities
-    entity_summary = "\n".join([
-        f"- {e['entity_name']} ({e['entity_type']}): {e.get('description', '')[:100]}"
-        for e in entities[:50]  # Limit to 50 entities per batch
-    ])
+    """
+    Infer missing relationships between entities using chunked batching.
     
-    prompt = f"""You are analyzing a government contracting knowledge graph. Identify missing relationships between these entities:
+    With 2M context window, processes 500 entities per batch with 100-entity overlap.
+    This reduces LLM calls by 90%+ while maintaining cross-batch relationship detection.
+    
+    Args:
+        entities: All entities to analyze
+        existing_rels: Existing relationships (for context)
+        model: LLM model name
+        temperature: LLM temperature
+        
+    Returns:
+        List of inferred relationships
+    """
+    import json
+    
+    all_relationships = []
+    batch_size = 500  # Increased from 50 to leverage 2M context window
+    overlap = 100     # Increased from 25 to maintain relationship coverage
+    total_entities = len(entities)
+    
+    # Build name to ID mapping once
+    name_to_id = {e['entity_name']: e['id'] for e in entities}
+    
+    # Process in overlapping batches
+    batch_num = 0
+    start_idx = 0
+    
+    while start_idx < total_entities:
+        end_idx = min(start_idx + batch_size, total_entities)
+        batch_entities = entities[start_idx:end_idx]
+        batch_num += 1
+        
+        logger.info(f"  Processing batch {batch_num}: entities {start_idx+1}-{end_idx} of {total_entities}")
+        
+        # Build context for this batch
+        entity_summary = "\n".join([
+            f"- {e['entity_name']} ({e['entity_type']}): {e.get('description', '')[:100]}"
+            for e in batch_entities
+        ])
+        
+        prompt = f"""You are analyzing a government contracting knowledge graph. Identify missing relationships between these entities:
 
 {entity_summary}
 
-Existing relationship types: LINKS_TO, REFERENCES, REQUIRES, PART_OF, APPLIES_TO
+Relationship types to use:
+- EVALUATES: Section M evaluation criteria → Section L requirements
+- FULFILLS: Deliverable → Requirement it satisfies
+- REQUIRES: Requirement → Equipment/Resource needed
+- REFERENCES: Document/Section → Another document/section
+- APPLIES_TO: Clause/Regulation → Program/Contract
+- PART_OF: Sub-component → Parent component
 
 Find logical relationships that are missing. For each relationship, provide:
-1. Source entity name
-2. Target entity name  
+1. Source entity name (must be from list above)
+2. Target entity name (must be from list above)
 3. Relationship type (one of the above)
 4. Confidence (0.0-1.0)
 5. Brief reasoning
 
 Format your response as JSON array:
 [
-  {{"source": "entity1", "target": "entity2", "type": "REQUIRES", "confidence": 0.85, "reasoning": "..."}}
+  {{"source": "entity1", "target": "entity2", "type": "EVALUATES", "confidence": 0.85, "reasoning": "..."}}
 ]
 
 Return ONLY the JSON array. If no relationships found, return []."""
-    
-    try:
-        response = await _call_llm_async(prompt, model=model, temperature=temperature)
         
-        # Parse JSON response
-        import json
-        relationships = json.loads(response)
-        
-        # Convert entity names to IDs
-        name_to_id = {e['entity_name']: e['id'] for e in entities}
-        
-        converted = []
-        for rel in relationships:
-            source_id = name_to_id.get(rel['source'])
-            target_id = name_to_id.get(rel['target'])
+        try:
+            response = await _call_llm_async(prompt, model=model, temperature=temperature)
             
-            if source_id and target_id:
-                converted.append({
-                    'source_id': source_id,
-                    'target_id': target_id,
-                    'relationship_type': rel['type'],
-                    'confidence': rel['confidence'],
-                    'reasoning': rel['reasoning']
-                })
+            # Parse JSON response
+            relationships = json.loads(response)
+            
+            # Convert entity names to IDs
+            for rel in relationships:
+                # Handle both 'type' and 'relationship_type' keys
+                rel_type = rel.get('type') or rel.get('relationship_type')
+                if not rel_type:
+                    logger.warning(f"  Skipping relationship without type: {rel}")
+                    continue
+                
+                source_id = name_to_id.get(rel.get('source'))
+                target_id = name_to_id.get(rel.get('target'))
+                
+                if source_id and target_id:
+                    all_relationships.append({
+                        'source_id': source_id,
+                        'target_id': target_id,
+                        'relationship_type': rel_type,
+                        'confidence': rel.get('confidence', 0.7),
+                        'reasoning': rel.get('reasoning', '')
+                    })
+                else:
+                    if not source_id:
+                        logger.warning(f"  Unknown source entity: {rel.get('source')}")
+                    if not target_id:
+                        logger.warning(f"  Unknown target entity: {rel.get('target')}")
+            
+            logger.info(f"    → Found {len(relationships)} relationships in batch {batch_num}")
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"  JSON parse error in batch {batch_num}: {e}")
+        except Exception as e:
+            logger.error(f"  Error inferring relationships in batch {batch_num}: {e}", exc_info=True)
         
-        return converted
-        
-    except Exception as e:
-        logger.error(f"  Error inferring relationships: {e}")
-        return []
+        # Move to next batch with overlap
+        start_idx += (batch_size - overlap)
+    
+    logger.info(f"\n  Total relationships inferred across {batch_num} batches: {len(all_relationships)}")
+    return all_relationships
 
 
 async def _semantic_post_processor_neo4j(
@@ -184,29 +239,46 @@ async def _semantic_post_processor_neo4j(
         
         for entity_type, entity_group in grouped.items():
             entity_type_clean = entity_type.lower()
+            has_hash_prefix = entity_type_clean.startswith('#')
             
             # Strip # prefix if present (LightRAG internal marker)
-            if entity_type_clean.startswith('#'):
+            if has_hash_prefix:
                 entity_type_clean = entity_type_clean[1:]
             
-            # Process UNKNOWN or any forbidden types (table, other, etc.)
-            if entity_type_clean == 'unknown' or entity_type_clean in forbidden_types_lower:
+            # Process entities that need correction:
+            # 1. UNKNOWN types (always need LLM inference)
+            # 2. Forbidden types (need retyping to allowed types)
+            # 3. Hash-prefixed types (corrupted, need cleaning even if underlying type is allowed)
+            needs_correction = (
+                entity_type_clean == 'unknown' or
+                entity_type_clean in forbidden_types_lower or
+                has_hash_prefix
+            )
+            
+            if needs_correction:
                 logger.info(f"  Processing {len(entity_group)} {entity_type} entities...")
                 
                 for entity in entity_group:
-                    # Call LLM to infer correct type
-                    new_type = await _infer_entity_type(
-                        entity_name=entity['entity_name'],
-                        description=entity.get('description', ''),
-                        model=llm_model_name,
-                        temperature=temperature
-                    )
-                    
-                    if new_type and new_type.lower() != entity_type_clean:
+                    # For hash-prefixed allowed types, just remove prefix without LLM call
+                    if has_hash_prefix and entity_type_clean in ALLOWED_TYPES:
                         entity_updates.append({
                             'id': entity['id'],
-                            'new_entity_type': new_type
+                            'new_entity_type': entity_type_clean  # Use cleaned type (no LLM needed)
                         })
+                    else:
+                        # Call LLM to infer correct type (for UNKNOWN or forbidden types)
+                        new_type = await _infer_entity_type(
+                            entity_name=entity['entity_name'],
+                            description=entity.get('description', ''),
+                            model=llm_model_name,
+                            temperature=temperature
+                        )
+                        
+                        if new_type and new_type.lower() != entity_type_clean:
+                            entity_updates.append({
+                                'id': entity['id'],
+                                'new_entity_type': new_type
+                            })
         
         entities_corrected = 0
         if entity_updates:
@@ -231,7 +303,7 @@ async def _semantic_post_processor_neo4j(
         else:
             logger.info("\n✅ No new relationships inferred")
         
-        # Step 4: Summary statistics
+        # Summary statistics
         processing_time = time.time() - start_time
         logger.info("\n" + "="*80)
         logger.info("✅ SEMANTIC POST-PROCESSING COMPLETE (Neo4j)")

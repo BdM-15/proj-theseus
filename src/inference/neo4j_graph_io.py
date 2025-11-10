@@ -125,6 +125,36 @@ class Neo4jGraphIO:
             logger.info(f"  ✅ Updated {count} entity types in Neo4j")
             return count
     
+    def update_entity_properties(self, property_updates: List[Dict]) -> int:
+        """
+        Update entity properties in Neo4j (for workload metadata enrichment).
+        
+        Args:
+            property_updates: List of dicts with 'id' and 'properties' keys
+                - id: Entity elementId
+                - properties: Dict of property_name → property_value
+                
+        Returns:
+            Number of entities updated
+        """
+        query = f"""
+        UNWIND $updates AS update
+        MATCH (n:`{self.workspace}`)
+        WHERE elementId(n) = update.id
+        SET n += update.properties,
+            n.enriched_by = 'workload_metadata_enrichment',
+            n.enriched_at = datetime()
+        RETURN count(n) as updated_count
+        """
+        
+        with self.driver.session(database=self.database) as session:
+            result = session.run(query, updates=property_updates)
+            record = result.single()
+            count = record['updated_count'] if record else 0
+            
+            logger.info(f"  ✅ Updated {count} entities with new properties in Neo4j")
+            return count
+    
     def create_relationships(self, new_relationships: List[Dict]) -> int:
         """
         Create new relationships in Neo4j.

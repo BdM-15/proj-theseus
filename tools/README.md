@@ -36,6 +36,27 @@ python tools/check_neo4j_props.py
 
 Useful for debugging property name issues.
 
+**`validate_rfp_processing.py`** - Production readiness validation ✨ NEW
+
+```powershell
+python tools/validate_rfp_processing.py              # Validate current workspace
+python tools/validate_rfp_processing.py WORKSPACE    # Validate specific workspace
+```
+
+Generates comprehensive validation report with:
+
+- Query quality scoring (30% weight)
+- Section L↔M coverage (25% weight)
+- Workload enrichment completeness (25% weight)
+- Deliverable traceability (20% weight)
+- Overall production readiness score (0-100%)
+
+**Quality Gates:**
+
+- 85%+ = ✅ PRODUCTION READY (deploy with confidence)
+- 70-85% = ⚠️ PASS (minor gaps, document limitations)
+- < 70% = ❌ FAIL (needs reprocessing)
+
 ---
 
 ## Testing Workflow
@@ -48,7 +69,10 @@ python tools/clear_neo4j.py
 
 # 2. Upload RFP via WebUI (http://localhost:9621/webui)
 
-# 3. Assess quality
+# 3. Validate production readiness
+python tools/validate_rfp_processing.py
+
+# 4. (Optional) Assess detailed quality metrics
 python tools/assess_quality.py
 ```
 
@@ -63,12 +87,13 @@ python test_neo4j_quick.py
 
 ## When to Use Each Tool
 
-| Tool                   | Use When            | Time    |
-| ---------------------- | ------------------- | ------- |
-| `clear_neo4j.py`       | Starting fresh test | 5 sec   |
-| `assess_quality.py`    | After processing    | 10 sec  |
-| `check_neo4j_props.py` | Debugging schema    | 2 sec   |
-| `test_neo4j_quick.py`  | Verify system works | 2-5 min |
+| Tool                         | Use When                   | Time    |
+| ---------------------------- | -------------------------- | ------- |
+| `clear_neo4j.py`             | Starting fresh test        | 5 sec   |
+| `validate_rfp_processing.py` | After processing (primary) | 15 sec  |
+| `assess_quality.py`          | Detailed metrics           | 10 sec  |
+| `check_neo4j_props.py`       | Debugging schema           | 2 sec   |
+| `test_neo4j_quick.py`        | Verify system works        | 2-5 min |
 
 ---
 
