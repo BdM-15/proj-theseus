@@ -37,6 +37,55 @@ class SectionLMCoverageValidator:
         self.neo4j_password = os.getenv("NEO4J_PASSWORD", "govcon-capture-2025")
         self.neo4j_database = os.getenv("NEO4J_DATABASE", "neo4j")
     
+    @staticmethod
+    def is_main_evaluation_factor(entity_id: str) -> bool:
+        """
+        Determine if evaluation_factor entity is a main factor vs supporting entity.
+        
+        Matches the filter logic in semantic_post_processor.py Algorithm 2b.
+        
+        Main factors: Factor 1, Subfactor 1.1, Technical Factor, Price Factor, etc.
+        Supporting entities: Rating scales (Outstanding, Good), metrics (95% Compliance),
+                           thresholds, processes (Price Realism Analysis)
+        
+        Args:
+            entity_id: The entity_id string to classify
+        
+        Returns:
+            True if main evaluation factor, False if supporting entity
+        """
+        name_lower = entity_id.lower()
+        
+        # Keep: Main evaluation factors
+        keep_patterns = [
+            'factor 1', 'factor 2', 'factor 3', 'factor 4',
+            'subfactor', 'technical factor', 'price factor',
+            'tomp', 'mission essential', 'quality control plan'
+        ]
+        
+        if any(pattern in name_lower for pattern in keep_patterns):
+            return True
+        
+        # Exclude: Rating terms (supporting entities for HAS_RATING_SCALE)
+        rating_terms = [
+            'outstanding', 'good', 'acceptable', 'marginal', 'unacceptable',
+            'pass', 'fail', 'satisfactory', 'unsatisfactory'
+        ]
+        
+        if any(term in name_lower for term in rating_terms):
+            return False
+        
+        # Exclude: Metrics and thresholds (supporting entities for MEASURED_BY)
+        if any(indicator in name_lower for indicator in ['%', 'rate', 'threshold', 'level']):
+            return False
+        
+        # Exclude: Evaluation processes and tables (supporting entities for EVALUATED_USING)
+        if any(term in name_lower for term in ['evaluation', 'analysis', 'table', '(table)']):
+            return False
+        
+        # Default: Keep as main factor if not explicitly excluded
+        return True
+    
     def validate(self) -> Dict[str, any]:
         """
         Run validation and return results.
@@ -81,24 +130,29 @@ class SectionLMCoverageValidator:
                 result = session.run(query_linked_reqs)
                 results["requirements_linked"] = result.single()["linked"]
                 
-                # Count total evaluation factors
+                # Count total evaluation factors (FILTERED to main factors only)
                 query_evals = f"""
                 MATCH (e:`{self.workspace}`)
                 WHERE e.entity_type = 'evaluation_factor'
-                RETURN count(e) AS total
+                RETURN e.entity_id AS entity_id
                 """
                 result = session.run(query_evals)
-                results["total_eval_factors"] = result.single()["total"]
+                all_eval_factors = [record["entity_id"] for record in result]
+                main_eval_factors = [ef for ef in all_eval_factors if self.is_main_evaluation_factor(ef)]
+                results["total_eval_factors"] = len(main_eval_factors)
+                results["total_eval_factors_all"] = len(all_eval_factors)  # Track for reporting
                 
-                # Count eval factors linked to requirements
+                # Count eval factors linked to requirements (FILTERED to main factors only)
                 query_linked_evals = f"""
                 MATCH (e:`{self.workspace}`)-[rel]-(r:`{self.workspace}`)
                 WHERE e.entity_type = 'evaluation_factor'
                   AND r.entity_type = 'requirement'
-                RETURN count(DISTINCT e) AS linked
+                RETURN DISTINCT e.entity_id AS entity_id
                 """
                 result = session.run(query_linked_evals)
-                results["eval_factors_linked"] = result.single()["linked"]
+                linked_eval_factors = [record["entity_id"] for record in result]
+                main_linked_eval_factors = [ef for ef in linked_eval_factors if self.is_main_evaluation_factor(ef)]
+                results["eval_factors_linked"] = len(main_linked_eval_factors)
                 
                 # Find orphaned requirements (no eval factor links)
                 query_orphaned_reqs = f"""
@@ -114,7 +168,7 @@ class SectionLMCoverageValidator:
                 result = session.run(query_orphaned_reqs)
                 results["orphaned_requirements"] = [record["name"] for record in result]
                 
-                # Find orphaned eval factors (no requirement links)
+                # Find orphaned eval factors (no requirement links) - FILTERED to main factors
                 query_orphaned_evals = f"""
                 MATCH (e:`{self.workspace}`)
                 WHERE e.entity_type = 'evaluation_factor'
@@ -123,10 +177,11 @@ class SectionLMCoverageValidator:
                     WHERE r.entity_type = 'requirement'
                   }}
                 RETURN e.entity_id AS name
-                LIMIT 10
                 """
                 result = session.run(query_orphaned_evals)
-                results["orphaned_eval_factors"] = [record["name"] for record in result]
+                all_orphaned_evals = [record["name"] for record in result]
+                main_orphaned_evals = [ef for ef in all_orphaned_evals if self.is_main_evaluation_factor(ef)]
+                results["orphaned_eval_factors"] = main_orphaned_evals[:10]  # Limit to 10 for display
                 
                 # Calculate score (average of both coverage percentages)
                 if results["total_requirements"] > 0 and results["total_eval_factors"] > 0:
@@ -166,7 +221,11 @@ class SectionLMCoverageValidator:
         
         if results["total_eval_factors"] > 0:
             eval_pct = (results["eval_factors_linked"] / results["total_eval_factors"]) * 100
+            total_all = results.get("total_eval_factors_all", results["total_eval_factors"])
+            filtered_count = total_all - results["total_eval_factors"]
             print(f"Eval Factors: {results['eval_factors_linked']}/{results['total_eval_factors']} linked ({eval_pct:.1f}%)")
+            if filtered_count > 0:
+                print(f"              ({filtered_count} supporting entities filtered: rating scales, metrics, processes)")
         else:
             print(f"⚠️  No evaluation factors found!")
         

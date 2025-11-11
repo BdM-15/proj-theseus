@@ -296,14 +296,82 @@ Return ONLY valid JSON array:
         except Exception as e:
             logger.error(f"    ❌ Algorithm 1 failed: {e}")
     
-    # ALGORITHM 2: Requirement-Evaluation Mapping (Requirements → Evaluation Factors)
+    # ALGORITHM 2A: Evaluation Hierarchy & Metrics (Structure evaluation framework)
+    if eval_factors:
+        logger.info(f"\n  [Algorithm 2a/7] Evaluation Hierarchy: {len(eval_factors)} evaluation entities")
+        
+        prompt_instructions = await _load_prompt_template("evaluation_hierarchy.md")
+        
+        # Build entity JSON with IDs
+        factors_json = json.dumps([{
+            'id': f['id'],
+            'name': f['entity_name'],
+            'type': f.get('entity_type'),
+            'description': f.get('description', '')[:300]
+        } for f in eval_factors], indent=2)
+        
+        prompt = f"""{prompt_instructions}
+
+EVALUATION_FACTOR_ENTITIES:
+{factors_json}
+
+Apply the hierarchy inference patterns from the instructions above. Use entity IDs from 'id' field (NOT names).
+Return ONLY valid JSON array:
+[
+  {{"source_id": "parent_id", "target_id": "child_id", "relationship_type": "HAS_SUBFACTOR|HAS_RATING_SCALE|MEASURED_BY|HAS_THRESHOLD|EVALUATED_USING|DEFINES_SCALE", "confidence": 0.75-0.95, "reasoning": "pattern explanation"}}
+]
+"""
+        
+        try:
+            response = await _call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
+            rels = json.loads(response.strip())
+            # Validate IDs exist
+            valid_rels = []
+            for rel in rels:
+                if rel.get('source_id') in id_to_entity and rel.get('target_id') in id_to_entity:
+                    valid_rels.append(rel)
+                else:
+                    logger.warning(f"  Invalid IDs in relationship: {rel}")
+            all_relationships.extend(valid_rels)
+            logger.info(f"    → Found {len(valid_rels)} evaluation hierarchy relationships")
+        except Exception as e:
+            logger.error(f"    ❌ Algorithm 2a failed: {e}")
+    
+    # ALGORITHM 2B: Requirement-Evaluation Mapping (Requirements → Main Evaluation Factors ONLY)
     requirements = entities_by_type.get('requirement', [])
     
-    # ALGORITHM 2: Requirement-Evaluation Mapping (Requirements → Evaluation Factors)
-    requirements = entities_by_type.get('requirement', [])
+    # Filter to MAIN evaluation factors only (exclude rating scales, metrics, thresholds)
+    def is_main_evaluation_factor(entity):
+        """Identify main evaluation factors vs supporting entities (metrics, ratings, etc.)"""
+        name = entity.get('entity_name', '').lower()
+        desc = entity.get('description', '').lower()
+        
+        # Main factor patterns
+        if any(pattern in name for pattern in ['factor 1', 'factor 2', 'factor 3', 'subfactor', 'technical factor', 'price factor']):
+            return True
+        if 'tomp' in name or 'mission essential' in name or 'quality control plan' in name:
+            return True
+        
+        # Exclude supporting entities
+        rating_terms = ['outstanding', 'good', 'acceptable', 'marginal', 'unacceptable', 'pass', 'fail']
+        if any(term in name for term in rating_terms):
+            return False
+        
+        # Exclude metrics (contains % or numeric thresholds)
+        if '%' in name or 'rate' in name or 'threshold' in name or 'level' in name:
+            return False
+        
+        # Exclude processes/tables
+        if 'evaluation' in name or 'analysis' in name or 'table' in name or '(table)' in name:
+            return False
+        
+        # Default: keep if not clearly a supporting entity
+        return True
     
-    if requirements and eval_factors:
-        logger.info(f"\n  [Algorithm 2/6] Requirement-Evaluation Mapping: {len(requirements)} requirements × {len(eval_factors)} eval factors")
+    main_eval_factors = [f for f in eval_factors if is_main_evaluation_factor(f)]
+    
+    if requirements and main_eval_factors:
+        logger.info(f"\n  [Algorithm 2b/7] Requirement-Evaluation Mapping: {len(requirements)} requirements × {len(main_eval_factors)} main factors (filtered from {len(eval_factors)} total)")
         
         prompt_instructions = await _load_prompt_template("requirement_evaluation.md")
         
@@ -320,7 +388,7 @@ Return ONLY valid JSON array:
             'name': f['entity_name'],
             'type': f.get('entity_type'),
             'description': f.get('description', '')[:200]
-        } for f in eval_factors], indent=2)
+        } for f in main_eval_factors], indent=2)
         
         prompt = f"""{prompt_instructions}
 
@@ -331,6 +399,7 @@ EVALUATION_FACTORS:
 {factors_json}
 
 Apply the inference patterns from the instructions above. Use entity IDs from 'id' field (NOT names).
+Focus ONLY on main evaluation factors (Factor 1, Factor 2, Subfactors). Exclude rating scales, metrics, and thresholds.
 Return ONLY valid JSON array:
 [
   {{"source_id": "requirement_id", "target_id": "factor_id", "relationship_type": "EVALUATED_BY", "confidence": 0.7-0.95, "reasoning": "pattern explanation"}}
@@ -348,17 +417,16 @@ Return ONLY valid JSON array:
                 else:
                     logger.warning(f"  Invalid IDs in relationship: {rel}")
             all_relationships.extend(valid_rels)
-            logger.info(f"    → Found {len(valid_rels)} requirement-evaluation relationships")
+            logger.info(f"    → Found {len(valid_rels)} requirement→main-factor relationships")
         except Exception as e:
-            logger.error(f"    ❌ Algorithm 2 failed: {e}")
+            logger.error(f"    ❌ Algorithm 2b failed: {e}")
     
-    # ALGORITHM 3: Deliverable Tracing (SOW → Deliverables)
     # ALGORITHM 3: Deliverable Tracing (SOW → Deliverables)
     sow_entities = entities_by_type.get('statement_of_work', []) + entities_by_type.get('pws', []) + entities_by_type.get('soo', [])
     deliverables = entities_by_type.get('deliverable', [])
     
     if sow_entities and deliverables:
-        logger.info(f"\n  [Algorithm 3/6] Deliverable Tracing: {len(sow_entities)} work statements × {len(deliverables)} deliverables")
+        logger.info(f"\n  [Algorithm 3/7] Deliverable Tracing: {len(sow_entities)} work statements × {len(deliverables)} deliverables")
         
         prompt_instructions = await _load_prompt_template("sow_deliverable_linking.md")
         
@@ -404,7 +472,7 @@ Return ONLY valid JSON array:
     documents = [e for e in entities if e.get('entity_type') in ['document', 'section', 'attachment', 'annex', 'amendment', 'clause', 'standard', 'specification', 'regulation', 'exhibit']]
     
     if len(documents) > 1:
-        logger.info(f"\n  [Algorithm 4/6] Document Hierarchy (All Document Types): {len(documents)} document entities")
+        logger.info(f"\n  [Algorithm 4/7] Document Hierarchy (All Document Types): {len(documents)} document entities")
         
         prompt_instructions = await _load_prompt_template("document_hierarchy.md")
         
@@ -444,7 +512,7 @@ Return ONLY valid JSON array:
     
     if (concepts or strategic_themes) and eval_factors:
         concept_pool = concepts + strategic_themes
-        logger.info(f"\n  [Algorithm 5/6] Semantic Concept Linking: {len(concept_pool)} concepts/themes")
+        logger.info(f"\n  [Algorithm 5/7] Semantic Concept Linking: {len(concept_pool)} concepts/themes")
         
         prompt_instructions = await _load_prompt_template("semantic_concept_linking.md")
         
@@ -481,7 +549,7 @@ Return ONLY valid JSON array:
             logger.error(f"    ❌ Algorithm 5 failed: {e}")
     
     # ALGORITHM 6: Heuristic Pattern Matching (CDRL cross-refs)
-    logger.info(f"\n  [Algorithm 6/6] Heuristic CDRL Pattern Matching")
+    logger.info(f"\n  [Algorithm 6/7] Heuristic CDRL Pattern Matching")
     
     heuristic_count = 0
     for entity in entities:
@@ -677,7 +745,7 @@ async def enhance_knowledge_graph(
     
     Steps:
     1. Load entities/relationships from GraphML
-    2. Correct entity types (UNKNOWN → proper types)
+    2. Correct entity types (UNKNOWN -> proper types)
     3. Infer missing relationships (semantic understanding)
     4. Save enhanced graph back to GraphML
     
