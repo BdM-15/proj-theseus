@@ -75,10 +75,15 @@ Return ONLY the entity type (lowercase with underscores). No explanation."""
 
 async def _infer_relationships_batch(entities: List[Dict], existing_rels: List[Dict], model: str, temperature: float) -> List[Dict]:
     """
-    Infer missing relationships between entities using chunked batching.
+    Infer missing relationships between entities using chunked batching with ID-based lookups.
     
     With 2M context window, processes 500 entities per batch with 100-entity overlap.
     This reduces LLM calls by 90%+ while maintaining cross-batch relationship detection.
+    
+    **ID-Based Approach (Branch 013a):**
+    - LLM receives entity IDs (e.g., "entity_123") instead of names
+    - Eliminates ambiguity from name mismatches (e.g., "Subfactor 1.1: TOMP" vs "TOMP")
+    - 100% match rate for valid relationships
     
     Args:
         entities: All entities to analyze
@@ -96,8 +101,8 @@ async def _infer_relationships_batch(entities: List[Dict], existing_rels: List[D
     overlap = 100     # Increased from 25 to maintain relationship coverage
     total_entities = len(entities)
     
-    # Build name to ID mapping once
-    name_to_id = {e['entity_name']: e['id'] for e in entities}
+    # Build ID-to-entity mapping and entity reference list for LLM
+    id_to_entity = {e['id']: e for e in entities}
     
     # Process in overlapping batches
     batch_num = 0
@@ -110,15 +115,18 @@ async def _infer_relationships_batch(entities: List[Dict], existing_rels: List[D
         
         logger.info(f"  Processing batch {batch_num}: entities {start_idx+1}-{end_idx} of {total_entities}")
         
-        # Build context for this batch
-        entity_summary = "\n".join([
-            f"- {e['entity_name']} ({e['entity_type']}): {e.get('description', '')[:100]}"
+        # Build entity reference table with IDs (eliminates name ambiguity)
+        # Format: entity_123 | requirement | Task Order Management Plan (TOMP) | Contractor shall develop...
+        entity_table = "ID | Type | Name | Description\n" + ("-" * 80) + "\n"
+        entity_table += "\n".join([
+            f"{e['id']} | {e['entity_type']} | {e['entity_name']} | {e.get('description', '')[:80]}"
             for e in batch_entities
         ])
         
-        prompt = f"""You are analyzing a government contracting knowledge graph. Identify missing relationships between these entities:
+        prompt = f"""You are analyzing a government contracting knowledge graph. Identify missing relationships between these entities.
 
-{entity_summary}
+ENTITY REFERENCE TABLE:
+{entity_table}
 
 Relationship types to use:
 - EVALUATES: Section M evaluation criteria → Section L requirements
@@ -129,15 +137,17 @@ Relationship types to use:
 - PART_OF: Sub-component → Parent component
 
 Find logical relationships that are missing. For each relationship, provide:
-1. Source entity name (must be from list above)
-2. Target entity name (must be from list above)
+1. Source entity ID (from ID column above - e.g., "4:abc123...")
+2. Target entity ID (from ID column above - e.g., "4:def456...")
 3. Relationship type (one of the above)
 4. Confidence (0.0-1.0)
 5. Brief reasoning
 
+**CRITICAL**: Use entity IDs from the table above, NOT entity names. IDs eliminate ambiguity.
+
 Format your response as JSON array:
 [
-  {{"source": "entity1", "target": "entity2", "type": "EVALUATES", "confidence": 0.85, "reasoning": "..."}}
+  {{"source_id": "4:abc123...", "target_id": "4:def456...", "type": "EVALUATES", "confidence": 0.85, "reasoning": "..."}}
 ]
 
 Return ONLY the JSON array. If no relationships found, return []."""
@@ -148,7 +158,7 @@ Return ONLY the JSON array. If no relationships found, return []."""
             # Parse JSON response
             relationships = json.loads(response)
             
-            # Convert entity names to IDs
+            # Validate entity IDs and build relationships
             for rel in relationships:
                 # Handle both 'type' and 'relationship_type' keys
                 rel_type = rel.get('type') or rel.get('relationship_type')
@@ -156,10 +166,11 @@ Return ONLY the JSON array. If no relationships found, return []."""
                     logger.warning(f"  Skipping relationship without type: {rel}")
                     continue
                 
-                source_id = name_to_id.get(rel.get('source'))
-                target_id = name_to_id.get(rel.get('target'))
+                source_id = rel.get('source_id')
+                target_id = rel.get('target_id')
                 
-                if source_id and target_id:
+                # Validate IDs exist in our entity map
+                if source_id in id_to_entity and target_id in id_to_entity:
                     all_relationships.append({
                         'source_id': source_id,
                         'target_id': target_id,
@@ -168,10 +179,10 @@ Return ONLY the JSON array. If no relationships found, return []."""
                         'reasoning': rel.get('reasoning', '')
                     })
                 else:
-                    if not source_id:
-                        logger.warning(f"  Unknown source entity: {rel.get('source')}")
-                    if not target_id:
-                        logger.warning(f"  Unknown target entity: {rel.get('target')}")
+                    if source_id not in id_to_entity:
+                        logger.warning(f"  Invalid source entity ID: {source_id}")
+                    if target_id not in id_to_entity:
+                        logger.warning(f"  Invalid target entity ID: {target_id}")
             
             logger.info(f"    → Found {len(relationships)} relationships in batch {batch_num}")
             

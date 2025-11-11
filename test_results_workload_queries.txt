@@ -1,0 +1,304 @@
+WORKLOAD QUERY TEST RESULTS
+================================================================================
+Workspace: afcapv_adab_iss_2025
+Date: 2025-11-09
+
+
+================================================================================
+Query 1.1: Complete Labor Workload Breakdown
+================================================================================
+### Summary of Scope
+
+Installation Support Services (ISS) at Al Dhafra Air Base (ADAB), United Arab Emirates, under the Air Force Contract Augmentation Program (AFCAP) V Task Order, encompass contractor-managed support for the 380th Expeditionary Force Support Squadron (EFSS). The core services include security escorts, customer service at Community Recreation Program (CRP) locations, recreation and fitness operations, lodging logistics and linen support, equipment/appliance maintenance, and water delivery, as detailed in the Performance Work Statement (PWS) dated 4 April 2025. These services operate across a base period (4 May 2026 to 3 May 2027, including 5-day transition) and up to four 1-year option periods, with potential 6-month extensions under FAR 52.217-8. Workload is driven by 32 performance objectives (POs) in the Contractor Performance Objectives and Thresholds Table, emphasizing zero-tolerance thresholds (e.g., no discrepancies in escorts), uptime requirements (e.g., 95% for equipment), and monthly surveillance. Facilities covered span ~286,698 sq ft (Table 1.1), including the Community Activity Center (C.A.C.), fitness centers, dormitories, and water storage. Labor is primarily U.S. Nationals (USNs) for key roles, with Local Nationals/Other Country Nationals (LN/OCNs) for support; total proposed full-time equivalents (FTEs) in the staffing matrix are placeholders (often 0, requiring estimation). MANDATORY requirements (e.g., 24/7 coverage, 1-hour emergency response) ensure mission continuity in a high-security contingency environment, while IMPORTANT ones (e.g., monthly reporting) support oversight. Implicit workloads include 3-shift rotation for 24/7 operations (~5.2 FTEs per position assuming 40-hour weeks) and surge capacity (e.g., 30% for furniture moves). All metrics below are derived from PWS sections, appendices, and CDRLs for basis-of-estimate (BOE) calculations, assuming 2,080 annual hours per FTE.
+
+Workload drivers are grouped by PWS logical sections/categories: General/Administrative (Sections 1.x), On-Site Operations (Section 4.x), Standby/Contingency (Section 6.x), Key Personnel (Section 5.0), and Appendices (F: Recreation/Fitness; G: Lodging; H: Maintenance; I: Water Delivery). Security Escorts and Customer Service are integrated under Section 4.x as core enablers.
+
+### General/Administrative Requirements (PWS Sections 1.2–1.3)
+
+These drive baseline overhead labor for planning, reporting, and compliance across all services, applying base-wide at ADAB.
+
+- **Task Order Management Plan (TOMP) Development and Updates (CDRL A002, Section 1.2.1)**: Description: Develop and maintain a site-specific plan mirroring the AFCAP V Management Plan, including mobilization schedule, organizational chart, staffing matrix, and compliance with Foreign Clearance Guide/Host Nation requirements (e.g., licenses, permissions). Frequency/Quantity: Initial submission within 10 days of award; updates as required (e.g., quarterly or on changes). Location/Coverage Area: ADAB-wide, coordinated with COR/ACO. Rationale/Context: MANDATORY for award; ensures operational readiness and CTORD by 9 May 2026. Implicit: ~0.5 FTE for planning/coordination (professional services labor).
+  
+- **Reporting and Deliverables Submission (Sections 1.3.4–1.3.8, CDRLs A001–A016)**: Description: Submit monthly performance/cost reports (A007), weekly personnel reports (A010), flash reports for critical events (A006), GFP inventories (A016), and status reports (A004); includes record-keeping and availability upon COR/PCO request. Frequency/Quantity: Monthly (e.g., A007 by 5th of next month); weekly (A010); as-required (e.g., A006 within 24 hours of event); annual inventories. Location/Coverage Area: ADAB office spaces (GFF-provided). Rationale/Context: MANDATORY for compliance (PWS 1.3.8.13); tracks deficiencies, risks, and metrics (e.g., 95% uptime). IMPORTANT for quality assurance. Implicit: ~1 FTE for admin/reporting (e.g., 4–8 hours/week per report type).
+
+- **Quality Control Plan (QCP) Implementation (CDRL A014, Section 1.2.8)**: Description: Task order-specific plan with inspection methods, discrepancy identification, corrective actions, and metrics (e.g., audits, reviews); non-generic, TO-focused. Frequency/Quantity: Initial submission with proposal; monthly reviews/updates; 100% inspection for zero-discrepancy POs. Location/Coverage Area: All Table 1.1 facilities (e.g., C.A.C., fitness centers). Rationale/Context: MANDATORY (unacceptable if generic); ties to 32 POs thresholds (e.g., ≤2 discrepancies/month). Implicit: ~0.25 FTE for ongoing audits (e.g., 2 hours/week).
+
+- **Mission Essential Plan (MEP) Maintenance (Subfactor 1.2, Section 1.3)**: Description: Plan for 30-day continuity during crises (e.g., pandemics), including personnel acquisition, training for remote/alternate work, and notification procedures. Frequency/Quantity: Initial with proposal; annual reviews; as-required drills. Location/Coverage Area: ADAB-wide, with alternate facilities. Rationale/Context: IMPORTANT for contingency; addresses risks like waves of events. Implicit: ~0.1 FTE for planning/drills.
+
+- **Combating Trafficking in Persons (CTIP) Compliance Plan (Subfactor 1.3, Section 1.3)**: Description: Awareness program, reporting hotline, recruitment/wage/housing plans, and subcontractor monitoring per FAR 52.222-50. Frequency/Quantity: Initial with proposal; annual training for all personnel; ongoing monitoring. Location/Coverage Area: All contractor personnel at ADAB. Rationale/Context: MANDATORY (applies to primes/subs); includes Global Human Trafficking Hotline integration. Implicit: ~0.2 FTE for training/admin (e.g., 1-hour sessions for 50+ personnel annually).
+
+- **Staffing Matrix and Organizational Chart (Attachment 5, Section 1.2.1)**: Description: Detail USN/LN/OCN quantities, hours by category/location, totaling proposed FTEs/hours per period. Frequency/Quantity: Initial submission; updates on changes (e.g., quarterly). Location/Coverage Area: ADAB functional areas (e.g., fitness, lodging). Rationale/Context: MANDATORY for TOMP; supports labor realism analysis (e.g., 1,880 base hours per category). Implicit: ~0.5 FTE for maintenance (professional labor).
+
+### On-Site Operations (PWS Section 4.x)
+
+Covers core daily/continuous activities at ADAB facilities (Table 1.1: ~15 sites, 286,698 sq ft), with MANDATORY 24/7 support unless specified.
+
+- **Security Escorts (POs SE1–SE5, Section 4.1)**: Description: Escort personnel/trucks in restricted areas; monitor via 100% inspection; zero discrepancies. Frequency/Quantity: Continuous/on-demand (e.g., 24/7 availability); ~96 water truck escorts/week. Location/Coverage Area: ADAB restricted zones (e.g., Phantom Center, dorms). Rationale/Context: MANDATORY (zero tolerance); supports high-security ops. Implicit: 24/7 implies 3 shifts (~3 FTEs, 40-hour rotation); surge for peaks.
+
+- **Customer Service Desk Coverage (PO-C1, Section 4.1)**: Description: Staff desks for inquiries/reservations; ≤2 discrepancies/month via periodic inspection. Frequency/Quantity: Continuous 24/7 coverage. Location/Coverage Area: CRP locations (e.g., C.A.C. Bldg 3760, 39,656 sq ft). Rationale/Context: MANDATORY for welfare; ensures all-times access. Implicit: 24/7 implies ~5.2 FTEs (3 shifts + overlap).
+
+- **LN/OCN Monitoring (Section 4.3)**: Description: Track non-USN personnel compliance (e.g., vetting per Countries of Concern MFR). Frequency/Quantity: Daily checks; monthly reports. Location/Coverage Area: All ADAB sites with LN/OCNs. Rationale/Context: IMPORTANT for security; ties to access (Section 7.0). Implicit: ~0.25 FTE for oversight.
+
+- **Work Order Management (Section 4.6)**: Description: Process routine/emergency requests; coordinate with 380th ECES. Frequency/Quantity: Emergency submissions within 1 hour; routine daily. Location/Coverage Area: All facilities (e.g., fitness annex Bldg 1730). Rationale/Context: MANDATORY (1-hour SLA); ensures rapid repairs. Implicit: ~1 FTE for dispatch/coordination.
+
+- **HAZMAT Compliance and Training (Section 4.5)**: Description: Manage hazardous materials for maintenance; annual training. Frequency/Quantity: Annual certification; ongoing handling. Location/Coverage Area: Workshop/storage (GFF-provided). Rationale/Context: MANDATORY per DoD standards; supports equipment ops. Implicit: ~0.1 FTE for training (e.g., 8 hours/personnel annually).
+
+- **Health Screening (Section 4.4.1)**: Description: Screen LN/OCN employees pre-hire. Frequency/Quantity: Within 5 days of hire (CDRL A011). Location/Coverage Area: ADAB processing areas. Rationale/Context: MANDATORY for force protection. Implicit: ~0.1 FTE per 10 hires.
+
+### Standby/Contingency Requirements (PWS Section 6.2)
+
+- **Standby Operations**: Description: Maintain readiness for surge/activation in high-security environments. Frequency/Quantity: As-required (e.g., up to 30 days crisis via MEP); periodic drills. Location/Coverage Area: ADAB-wide. Rationale/Context: MANDATORY for contingency; supports FOC transitions. Implicit: ~20% additional FTEs for on-call rotation (e.g., 0.5 FTE base).
+
+### Key Personnel Qualifications (PWS Section 5.0)
+
+Drives specialized labor for oversight; all require SECRET clearance.
+
+- **Site Manager (SM)**: Description: Oversee all ISS; 10+ years experience in rec/fitness/maintenance/POS. Frequency/Quantity: 1 full-time USN. Location/Coverage Area: ADAB central office. Rationale/Context: MANDATORY; empowered decision-maker. Implicit: 1 FTE (professional, 2,080 hours/year).
+
+- **Alternate Site Manager (ASM)**: Description: Backup with 6+ years experience. Frequency/Quantity: 1 full-time USN. Location/Coverage Area: ADAB-wide. Rationale/Context: IMPORTANT for continuity. Implicit: 1 FTE (rotational coverage).
+
+### Appendix F: Recreation Services (POs F1–F15)
+
+Covers morale/welfare at rec areas (e.g., C.A.C., outdoor rec 40,904 sq ft); 24/7 unless noted.
+
+- **Alcohol Sales Tracking/Enforcement (PO-F1)**: Description: Monitor sales/logs; zero violations. Frequency/Quantity: Daily tracking; monthly audits. Location/Coverage Area: C.A.C. (Bldg 3760). Rationale/Context: MANDATORY (zero tolerance). Implicit: ~0.5 FTE.
+
+- **Recreation Events Scheduling (PO-F2)**: Description: Plan/post events; ≤2 late/month. Frequency/Quantity: Weekly events; monthly schedule. Location/Coverage Area: Stage area (Bldg 3762, 16,329 sq ft). Rationale/Context: IMPORTANT for engagement. Implicit: ~1 FTE (event-driven peaks).
+
+- **Inventory Submissions/Par Levels (POs F3–F4)**: Description: Submit monthly inventories; maintain par levels. Frequency/Quantity: Monthly; continuous stocking. Location/Coverage Area: C.A.C./outdoor rec. Rationale/Context: MANDATORY (95% availability). Implicit: ~0.5 FTE.
+
+- **Equipment Operational Status/Bottled Water Stocking (POs F5–F6)**: Description: Ensure 95% uptime; stock water. Frequency/Quantity: Daily checks; ≤2 outages/month. Location/Coverage Area: All rec areas. Rationale/Context: MANDATORY. Implicit: ~1 FTE (inspections).
+
+- **Fitness Center Coverage/Instructor-Led Classes (POs F7–F8)**: Description: 24/7 staffing; daily classes. Frequency/Quantity: Continuous coverage; 5–7 classes/week. Location/Coverage Area: Main/satellite fitness (Bldgs 2724/3807/7572, ~27,664 sq ft total). Rationale/Context: MANDATORY (personnel provision for 24/7). Implicit: ~5.2 FTEs (3 shifts).
+
+- **Special Sports Events/Equipment Cleaning/Trash Pickup (POs F9–F15)**: Description: Weekly events; clean equipment ≤4 misses/month; daily trash. Frequency/Quantity: Weekly events; daily cleaning (e.g., weekly for cycles); daily trash. Location/Coverage Area: Fitness annex (Bldg 1730)/outdoor. Rationale/Context: IMPORTANT; periodic monthly inspections. Implicit: ~2 FTEs (seasonal peaks for events).
+
+### Appendix G: Lodging Logistics Operations and Linen Support
+
+Supports ~110 facilities (dorms/tents/RLB/TLE, ~87,482 sq ft); uses GFF equipment (e.g., 5K/7K forklifts).
+
+- **Furniture Moves (Section G.6)**: Description: Relocate furniture/beds. Frequency/Quantity: 3–6/month; 1–19 rooms/move; 30% surge possible. Location/Coverage Area: Dormitories/tents (Various bldgs). Rationale/Context: On-demand; IMPORTANT for turnover. Implicit: ~1 FTE (forklift-certified; peaks imply overtime).
+
+- **Linen Support/Inventory Management**: Description: Deliver/rotate linens; manage inventory. Frequency/Quantity: Weekly deliveries; monthly inventories. Location/Coverage Area: Wet Stack/RLB/TLE (Various). Rationale/Context: MANDATORY (zero discrepancies). Implicit: ~2 FTEs (logistics team).
+
+### Appendix H: Equipment and Appliance Maintenance
+
+Covers fitness/rec equipment (~$60,000 monthly reimbursables; 95% parts availability).
+
+- **Preventive Maintenance/Repairs (Table in H.4–H.10)**: Description: Clean/repair per schedule (e.g., weekly housing clean; yearly evaluations); 1-week repairs. Frequency/Quantity: Weekly (e.g., treadmills); monthly (strength machines); annual (all); certified techs. Location/Coverage Area: Fitness/rec areas (e.g., stationary cycles in Bldg 2724). Rationale/Context: MANDATORY (95% uptime; 20% inventory growth). Implicit: ~3 FTEs (techs; includes 1-week SLA).
+
+- **Supplies Management**: Description: Track/reorder parts. Frequency/Quantity: Continuous; monthly reports. Location/Coverage Area: Workshops (GFF). Rationale/Context: IMPORTANT. Implicit: ~0.5 FTE.
+
+### Appendix I: Water Delivery Services (POs I1–I4)
+
+Delivers to 110 facilities; uses escorts.
+
+- **Pallet Delivery/Escorting/Inspection/Rotation (POs I1–I3)**: Description: Deliver/escort trucks; inspect/rotate stock (FIFO); label 4-sided; sample/test 1 bottle/pallet. Frequency/Quantity: 96 pallets/week (15–20 daily); Mon–Sat 0700–1800; zero discrepancies. Location/Coverage Area: Water storage lot (Bldg 3818, 4,709 sq ft) to 110 drop-offs. Rationale/Context: MANDATORY (100% inspection). Implicit: ~4 FTEs (daily 8x6 schedule; escorts tie to SE POs).
+
+- **Unscheduled Deliveries/Pickups/Scheduling (PO-I4)**: Description: Handle ad-hoc; submit monthly schedule/map (5 days prior). Frequency/Quantity: ≤2 late/outages/month; monthly submission. Location/Coverage Area: ADAB-wide. Rationale/Context: IMPORTANT; periodic inspections. Implicit: ~1 FTE for scheduling.
+
+### References
+
+- [1] Atch 2 CLIN Structure Price Schedule_ADAB ISS_4 April 25.xlsx
+- [2] Atch 1 ADAB ISS PWS_4 April 25.pdf
+- [3] Amend 1 FOPR ADAB ISS 3 Nov 25.pdf
+
+================================================================================
+Query 2.1: Complete Material/Supply Inventory
+================================================================================
+### Inventory of Materials, Supplies, and Equipment for Installation Support Services
+
+The following inventory is derived from the Performance Work Statement (PWS) and related appendices for Installation Support Services (ISS) at Al Dhafra Air Base (ADAB). It is organized by service area, aligning with PWS subsections and appendices (e.g., Appendix F for Recreational Services, Appendix G for Lodging Logistics and Linen Support, Appendix H for Equipment and Appliance Maintenance Services, and Appendix I for Water Delivery Services). Requirements are distinguished as one-time (capital/durable goods, such as equipment with replacement cycles) versus recurring (consumables for ongoing operations). All items are contractor-furnished unless explicitly flagged as Government-Furnished Equipment (GFE), which reduces contractor costs by eliminating procurement needs for those assets. Quantities, frequencies, and specifications are based on PWS workload estimates, maintenance protocols, and inventory tracking mandates. This covers the base period (4 May 2026 to 3 May 2027, including 5-day transition) and option periods, with recurring items scaled annually. GFP (Government Furnished Property) accountability requires inventories within 30 days of period of performance (POP) start/end, annually, and as directed, using WAWF forms with joint COR-contractor verification.
+
+#### 1. Recreational Services (Appendix F, PWS Sections F.2 and Annex F)
+This service area supports the Community Activity Center (C.A.C.) operations, including recreational programs and fitness center activities for the 380th Expeditionary Force Support Squadron (EFSS). Inventories reference Annex F-3 (C.A.C. Items Inventory spreadsheet) for equipment assembly and delivery. Weekly inventories of consumables are submitted to EFSS to ensure sufficient stock levels.
+
+**CONSUMABLES (Recurring Purchases):**
+- **Item Description:** Complimentary consumable items (e.g., popcorn and other recreation supplies for community events).
+  - **Quantity per Period:** Sufficient to maintain stock for weekly recreational programs (exact quantity not specified; tracked via weekly inventories to avoid shortages).
+  - **Frequency:** Weekly replenishment and submission of inventories to EFSS.
+  - **Unit Specifications:** EFSS/CC-approved parameters for cost of goods; non-alcoholic, mission-supportive items aligned with DAFI 34-101 (Air Force Morale, Welfare, and Recreation Programs).
+- **Distinction:** Recurring costs; contractor-furnished, with purchases reported monthly to track against budget.
+
+**EQUIPMENT (Capital/Durable Goods):**
+- **Item Description:** C.A.C. items (e.g., furniture, recreational gear like tables, chairs, and activity equipment for assembly/delivery).
+  - **Quantity:** As listed in C.A.C. Items Inventory spreadsheet (Annex F-3); supports operations across 39,656 sq ft C.A.C. facility (Bldg 3760, two stories) and 16,329 sq ft stage area (Bldg 3762).
+  - **Model/Specifications:** Per inventory spreadsheet; must comply with Air Force standards for durability and safety (e.g., no co-mingling with GFP per DoDI 5000.64).
+  - **Replacement Cycle:** As per 5-Year Plan documenting life expectancies; replacements planned to ensure at least 95% operational availability within two years, with annual reviews for items beyond economic life.
+- **Distinction:** One-time capital purchase for initial setup, recurring replacements; contractor-furnished.
+
+**GOVERNMENT-FURNISHED EQUIPMENT (GFE):**
+- No specific GFE identified for recreational services; all items are contractor-furnished to maintain full accountability. GFP reporting (CDRL A016) applies if any government items are integrated, but PWS Section 3.1 states no GFP (equipment or vehicles) is furnished.
+
+#### 2. Lodging Logistics and Linen Support (Appendix G, PWS Sections G.2–G.6)
+This covers logistics operations, linen exchange, inventory maintenance, furniture moves, and storage at the warehouse and Bldg 3814 (0700–1900 daily). Annex G1 references the Lodging Items Inventory.xlsx spreadsheet for equipment details. Workload includes 3–6 monthly furniture moves (1–19 rooms per move, up to 30% surge) and <2 monthly inventory discrepancies.
+
+**CONSUMABLES (Recurring Purchases):**
+- **Item Description:** Linen supplies (e.g., sheets, towels for exchange and replenishment).
+  - **Quantity per Period:** Sufficient for daily exchanges at 110+ facilities (dorms, tents, RLB/TLE/Wet Stack units totaling ~87,482 sq ft); exact quantity tracked via inventory to support rotation and check-out verification.
+  - **Frequency:** Daily replenishment during operational hours; monthly scheduling for surges.
+  - **Unit Specifications:** Clean, serviceable linens compliant with AEWI 34-135 (Lodging Occupancy Guidance); first-in-first-out rotation to prevent spoilage.
+- **Distinction:** Recurring costs; contractor-furnished, with monthly purchase reports for tracking.
+
+**EQUIPMENT (Capital/Durable Goods):**
+- **Item Description:** Lodging furniture and appliances (e.g., bunk beds, nightstands, refrigerators, wall lockers for dorms/tents).
+  - **Quantity:** As detailed in Lodging Items Inventory.xlsx (Annex G1); covers 4 dormitories (22,400 sq ft total), 28 tents (650 sq ft total), 36 RLB units (15,600 sq ft), 22 TLE units (15,600 sq ft), and 77 Wet Stack units (8,232 sq ft).
+  - **Model/Specifications:** Government-controlled but maintained by contractor; 95% operational rate per Appendix H integration; supports moves with <48-hour acknowledgment.
+  - **Replacement Cycle:** Annual reviews via Lodging Items Inventory to identify items beyond economic life; 5-Year Plan for planned replacements to achieve 95% availability within two years.
+- **Distinction:** One-time capital for initial inventory build-out, recurring for repairs/replacements; contractor-furnished for maintenance, but core items are GFE (see below).
+- **Item Description:** Storage and handling tools (e.g., non-GFE supplemental carts or shelving for warehouse optimization).
+  - **Quantity:** As needed for floor-to-ceiling storage (G.3.1); not quantified but supports 3–6 monthly moves.
+  - **Model/Specifications:** Durable, compliant with safety standards (AFOSH 48-14 for handling).
+  - **Replacement Cycle:** As per 5-Year Plan; routine maintenance within 72 hours.
+- **Distinction:** Recurring maintenance costs; contractor-furnished.
+
+**GOVERNMENT-FURNISHED EQUIPMENT (GFE):**
+- **Items Provided by Government:** Heli 7K Forklift (Qty: 1, Model: Heli, Condition: Good, Location: DFAC); Heli 5K Forklift (Qty: 1, Model: Heli, Condition: Good, Location: DFAC); Hino Canter Truck (Qty: 1, Model: Hino, Condition: Good, Location: DFAC). These support furniture moves (G.6), inventory/delivery (G.3.1), and surges; government retains control with 24-hour incident reporting to COR.
+  - **Contractor-Furnished vs. GFE Distinction:** Contractor uses GFE for heavy lifting/transport (e.g., 7K for bulk bunk beds, 5K for individual items, truck for shuttling to Bldg 3814/dorms); no contractor procurement needed, reducing capital costs. Contractor-furnished items include linens and minor tools; all GFE must be returned in serviceable condition (PWS 3.2.6).
+- **Impact on Cost Proposal:** GFE eliminates ~$X (estimated based on forklift/truck values) in contractor capital outlay; ODC CLIN (per Appendix H) covers any repairs.
+
+#### 3. Equipment and Appliance Maintenance Services (Appendix H, PWS Sections H.4–H.10)
+This includes preventive maintenance, repairs, and bench stock for fitness equipment, appliances in dorms/laundry (e.g., washers, dryers, refrigerators), and facilities like the Main Fitness Center (22,550 sq ft, Bldg 2724). Targets 95% operational availability, one-week repairs, and certified technicians. Monthly reimbursables up to $60,000 for parts.
+
+**CONSUMABLES (Recurring Purchases):**
+- **Item Description:** Maintenance parts (e.g., oils like 30W oil, cleansers for fitness equipment).
+  - **Quantity per Period:** Bench stock levels to ensure 95% parts availability; sufficient for weekly cleanings and monthly purchases across fitness categories (stationary cycles, treadmills, strength machines) and appliances (95% operational in dorms/laundry).
+  - **Frequency:** Weekly cleanings (e.g., machine housing); monthly purchase reports (H.4.6) for oils/cleansers; as needed for repairs (routine: 72 hours, urgent: 48 hours, emergency: 24 hours).
+  - **Unit Specifications:** COR-approved; 30W oil for lubrication, non-toxic cleansers per AFOSH standards; supports potential 20% inventory growth.
+- **Distinction:** Recurring costs; contractor-furnished, reimbursable via ODC CLIN up to $60,000/month.
+
+**EQUIPMENT (Capital/Durable Goods):**
+- **Item Description:** Fitness equipment (e.g., stationary cycles, treadmills, strength machines in Main/Satellite Fitness Centers and Annex).
+  - **Quantity:** Covers 22,550 sq ft Main Center (Bldg 2724), 3,367 sq ft Phantom Satellite (Bldg 3807), 1,560 sq ft MoTown Satellite (Bldg 7572), and 187 sq ft Annex (Bldg 1730); exact per inventory.
+  - **Model/Specifications:** Certified technician-executed; preventive tasks like yearly evaluations; tied to DAFI 34-114 (Fitness Programs).
+  - **Replacement Cycle:** 5-Year Plan for life expectancies; replacements to address 95% within two years, with annual reviews.
+- **Distinction:** One-time capital for setup, recurring replacements/repairs; contractor-furnished.
+- **Item Description:** Appliances (e.g., refrigerators, washers/dryers in dorms, self-help laundry, and 96,353 sq ft Phantom Center, Bldg 3818).
+  - **Quantity:** Across 110 facilities (dorms/tents totaling ~31,882 sq ft living space).
+  - **Model/Specifications:** 95% operational; work orders via Air Force procedures.
+  - **Replacement Cycle:** Periodic schedules within 15 days of contract start; annual reviews for economic life.
+- **Distinction:** Recurring maintenance; contractor-furnished.
+
+**GOVERNMENT-FURNISHED EQUIPMENT (GFE):**
+- **Items Provided by Government:** Furniture and appliances for lodging maintenance (e.g., bunk beds, refrigerators in dorms; accessible via Lodging Items Inventory.xlsx). These are government-controlled, with contractor responsible for 95% upkeep.
+  - **Contractor-Furnished vs. GFE Distinction:** GFE covers core lodging items (no contractor purchase); contractor-furnishes bench stock parts and tools for repairs. Incidents reported within 24 hours; joint inventories ensure <2 discrepancies/month.
+- **Impact on Cost Proposal:** GFE reduces contractor capital for appliances/furniture (~$X estimated); ODC CLIN reimburses parts/labor.
+
+#### 4. Water Delivery Services (Appendix I, PWS Section I)
+Involves weekly delivery of bottled water to 110 facilities (0700–1800, Mon–Sat), including escorting, inspection, rotation, and sampling.
+
+**CONSUMABLES (Recurring Purchases):**
+- **Item Description:** Bottled water pallets.
+  - **Quantity per Period:** 96 pallets/week (15–20 daily); one bottle sampled per pallet for testing.
+  - **Frequency:** Weekly delivery and rotation (first-in-first-out); monthly scheduling.
+  - **Unit Specifications:** Four-sided labeling; damage inspection; compliant with FDA Food Code for potable water.
+- **Distinction:** Recurring costs; contractor-furnished.
+
+**EQUIPMENT (Capital/Durable Goods):**
+- No capital equipment specified; relies on vehicles (potentially shared with GFE from lodging).
+  - **Distinction:** Minimal; contractor-furnished transport if not using GFE.
+
+**GOVERNMENT-FURNISHED EQUIPMENT (GFE):**
+- No specific GFE for water delivery; contractor-furnished. However, Hino Canter Truck (GFE from Appendix G) may support transport, reducing costs if approved by COR.
+
+#### Additional Cross-Cutting Requirements
+- **Inventory Control System:** Contractor-created for all equipment accountability/returns (PWS-wide); recurring maintenance, one-time setup (capital).
+- **Bench Stock:** Small inventory of parts for fitness repairs (Appendix H); recurring purchases, contractor-furnished, COR-approved.
+- **5-Year Plan:** Documents equipment life expectancies across services; one-time deliverable, informs recurring replacements.
+- **Cost of Goods Parameters:** All consumables within EFSS/CC-approved limits; monthly reports for purchases.
+- **Total Focus for BOM/Procurement:** Recurring consumables drive ~70% of ongoing costs (e.g., linens, water, oils); capital equipment ~30% initial outlay (e.g., fitness gear, with GFE offsetting lodging). Plan for 20% surge capacity; GFP reporting ensures no co-mingling.
+
+### References
+
+* [1] Atch 1 ADAB ISS PWS_4 April 25.pdf
+* [2] Atch 2 CLIN Structure Price Schedule_ADAB ISS_4 April 25.xlsx
+
+================================================================================
+Query 7.1: Government-Furnished Equipment & Facilities
+================================================================================
+### Government-Furnished Equipment (GFE) and Facilities (GFF) Overview
+
+The Performance Work Statement (PWS) for Installation Support Services (ISS) at Al Dhafra Air Base (ADAB) under the Air Force Contract Augmentation Program (AFCAP) outlines limited government support to promote contractor self-sufficiency. Section 3.0 specifies no Government Furnished Property (GFP), with Government Furnished Equipment (GFE) treated as a subset available only through task order modifications and government control. GFF is restricted to facilitative resources without asset liability for the contractor. All GFE and GFF must be used for official contract performance only, returned in serviceable condition (minus normal wear and tear), and subject to Contracting Officer's Representative (COR) inspections and approvals. Improper use triggers a 72-hour remedy period under Section 3.2.1. Contractor-furnished alternatives are implied for non-provided items, as the contract emphasizes contractor accountability for all non-Government resources. No explicit cost savings calculations are detailed in the PWS; however, GFE/GFF reduces contractor procurement needs by providing essential logistics tools and workspaces, aligning with the Task Order's focus on minimal government aid. Delivery dependencies include availability at contract start (4 May 2026, with transition by 9 May 2026), COR joint inventories within 30 days of period of performance (POP) start, and annual reporting via CDRL A016. Risks include delays in COR approvals for access or modifications, potential equipment condition degradation requiring contractor reporting within 24 hours, and base security restrictions limiting access hours.
+
+#### Section 3.0: Government Property, GFF, and Government Furnished Services (GFS)
+This section establishes the baseline: zero GFP (no equipment, vehicles, tools, or special test equipment furnished except via modification), with GFF limited to non-accountable facilities for workspace support. GFS is referenced but not detailed beyond equivalence to military/DoD civilian levels for administrative tools.
+
+**1. Equipment Provided by Government (GFE):**  
+None under this section, as GFP is explicitly zero. GFE, if introduced via modification, would require separate scheduling, inventory, and Wide Area Workflow (WAWF) reporting. Maintenance responsibility falls to the government, with contractor performing operator-level checks only if directed.
+
+**2. Facilities Provided by Government (GFF):**  
+- **Facility Type:** Shared workspace of reasonable size with government employees, including office spaces (desks, chairs, file cabinets, file storage, telephone, LAN connection, one computer per space) and workshop spaces (potentially combined with office/storage). Storage approved via COR inspection; parking at contractor's risk.  
+- **Square Footage, Utilities Included, Access Hours:** Not quantified here; utilities (e.g., LAN, electricity for computers) implied for office/workshop use. Access tied to base operations, requiring compliance with ADAB security and Host Nation requirements.  
+- **Condition:** Move-in ready for basic use; must be returned in serviceable condition. Modifications require AF Form 332 and COR approval; no unapproved alterations.  
+
+**3. Contractor-Furnished Alternatives:**  
+Contractor must provide all property not furnished (e.g., additional tools, vehicles beyond any modified GFE), ensuring self-sufficiency. No specific cost impact stated; however, absence of GFP shifts full procurement/maintenance burden to contractor, potentially requiring lease/purchase for equivalents like computers or storage units if GFF insufficient.
+
+**4. Risk Factors:**  
+- GFE Delivery Delays: N/A due to zero baseline GFP; any modified GFE could delay contract start if not available by 4 May 2026, impacting POP transition.  
+- GFE Condition Issues: N/A; for GFF, obsolescence risks if facilities not maintained, with contractor liable for damage over normal wear.  
+- Facility Access Restrictions: COR approval required for storage/parking; security protocols (e.g., Foreign Clearance Guide) may restrict hours, with 72-hour remedy for misuse leading to withholding payment.
+
+#### Section 3.2: Government Furnished Facilities (GFF)
+This subsection details GFF provisions, emphasizing optimization (e.g., floor-to-ceiling storage) and accountability (e.g., facility managers designated under 3.2.6). Ties to Section 4.1 for on-site ADAB areas.
+
+**1. Equipment Provided by Government (GFE):**  
+None; reinforces zero GFP, with contractor responsible for non-Government tools/equipment.
+
+**2. Facilities Provided by Government (GFF):**  
+- **Facility Type:** Office/workspace (shared with desks, chairs, LAN, computers); workshop areas; approved storage (via COR inspection); parking spaces. Secure areas implied via base access procedures.  
+- **Square Footage, Utilities Included, Access Hours:** Square footage not specified; utilities include LAN/computers for offices. Access per ADAB operations (e.g., 0700-1900 for logistics under related appendices), with escorts for restricted zones.  
+- **Condition:** Serviceable and move-in ready; requires return in original condition minus wear/tear. Storage must be optimized; modifications need written justification and AF Form 332.  
+
+**3. Contractor-Furnished Alternatives:**  
+If GFF storage/workspace insufficient, contractor provides own (e.g., temporary offices or leased storage). No cost impact detailed; contractor bears full expense, potentially via lease to avoid purchase obsolescence.
+
+**4. Risk Factors:**  
+- GFE Delivery Delays: N/A.  
+- GFE Condition Issues: N/A; facility modifications delayed by COR review could cause operational gaps.  
+- Facility Access Restrictions: Parking at contractor risk (e.g., damage liability); security (e.g., DBIDS badges) and Host Nation rules limit access, with zero discrepancies allowed for escort monitoring under related PWS 4.3.
+
+#### Section G.5 and Appendix G: Lodging Logistics Operations and Linen Support
+G.5 outlines government-provided equipment for lodging maintenance, linked to Annex G1 inventory. Supports furniture moves (3-6 monthly, per G.6) and 95% operational appliance rates (Appendix H). Equipment centralized at DFAC for surge response (up to 30%).
+
+**1. Equipment Provided by Government (GFE):**  
+- **Item Description, Quantity, Condition:** Heli 7K Forklift (Qty: 1, Condition: Good); Heli 5K Forklift (Qty: 1, Condition: Good); Hino Canter Truck (Qty: 1, Condition: Good). Used for furniture moves (e.g., bunk beds, refrigerators) and linen logistics.  
+- **Delivery Timeline:** Available at contract start (4 May 2026); joint inventory with COR within 30 days of POP. Accessible via DFAC location.  
+- **Maintenance Responsibility:** Government retains control; contractor reports incidents/damage over $100 within 24 hours to COR and 380th Expeditionary Force Support Squadron (ESFS). Contractor performs operator-level maintenance; repairs via work orders (emergency: 1 hour submission, 24-hour response).  
+
+**2. Facilities Provided by Government (GFF):**  
+- **Facility Type:** Storage warehouse and Building 3814 (linen exchange); ties to Table 1.1 areas like dormitories and tents for logistics support.  
+- **Square Footage, Utilities Included, Access Hours:** Not specified for GFF subset; overall ADAB facilities total ~286,698 sq ft (e.g., dormitories: 22,400 sq ft across 4 units). Utilities implied (e.g., power for appliances). Access: 0700-1900 daily, with escorts for secure areas.  
+- **Condition:** Move-in ready (Good condition for equipment integration); <2 monthly discrepancies goal for inventory.  
+
+**3. Contractor-Furnished Alternatives:**  
+If GFE unavailable (e.g., due to mission needs substitution per G.5), contractor provides equivalents (e.g., leased forklifts/trucks). Cost impact: Full contractor expense; leasing preferred for short-term surges to avoid purchase costs, with no more than 2 unfulfilled requests/month (G.3.1.1).
+
+**4. Risk Factors:**  
+- GFE Delivery Delays: Equipment ready at DFAC but dependent on base access transition (by 9 May 2026); delays could halt furniture moves, triggering CDRL A006 Flash Reports.  
+- GFE Condition Issues: All in Good condition, but obsolescence risks if not maintained; contractor liable for loss/damage, with full reimbursement required.  
+- Facility Access Restrictions: DFAC/warehouse security requires escorts (zero discrepancies for monitoring, PWS 4.3); Host Nation hours limit surges.
+
+#### Section 4.1 and Table 1.1: Contractor-Managed Facilities and Areas at ADAB
+Table 1.1 inventories 15 facilities (~286,698 sq ft total) managed by contractor under GFF provisions, supporting recreation, fitness, and living quarters. Living areas ~35% of total; emphasizes personnel support.
+
+**1. Equipment Provided by Government (GFE):**  
+None directly; references Annex G1 'Lodging Items Inventory.xlsx' for government-controlled items (e.g., bunk beds, refrigerators) accessible via G.5, but not exhaustive list.
+
+**2. Facilities Provided by Government (GFF):**  
+- **Facility Type:** Recreation (C.A.C., Stage area, Outdoor Rec Area); fitness (Main/Satellite Centers, Annex); living quarters (RLB, TLE, Wet Stack, Dormitory, Tent); support (Phantom Center, Water Storage Lot). Warehouse/storage implied for logistics.  
+- **Square Footage, Utilities Included, Access Hours:** Total 286,698 sq ft (e.g., C.A.C.: 39,656 sq ft, two stories; Phantom Center: 96,353 sq ft, single story; Water Storage Lot: 4,709 sq ft, NA). Utilities included for operations (e.g., power, water); access per base (e.g., 24/7 for fitness, restricted for secure living areas).  
+- **Condition:** Move-in ready; two-story indicators for vertical access needs. COR inspections required; return serviceable.  
+
+**3. Contractor-Furnished Alternatives:**  
+Contractor furnishes any non-listed equipment (e.g., additional rec/fitness gear if surge exceeds capacity). Cost impact: Contractor manages via ODC CLIN (Appendix H); leasing for temporary needs (e.g., extra tents) to match 95% operational thresholds without full purchase.
+
+**4. Risk Factors:**  
+- GFE Delivery Delays: N/A; facility handoff by transition end (9 May 2026) critical, with joint inventories flagging issues.  
+- GFE Condition Issues: Potential for non-repairable items (recommendations to COR per H.4.2); obsolescence in modular units (e.g., tents: 650 sq ft total).  
+- Facility Access Restrictions: Security (e.g., LN/OCN escorts, zero discrepancies); two-story facilities increase fall risks, with emergency work orders within 1 hour.
+
+### References
+
+* [1] Atch 1 ADAB ISS PWS_4 April 25.pdf
+* [2] Atch 2 CLIN Structure Price Schedule_ADAB ISS_4 April 25.xlsx
