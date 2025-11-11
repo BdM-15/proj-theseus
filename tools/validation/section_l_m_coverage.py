@@ -21,15 +21,17 @@ from dotenv import load_dotenv
 class SectionLMCoverageValidator:
     """Validates Section L ↔ M requirement/evaluation linkage."""
     
-    def __init__(self, workspace: str):
+    def __init__(self, workspace: str = None):
         """
         Initialize validator.
         
         Args:
             workspace: Neo4j workspace label (e.g., 'afcapv_adab_iss_2025')
+                       If not provided, reads from NEO4J_WORKSPACE env var
         """
         load_dotenv()
-        self.workspace = workspace
+        # Use NEO4J_WORKSPACE from .env if workspace not provided
+        self.workspace = workspace or os.getenv("NEO4J_WORKSPACE", "default")
         self.neo4j_uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
         self.neo4j_user = os.getenv("NEO4J_USER", "neo4j")
         self.neo4j_password = os.getenv("NEO4J_PASSWORD", "govcon-capture-2025")
@@ -106,7 +108,7 @@ class SectionLMCoverageValidator:
                     MATCH (r)-[]-(e:`{self.workspace}`)
                     WHERE e.entity_type = 'evaluation_factor'
                   }}
-                RETURN r.name AS name
+                RETURN r.entity_id AS name
                 LIMIT 10
                 """
                 result = session.run(query_orphaned_reqs)
@@ -120,7 +122,7 @@ class SectionLMCoverageValidator:
                     MATCH (e)-[]-(r:`{self.workspace}`)
                     WHERE r.entity_type = 'requirement'
                   }}
-                RETURN e.name AS name
+                RETURN e.entity_id AS name
                 LIMIT 10
                 """
                 result = session.run(query_orphaned_evals)
