@@ -254,7 +254,7 @@ async def _infer_relationships_multi_algorithm(
     eval_factors = entities_by_type.get('evaluation_factor', [])
     
     if instructions and eval_factors:
-        logger.info(f"\n  [Algorithm 1/6] Instruction-Evaluation Linking: {len(instructions)} instructions × {len(eval_factors)} eval factors")
+        logger.info(f"\n  [Algorithm 1/7] Instruction-Evaluation Linking: {len(instructions)} instructions × {len(eval_factors)} eval factors")
         
         prompt_instructions = await _load_prompt_template("instruction_evaluation_linking.md")
         
@@ -698,6 +698,28 @@ async def _semantic_post_processor_neo4j(
         else:
             logger.info("\n✅ No new relationships inferred")
         
+        # Step 4: Workload Enrichment (BOE metadata for requirements)
+        logger.info("\n🏗️ Step 4: Enriching requirements with workload metadata...")
+        from src.inference.workload_enrichment import enrich_workload_metadata
+        
+        workload_stats = await enrich_workload_metadata(
+            neo4j_io=neo4j_io,
+            llm_func=_call_llm_async,
+            batch_size=50,
+            model=llm_model_name,
+            temperature=temperature
+        )
+        
+        requirements_enriched = workload_stats.get("requirements_enriched", 0)
+        enrichment_rate = workload_stats.get("enrichment_rate", 0)
+        category_distribution = workload_stats.get("category_distribution", {})
+        
+        logger.info(f"\n✅ Workload enrichment complete:")
+        logger.info(f"  Requirements enriched: {requirements_enriched}")
+        logger.info(f"  Enrichment rate:       {enrichment_rate:.1f}%")
+        if category_distribution:
+            logger.info(f"  BOE categories used:   {', '.join([f'{k}:{v}' for k,v in category_distribution.items() if v > 0])}")
+        
         # Summary statistics
         processing_time = time.time() - start_time
         logger.info("\n" + "="*80)
@@ -705,6 +727,7 @@ async def _semantic_post_processor_neo4j(
         logger.info("="*80)
         logger.info(f"  Entities corrected:      {entities_corrected}")
         logger.info(f"  Relationships inferred:  {relationships_inferred}")
+        logger.info(f"  Requirements enriched:   {requirements_enriched}")
         logger.info(f"  Processing time:         {processing_time:.2f}s")
         logger.info("="*80)
         
@@ -718,6 +741,9 @@ async def _semantic_post_processor_neo4j(
             "status": "success",
             "entities_corrected": entities_corrected,
             "relationships_inferred": relationships_inferred,
+            "requirements_enriched": requirements_enriched,
+            "enrichment_rate": enrichment_rate,
+            "category_distribution": category_distribution,
             "processing_time": processing_time,
             "entity_type_counts": type_counts
         }
@@ -729,6 +755,7 @@ async def _semantic_post_processor_neo4j(
             "error": str(e),
             "entities_corrected": 0,
             "relationships_inferred": 0,
+            "requirements_enriched": 0,
             "processing_time": time.time() - start_time
         }
     finally:
