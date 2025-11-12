@@ -446,52 +446,104 @@ Return ONLY valid JSON array:
         except Exception as e:
             logger.error(f"    ❌ Algorithm 2b failed: {e}")
     
-    # ALGORITHM 3: Deliverable Tracing (SOW → Deliverables)
-    sow_entities = entities_by_type.get('statement_of_work', []) + entities_by_type.get('pws', []) + entities_by_type.get('soo', [])
+    # ALGORITHM 3: Deliverable Traceability (Dual-Pattern: Requirements + Work Statements)
+    requirements = entities_by_type.get('requirement', [])
+    work_statements = entities_by_type.get('statement_of_work', []) + entities_by_type.get('pws', []) + entities_by_type.get('soo', [])
     deliverables = entities_by_type.get('deliverable', [])
     
-    if sow_entities and deliverables:
-        logger.info(f"\n  [Algorithm 3/7] Deliverable Tracing: {len(sow_entities)} work statements × {len(deliverables)} deliverables")
+    if deliverables and (requirements or work_statements):
+        logger.info(f"\n  [Algorithm 3/7] Deliverable Traceability: {len(requirements)} requirements + {len(work_statements)} work statements × {len(deliverables)} deliverables")
         
-        prompt_instructions = await _load_prompt_template("sow_deliverable_linking.md")
+        prompt_instructions = await _load_prompt_template("deliverable_traceability.md")
         
-        sow_json = json.dumps([{
-            'id': s['id'],
-            'name': s['entity_name'],
-            'type': s.get('entity_type'),
-            'description': s.get('description', '')[:200]
-        } for s in sow_entities], indent=2)
-        
-        deliv_json = json.dumps([{
-            'id': d['id'],
-            'name': d['entity_name'],
-            'type': d.get('entity_type'),
-            'description': d.get('description', '')[:200]
-        } for d in deliverables], indent=2)
-        
-        prompt = f"""{prompt_instructions}
+        # Pattern 1: Requirement → Deliverable (PRIMARY - captures CDRL/clause/eval deliverables)
+        pattern1_rels = []
+        if requirements:
+            reqs_json = json.dumps([{
+                'id': r['id'],
+                'name': r['entity_name'],
+                'type': r.get('entity_type'),
+                'description': r.get('description', '')[:300]
+            } for r in requirements], indent=2)
+            
+            deliv_json = json.dumps([{
+                'id': d['id'],
+                'name': d['entity_name'],
+                'type': d.get('entity_type'),
+                'description': d.get('description', '')[:200]
+            } for d in deliverables], indent=2)
+            
+            prompt = f"""{prompt_instructions}
 
-WORK_STATEMENTS:
-{sow_json}
+Apply PATTERN 1 (Requirement → Deliverable) detection rules.
+
+REQUIREMENTS:
+{reqs_json}
 
 DELIVERABLES:
 {deliv_json}
 
-Apply the detection rules from the instructions above. Use entity IDs from 'id' field.
+Use entity IDs from 'id' field. Focus on evidence relationships (deliverables that prove/document requirement compliance).
 Return ONLY valid JSON array:
 [
-  {{"source_id": "sow_id", "target_id": "deliverable_id", "relationship_type": "PRODUCES", "confidence": 0.3-0.96, "reasoning": "detection rule explanation"}}
+  {{"source_id": "requirement_id", "target_id": "deliverable_id", "relationship_type": "SATISFIED_BY", "confidence": 0.50-0.95, "reasoning": "evidence relationship explanation"}}
 ]
 """
+            
+            try:
+                response = await _call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
+                rels = json.loads(response.strip())
+                pattern1_rels = [r for r in rels if r.get('source_id') in id_to_entity and r.get('target_id') in id_to_entity]
+                logger.info(f"    → Pattern 1 (Requirement→Deliverable): {len(pattern1_rels)} relationships")
+            except Exception as e:
+                logger.error(f"    ❌ Pattern 1 failed: {e}")
         
-        try:
-            response = await _call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
-            rels = json.loads(response.strip())
-            valid_rels = [r for r in rels if r.get('source_id') in id_to_entity and r.get('target_id') in id_to_entity]
-            all_relationships.extend(valid_rels)
-            logger.info(f"    → Found {len(valid_rels)} SOW→Deliverable relationships")
-        except Exception as e:
-            logger.error(f"    ❌ Algorithm 3 failed: {e}")
+        # Pattern 2: Work Statement → Deliverable (SECONDARY - captures explicit SOW references)
+        pattern2_rels = []
+        if work_statements:
+            work_json = json.dumps([{
+                'id': w['id'],
+                'name': w['entity_name'],
+                'type': w.get('entity_type'),
+                'description': w.get('description', '')[:300]
+            } for w in work_statements], indent=2)
+            
+            deliv_json = json.dumps([{
+                'id': d['id'],
+                'name': d['entity_name'],
+                'type': d.get('entity_type'),
+                'description': d.get('description', '')[:200]
+            } for d in deliverables], indent=2)
+            
+            prompt = f"""{prompt_instructions}
+
+Apply PATTERN 2 (Work Statement → Deliverable) detection rules.
+
+WORK_STATEMENTS:
+{work_json}
+
+DELIVERABLES:
+{deliv_json}
+
+Use entity IDs from 'id' field. Focus on explicit CDRL references and work-product relationships.
+Return ONLY valid JSON array:
+[
+  {{"source_id": "work_statement_id", "target_id": "deliverable_id", "relationship_type": "PRODUCES", "confidence": 0.50-0.96, "reasoning": "explicit reference or work-product explanation"}}
+]
+"""
+            
+            try:
+                response = await _call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
+                rels = json.loads(response.strip())
+                pattern2_rels = [r for r in rels if r.get('source_id') in id_to_entity and r.get('target_id') in id_to_entity]
+                logger.info(f"    → Pattern 2 (WorkStatement→Deliverable): {len(pattern2_rels)} relationships")
+            except Exception as e:
+                logger.error(f"    ❌ Pattern 2 failed: {e}")
+        
+        # Combine both patterns (no deduplication - different relationship types serve different purposes)
+        all_relationships.extend(pattern1_rels)
+        all_relationships.extend(pattern2_rels)
+        logger.info(f"    → Total Deliverable Traceability: {len(pattern1_rels) + len(pattern2_rels)} relationships (Pattern 1: {len(pattern1_rels)}, Pattern 2: {len(pattern2_rels)})")
     
     # ALGORITHM 4: Document Hierarchy (comprehensive - attachments, sections, clauses, standards)
     documents = [e for e in entities if e.get('entity_type') in ['document', 'section', 'attachment', 'annex', 'amendment', 'clause', 'standard', 'specification', 'regulation', 'exhibit']]
