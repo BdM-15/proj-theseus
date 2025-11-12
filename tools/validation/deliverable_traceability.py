@@ -71,11 +71,25 @@ class DeliverableTraceabilityValidator:
                 result = session.run(query_delivs)
                 results["total_deliverables"] = result.single()["total"]
                 
-                # Count deliverables linked to requirements
+                # Count deliverables linked via dual-pattern approach
+                # Pattern 1: REQUIREMENT --SATISFIED_BY--> DELIVERABLE
+                # Pattern 2: STATEMENT_OF_WORK --PRODUCES--> DELIVERABLE
+                # Note: Relationships stored as INFERRED_RELATIONSHIP with type property
                 query_linked_delivs = f"""
-                MATCH (d:`{self.workspace}`)-[rel]-(r:`{self.workspace}`)
+                MATCH (d:`{self.workspace}`)
                 WHERE d.entity_type = 'deliverable'
-                  AND r.entity_type = 'requirement'
+                  AND (
+                    EXISTS {{
+                      MATCH (r:`{self.workspace}`)-[rel:INFERRED_RELATIONSHIP]->(d)
+                      WHERE r.entity_type = 'requirement'
+                        AND rel.type = 'SATISFIED_BY'
+                    }}
+                    OR EXISTS {{
+                      MATCH (w:`{self.workspace}`)-[rel:INFERRED_RELATIONSHIP]->(d)
+                      WHERE w.entity_type IN ['statement_of_work', 'pws', 'soo']
+                        AND rel.type = 'PRODUCES'
+                    }}
+                  )
                 RETURN count(DISTINCT d) AS linked
                 """
                 result = session.run(query_linked_delivs)
@@ -90,23 +104,30 @@ class DeliverableTraceabilityValidator:
                 result = session.run(query_reqs)
                 results["total_requirements"] = result.single()["total"]
                 
-                # Count requirements with deliverable links
+                # Count requirements with deliverable links (via SATISFIED_BY)
                 query_reqs_with_delivs = f"""
-                MATCH (r:`{self.workspace}`)-[rel]-(d:`{self.workspace}`)
+                MATCH (r:`{self.workspace}`)-[rel:INFERRED_RELATIONSHIP]->(d:`{self.workspace}`)
                 WHERE r.entity_type = 'requirement'
                   AND d.entity_type = 'deliverable'
+                  AND rel.type = 'SATISFIED_BY'
                 RETURN count(DISTINCT r) AS linked
                 """
                 result = session.run(query_reqs_with_delivs)
                 results["requirements_with_deliverables"] = result.single()["linked"]
                 
-                # Find orphaned deliverables (no requirement links)
+                # Find orphaned deliverables (no requirement or work statement links)
                 query_orphaned_delivs = f"""
                 MATCH (d:`{self.workspace}`)
                 WHERE d.entity_type = 'deliverable'
                   AND NOT EXISTS {{
-                    MATCH (d)-[]-(r:`{self.workspace}`)
+                    MATCH (r:`{self.workspace}`)-[rel:INFERRED_RELATIONSHIP]->(d)
                     WHERE r.entity_type = 'requirement'
+                      AND rel.type = 'SATISFIED_BY'
+                  }}
+                  AND NOT EXISTS {{
+                    MATCH (w:`{self.workspace}`)-[rel:INFERRED_RELATIONSHIP]->(d)
+                    WHERE w.entity_type IN ['statement_of_work', 'pws', 'soo']
+                      AND rel.type = 'PRODUCES'
                   }}
                 RETURN d.entity_id AS name
                 LIMIT 10
@@ -114,13 +135,14 @@ class DeliverableTraceabilityValidator:
                 result = session.run(query_orphaned_delivs)
                 results["orphaned_deliverables"] = [record["name"] for record in result]
                 
-                # Find requirements without deliverables (may be process requirements)
+                # Find requirements without deliverables (via SATISFIED_BY)
                 query_reqs_no_delivs = f"""
                 MATCH (r:`{self.workspace}`)
                 WHERE r.entity_type = 'requirement'
                   AND NOT EXISTS {{
-                    MATCH (r)-[]-(d:`{self.workspace}`)
+                    MATCH (r)-[rel:INFERRED_RELATIONSHIP]->(d:`{self.workspace}`)
                     WHERE d.entity_type = 'deliverable'
+                      AND rel.type = 'SATISFIED_BY'
                   }}
                 RETURN r.entity_id AS name
                 LIMIT 10
