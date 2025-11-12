@@ -250,11 +250,36 @@ async def _infer_relationships_multi_algorithm(
     system_prompt = await _load_prompt_template("system_prompt.md")
     
     # ALGORITHM 1: Instruction-Evaluation Linking (Submission Instructions → Evaluation Factors)
+    # Content-based agnostic search: find instruction-like entities regardless of type
+    
+    # Traditional submission_instruction entities (UCF Section L)
     instructions = entities_by_type.get('instruction', []) + entities_by_type.get('submission_instruction', [])
+    
+    # Agnostic: Deliverables with submission requirements (Task Orders, CDRLs)
+    deliverables_with_instructions = [
+        e for e in entities_by_type.get('deliverable', [])
+        if any(term in (e.get('description', '') + e.get('entity_name', '')).lower() 
+               for term in ['submit', 'provide', 'page', 'format', 'volume', 'shall include', 
+                           'maximum', 'minimum', 'font', 'address', 'respond'])
+    ]
+    
+    # Agnostic: Requirements with submission verbs (embedded instructions)
+    requirements_with_instructions = [
+        e for e in entities_by_type.get('requirement', [])
+        if e.get('modal_verb') in ['shall', 'must'] and 
+           any(term in e.get('entity_name', '').lower() 
+               for term in ['submit', 'provide', 'proposal', 'response', 'volume', 
+                           'page limit', 'format', 'electronic', 'hard copy'])
+    ]
+    
+    # Combine all instruction sources
+    all_instruction_entities = instructions + deliverables_with_instructions + requirements_with_instructions
+    
     eval_factors = entities_by_type.get('evaluation_factor', [])
     
-    if instructions and eval_factors:
-        logger.info(f"\n  [Algorithm 1/7] Instruction-Evaluation Linking: {len(instructions)} instructions × {len(eval_factors)} eval factors")
+    if all_instruction_entities and eval_factors:
+        logger.info(f"\n  [Algorithm 1/7] Instruction-Evaluation Linking: {len(all_instruction_entities)} instruction entities × {len(eval_factors)} eval factors")
+        logger.info(f"      Sources: {len(instructions)} submission_instruction, {len(deliverables_with_instructions)} deliverables, {len(requirements_with_instructions)} requirements")
         
         prompt_instructions = await _load_prompt_template("instruction_evaluation_linking.md")
         
@@ -263,7 +288,7 @@ async def _infer_relationships_multi_algorithm(
             'name': i['entity_name'],
             'type': i.get('entity_type'),
             'description': i.get('description', '')[:200]
-        } for i in instructions], indent=2)
+        } for i in all_instruction_entities], indent=2)
         
         factors_json = json.dumps([{
             'id': f['id'],
@@ -274,7 +299,7 @@ async def _infer_relationships_multi_algorithm(
         
         prompt = f"""{prompt_instructions}
 
-SUBMISSION INSTRUCTIONS:
+SUBMISSION INSTRUCTIONS (and instruction-like entities):
 {inst_json}
 
 EVALUATION CRITERIA/FACTORS:

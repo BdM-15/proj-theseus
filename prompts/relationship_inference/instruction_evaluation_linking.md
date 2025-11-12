@@ -113,6 +113,50 @@ Section M.1: Technical Approach
 
 ---
 
+## Pattern 4: Agnostic Content-Based Detection (Confidence: 0.75-0.90)
+
+**Signal**: Find instruction-like content regardless of entity type or location
+
+**Instruction Indicators** (look for these in ANY entity type):
+
+- Modal verbs: "shall submit", "must provide", "will include"
+- Format terms: "page limit", "font size", "volume", "maximum pages"
+- Delivery terms: "due date", "submission format", "electronic delivery"
+- Structure terms: "section", "paragraph", "attachment", "annex"
+
+**Evaluation Indicators** (to match against):
+
+- "will be evaluated", "will assess", "will consider"
+- "factor", "criteria", "subfactor", "selection criterion"
+- Relative importance: "significantly important", "most important", "somewhat important"
+
+**Example (FAR 16 Task Order)**:
+
+```
+DELIVERABLE ENTITY: "Technical Proposal"
+Description: "Submit technical approach in PDF format, maximum 20 pages,
+addressing Selection Criteria 1-3 (Technical Capability, Management Approach,
+Past Performance)"
+
+EVALUATION_FACTOR: "Selection Criterion 1: Technical Capability"
+
+EXTRACTION:
+{
+  "source_id": "deliverable_technical_proposal",
+  "target_id": "evaluation_factor_criterion_1",
+  "relationship_type": "GUIDES",
+  "confidence": 0.90,
+  "reasoning": "Deliverable explicitly states 'addressing Selection Criteria 1-3',
+               includes Criterion 1. Contains format instructions (PDF, 20 pages)."
+}
+```
+
+**Key Insight**: In non-UCF structures (Task Orders, IDIQs, Fair Opportunity Notices),
+submission instructions are often embedded in deliverable descriptions or evaluation
+criteria themselves, not separated into "Section L". Search content, not location.
+
+---
+
 ## LLM Inference Prompt Template
 
 Use this prompt structure when calling LLM for instruction-evaluation inference:
@@ -121,21 +165,26 @@ Use this prompt structure when calling LLM for instruction-evaluation inference:
 You are analyzing submission instructions and evaluation criteria/factors
 to determine which instructions guide which evaluation factors.
 
-NOTE: Instructions may be labeled as "Section L", "Proposal Instructions",
-"Response Format", or embedded within factor descriptions depending on RFP structure.
+IMPORTANT: Instructions appear in multiple forms across different RFP structures:
+- UCF RFPs: "Section L" instructions → "Section M" criteria
+- Task Orders: "Proposal Instructions" → "Selection Criteria"
+- Non-UCF: Instructions embedded in deliverables, requirements, or evaluation factors
+- Agnostic: Any entity with submission verbs (shall submit, must provide) and
+  format terms (page limit, font size, volume)
 
-SUBMISSION INSTRUCTIONS:
+SUBMISSION INSTRUCTIONS (and instruction-like entities):
 {json_list_of_submission_instructions}
 
 EVALUATION CRITERIA/FACTORS:
 {json_list_of_evaluation_factors}
 
 TASK:
-For each submission instruction, determine which evaluation factor(s) it guides based on:
+For each submission instruction or instruction-like entity, determine which
+evaluation factor(s) it guides based on:
 
 1. EXPLICIT CROSS-REFERENCES (Confidence 0.95):
-   - Direct mentions: "Volume addresses Factor X"
-   - Factor IDs in text: "M1", "M2.1"
+   - Direct mentions: "Volume addresses Factor X", "responding to Criterion 2"
+   - Factor IDs in text: "M1", "M2.1", "Selection Criterion 1"
 
 2. IMPLICIT CO-LOCATION (Confidence 0.80):
    - Instructions embedded within factor description
@@ -144,6 +193,11 @@ For each submission instruction, determine which evaluation factor(s) it guides 
 3. CONTENT ALIGNMENT (Confidence 0.70):
    - Topic matching: "Technical Volume" → "Technical Approach factor"
    - Keyword overlap: "staffing", "maintenance", "transition"
+
+4. AGNOSTIC CONTENT PATTERNS (Confidence 0.75-0.90):
+   - Deliverable with submission requirements → Factor it addresses
+   - Requirement with submission verbs → Factor it satisfies
+   - Embedded format instructions → Factor containing them
 
 OUTPUT FORMAT:
 Return JSON array of relationships with confidence ≥ 0.70:
