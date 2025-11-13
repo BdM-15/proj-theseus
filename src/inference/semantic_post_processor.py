@@ -209,6 +209,40 @@ async def _load_prompt_template(prompt_filename: str) -> str:
         return ""
 
 
+def _validate_relationships(rels: List[Dict], id_to_entity: Dict, algorithm_name: str) -> List[Dict]:
+    """
+    Validate and filter relationships to ensure required fields are present.
+    
+    Args:
+        rels: List of relationship dicts from LLM
+        id_to_entity: Mapping of entity IDs to entities
+        algorithm_name: Name of algorithm for logging
+        
+    Returns:
+        List of valid relationships with all required fields
+    """
+    valid_rels = []
+    for rel in rels:
+        if (rel.get('source_id') in id_to_entity and 
+            rel.get('target_id') in id_to_entity and 
+            rel.get('relationship_type')):
+            valid_rels.append(rel)
+        else:
+            missing = []
+            if not rel.get('source_id') or rel.get('source_id') not in id_to_entity:
+                missing.append('source_id')
+            if not rel.get('target_id') or rel.get('target_id') not in id_to_entity:
+                missing.append('target_id')
+            if not rel.get('relationship_type'):
+                missing.append('relationship_type')
+            logger.warning(f"    ⚠️ {algorithm_name}: Skipping malformed relationship (missing: {', '.join(missing)})")
+    
+    if len(rels) > len(valid_rels):
+        logger.warning(f"    ⚠️ {algorithm_name}: Filtered out {len(rels) - len(valid_rels)} of {len(rels)} relationships")
+    
+    return valid_rels
+
+
 async def _infer_relationships_multi_algorithm(
     entities: List[Dict],
     existing_rels: List[Dict],
@@ -315,7 +349,7 @@ Return ONLY valid JSON array:
         try:
             response = await _call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
             rels = json.loads(response.strip())
-            valid_rels = [r for r in rels if r.get('source_id') in id_to_entity and r.get('target_id') in id_to_entity]
+            valid_rels = _validate_relationships(rels, id_to_entity, "Algorithm 1")
             all_relationships.extend(valid_rels)
             logger.info(f"    → Found {len(valid_rels)} instruction-evaluation relationships")
         except Exception as e:
@@ -350,13 +384,7 @@ Return ONLY valid JSON array:
         try:
             response = await _call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
             rels = json.loads(response.strip())
-            # Validate IDs exist
-            valid_rels = []
-            for rel in rels:
-                if rel.get('source_id') in id_to_entity and rel.get('target_id') in id_to_entity:
-                    valid_rels.append(rel)
-                else:
-                    logger.warning(f"  Invalid IDs in relationship: {rel}")
+            valid_rels = _validate_relationships(rels, id_to_entity, "Algorithm 2a")
             all_relationships.extend(valid_rels)
             logger.info(f"    → Found {len(valid_rels)} evaluation hierarchy relationships")
         except Exception as e:
@@ -493,7 +521,7 @@ Return ONLY valid JSON array:
             try:
                 response = await _call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
                 rels = json.loads(response.strip())
-                pattern1_rels = [r for r in rels if r.get('source_id') in id_to_entity and r.get('target_id') in id_to_entity]
+                pattern1_rels = _validate_relationships(rels, id_to_entity, "Algorithm 3 Pattern 1")
                 logger.info(f"    → Pattern 1 (Requirement→Deliverable): {len(pattern1_rels)} relationships")
             except Exception as e:
                 logger.error(f"    ❌ Pattern 1 failed: {e}")
@@ -535,7 +563,7 @@ Return ONLY valid JSON array:
             try:
                 response = await _call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
                 rels = json.loads(response.strip())
-                pattern2_rels = [r for r in rels if r.get('source_id') in id_to_entity and r.get('target_id') in id_to_entity]
+                pattern2_rels = _validate_relationships(rels, id_to_entity, "Algorithm 3 Pattern 2")
                 logger.info(f"    → Pattern 2 (WorkStatement→Deliverable): {len(pattern2_rels)} relationships")
             except Exception as e:
                 logger.error(f"    ❌ Pattern 2 failed: {e}")
@@ -576,7 +604,7 @@ Return ONLY valid JSON array:
         try:
             response = await _call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
             rels = json.loads(response.strip())
-            valid_rels = [r for r in rels if r.get('source_id') in id_to_entity and r.get('target_id') in id_to_entity]
+            valid_rels = _validate_relationships(rels, id_to_entity, "Algorithm 4")
             all_relationships.extend(valid_rels)
             logger.info(f"    → Found {len(valid_rels)} document hierarchy relationships")
         except Exception as e:
@@ -619,7 +647,7 @@ Return ONLY valid JSON array:
         try:
             response = await _call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
             rels = json.loads(response.strip())
-            valid_rels = [r for r in rels if r.get('source_id') in id_to_entity and r.get('target_id') in id_to_entity]
+            valid_rels = _validate_relationships(rels, id_to_entity, "Algorithm 5")
             all_relationships.extend(valid_rels)
             logger.info(f"    → Found {len(valid_rels)} semantic concept relationships")
         except Exception as e:
