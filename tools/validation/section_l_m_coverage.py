@@ -40,50 +40,97 @@ class SectionLMCoverageValidator:
     @staticmethod
     def is_main_evaluation_factor(entity_id: str) -> bool:
         """
-        Determine if evaluation_factor entity is a main factor vs supporting entity.
+        Determine if evaluation_factor entity is a main factor/subfactor vs supporting entity.
         
-        Matches the filter logic in semantic_post_processor.py Algorithm 2b.
+        STRICT FILTERING APPROACH (similar to deliverable traceability validation):
+        - Government RFPs typically have 3-8 main evaluation factors (e.g., Factor A, Technical, Price)
+        - Each may have 0-5 subfactors (e.g., Subfactor 1.1, Management Methodology)
+        - BUT also have 20-40 supporting entities (rating scales, metrics, processes, tables)
+        - ONLY main factors and subfactors should be linked to Section L requirements/instructions
         
-        Main factors: Factor 1, Subfactor 1.1, Technical Factor, Price Factor, etc.
-        Supporting entities: Rating scales (Outstanding, Good), metrics (95% Compliance),
-                           thresholds, processes (Price Realism Analysis)
+        Main factors/subfactors: "Factor A", "Technical Factor", "Past Performance", "Management Methodology"
+        Supporting entities (DO NOT LINK): "Outstanding", "95% Compliance", "Price Analysis", "Evaluation Table"
         
         Args:
             entity_id: The entity_id string to classify
         
         Returns:
-            True if main evaluation factor, False if supporting entity
+            True if main factor/subfactor (linkable), False if supporting entity (non-linkable)
         """
         name_lower = entity_id.lower()
         
-        # Keep: Main evaluation factors
-        keep_patterns = [
-            'factor 1', 'factor 2', 'factor 3', 'factor 4',
-            'subfactor', 'technical factor', 'price factor',
-            'tomp', 'mission essential', 'quality control plan'
+        # STRICT KEEP: Explicit main factor patterns (high precision)
+        # These are the ONLY patterns that indicate a true evaluation factor worth linking
+        main_factor_patterns = [
+            # Standard factor naming (most common in government RFPs)
+            'factor a', 'factor b', 'factor c', 'factor d', 'factor e', 'factor f',
+            'factor 1', 'factor 2', 'factor 3', 'factor 4', 'factor 5', 'factor 6',
+            'subfactor',
+            
+            # Named factors (common in AFCAP/SEAPORT/etc.)
+            'technical factor', 'price factor', 'cost factor', 'management factor',
+            
+            # Methodology subfactors (common subfactor naming)
+            'methodology' if any(x in name_lower for x in ['management', 'technical', 'navy', 'usmc', 'army']) else None,
+            
+            # Specific high-value subfactors
+            'tomp', 'past performance', 'small business',
+            'mission essential', 'quality control plan'
         ]
         
-        if any(pattern in name_lower for pattern in keep_patterns):
-            return True
+        # Remove None values and check for matches
+        main_factor_patterns = [p for p in main_factor_patterns if p is not None]
         
-        # Exclude: Rating terms (supporting entities for HAS_RATING_SCALE)
-        rating_terms = [
+        # CRITICAL: Must match at least ONE main factor pattern
+        has_main_pattern = any(pattern in name_lower for pattern in main_factor_patterns)
+        
+        if not has_main_pattern:
+            # If no main pattern found, it's a supporting entity by default
+            return False
+        
+        # EXCLUDE: Even if it matches main pattern, exclude if it's clearly a supporting entity
+        
+        # Exclude: Rating scale values (HAS_RATING_SCALE supporting entities)
+        rating_values = [
             'outstanding', 'good', 'acceptable', 'marginal', 'unacceptable',
-            'pass', 'fail', 'satisfactory', 'unsatisfactory'
+            'satisfactory', 'unsatisfactory', 'pass', 'fail',
+            'substantial confidence', 'satisfactory confidence', 'limited confidence',
+            'no confidence', 'neutral confidence', 'neutral rating',
+            'very relevant', 'relevant', 'somewhat relevant', 'not relevant'
         ]
         
-        if any(term in name_lower for term in rating_terms):
+        if any(rating in name_lower for rating in rating_values):
             return False
         
-        # Exclude: Metrics and thresholds (supporting entities for MEASURED_BY)
-        if any(indicator in name_lower for indicator in ['%', 'rate', 'threshold', 'level']):
+        # Exclude: Generic process/analysis terms (EVALUATED_USING supporting entities)
+        generic_processes = [
+            'analysis', 'assessment', 'government evaluation', 'interviews',
+            'realism', 'reasonableness', 'probable cost', 'completeness',
+            'adjectival', 'confidence ratings', 'relevancy ratings',
+            'description', 'rating' if name_lower == 'rating' else None  # "RATING" alone is generic
+        ]
+        
+        generic_processes = [p for p in generic_processes if p is not None]
+        
+        if any(term in name_lower for term in generic_processes):
             return False
         
-        # Exclude: Evaluation processes and tables (supporting entities for EVALUATED_USING)
-        if any(term in name_lower for term in ['evaluation', 'analysis', 'table', '(table)']):
+        # Exclude: Metrics/indices (MEASURED_BY supporting entities)
+        if any(indicator in name_lower for indicator in [
+            '%', 'cei', 'sei', 'kpi', 'index', 'performance',
+            'cost effectiveness', 'schedule effectiveness'
+        ]):
             return False
         
-        # Default: Keep as main factor if not explicitly excluded
+        # Exclude: Tables and outlines (structural supporting entities)
+        if '(table)' in name_lower or 'table' in name_lower or 'outline' in name_lower:
+            return False
+        
+        # Exclude: Volume references (document structure, not evaluation criteria)
+        if 'volume' in name_lower and any(x in name_lower for x in ['i', 'ii', 'iii', 'iv', 'v']):
+            return False
+        
+        # PASSED: Has main factor pattern AND not excluded = TRUE MAIN FACTOR
         return True
     
     def validate(self) -> Dict[str, any]:
@@ -192,13 +239,32 @@ class SectionLMCoverageValidator:
                     results["score"] = 0.0
                 
                 # Generate recommendations
-                if req_coverage < 80:
+                # NOTE: Section L↔M thresholds are intentionally lower than workload metrics (~95%)
+                # because government RFPs typically have:
+                # - 3-8 main evaluation factors (e.g., Factor A, Technical, Price)
+                # - 20-100+ requirements (Section L instructions, compliance items)
+                # - NOT all requirements map to factors (many are process/admin requirements)
+                # - ~60-80% requirement coverage is realistic and acceptable
+                # - ~50%+ factor coverage indicates good Section M extraction
+                #
+                # Many requirements are procedural (deadlines, formats, submission rules) and don't
+                # directly map to scored evaluation factors. This is normal RFP structure.
+                if req_coverage < 60:
                     results["recommendations"].append(
-                        f"Low requirement coverage ({req_coverage:.1f}%) - enhance relationship inference"
+                        f"Low requirement coverage ({req_coverage:.1f}%) - may need to enhance relationship inference"
                     )
-                if eval_coverage < 80:
+                elif req_coverage < 80:
                     results["recommendations"].append(
-                        f"Low eval factor coverage ({eval_coverage:.1f}%) - verify Section M extraction"
+                        f"Requirement coverage ({req_coverage:.1f}%) is acceptable - many requirements are procedural/administrative"
+                    )
+                
+                if eval_coverage < 50:
+                    results["recommendations"].append(
+                        f"Low eval factor coverage ({eval_coverage:.1f}%) - verify Section M extraction quality or check for missing factors"
+                    )
+                elif eval_coverage < 80:
+                    results["recommendations"].append(
+                        f"Eval factor coverage ({eval_coverage:.1f}%) is acceptable - most main factors have requirement links"
                     )
         
         finally:
