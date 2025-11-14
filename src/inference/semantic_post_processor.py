@@ -394,31 +394,68 @@ Return ONLY valid JSON array:
     requirements = entities_by_type.get('requirement', [])
     
     # Filter to MAIN evaluation factors only (exclude rating scales, metrics, thresholds)
+    # STRICT FILTERING (Branch 014/015): Aligned with validation - explicit main patterns only
     def is_main_evaluation_factor(entity):
-        """Identify main evaluation factors vs supporting entities (metrics, ratings, etc.)"""
-        name = entity.get('entity_name', '').lower()
-        desc = entity.get('description', '').lower()
+        """
+        Identify main evaluation factors vs supporting entities.
         
-        # Main factor patterns
-        if any(pattern in name for pattern in ['factor 1', 'factor 2', 'factor 3', 'subfactor', 'technical factor', 'price factor']):
-            return True
-        if 'tomp' in name or 'mission essential' in name or 'quality control plan' in name:
-            return True
+        CRITICAL: Government RFPs have 3-8 main factors BUT 40-100+ total eval factor entities.
+        70-90% are supporting entities (rating scales, metrics, processes, tables).
+        ONLY link main factors/subfactors to requirements for accurate coverage metrics.
         
-        # Exclude supporting entities
-        rating_terms = ['outstanding', 'good', 'acceptable', 'marginal', 'unacceptable', 'pass', 'fail']
-        if any(term in name for term in rating_terms):
+        Returns:
+            True if main factor/subfactor (linkable), False if supporting entity
+        """
+        name_lower = entity.get('entity_name', '').lower()
+        
+        # STRICT KEEP: Explicit main factor patterns only
+        main_factor_patterns = [
+            'factor a', 'factor b', 'factor c', 'factor d', 'factor e', 'factor f',
+            'factor 1', 'factor 2', 'factor 3', 'factor 4', 'factor 5', 'factor 6',
+            'subfactor',
+            'technical factor', 'price factor', 'cost factor', 'management factor',
+            'tomp', 'past performance', 'small business',
+            'mission essential', 'quality control plan'
+        ]
+        
+        # Check for methodology subfactors (conditional)
+        if 'methodology' in name_lower and any(x in name_lower for x in ['management', 'technical', 'navy', 'usmc', 'army']):
+            main_factor_patterns.append('methodology')
+        
+        # CRITICAL: Must match at least ONE main factor pattern (default EXCLUDE)
+        has_main_pattern = any(pattern in name_lower for pattern in main_factor_patterns)
+        if not has_main_pattern:
             return False
         
-        # Exclude metrics (contains % or numeric thresholds)
-        if '%' in name or 'rate' in name or 'threshold' in name or 'level' in name:
+        # EXCLUDE: Even if main pattern matched, exclude supporting entities
+        
+        # Rating scale values
+        rating_values = ['outstanding', 'good', 'acceptable', 'marginal', 'unacceptable',
+                        'satisfactory', 'unsatisfactory', 'pass', 'fail',
+                        'substantial confidence', 'limited confidence', 'neutral confidence',
+                        'very relevant', 'relevant', 'somewhat relevant', 'not relevant']
+        if any(rating in name_lower for rating in rating_values):
             return False
         
-        # Exclude processes/tables
-        if 'evaluation' in name or 'analysis' in name or 'table' in name or '(table)' in name:
+        # Generic processes/analyses
+        generic_processes = ['analysis', 'assessment', 'government evaluation', 'interviews',
+                           'realism', 'reasonableness', 'completeness', 'adjectival']
+        if any(term in name_lower for term in generic_processes):
             return False
         
-        # Default: keep if not clearly a supporting entity
+        # Metrics/indices
+        if any(indicator in name_lower for indicator in ['%', 'cei', 'sei', 'kpi', 'index', 'cost effectiveness']):
+            return False
+        
+        # Tables/outlines
+        if '(table)' in name_lower or 'table' in name_lower or 'outline' in name_lower:
+            return False
+        
+        # Volume references
+        if 'volume' in name_lower and any(x in name_lower for x in ['i', 'ii', 'iii', 'iv', 'v']):
+            return False
+        
+        # PASSED: Has main pattern AND not excluded = TRUE MAIN FACTOR
         return True
     
     main_eval_factors = [f for f in eval_factors if is_main_evaluation_factor(f)]
@@ -429,18 +466,21 @@ Return ONLY valid JSON array:
         prompt_instructions = await _load_prompt_template("requirement_evaluation.md")
         
         # Build entity JSON with IDs
+        # ENHANCEMENT (Branch 015): Include full descriptions for semantic matching
+        # Evaluation factor descriptions contain topic keywords (e.g., "evaluating management, staffing, quality")
+        # This enables matching generic factor labels (Factor A, Factor B) to requirement content
         reqs_json = json.dumps([{
             'id': r['id'],
             'name': r['entity_name'],
             'type': r.get('entity_type'),
-            'description': r.get('description', '')[:200]
+            'description': r.get('description', '')[:500]  # Increased from 200 to capture full semantic context
         } for r in requirements], indent=2)
         
         factors_json = json.dumps([{
             'id': f['id'],
             'name': f['entity_name'],
             'type': f.get('entity_type'),
-            'description': f.get('description', '')[:200]
+            'description': f.get('description', '')[:500]  # Increased from 200 to capture evaluation criteria/topics
         } for f in main_eval_factors], indent=2)
         
         prompt = f"""{prompt_instructions}
@@ -450,6 +490,12 @@ REQUIREMENTS:
 
 EVALUATION_FACTORS:
 {factors_json}
+
+CRITICAL INSTRUCTION - Use factor descriptions for semantic matching:
+- Factor names may be generic (Factor A, Factor B, Factor 1, etc.)
+- Factor descriptions contain evaluation criteria and topics (e.g., "evaluating management approach, staffing methodology")
+- Match requirement CONTENT to factor DESCRIPTION topics, not just factor names
+- Example: "Factor A" with description "evaluating management methodology" matches requirements about management/staffing
 
 Apply the inference patterns from the instructions above. Use entity IDs from 'id' field (NOT names).
 Focus ONLY on main evaluation factors (Factor 1, Factor 2, Subfactors). Exclude rating scales, metrics, and thresholds.
