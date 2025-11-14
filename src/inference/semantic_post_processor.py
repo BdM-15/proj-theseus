@@ -429,18 +429,21 @@ Return ONLY valid JSON array:
         prompt_instructions = await _load_prompt_template("requirement_evaluation.md")
         
         # Build entity JSON with IDs
+        # ENHANCEMENT (Branch 015): Include full descriptions for semantic matching
+        # Evaluation factor descriptions contain topic keywords (e.g., "evaluating management, staffing, quality")
+        # This enables matching generic factor labels (Factor A, Factor B) to requirement content
         reqs_json = json.dumps([{
             'id': r['id'],
             'name': r['entity_name'],
             'type': r.get('entity_type'),
-            'description': r.get('description', '')[:200]
+            'description': r.get('description', '')[:500]  # Increased from 200 to capture full semantic context
         } for r in requirements], indent=2)
         
         factors_json = json.dumps([{
             'id': f['id'],
             'name': f['entity_name'],
             'type': f.get('entity_type'),
-            'description': f.get('description', '')[:200]
+            'description': f.get('description', '')[:500]  # Increased from 200 to capture evaluation criteria/topics
         } for f in main_eval_factors], indent=2)
         
         prompt = f"""{prompt_instructions}
@@ -450,6 +453,12 @@ REQUIREMENTS:
 
 EVALUATION_FACTORS:
 {factors_json}
+
+CRITICAL INSTRUCTION - Use factor descriptions for semantic matching:
+- Factor names may be generic (Factor A, Factor B, Factor 1, etc.)
+- Factor descriptions contain evaluation criteria and topics (e.g., "evaluating management approach, staffing methodology")
+- Match requirement CONTENT to factor DESCRIPTION topics, not just factor names
+- Example: "Factor A" with description "evaluating management methodology" matches requirements about management/staffing
 
 Apply the inference patterns from the instructions above. Use entity IDs from 'id' field (NOT names).
 Focus ONLY on main evaluation factors (Factor 1, Factor 2, Subfactors). Exclude rating scales, metrics, and thresholds.
