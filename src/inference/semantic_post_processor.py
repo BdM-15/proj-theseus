@@ -266,13 +266,17 @@ async def _resolve_orphan_patterns(
     temperature: float
 ) -> List[Dict]:
     """
-    Resolve orphaned entities using 4 targeted pattern matchers.
+    Resolve orphaned entities using LLM-powered relationship inference.
+    
+    Strategy: Single batched LLM call with all orphans + connected entities
+    for focused inference. More efficient than per-orphan calls and more
+    adaptive than regex patterns.
     
     Patterns addressed:
-    1. Equipment-Requirement Quantified: "X must be Y Z times" → REQUIRES
-    2. Government-Provided Equipment: "Gov't provides X for Y" → ENABLED_BY
-    3. Person-Deliverable Submitter: "Person shall submit deliverable" → RESPONSIBLE_FOR
-    4. Table-Embedded Field Context: "field in X table" → FIELD_IN
+    - Equipment/Technology → Requirements (quantified, Gov't-provided)
+    - Person → Deliverable (submission responsibilities)
+    - Concept → Document (table fields, data elements)
+    - Any other missing relationships the LLM detects
     
     Args:
         entities: All entities to analyze
@@ -283,19 +287,26 @@ async def _resolve_orphan_patterns(
     Returns:
         List of relationships for orphan patterns
     """
-    import re
-    from difflib import SequenceMatcher
+    import json
     
-    all_orphan_rels = []
-    
-    # Identify orphaned entities (no relationships as source or target)
+    # Identify orphaned entities (entities with no relationships)
+    # Note: In Neo4j, entities already have relationships stored, so we look for
+    # entities that were never connected during Algorithms 1-7
     entity_ids_with_rels = set()
-    for entity in entities:
-        # Check if entity has any relationships stored in its metadata
-        if entity.get('relationships'):
-            entity_ids_with_rels.add(entity['id'])
     
-    orphaned = [e for e in entities if e['id'] not in entity_ids_with_rels]
+    # For each entity, check if it appears as source/target in any existing relationships
+    # This is implicitly handled by Neo4j - entities without edges won't have relationship metadata
+    # We rely on the fact that connected entities have relationship_type fields populated
+    
+    # Simple heuristic: Check if entity has minimal connections (0-1 relationships)
+    # This catches true orphans and weakly connected entities that may need more links
+    orphaned = []
+    for entity in entities:
+        # Count relationships this entity participates in
+        # Neo4j entities store relationships in metadata
+        rel_types = entity.get('relationships', [])
+        if isinstance(rel_types, list) and len(rel_types) == 0:
+            orphaned.append(entity)
     
     if not orphaned:
         logger.info("    → No orphaned entities found")
@@ -303,7 +314,7 @@ async def _resolve_orphan_patterns(
     
     logger.info(f"    → Found {len(orphaned)} orphaned entities")
     
-    # Build entity type indices for fast lookup
+    # Build entity type indices for candidate relationships
     entities_by_type = {}
     for e in entities:
         etype = e.get('entity_type', 'concept')
@@ -311,143 +322,92 @@ async def _resolve_orphan_patterns(
             entities_by_type[etype] = []
         entities_by_type[etype].append(e)
     
-    # Pattern 1: Equipment-Requirement Quantified Matcher
-    # Pattern: "X [equipment] must be Y [action] Z [frequency/metric]"
-    equipment_orphans = [e for e in orphaned if e.get('entity_type') == 'equipment']
-    requirements = entities_by_type.get('requirement', [])
+    # Gather candidate entities for linking (focus on high-value types)
+    candidate_types = ['requirement', 'deliverable', 'document', 'clause', 'section', 
+                      'work_statement', 'evaluation_factor', 'technology', 'equipment']
     
-    if equipment_orphans and requirements:
-        logger.info(f"    → Pattern 1: Checking {len(equipment_orphans)} orphaned equipment against {len(requirements)} requirements")
-        
-        for eq in equipment_orphans:
-            eq_name = eq.get('entity_name', '').lower()
-            eq_desc = eq.get('description', '').lower()
-            
-            # Look for equipment name in requirement descriptions with quantified actions
-            quantified_patterns = [
-                r'\b\d+\s*(?:times?|per|twice|daily|weekly)\b',  # Frequency
-                r'\bmust be\b.*\b(?:emptied|cleaned|maintained|provided)\b',  # Action requirement
-                r'\b(?:no less than|at least|minimum)\b',  # Quantity/threshold
-            ]
-            
-            for req in requirements:
-                req_desc = req.get('description', '').lower()
-                
-                # Check if equipment name appears in requirement
-                if eq_name in req_desc or any(word in req_desc for word in eq_name.split()):
-                    # Check if requirement has quantified pattern
-                    if any(re.search(pattern, req_desc) for pattern in quantified_patterns):
-                        all_orphan_rels.append({
-                            'source_id': req['id'],
-                            'target_id': eq['id'],
-                            'relationship_type': 'REQUIRES',
-                            'confidence': 0.85,
-                            'reasoning': f"Pattern 1: Quantified requirement '{req.get('entity_name')}' mentions equipment '{eq.get('entity_name')}'"
-                        })
-                        logger.debug(f"      → Linked {req.get('entity_name')} REQUIRES {eq.get('entity_name')}")
-                        break  # One relationship per orphan
+    candidates = []
+    for etype in candidate_types:
+        candidates.extend(entities_by_type.get(etype, []))
     
-    # Pattern 2: Government-Provided Equipment Linker
-    # Pattern: "Government provides/furnishes [equipment] for [requirement]"
-    tech_orphans = [e for e in orphaned if e.get('entity_type') in ['technology', 'equipment']]
+    # Limit candidates to avoid massive prompts (take top 200 most relevant)
+    # Prioritize requirements and deliverables (most common link targets)
+    priority_candidates = (
+        entities_by_type.get('requirement', [])[:100] +
+        entities_by_type.get('deliverable', [])[:50] +
+        entities_by_type.get('document', [])[:30] +
+        entities_by_type.get('clause', [])[:20]
+    )
     
-    if tech_orphans and requirements:
-        logger.info(f"    → Pattern 2: Checking {len(tech_orphans)} orphaned tech/equipment for Gov't-provided")
-        
-        gov_keywords = ['government', 'gov\'t', 'furnished', 'provided by', 'gfe']
-        
-        for tech in tech_orphans:
-            tech_desc = tech.get('description', '').lower()
-            
-            # Check if description indicates government provision
-            if any(keyword in tech_desc for keyword in gov_keywords):
-                tech_name = tech.get('entity_name', '').lower()
-                
-                # Find requirements mentioning same equipment category
-                for req in requirements:
-                    req_desc = req.get('description', '').lower()
-                    
-                    if tech_name in req_desc or any(word in req_desc for word in tech_name.split()):
-                        all_orphan_rels.append({
-                            'source_id': req['id'],
-                            'target_id': tech['id'],
-                            'relationship_type': 'ENABLED_BY',
-                            'confidence': 0.90,
-                            'reasoning': f"Pattern 2: Requirement '{req.get('entity_name')}' enabled by Gov't-provided '{tech.get('entity_name')}'"
-                        })
-                        logger.debug(f"      → Linked {req.get('entity_name')} ENABLED_BY {tech.get('entity_name')}")
-                        break
+    if not priority_candidates:
+        logger.info("    → No candidate entities for linking")
+        return []
     
-    # Pattern 3: Deliverable-Submitter Linker
-    # Pattern: "[Person role] shall submit [deliverable]"
-    person_orphans = [e for e in orphaned if e.get('entity_type') == 'person']
-    deliverables = entities_by_type.get('deliverable', [])
+    logger.info(f"    → Using {len(orphaned)} orphans × {len(priority_candidates)} candidates for inference")
     
-    if person_orphans and deliverables:
-        logger.info(f"    → Pattern 3: Checking {len(person_orphans)} orphaned persons against {len(deliverables)} deliverables")
-        
-        for person in person_orphans:
-            person_name = person.get('entity_name', '').lower()
-            person_desc = person.get('description', '').lower()
-            
-            # Extract role keywords (e.g., "manager", "lead", "coordinator")
-            role_keywords = [word for word in person_name.split() if len(word) > 4]
-            
-            for deliv in deliverables:
-                deliv_desc = deliv.get('description', '').lower()
-                
-                # Check if deliverable mentions person role + submission keywords
-                submission_keywords = ['submit', 'provide', 'deliver', 'prepare']
-                
-                if any(role in deliv_desc for role in role_keywords):
-                    if any(keyword in deliv_desc for keyword in submission_keywords):
-                        all_orphan_rels.append({
-                            'source_id': person['id'],
-                            'target_id': deliv['id'],
-                            'relationship_type': 'RESPONSIBLE_FOR',
-                            'confidence': 0.80,
-                            'reasoning': f"Pattern 3: Person '{person.get('entity_name')}' responsible for submitting '{deliv.get('entity_name')}'"
-                        })
-                        logger.debug(f"      → Linked {person.get('entity_name')} RESPONSIBLE_FOR {deliv.get('entity_name')}")
-                        break
+    # Build JSON representations (truncate descriptions to save tokens)
+    orphan_json = json.dumps([{
+        'id': o['id'],
+        'name': o['entity_name'],
+        'type': o.get('entity_type'),
+        'description': o.get('description', '')[:300]
+    } for o in orphaned], indent=2)
     
-    # Pattern 4: Table-Embedded Field Context Linker
-    # Pattern: "[Field], a field in [Table] for [Purpose]"
-    concept_orphans = [e for e in orphaned if e.get('entity_type') == 'concept']
-    documents = entities_by_type.get('document', []) + entities_by_type.get('clause', [])
+    candidate_json = json.dumps([{
+        'id': c['id'],
+        'name': c['entity_name'],
+        'type': c.get('entity_type'),
+        'description': c.get('description', '')[:200]
+    } for c in priority_candidates], indent=2)
     
-    if concept_orphans and documents:
-        logger.info(f"    → Pattern 4: Checking {len(concept_orphans)} orphaned concepts for table-embedded fields")
-        
-        for concept in concept_orphans:
-            concept_desc = concept.get('description', '').lower()
-            
-            # Check if description indicates table field
-            if 'field in' in concept_desc or 'column' in concept_desc or 'data element' in concept_desc:
-                # Extract table name from description
-                table_match = re.search(r'(?:field in|column in|element in)\s+(?:the\s+)?([A-Z\s]+)\s+(?:table|data)', concept_desc, re.IGNORECASE)
-                
-                if table_match:
-                    table_name = table_match.group(1).strip().lower()
-                    
-                    # Find documents/clauses mentioning this table
-                    for doc in documents:
-                        doc_desc = doc.get('description', '').lower()
-                        doc_name = doc.get('entity_name', '').lower()
-                        
-                        if table_name in doc_desc or table_name in doc_name:
-                            all_orphan_rels.append({
-                                'source_id': concept['id'],
-                                'target_id': doc['id'],
-                                'relationship_type': 'FIELD_IN',
-                                'confidence': 0.75,
-                                'reasoning': f"Pattern 4: Field '{concept.get('entity_name')}' in table referenced by '{doc.get('entity_name')}'"
-                            })
-                            logger.debug(f"      → Linked {concept.get('entity_name')} FIELD_IN {doc.get('entity_name')}")
-                            break
-    
-    logger.info(f"    → Orphan pattern matching generated {len(all_orphan_rels)} relationships")
-    return all_orphan_rels
+    # LLM prompt optimized for orphan resolution
+    prompt = f"""You are analyzing orphaned entities in a government contracting knowledge graph. 
+These entities were extracted correctly but lack relationships to other entities.
+
+ORPHANED ENTITIES (need relationships):
+{orphan_json}
+
+CANDIDATE ENTITIES (potential relationship targets):
+{candidate_json}
+
+Find logical relationships for as many orphans as possible. Common patterns:
+
+REQUIREMENT-CENTRIC:
+- REQUIRES: Requirement → Equipment/Resource (e.g., "Trash must be emptied" → trash receptacles)
+- ENABLED_BY: Requirement → Gov't-provided Technology/Equipment (e.g., "GFE ancillary hardware")
+- SATISFIED_BY: Requirement → Deliverable
+
+PERSON-CENTRIC:
+- RESPONSIBLE_FOR: Person → Deliverable they submit/create (e.g., "Program Manager submits QCP")
+
+DOCUMENT-CENTRIC:
+- FIELD_IN: Table field/Data element → Document/Clause containing it (e.g., "DODAAC field in WAWF table")
+- PART_OF: Sub-component → Parent document
+- REFERENCES: Document → Another document
+
+SPECIAL PATTERNS:
+- Quantified items: "X equipment must be Y times" → REQUIRES
+- Government-provided: "furnished by Government" → ENABLED_BY
+- Conditional requirements: "may substitute" → REQUIRES
+- Table/data references: "field in X" → FIELD_IN
+
+Use entity IDs from 'id' field. Focus on high-confidence relationships (>0.65).
+Return ONLY valid JSON array:
+[
+  {{"source_id": "entity_id", "target_id": "entity_id", "relationship_type": "TYPE", "confidence": 0.65-0.95, "reasoning": "brief evidence"}}
+]
+
+If no relationships found, return []."""
+
+    try:
+        response = await _call_llm_async(prompt, model=model, temperature=temperature)
+        rels = json.loads(response.strip())
+        valid_rels = _validate_relationships(rels, id_to_entity, "Algorithm 8")
+        logger.info(f"    → Found {len(valid_rels)} orphan relationships")
+        return valid_rels
+    except Exception as e:
+        logger.error(f"    ❌ Algorithm 8 failed: {e}")
+        return []
 
 
 async def _infer_relationships_multi_algorithm(
