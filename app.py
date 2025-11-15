@@ -30,18 +30,6 @@ import time
 import os
 from pathlib import Path
 
-# Set up logging FIRST before any imports that use logging
-from src.utils.logging_config import setup_logging
-
-# Initialize logging with rotating files
-log_info = setup_logging(
-    log_level="INFO",
-    log_dir="logs",
-    max_file_size=10 * 1024 * 1024,  # 10MB per file
-    backup_count=5,  # Keep 5 backup files per log
-    console_output=True  # Also show in terminal (filtered)
-)
-
 # Import LightRAG and RAG-Anything from pip BEFORE adding src to path
 # This prevents any old fork from shadowing the pip package
 from raganything import RAGAnything
@@ -207,11 +195,46 @@ def manage_neo4j_startup():
 
 
 if __name__ == "__main__":
-    print("=" * 60)
-    print("🎯 GovCon Capture Vibe - Project Theseus")
-    print("   Government Contracting Intelligence Platform")
-    print("=" * 60)
-    print()
+    # ANSI color codes for PowerShell
+    CYAN = '\033[96m'
+    BLUE = '\033[94m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    MAGENTA = '\033[95m'
+    BOLD = '\033[1m'
+    RESET = '\033[0m'
+    DIM = '\033[2m'
+    
+    print(f"""
+{CYAN}{'═' * 65}{RESET}
+  {YELLOW}██████╗ ██████╗  ██████╗      ██╗███████╗ ██████╗████████╗{RESET}
+  {YELLOW}██╔══██╗██╔══██╗██╔═══██╗     ██║██╔════╝██╔════╝╚══██╔══╝{RESET}
+  {YELLOW}██████╔╝██████╔╝██║   ██║     ██║█████╗  ██║        ██║{RESET}
+  {YELLOW}██╔═══╝ ██╔══██╗██║   ██║██   ██║██╔══╝  ██║        ██║{RESET}
+  {YELLOW}██║     ██║  ██║╚██████╔╝╚██████╔╝███████╗╚██████╗   ██║{RESET}
+  {YELLOW}╚═╝     ╚═╝  ╚═╝ ╚═════╝  ╚═════╝ ╚══════╝ ╚═════╝   ╚═╝{RESET}
+
+  {YELLOW}████████╗██╗  ██╗███████╗███████╗███████╗██╗   ██╗███████╗{RESET}
+  {YELLOW}╚══██╔══╝██║  ██║██╔════╝██╔════╝██╔════╝██║   ██║██╔════╝{RESET}
+  {YELLOW}   ██║   ███████║█████╗  ███████╗█████╗  ██║   ██║███████╗{RESET}
+  {YELLOW}   ██║   ██╔══██║██╔══╝  ╚════██║██╔══╝  ██║   ██║╚════██║{RESET}
+  {YELLOW}   ██║   ██║  ██║███████╗███████║███████╗╚██████╔╝███████║{RESET}
+  {YELLOW}   ╚═╝   ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝ ╚═════╝ ╚══════╝{RESET}
+
+  {MAGENTA}Government Contracting Intelligence Platform{RESET}
+  {DIM}Ontology-Based RAG for Federal RFP Analysis{RESET}
+{CYAN}{'═' * 65}{RESET}
+""")
+    
+    # Now initialize logging (after banner is displayed)
+    from src.utils.logging_config import setup_logging
+    log_info = setup_logging(
+        log_level="INFO",
+        log_dir="logs",
+        max_file_size=10 * 1024 * 1024,  # 10MB per file
+        backup_count=5,  # Keep 5 backup files per log
+        console_output=True  # Also show in terminal (filtered)
+    )
     
     neo4j_started_by_us = False
     

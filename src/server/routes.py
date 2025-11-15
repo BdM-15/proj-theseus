@@ -66,13 +66,42 @@ async def process_document_with_semantic_inference(
     logger.info(f"📄 Processing {file_name}")
     logger.info(f"🔧 Using RAG-Anything + LLM semantic inference (format-agnostic)")
     
-    # Step 1: Multimodal extraction + entity extraction
-    # Use process_document_complete() which handles multimodal content separately
-    # (NOT process_document_complete_lightrag_api() which tries to pass multimodal_content to ainsert)
-    await rag_instance.process_document_complete(
+    # Step 1: Parse document with MinerU (multimodal extraction)
+    content_list, doc_id = await rag_instance.parse_document(
         file_path=file_path,
         output_dir=global_args.working_dir,
         parse_method="auto"
+    )
+    
+    # Step 1.5: Filter out MinerU discarded content types (Fix #3)
+    # MinerU 2.6.4 correctly identifies artifacts but RAG-Anything processes ALL content types
+    # Pre-filtering prevents GenericModalProcessor from creating contaminated entities
+    DISCARDED_TYPES = {
+        "discarded",      # Generic discarded content (page numbers, OCR glitches)
+        "header",         # Page headers
+        "footer",         # Page footers
+        "page_number",    # Page numbers
+        "aside_text",     # Marginal notes
+        "page_footnote",  # Footer notes (not document footnotes)
+    }
+    
+    original_count = len(content_list)
+    filtered_content = [
+        item for item in content_list
+        if item.get("type") not in DISCARDED_TYPES
+    ]
+    filtered_count = len(filtered_content)
+    discarded_count = original_count - filtered_count
+    
+    if discarded_count > 0:
+        logger.info(f"🚫 Filtered {discarded_count} discarded content blocks (keeping {filtered_count}/{original_count} legitimate items)")
+    
+    # Step 2: Insert filtered content using official RAG-Anything API
+    # This ensures GenericModalProcessor only sees legitimate content (tables, images, equations)
+    await rag_instance.insert_content_list(
+        content_list=filtered_content,
+        file_path=file_path,
+        doc_id=doc_id
     )
     
     # Check if Neo4j storage is enabled - proceed with Neo4j-aware post-processing

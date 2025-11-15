@@ -211,20 +211,28 @@ def setup_logging(
         console_handler.addFilter(HTTPFilter())
         root_logger.addHandler(console_handler)
     
-    # Log startup message
+    # Log startup message with ANSI colors
     logger = logging.getLogger(__name__)
-    logger.info("=" * 70)
-    logger.info("📋 GovCon Capture Vibe - Logging Initialized")
-    logger.info("=" * 70)
-    logger.info(f"📂 Log Directory: {log_path.absolute()}")
-    logger.info(f"📄 Processing Log: {processing_log_file.name} (RFP extraction, semantic inference)")
-    logger.info(f"🖥️  Server Log: {server_log_file.name} (startup, API calls)")
-    logger.info(f"❌ Error Log: {error_log_file.name} (all errors)")
-    logger.info(f"📦 Max File Size: {max_file_size / 1024 / 1024:.1f}MB per file")
-    logger.info(f"🗄️  Backup Count: {backup_count} files per log")
-    logger.info(f"🖥️  Console Output: {'Enabled' if console_output else 'Disabled'} (filtered)")
-    logger.info(f"📊 Log Level: {log_level.upper()}")
-    logger.info("=" * 70)
+    CYAN = '\033[96m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    BOLD = '\033[1m'
+    RESET = '\033[0m'
+    
+    logger.info("")
+    logger.info(f"{CYAN}{'═' * 80}{RESET}")
+    logger.info(f"{BOLD}{CYAN}📋 LOGGING INFRASTRUCTURE{RESET}")
+    logger.info(f"{CYAN}{'═' * 80}{RESET}")
+    logger.info(f"{YELLOW}Directory:{RESET}        {log_path.absolute()}")
+    logger.info(f"{GREEN}Processing Log:{RESET}   {processing_log_file.name} {CYAN}(RFP extraction, semantic inference){RESET}")
+    logger.info(f"{GREEN}Server Log:{RESET}       {server_log_file.name} {CYAN}(startup, API calls){RESET}")
+    logger.info(f"{GREEN}Error Log:{RESET}        {error_log_file.name} {CYAN}(all errors){RESET}")
+    logger.info(f"{YELLOW}Max File Size:{RESET}    {max_file_size / 1024 / 1024:.1f}MB per file")
+    logger.info(f"{YELLOW}Backup Count:{RESET}     {backup_count} files per log")
+    logger.info(f"{YELLOW}Console Output:{RESET}   {'Enabled' if console_output else 'Disabled'} (filtered)")
+    logger.info(f"{YELLOW}Log Level:{RESET}        {log_level.upper()}")
+    logger.info(f"{CYAN}{'═' * 80}{RESET}")
+    logger.info("")
     
     return {
         "log_dir": str(log_path.absolute()),

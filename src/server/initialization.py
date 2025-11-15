@@ -189,12 +189,6 @@ async def initialize_raganything():
         load_prompt("extraction/entity_detection_rules"),        # ~1,155 lines - HOW to detect (semantic signals, UCF)
     ]
     custom_entity_extraction_prompt = "\n\n---\n\n".join(entity_extraction_prompts)
-    
-    logger.info(f"📚 Loaded 2 entity extraction prompts (~2,605 lines total)")
-    logger.info(f"   → Core extraction rules: WHAT to extract (1,450 lines)")
-    logger.info(f"   → Semantic detection: HOW to detect (1,155 lines)")
-    logger.info(f"   → Metadata enrichment: Moved to prompts/query/ (Branch 010)")
-    logger.info(f"   → Separation of concerns: Extraction (ingestion) vs. Query (intelligence)")
 
     # Initialize RAG-Anything with custom configuration
     # IMPORTANT: LightRAG reads chunk_token_size from environment at import time
@@ -205,6 +199,7 @@ async def initialize_raganything():
         "addon_params": {
             "entity_types": entity_types,
             "entity_extraction_system_prompt": custom_entity_extraction_prompt,
+            # NOTE: entity_extraction_examples is handled at module load time via PROMPTS override
         },
         # Chunking configuration comes from environment variables:
         # - CHUNK_SIZE controls chunk_token_size (default: 8192)
@@ -217,7 +212,6 @@ async def initialize_raganything():
     # LightRAG reads these automatically - we only need to specify graph_storage type
     if hasattr(global_args, 'graph_storage') and global_args.graph_storage == "Neo4JStorage":
         lightrag_kwargs["graph_storage"] = global_args.graph_storage
-        logger.info(f"📊 Configuring RAG-Anything to use Neo4j storage...")
     
     _rag_anything = RAGAnything(
         config=config,
@@ -235,6 +229,37 @@ async def initialize_raganything():
         error_msg = result.get("error", "Unknown error")
         logger.error(f"Failed to initialize LightRAG: {error_msg}")
         raise RuntimeError(f"LightRAG initialization failed: {error_msg}")
+    
+    # CRITICAL: Disable LightRAG's hardcoded fictional examples to prevent ontology contamination
+    # LightRAG always uses PROMPTS["entity_extraction_examples"] (does NOT check addon_params)
+    # These examples contain Alex/Taylor/Jordan with conflicting entity types (person, equipment)
+    # that contaminate our government contracting ontology (requirement, organization, etc.)
+    from lightrag.prompt import PROMPTS
+    PROMPTS["entity_extraction_examples"] = []  # Empty list = no examples injected
+    logger.info("✅ Disabled LightRAG's fictional example entities (prevents ontology contamination)")
+    
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Startup Configuration Summary
+    # ═══════════════════════════════════════════════════════════════════════════════
+    
+    # ANSI color codes
+    CYAN = '\033[96m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    MAGENTA = '\033[95m'
+    BOLD = '\033[1m'
+    RESET = '\033[0m'
+    
+    logger.info("")
+    logger.info(f"{CYAN}{'═' * 80}{RESET}")
+    logger.info(f"{BOLD}{MAGENTA}🎯 CONFIGURATION{RESET}")
+    logger.info(f"{CYAN}{'═' * 80}{RESET}")
+    logger.info(f"{GREEN}Entity Types:{RESET} {BOLD}{len(entity_types)}{RESET} specialized (organization, requirement, evaluation_factor, etc.)")
+    logger.info(f"{GREEN}Parser:{RESET} {BOLD}MinerU 2.6.4{RESET} | Device: {BOLD}{GREEN if device == 'cuda' else YELLOW}{device.upper()}{RESET} | Method: {parse_method.upper()}")
+    logger.info(f"{GREEN}Multimodal:{RESET} Images, Tables, Equations {BOLD}{GREEN}ENABLED{RESET}")
+    logger.info(f"{GREEN}Advanced:{RESET} Formula Recognition, Table Merge {BOLD}{GREEN}ENABLED{RESET} | Timeout: {YELLOW}600s{RESET}")
+    logger.info(f"{CYAN}{'═' * 80}{RESET}")
+    logger.info("")
     
     # ═══════════════════════════════════════════════════════════════════════════════
     # COMPATIBILITY FIX: RAG-Anything 1.2.8 + LightRAG 1.4.9.3 doc_status schema
@@ -318,15 +343,6 @@ async def initialize_raganything():
     _rag_anything.lightrag.doc_status.get_by_id = filtered_get_by_id
     _rag_anything.lightrag.doc_status.get_docs_paginated = filtered_get_docs_paginated
     # ═════════════════════════════════════════════════════════════════════════════
-    
-    # Use print() instead of logger to ensure output visibility during startup
-    print("✅ RAG-Anything initialized")
-    print(f"   Parser: MinerU ({parse_method}) - multimodal enabled")
-    print(f"   Device: {device.upper()} (GPU acceleration {'enabled' if device == 'cuda' else 'disabled'})")
-    print(f"   Entity types: {len(entity_types)} specialized types")
-    print(f"   LightRAG storages: Ready")
-    print(f"   LightRAG version: 1.4.9.7")
-    print(f"   Multimodal processing: Using process_document_complete() (separate text/multimodal paths) ✅")
     
     return _rag_anything
 
