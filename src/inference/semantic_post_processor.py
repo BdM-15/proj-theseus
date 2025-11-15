@@ -312,7 +312,7 @@ async def _infer_relationships_multi_algorithm(
     eval_factors = entities_by_type.get('evaluation_factor', [])
     
     if all_instruction_entities and eval_factors:
-        logger.info(f"\n  [Algorithm 1/7] Instruction-Evaluation Linking: {len(all_instruction_entities)} instruction entities × {len(eval_factors)} eval factors")
+        logger.info(f"\n  [Algorithm 1/8] Instruction-Evaluation Linking: {len(all_instruction_entities)} instruction entities × {len(eval_factors)} eval factors")
         logger.info(f"      Sources: {len(instructions)} submission_instruction, {len(deliverables_with_instructions)} deliverables, {len(requirements_with_instructions)} requirements")
         
         prompt_instructions = await _load_prompt_template("instruction_evaluation_linking.md")
@@ -355,9 +355,9 @@ Return ONLY valid JSON array:
         except Exception as e:
             logger.error(f"    ❌ Algorithm 1 failed: {e}")
     
-    # ALGORITHM 2A: Evaluation Hierarchy & Metrics (Structure evaluation framework)
+    # ALGORITHM 2: Evaluation Hierarchy & Metrics (Structure evaluation framework)
     if eval_factors:
-        logger.info(f"\n  [Algorithm 2a/7] Evaluation Hierarchy: {len(eval_factors)} evaluation entities")
+        logger.info(f"\n  [Algorithm 2/8] Evaluation Hierarchy: {len(eval_factors)} evaluation entities")
         
         prompt_instructions = await _load_prompt_template("evaluation_hierarchy.md")
         
@@ -384,13 +384,13 @@ Return ONLY valid JSON array:
         try:
             response = await _call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
             rels = json.loads(response.strip())
-            valid_rels = _validate_relationships(rels, id_to_entity, "Algorithm 2a")
+            valid_rels = _validate_relationships(rels, id_to_entity, "Algorithm 2")
             all_relationships.extend(valid_rels)
             logger.info(f"    → Found {len(valid_rels)} evaluation hierarchy relationships")
         except Exception as e:
-            logger.error(f"    ❌ Algorithm 2a failed: {e}")
+            logger.error(f"    ❌ Algorithm 2 failed: {e}")
     
-    # ALGORITHM 2B: Requirement-Evaluation Mapping (Requirements → Main Evaluation Factors ONLY)
+    # ALGORITHM 3: Requirement-Evaluation Mapping (Requirements → Main Evaluation Factors ONLY)
     requirements = entities_by_type.get('requirement', [])
     
     # Filter to MAIN evaluation factors only (exclude rating scales, metrics, thresholds)
@@ -461,7 +461,7 @@ Return ONLY valid JSON array:
     main_eval_factors = [f for f in eval_factors if is_main_evaluation_factor(f)]
     
     if requirements and main_eval_factors:
-        logger.info(f"\n  [Algorithm 2b/7] Requirement-Evaluation Mapping: {len(requirements)} requirements × {len(main_eval_factors)} main factors (filtered from {len(eval_factors)} total)")
+        logger.info(f"\n  [Algorithm 3/8] Requirement-Evaluation Mapping: {len(requirements)} requirements × {len(main_eval_factors)} main factors (filtered from {len(eval_factors)} total)")
         
         prompt_instructions = await _load_prompt_template("requirement_evaluation.md")
         
@@ -518,15 +518,15 @@ Return ONLY valid JSON array:
             all_relationships.extend(valid_rels)
             logger.info(f"    → Found {len(valid_rels)} requirement→main-factor relationships")
         except Exception as e:
-            logger.error(f"    ❌ Algorithm 2b failed: {e}")
+            logger.error(f"    ❌ Algorithm 3 failed: {e}")
     
-    # ALGORITHM 3: Deliverable Traceability (Dual-Pattern: Requirements + Work Statements)
+    # ALGORITHM 4: Deliverable Traceability (Dual-Pattern: Requirements + Work Statements)
     requirements = entities_by_type.get('requirement', [])
     work_statements = entities_by_type.get('statement_of_work', []) + entities_by_type.get('pws', []) + entities_by_type.get('soo', [])
     deliverables = entities_by_type.get('deliverable', [])
     
     if deliverables and (requirements or work_statements):
-        logger.info(f"\n  [Algorithm 3/7] Deliverable Traceability: {len(requirements)} requirements + {len(work_statements)} work statements × {len(deliverables)} deliverables")
+        logger.info(f"\n  [Algorithm 4/8] Deliverable Traceability: {len(requirements)} requirements + {len(work_statements)} work statements × {len(deliverables)} deliverables")
         
         prompt_instructions = await _load_prompt_template("deliverable_traceability.md")
         
@@ -567,7 +567,7 @@ Return ONLY valid JSON array:
             try:
                 response = await _call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
                 rels = json.loads(response.strip())
-                pattern1_rels = _validate_relationships(rels, id_to_entity, "Algorithm 3 Pattern 1")
+                pattern1_rels = _validate_relationships(rels, id_to_entity, "Algorithm 4 Pattern 1")
                 logger.info(f"    → Pattern 1 (Requirement→Deliverable): {len(pattern1_rels)} relationships")
             except Exception as e:
                 logger.error(f"    ❌ Pattern 1 failed: {e}")
@@ -609,7 +609,7 @@ Return ONLY valid JSON array:
             try:
                 response = await _call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
                 rels = json.loads(response.strip())
-                pattern2_rels = _validate_relationships(rels, id_to_entity, "Algorithm 3 Pattern 2")
+                pattern2_rels = _validate_relationships(rels, id_to_entity, "Algorithm 4 Pattern 2")
                 logger.info(f"    → Pattern 2 (WorkStatement→Deliverable): {len(pattern2_rels)} relationships")
             except Exception as e:
                 logger.error(f"    ❌ Pattern 2 failed: {e}")
@@ -619,11 +619,11 @@ Return ONLY valid JSON array:
         all_relationships.extend(pattern2_rels)
         logger.info(f"    → Total Deliverable Traceability: {len(pattern1_rels) + len(pattern2_rels)} relationships (Pattern 1: {len(pattern1_rels)}, Pattern 2: {len(pattern2_rels)})")
     
-    # ALGORITHM 4: Document Hierarchy (comprehensive - attachments, sections, clauses, standards)
+    # ALGORITHM 5: Document Hierarchy (comprehensive - attachments, sections, clauses, standards)
     documents = [e for e in entities if e.get('entity_type') in ['document', 'section', 'attachment', 'annex', 'amendment', 'clause', 'standard', 'specification', 'regulation', 'exhibit']]
     
     if len(documents) > 1:
-        logger.info(f"\n  [Algorithm 4/7] Document Hierarchy (All Document Types): {len(documents)} document entities")
+        logger.info(f"\n  [Algorithm 5/8] Document Hierarchy (All Document Types): {len(documents)} document entities")
         
         prompt_instructions = await _load_prompt_template("document_hierarchy.md")
         
@@ -650,20 +650,19 @@ Return ONLY valid JSON array:
         try:
             response = await _call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
             rels = json.loads(response.strip())
-            valid_rels = _validate_relationships(rels, id_to_entity, "Algorithm 4")
+            valid_rels = _validate_relationships(rels, id_to_entity, "Algorithm 5")
             all_relationships.extend(valid_rels)
             logger.info(f"    → Found {len(valid_rels)} document hierarchy relationships")
         except Exception as e:
-            logger.error(f"    ❌ Algorithm 4 failed: {e}")
+            logger.error(f"    ❌ Algorithm 5 failed: {e}")
     
-    # ALGORITHM 5: Semantic Concept Linking
-    # ALGORITHM 5: Semantic Concept Linking
+    # ALGORITHM 6: Semantic Concept Linking
     concepts = entities_by_type.get('concept', [])[:50]  # Limit to 50 concepts
     strategic_themes = entities_by_type.get('strategic_theme', [])
     
     if (concepts or strategic_themes) and eval_factors:
         concept_pool = concepts + strategic_themes
-        logger.info(f"\n  [Algorithm 5/7] Semantic Concept Linking: {len(concept_pool)} concepts/themes")
+        logger.info(f"\n  [Algorithm 6/8] Semantic Concept Linking: {len(concept_pool)} concepts/themes")
         
         prompt_instructions = await _load_prompt_template("semantic_concept_linking.md")
         
@@ -697,10 +696,10 @@ Return ONLY valid JSON array:
             all_relationships.extend(valid_rels)
             logger.info(f"    → Found {len(valid_rels)} semantic concept relationships")
         except Exception as e:
-            logger.error(f"    ❌ Algorithm 5 failed: {e}")
+            logger.error(f"    ❌ Algorithm 6 failed: {e}")
     
-    # ALGORITHM 6: Heuristic Pattern Matching (CDRL cross-refs)
-    logger.info(f"\n  [Algorithm 6/7] Heuristic CDRL Pattern Matching")
+    # ALGORITHM 7: Heuristic Pattern Matching (CDRL cross-refs)
+    logger.info(f"\n  [Algorithm 7/8] Heuristic CDRL Pattern Matching")
     
     heuristic_count = 0
     for entity in entities:
@@ -727,6 +726,12 @@ Return ONLY valid JSON array:
                     break
     
     logger.info(f"    → Found {heuristic_count} heuristic relationships")
+    
+    # ALGORITHM 8: Orphan Pattern Resolution (Equipment, Gov't-Provided, Person-Deliverable, Table-Field)
+    logger.info(f"\n  [Algorithm 8/8] Orphan Pattern Resolution")
+    orphan_rels = await _resolve_orphan_patterns(entities, id_to_entity, model=model, temperature=temperature)
+    all_relationships.extend(orphan_rels)
+    logger.info(f"    → Found {len(orphan_rels)} orphan pattern relationships")
     
     # Summary
     logger.info(f"\n  ✅ Total relationships from all algorithms: {len(all_relationships)}")
