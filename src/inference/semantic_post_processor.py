@@ -229,25 +229,26 @@ def _validate_relationships(rels: List[Dict], id_to_entity: Dict, algorithm_name
     """
     Validate and filter relationships to ensure required fields are present.
     
+    Trust LLM semantic quality like LightRAG does - no confidence required.
+    
     Args:
         rels: List of relationship dicts from LLM
         id_to_entity: Mapping of entity IDs to entities
         algorithm_name: Name of algorithm for logging
         
     Returns:
-        List of valid relationships with all required fields (including default confidence)
+        List of valid relationships with required fields only
     """
     valid_rels = []
     for rel in rels:
         if (rel.get('source_id') in id_to_entity and 
             rel.get('target_id') in id_to_entity and 
             rel.get('relationship_type')):
-            # Ensure confidence field has valid value (default 0.7 if missing/null)
+            # Include only required fields - trust LLM inference quality
             valid_rel = {
                 'source_id': rel['source_id'],
                 'target_id': rel['target_id'],
                 'relationship_type': rel['relationship_type'],
-                'confidence': rel.get('confidence') if rel.get('confidence') is not None else 0.7,
                 'reasoning': rel.get('reasoning', '')
             }
             valid_rels.append(valid_rel)
@@ -392,10 +393,10 @@ SPECIAL PATTERNS:
 - Conditional requirements: "may substitute" → REQUIRES
 - Table/data references: "field in X" → FIELD_IN
 
-Use entity IDs from 'id' field. Focus on high-confidence relationships (>0.65).
+Use entity IDs from 'id' field. Return ONLY valid relationships.
 Return ONLY valid JSON array:
 [
-  {{"source_id": "entity_id", "target_id": "entity_id", "relationship_type": "TYPE", "confidence": 0.65-0.95, "reasoning": "brief evidence"}}
+  {{"source_id": "entity_id", "target_id": "entity_id", "relationship_type": "TYPE", "reasoning": "brief evidence"}}
 ]
 
 If no relationships found, return []."""
