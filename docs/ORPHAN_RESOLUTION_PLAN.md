@@ -1,4 +1,5 @@
 # Holistic Orphan Resolution Plan
+
 ## Pattern-Based Relationship Inference Enhancement
 
 **Date**: November 15, 2025  
@@ -10,19 +11,23 @@
 ## Root Cause Analysis
 
 ### Pattern 1: High Co-Occurrence, Zero Relationships
+
 **Finding**: 13 orphaned concepts (DODAAC codes) share chunks with 13+ connected clauses/documents  
 **Why LLM Missed It**: Table-embedded field values aren't semantically linked to clause text  
 **Impact**: Administrative workflow entities isolated from contract clauses
 
 ### Pattern 2: Missing Relationship Type Coverage
+
 **Current State**:
+
 - `DIRECTED`: 3,617 relationships (73.8%)
 - `INFERRED_RELATIONSHIP`: 1,285 relationships (26.2%)
 
 **Under-Represented Patterns**:
+
 ```
 equipment → requirement:   31 existing vs 4 orphaned equipment (11.4% orphan rate)
-deliverable → requirement: 135 existing vs 3 orphaned deliverables (2.2% orphan rate)  
+deliverable → requirement: 135 existing vs 3 orphaned deliverables (2.2% orphan rate)
 person → deliverable:      25 existing vs 6 orphaned persons (19.4% orphan rate)
 technology → requirement:  2 existing vs 2 orphaned tech (50% orphan rate!)
 ```
@@ -30,12 +35,14 @@ technology → requirement:  2 existing vs 2 orphaned tech (50% orphan rate!)
 **Critical**: `technology → requirement` has 50% orphan rate - this is ODC-critical (Gov't-provided equipment)
 
 ### Pattern 3: Semantic Description Patterns
+
 **Table-Embedded** (7 orphans): "field in WAWF routing data table"  
 **Government-Role** (4 orphans): "provided by the Government", "furnished"  
 **Conditional** (2 orphans): "may substitute", "as necessary"  
 **Quantified** (4 orphans): Has specific quantities (10 receptacles, 6 trash cans)
 
 ### Pattern 4: Rich Context, Still Missed
+
 **All orphan chunks have 40+ entities with 7-9 type diversity**  
 → This proves chunks ARE processed, but LLM fails on specific semantic patterns
 
@@ -44,9 +51,11 @@ technology → requirement:  2 existing vs 2 orphaned tech (50% orphan rate!)
 ## Solution Architecture
 
 ### Phase 1: Targeted Relationship Inference Algorithms
+
 **Goal**: Add specialized algorithms for discovered patterns
 
 #### Algorithm 1: Equipment-Requirement Quantified Matcher
+
 ```python
 Pattern: "X [equipment] must be Y [action] Z [frequency/metric]"
 Example: "Trash Receptacles must be emptied no less than twice a day"
@@ -59,6 +68,7 @@ Logic:
 ```
 
 #### Algorithm 2: Government-Provided Equipment Linker
+
 ```python
 Pattern: "Government provides/furnishes [equipment] for [requirement]"
 Example: "Ancillary Hardware provided by Government for PWS requirements"
@@ -71,6 +81,7 @@ Logic:
 ```
 
 #### Algorithm 3: Deliverable-Submitter Linker
+
 ```python
 Pattern: "[Person role] shall submit [deliverable]"
 Example: "Program Manager photo required in Key Contact Listing"
@@ -83,6 +94,7 @@ Logic:
 ```
 
 #### Algorithm 4: Table-Embedded Field Context Linker
+
 ```python
 Pattern: "[Field], a field in [Table] for [Purpose]"
 Example: "Admin DODAAC, a field in WAWF routing table for administration"
@@ -96,9 +108,11 @@ Logic:
 ---
 
 ### Phase 2: Enhanced LLM Prompts
+
 **Goal**: Improve general-purpose relationship inference for discovered patterns
 
 #### Current Prompt Issues
+
 ```python
 # Current semantic_post_processor.py prompt (line ~120)
 """
@@ -113,12 +127,14 @@ Relationship types to use:
 ```
 
 **Problems**:
+
 1. Missing `ENABLED_BY` (for Gov't-provided equipment → requirements)
 2. Missing `RESPONSIBLE_FOR` (person → deliverable)
 3. No guidance for quantified/conditional entities
 4. No table-embedded entity handling
 
 #### Enhanced Prompt
+
 ```python
 """
 Relationship types to use:
@@ -135,7 +151,7 @@ STRUCTURAL:
 - REFERENCES: Document/Section → Another document/section
 
 REGULATORY:
-- EVALUATES: Section M evaluation criteria → Section L requirements  
+- EVALUATES: Section M evaluation criteria → Section L requirements
 - APPLIES_TO: Clause/Regulation → Program/Contract
 
 SPECIAL PATTERNS TO CATCH:
@@ -150,16 +166,18 @@ SPECIAL PATTERNS TO CATCH:
 ---
 
 ### Phase 3: Orphan Detection & Correction Pipeline
+
 **Goal**: Automated workflow to detect and fix orphans in future RFPs
 
 #### Component 1: Post-Phase-6 Orphan Detector
+
 ```python
 # src/inference/orphan_detection.py
 
 async def detect_orphan_patterns(neo4j_io: Neo4jGraphIO) -> Dict:
     """
     Run after Phase 6/7 completion to identify orphan patterns.
-    
+
     Returns:
         {
             'orphans_by_type': {...},
@@ -171,6 +189,7 @@ async def detect_orphan_patterns(neo4j_io: Neo4jGraphIO) -> Dict:
 ```
 
 #### Component 2: Pattern-Based Fixer
+
 ```python
 # src/inference/orphan_fixer.py
 
@@ -180,7 +199,7 @@ async def fix_orphans_by_pattern(
 ) -> Dict:
     """
     Apply algorithms 1-4 to create missing relationships.
-    
+
     Returns:
         {
             'relationships_created': 123,
@@ -191,6 +210,7 @@ async def fix_orphans_by_pattern(
 ```
 
 #### Component 3: Integration into routes.py
+
 ```python
 # After Phase 7 completes
 inference_result = await enhance_knowledge_graph(...)
@@ -204,12 +224,12 @@ orphan_analysis = await detect_orphan_patterns(neo4j_io)
 if orphan_analysis['critical_orphans']:
     logger.info(f"⚠️  {len(orphan_analysis['critical_orphans'])} critical orphans detected")
     logger.info("🔧 Running pattern-based orphan fixer...")
-    
+
     fix_result = await fix_orphans_by_pattern(
         neo4j_io,
         patterns=['equipment_quantified', 'govt_provided', 'person_deliverable', 'table_field']
     )
-    
+
     logger.info(f"✅ Fixed {fix_result['orphans_fixed']} orphans")
     logger.info(f"📊 {fix_result['remaining_orphans']} orphans remain (peripheral/acceptable)")
 ```
@@ -221,21 +241,27 @@ if orphan_analysis['critical_orphans']:
 ### Branch: `019-pattern-based-orphan-resolution`
 
 ### Step 1: Create Targeted Algorithms (2-3 hours)
+
 **Files**:
+
 - `src/inference/orphan_patterns.py` - Pattern matchers (Algorithms 1-4)
 - `tests/test_orphan_patterns.py` - Unit tests for each algorithm
 
 **Deliverable**: 4 working algorithms that can create relationships for discovered patterns
 
 ### Step 2: Enhance LLM Prompts (1 hour)
+
 **Files**:
+
 - `src/inference/semantic_post_processor.py` - Update relationship inference prompt
 - `prompts/relationship_inference/enhanced_patterns.txt` - Detailed examples
 
 **Deliverable**: Improved general-purpose relationship inference
 
 ### Step 3: Build Detection & Correction Pipeline (2 hours)
+
 **Files**:
+
 - `src/inference/orphan_detection.py` - Post-Phase-6 orphan analyzer
 - `src/inference/orphan_fixer.py` - Pattern-based relationship creator
 - `src/server/routes.py` - Integration into processing pipeline
@@ -243,7 +269,9 @@ if orphan_analysis['critical_orphans']:
 **Deliverable**: Automated orphan fixing after Phase 6/7
 
 ### Step 4: Validation (1 hour)
+
 **Test Cases**:
+
 1. Re-process Amend 1 FOPR (clear Neo4j first)
 2. Verify orphan count reduction (target: <10 orphans, <1%)
 3. Verify critical patterns fixed:
@@ -253,6 +281,7 @@ if orphan_analysis['critical_orphans']:
 4. Validate no relationship quality regression
 
 **Acceptance Criteria**:
+
 - Orphan rate < 1% (currently 2.4%)
 - All ODC-critical items linked (equipment, gov't-provided, deliverables)
 - All BOE-critical items linked (person roles, deliverables, requirements)
@@ -263,11 +292,13 @@ if orphan_analysis['critical_orphans']:
 ## Success Metrics
 
 **Before (Current State)**:
+
 - Total orphans: 34/1,410 = 2.4%
 - Critical orphans: 12 (equipment, deliverables, gov't-provided)
 - Technology → requirement orphan rate: 50%
 
 **After (Target)**:
+
 - Total orphans: <14/1,410 = <1%
 - Critical orphans: 0
 - Technology → requirement orphan rate: <10%
