@@ -25,8 +25,8 @@ from typing import Optional, Tuple
 from neo4j import GraphDatabase
 from dotenv import load_dotenv
 
-# Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Add src to path for imports (tools/neo4j/ -> project root)
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 # Load environment variables
 load_dotenv()

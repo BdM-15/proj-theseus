@@ -10,7 +10,7 @@ import os
 import sys
 from pathlib import Path
 
-# Add project root to path
+# Add project root to path (tools/diagnostics/ -> project root)
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
