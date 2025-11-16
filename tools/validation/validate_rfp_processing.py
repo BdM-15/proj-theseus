@@ -28,12 +28,12 @@ from pathlib import Path
 # Add project root to path to access src modules (tools/validation/ -> project root)
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
-sys.path.insert(0, str(Path(__file__).parent))
 
-from validation.query_quality import QueryQualityValidator
-from validation.section_l_m_coverage import SectionLMCoverageValidator
-from validation.workload_completeness import WorkloadCompletenessValidator
-from validation.deliverable_traceability import DeliverableTraceabilityValidator
+# Import validation modules directly (same directory)
+from query_quality import QueryQualityValidator
+from section_l_m_coverage import SectionLMCoverageValidator
+from workload_completeness import WorkloadCompletenessValidator
+from deliverable_traceability import DeliverableTraceabilityValidator
 
 
 def calculate_overall_score(results: dict) -> float:
