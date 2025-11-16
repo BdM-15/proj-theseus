@@ -183,14 +183,15 @@ class Neo4jGraphIO:
                 - source_id: Entity ID for source node (elementId)
                 - target_id: Entity ID for target node (elementId)
                 - relationship_type: Type of relationship
-                - confidence: Confidence score (0.0-1.0)
                 - reasoning: Human-readable explanation
+                - confidence: Optional confidence score (0.0-1.0)
                 
         Returns:
             Number of relationships created
         """
         # Neo4j doesn't allow dynamic relationship types in pure Cypher
         # We need to use APOC or create with a property
+        # Only include confidence if present (trust LLM quality like LightRAG)
         query = f"""
         UNWIND $relationships AS rel
         MATCH (source:`{self.workspace}`)
@@ -199,11 +200,11 @@ class Neo4jGraphIO:
         WHERE elementId(target) = rel.target_id
         MERGE (source)-[r:INFERRED_RELATIONSHIP {{
             type: rel.relationship_type,
-            confidence: rel.confidence,
             reasoning: rel.reasoning,
             source: 'semantic_post_processor',
             created_at: datetime()
         }}]->(target)
+        SET r.confidence = CASE WHEN rel.confidence IS NOT NULL THEN rel.confidence ELSE r.confidence END
         RETURN count(r) as created_count
         """
         
