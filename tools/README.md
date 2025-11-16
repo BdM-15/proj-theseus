@@ -2,45 +2,69 @@
 
 Helper scripts for managing and testing the GovCon Capture Vibe system.
 
+## Directory Structure
+
+```
+tools/
+├── neo4j/              # Neo4j workspace management
+│   ├── clear_neo4j.py          # Clear/delete workspaces
+│   └── duplicate_workspace.py  # Duplicate baseline workspaces
+│
+├── validation/         # Production readiness validation
+│   ├── validate_rfp_processing.py   # Main validation script
+│   ├── deliverable_traceability.py  # Deliverable coverage checks
+│   ├── query_quality.py             # Query effectiveness scoring
+│   ├── section_l_m_coverage.py      # Section L↔M mapping analysis
+│   └── workload_completeness.py     # Workload enrichment checks
+│
+└── diagnostics/        # Debugging & quality analysis
+    ├── assess_quality.py            # Overall quality metrics
+    ├── check_neo4j_props.py         # Property schema inspection
+    ├── check_eval_factors.py        # Evaluation factor analysis
+    ├── check_eval_factor_filtering.py # Factor filtering validation
+    └── check_pattern_counts.py      # Pattern matching statistics
+```
+
+---
+
 ## Quick Reference
 
-### Production Tools
+### Neo4j Management (`tools/neo4j/`)
 
 **`clear_neo4j.py`** - Clear Neo4j workspace for fresh testing
 
 ```powershell
-python tools/clear_neo4j.py              # Clear current workspace
-python tools/clear_neo4j.py --list       # List all workspaces
-python tools/clear_neo4j.py --workspace NAME  # Clear specific workspace
+python tools/neo4j/clear_neo4j.py                  # Clear current workspace
+python tools/neo4j/clear_neo4j.py --list           # List all workspaces
+python tools/neo4j/clear_neo4j.py --workspace NAME # Clear specific workspace
+python tools/neo4j/clear_neo4j.py --all            # Delete EVERYTHING (dangerous!)
 ```
 
-**`assess_quality.py`** - Analyze Neo4j data quality
+**`duplicate_workspace.py`** - Duplicate baseline workspace ✨ NEW
 
 ```powershell
-python tools/assess_quality.py
+python tools/neo4j/duplicate_workspace.py
 ```
 
-Shows:
+Interactive prompts guide you through:
 
-- Entity/relationship counts
-- Type distributions
-- Correction statistics
-- Sample inferred relationships
-- Quality metrics
+- Select source workspace (e.g., baseline RFP)
+- Name new workspace (e.g., baseline + technical docs)
+- Dry-run mode (preview before copying)
+- Copies Neo4j nodes/relationships + rag_storage folder
+- Option to update `.env` to point to new workspace
 
-**`check_neo4j_props.py`** - Inspect Neo4j node properties
+**Use case**: Preserve processed RFP baseline, extend with additional documents without reprocessing.
 
-```powershell
-python tools/check_neo4j_props.py
-```
+---
 
-Useful for debugging property name issues.
+### Validation (`tools/validation/`)
 
-**`validate_rfp_processing.py`** - Production readiness validation ✨ NEW
+**`validate_rfp_processing.py`** - Production readiness validation 🎯 PRIMARY TOOL
 
 ```powershell
-python tools/validate_rfp_processing.py              # Validate current workspace
-python tools/validate_rfp_processing.py WORKSPACE    # Validate specific workspace
+python tools/validation/validate_rfp_processing.py              # Validate current workspace
+python tools/validation/validate_rfp_processing.py WORKSPACE    # Validate specific workspace
 ```
 
 Generates comprehensive validation report with:
@@ -59,41 +83,104 @@ Generates comprehensive validation report with:
 
 ---
 
-## Testing Workflow
+### Diagnostics (`tools/diagnostics/`)
 
-**Before each test:**
+**`assess_quality.py`** - Analyze Neo4j data quality
+
+```powershell
+python tools/diagnostics/assess_quality.py
+```
+
+Shows:
+
+- Entity/relationship counts
+- Type distributions
+- Correction statistics
+- Sample inferred relationships
+- Quality metrics
+
+**`check_neo4j_props.py`** - Inspect Neo4j node properties
+
+```powershell
+python tools/diagnostics/check_neo4j_props.py
+```
+
+Useful for debugging property name issues and schema validation.
+
+**`check_eval_factors.py`** - Evaluation factor analysis
+
+```powershell
+python tools/diagnostics/check_eval_factors.py
+```
+
+Analyzes evaluation factor hierarchy and filtering logic.
+
+---
+
+## Common Workflows
+
+### Testing Workflow (Fresh RFP Processing)
 
 ```powershell
 # 1. Clear Neo4j workspace
-python tools/clear_neo4j.py
+python tools/neo4j/clear_neo4j.py
 
 # 2. Upload RFP via WebUI (http://localhost:9621/webui)
 
 # 3. Validate production readiness
-python tools/validate_rfp_processing.py
+python tools/validation/validate_rfp_processing.py
 
 # 4. (Optional) Assess detailed quality metrics
-python tools/assess_quality.py
+python tools/diagnostics/assess_quality.py
 ```
 
-**Quick validation (no document upload needed):**
+### Baseline Extension Workflow (Add Documents to Existing Graph)
 
 ```powershell
-# Run from project root
-python test_neo4j_quick.py
+# 1. Duplicate baseline workspace
+python tools/neo4j/duplicate_workspace.py
+# Select source: afcapv_adab_iss_2025
+# Enter new name: afcapv_adab_iss_2025_extended
+
+# 2. Update .env to point to new workspace (script prompts for this)
+
+# 3. Restart server
+
+# 4. Upload additional documents via WebUI
+# New entities/relationships added to duplicated baseline
+
+# 5. Validate extended workspace
+python tools/validation/validate_rfp_processing.py afcapv_adab_iss_2025_extended
+```
+
+### Debugging Workflow
+
+```powershell
+# 1. Check workspace exists
+python tools/neo4j/clear_neo4j.py --list
+
+# 2. Inspect node properties
+python tools/diagnostics/check_neo4j_props.py
+
+# 3. Check evaluation factors
+python tools/diagnostics/check_eval_factors.py
+
+# 4. Assess overall quality
+python tools/diagnostics/assess_quality.py
 ```
 
 ---
 
-## When to Use Each Tool
+## Tool Comparison Matrix
 
-| Tool                         | Use When                   | Time    |
-| ---------------------------- | -------------------------- | ------- |
-| `clear_neo4j.py`             | Starting fresh test        | 5 sec   |
-| `validate_rfp_processing.py` | After processing (primary) | 15 sec  |
-| `assess_quality.py`          | Detailed metrics           | 10 sec  |
-| `check_neo4j_props.py`       | Debugging schema           | 2 sec   |
-| `test_neo4j_quick.py`        | Verify system works        | 2-5 min |
+| Tool                                    | Category    | Use When                                | Time      |
+| --------------------------------------- | ----------- | --------------------------------------- | --------- |
+| `neo4j/clear_neo4j.py`                  | Management  | Starting fresh test                     | 5 sec     |
+| `neo4j/duplicate_workspace.py`          | Management  | Extending baseline without reprocessing | 10-30 sec |
+| `validation/validate_rfp_processing.py` | Validation  | After processing (PRIMARY)              | 15 sec    |
+| `diagnostics/assess_quality.py`         | Diagnostics | Detailed metrics                        | 10 sec    |
+| `diagnostics/check_neo4j_props.py`      | Diagnostics | Debugging schema                        | 2 sec     |
+| `diagnostics/check_eval_factors.py`     | Diagnostics | Evaluation factor issues                | 5 sec     |
 
 ---
 
