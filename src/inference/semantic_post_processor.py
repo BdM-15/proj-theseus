@@ -270,6 +270,7 @@ def _validate_relationships(rels: List[Dict], id_to_entity: Dict, algorithm_name
 async def _resolve_orphan_patterns(
     entities: List[Dict],
     id_to_entity: Dict[str, Dict],
+    neo4j_io,
     model: str,
     temperature: float
 ) -> List[Dict]:
@@ -289,6 +290,7 @@ async def _resolve_orphan_patterns(
     Args:
         entities: All entities to analyze
         id_to_entity: Entity ID lookup dictionary
+        neo4j_io: Neo4jGraphIO instance for querying orphans
         model: LLM model name
         temperature: LLM temperature
         
@@ -297,24 +299,15 @@ async def _resolve_orphan_patterns(
     """
     import json
     
-    # Identify orphaned entities (entities with no relationships)
-    # Note: In Neo4j, entities already have relationships stored, so we look for
-    # entities that were never connected during Algorithms 1-7
-    entity_ids_with_rels = set()
+    # Get truly orphaned entity IDs from Neo4j (nodes with NO relationships)
+    orphan_ids = set(neo4j_io.get_orphaned_entity_ids())
     
-    # For each entity, check if it appears as source/target in any existing relationships
-    # This is implicitly handled by Neo4j - entities without edges won't have relationship metadata
-    # We rely on the fact that connected entities have relationship_type fields populated
+    if not orphan_ids:
+        logger.info("    → No orphaned entities found")
+        return []
     
-    # Simple heuristic: Check if entity has minimal connections (0-1 relationships)
-    # This catches true orphans and weakly connected entities that may need more links
-    orphaned = []
-    for entity in entities:
-        # Count relationships this entity participates in
-        # Neo4j entities store relationships in metadata
-        rel_types = entity.get('relationships', [])
-        if isinstance(rel_types, list) and len(rel_types) == 0:
-            orphaned.append(entity)
+    # Filter entities to only those that are actually orphaned
+    orphaned = [e for e in entities if e['id'] in orphan_ids]
     
     if not orphaned:
         logger.info("    → No orphaned entities found")
@@ -904,7 +897,7 @@ Return ONLY valid JSON array:
     
     # ALGORITHM 8: Orphan Pattern Resolution (Equipment, Gov't-Provided, Person-Deliverable, Table-Field)
     logger.info(f"\n  [Algorithm 8/8] Orphan Pattern Resolution")
-    orphan_rels = await _resolve_orphan_patterns(entities, id_to_entity, model=model, temperature=temperature)
+    orphan_rels = await _resolve_orphan_patterns(entities, id_to_entity, neo4j_io, model=model, temperature=temperature)
     all_relationships.extend(orphan_rels)
     logger.info(f"    → Found {len(orphan_rels)} orphan pattern relationships")
     
