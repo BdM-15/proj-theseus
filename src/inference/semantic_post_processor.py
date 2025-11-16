@@ -235,14 +235,22 @@ def _validate_relationships(rels: List[Dict], id_to_entity: Dict, algorithm_name
         algorithm_name: Name of algorithm for logging
         
     Returns:
-        List of valid relationships with all required fields
+        List of valid relationships with all required fields (including default confidence)
     """
     valid_rels = []
     for rel in rels:
         if (rel.get('source_id') in id_to_entity and 
             rel.get('target_id') in id_to_entity and 
             rel.get('relationship_type')):
-            valid_rels.append(rel)
+            # Ensure confidence field has valid value (default 0.7 if missing/null)
+            valid_rel = {
+                'source_id': rel['source_id'],
+                'target_id': rel['target_id'],
+                'relationship_type': rel['relationship_type'],
+                'confidence': rel.get('confidence') if rel.get('confidence') is not None else 0.7,
+                'reasoning': rel.get('reasoning', '')
+            }
+            valid_rels.append(valid_rel)
         else:
             missing = []
             if not rel.get('source_id') or rel.get('source_id') not in id_to_entity:
