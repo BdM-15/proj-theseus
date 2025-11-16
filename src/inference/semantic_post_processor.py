@@ -414,23 +414,27 @@ If no relationships found, return []."""
 async def _infer_relationships_multi_algorithm(
     entities: List[Dict],
     existing_rels: List[Dict],
+    neo4j_io,
     model: str,
     temperature: float
 ) -> List[Dict]:
     """
     Multi-algorithm relationship inference using specialized prompts.
     
-    6 Algorithms (uses entity IDs from Branch 013a for precision):
+    8 Algorithms (uses entity IDs from Branch 013a for precision):
     1. Instruction-Evaluation Linking (instruction_evaluation_linking.md)
-    2. Requirement-Evaluation Mapping (requirement_evaluation.md)
-    3. Deliverable Tracing (sow_deliverable_linking.md)
-    4. Document Hierarchy (document_hierarchy.md, attachment_section_linking.md, document_section_linking.md, clause_clustering.md)
-    5. Semantic Concept Linking (semantic_concept_linking.md)
-    6. Heuristic Pattern Matching (CDRL, cross-refs)
+    2. Evaluation Hierarchy & Metrics
+    3. Requirement-Evaluation Mapping (requirement_evaluation.md)
+    4. Deliverable Tracing (sow_deliverable_linking.md)
+    5. Document Hierarchy (document_hierarchy.md, attachment_section_linking.md, document_section_linking.md, clause_clustering.md)
+    6. Semantic Concept Linking (semantic_concept_linking.md)
+    7. Heuristic Pattern Matching (CDRL, cross-refs)
+    8. Orphan Pattern Resolution (Neo4j query-based)
     
     Args:
         entities: All entities to analyze
         existing_rels: Existing relationships
+        neo4j_io: Neo4jGraphIO instance for querying orphans
         model: LLM model name
         temperature: LLM temperature
         
@@ -1011,6 +1015,7 @@ async def _semantic_post_processor_neo4j(
         new_relationships = await _infer_relationships_multi_algorithm(
             entities=entities,
             existing_rels=relationships,
+            neo4j_io=neo4j_io,
             model=llm_model_name,
             temperature=temperature
         )
