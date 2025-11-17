@@ -328,8 +328,8 @@ def main():
         print()
         
         if not dry_run:
-            confirm = input("Proceed with duplication? (yes/no): ").strip().lower()
-            if confirm != 'yes':
+            confirm = input("Proceed with duplication? (y/n): ").strip().lower()
+            if confirm != 'y':
                 print("❌ Duplication cancelled")
                 return
         
