@@ -99,67 +99,103 @@ class WorkspaceDuplicator:
             relationships = session.run(rel_query).single()['count']
             return entities, relationships
     
-    def duplicate_neo4j_workspace(self, source: str, target: str, dry_run: bool = False) -> Tuple[int, int]:
+    def duplicate_neo4j_workspace(self, source: str, target: str, dry_run: bool = False, dual_label: bool = True) -> Tuple[int, int]:
         """
-        Duplicate Neo4j workspace by copying all nodes and relationships.
+        Duplicate Neo4j workspace by adding target label to source nodes.
+        
+        Args:
+            source: Source workspace label
+            target: Target workspace label to add
+            dry_run: If True, only preview without making changes
+            dual_label: If True, add target label to existing nodes (baseline inheritance)
+                       If False, create separate nodes with only target label (full copy)
         
         Returns:
             Tuple of (entities_copied, relationships_copied)
         """
         if dry_run:
             entities, rels = self.get_workspace_stats(source)
-            print(f"  [DRY RUN] Would copy {entities} entities and {rels} relationships")
+            mode_desc = "dual-label (add to baseline)" if dual_label else "single-label (full copy)"
+            print(f"  [DRY RUN] Would copy {entities} entities and {rels} relationships ({mode_desc})")
             return entities, rels
         
-        # Copy nodes
-        copy_nodes_query = f"""
-        MATCH (n:`{source}`)
-        CREATE (n2:`{target}`)
-        SET n2 = properties(n)
-        RETURN count(n2) as count
-        """
+        if dual_label:
+            # Dual-label mode: Add target label to source nodes (baseline inheritance)
+            # This allows new documents in target workspace to reference baseline entities
+            copy_nodes_query = f"""
+            MATCH (n:`{source}`)
+            SET n:`{target}`
+            RETURN count(n) as count
+            """
+        else:
+            # Single-label mode: Create separate copy (original behavior)
+            copy_nodes_query = f"""
+            MATCH (n:`{source}`)
+            CREATE (n2:`{target}`)
+            SET n2 = properties(n)
+            RETURN count(n2) as count
+            """
         
-        # Copy relationships
-        copy_rels_query = f"""
-        MATCH (a:`{source}`)-[r]->(b:`{source}`)
-        MATCH (a2:`{target}` {{entity_id: a.entity_id}})
-        MATCH (b2:`{target}` {{entity_id: b.entity_id}})
-        WITH a2, b2, r, type(r) as rel_type, properties(r) as props
-        CALL apoc.create.relationship(a2, rel_type, props, b2) YIELD rel
-        RETURN count(rel) as count
-        """
-        
-        # Fallback if APOC not available
-        copy_rels_fallback = f"""
-        MATCH (a:`{source}`)-[r]->(b:`{source}`)
-        MATCH (a2:`{target}` {{entity_id: a.entity_id}})
-        MATCH (b2:`{target}` {{entity_id: b.entity_id}})
-        CREATE (a2)-[r2:INFERRED_RELATIONSHIP]->(b2)
-        SET r2 = properties(r)
-        RETURN count(r2) as count
-        """
+        if dual_label:
+            # Dual-label mode: Relationships already exist on the same nodes
+            # Just need to count them for the target workspace view
+            copy_rels_query = f"""
+            MATCH (a:`{target}`)-[r]->(b:`{target}`)
+            RETURN count(r) as count
+            """
+            copy_rels_fallback = copy_rels_query  # Same query, no APOC needed
+        else:
+            # Single-label mode: Need to duplicate relationships to new nodes
+            copy_rels_query = f"""
+            MATCH (a:`{source}`)-[r]->(b:`{source}`)
+            MATCH (a2:`{target}` {{entity_id: a.entity_id}})
+            MATCH (b2:`{target}` {{entity_id: b.entity_id}})
+            WITH a2, b2, r, type(r) as rel_type, properties(r) as props
+            CALL apoc.create.relationship(a2, rel_type, props, b2) YIELD rel
+            RETURN count(rel) as count
+            """
+            
+            # Fallback if APOC not available
+            copy_rels_fallback = f"""
+            MATCH (a:`{source}`)-[r]->(b:`{source}`)
+            MATCH (a2:`{target}` {{entity_id: a.entity_id}})
+            MATCH (b2:`{target}` {{entity_id: b.entity_id}})
+            CREATE (a2)-[r2:INFERRED_RELATIONSHIP]->(b2)
+            SET r2 = properties(r)
+            RETURN count(r2) as count
+            """
         
         with self.driver.session(database=self.neo4j_database) as session:
-            # Copy nodes
-            print(f"  Copying entities from '{source}' to '{target}'...")
+            # Copy/label nodes
+            action = "Adding target label to" if dual_label else "Copying entities from"
+            print(f"  {action} '{source}' baseline...")
             result = session.run(copy_nodes_query)
             entities_copied = result.single()['count']
-            print(f"    ✓ Copied {entities_copied} entities")
+            if dual_label:
+                print(f"    ✓ Added '{target}' label to {entities_copied} baseline entities")
+            else:
+                print(f"    ✓ Copied {entities_copied} entities")
             
-            # Copy relationships (try APOC first, fallback if not available)
-            print(f"  Copying relationships...")
-            try:
+            # Handle relationships
+            if dual_label:
+                print(f"  Counting existing relationships in target workspace view...")
                 result = session.run(copy_rels_query)
                 rels_copied = result.single()['count']
-            except Exception as e:
-                if 'apoc' in str(e).lower():
-                    print(f"    ⚠️  APOC not available, using fallback method")
-                    result = session.run(copy_rels_fallback)
+                print(f"    ✓ {rels_copied} relationships available in '{target}' workspace")
+            else:
+                print(f"  Copying relationships...")
+                try:
+                    result = session.run(copy_rels_query)
                     rels_copied = result.single()['count']
-                else:
-                    raise
-            
-            print(f"    ✓ Copied {rels_copied} relationships")
+                except Exception as e:
+                    if 'apoc' in str(e).lower():
+                        print(f"    ⚠️  APOC not available, using fallback method")
+                        result = session.run(copy_rels_fallback)
+                        rels_copied = result.single()['count']
+                    else:
+                        raise
+                
+                print(f"    ✓ Copied {rels_copied} relationships")
             
             return entities_copied, rels_copied
     
@@ -313,18 +349,66 @@ def main():
         
         print()
         
-        # Step 4: Dry run option
+        # Step 4: Backup creation option (for dual-label safety)
+        create_backup = False
+        backup_workspace = f"{source_workspace}_backup"
+        
+        if not duplicator.workspace_exists(backup_workspace):
+            print("💾 Backup Protection:")
+            print(f"  Create safety backup '{backup_workspace}' before extending baseline?")
+            print("  → Protects baseline from accidental deletion")
+            print("  → Single-label copy (isolated, never modified)")
+            print("  → Can restore baseline if working copy gets corrupted")
+            print()
+            backup_input = input("Create backup? (y/n): ").strip().lower()
+            create_backup = backup_input == 'y'
+            print()
+        else:
+            print(f"ℹ️  Backup '{backup_workspace}' already exists, skipping backup creation")
+            print()
+        
+        # Step 5: Choose duplication mode
+        print("🔀 Duplication Mode:")
+        print("  [1] Dual-label (recommended): Add new workspace label to baseline entities")
+        print("      → Baseline entities visible in BOTH workspaces")
+        print("      → New documents can reference baseline entities")
+        print("      → Use this to extend baseline with additional documents")
+        print()
+        print("  [2] Single-label (full copy): Create separate copy with new label only")
+        print("      → Baseline and new workspace are completely independent")
+        print("      → No cross-workspace connections possible")
+        print("      → Use this for testing or complete isolation")
+        print()
+        
+        while True:
+            mode_input = input("Select mode (1 or 2): ").strip()
+            if mode_input == '1':
+                dual_label = True
+                break
+            elif mode_input == '2':
+                dual_label = False
+                break
+            else:
+                print("  ❌ Invalid selection. Enter 1 or 2.")
+        
+        print()
+        
+        # Step 6: Dry run option
         dry_run_input = input("Run in dry-run mode (preview only)? (y/n): ").strip().lower()
         dry_run = dry_run_input == 'y'
         
         print()
         
-        # Step 5: Confirmation
+        # Step 7: Confirmation
         entities, rels = duplicator.get_workspace_stats(source_workspace)
+        mode_desc = "Dual-label (baseline inheritance)" if dual_label else "Single-label (full copy)"
         print("📋 Duplication Summary:")
         print(f"  Source:      {source_workspace} ({entities} entities, {rels} relationships)")
+        if create_backup:
+            print(f"  Backup:      {backup_workspace} (safety copy, single-label)")
         print(f"  Target:      {target_workspace}")
-        print(f"  Mode:        {'DRY RUN (preview only)' if dry_run else 'LIVE (will copy data)'}")
+        print(f"  Mode:        {mode_desc}")
+        print(f"  Execution:   {'DRY RUN (preview only)' if dry_run else 'LIVE (will modify data)'}")
         print()
         
         if not dry_run:
@@ -339,17 +423,51 @@ def main():
         print("=" * 80)
         print()
         
-        # Step 6: Duplicate Neo4j workspace
-        print("🔄 Step 1/2: Duplicating Neo4j workspace...")
+        # Step 8: Create backup first (if requested)
+        backup_size_mb = 0
+        if create_backup:
+            print("🔄 Step 1: Creating safety backup...")
+            print(f"  Source: {source_workspace}")
+            print(f"  Backup: {backup_workspace}")
+            print()
+            
+            # Create backup with single-label mode
+            backup_entities, backup_rels = duplicator.duplicate_neo4j_workspace(
+                source_workspace,
+                backup_workspace,
+                dry_run,
+                dual_label=False  # Always single-label for backups
+            )
+            print()
+            
+            # Copy backup rag_storage
+            try:
+                backup_size_mb = duplicator.duplicate_rag_storage(
+                    source_workspace,
+                    backup_workspace,
+                    dry_run
+                )
+            except FileNotFoundError as e:
+                print(f"  ⚠️  {e}")
+                print(f"  ⚠️  Skipping backup rag_storage duplication")
+                backup_size_mb = 0
+            print()
+            print(f"  ✅ Backup created: {backup_entities} entities, {backup_rels} relationships, {backup_size_mb} MB")
+            print()
+        
+        # Step 9: Duplicate Neo4j workspace (working copy)
+        step_num = "2" if create_backup else "1"
+        print(f"🔄 Step {step_num}/2: Duplicating Neo4j workspace...")
         entities_copied, rels_copied = duplicator.duplicate_neo4j_workspace(
             source_workspace, 
             target_workspace,
-            dry_run
+            dry_run,
+            dual_label
         )
         print()
         
-        # Step 7: Duplicate rag_storage
-        print("🔄 Step 2/2: Duplicating rag_storage folder...")
+        # Step 10: Duplicate rag_storage
+        print(f"🔄 Step {step_num}/2: Duplicating rag_storage folder...")
         try:
             size_mb = duplicator.duplicate_rag_storage(
                 source_workspace,
@@ -362,14 +480,14 @@ def main():
             size_mb = 0
         print()
         
-        # Step 8: Update .env option
+        # Step 11: Update .env option
         if not dry_run:
             update_env = input("Update .env to point to new workspace? (y/n): ").strip().lower()
             if update_env == 'y':
                 duplicator.update_env_file(target_workspace, dry_run)
                 print()
         
-        # Step 9: Summary
+        # Step 12: Summary
         print("=" * 80)
         if dry_run:
             print("DRY RUN COMPLETE")
@@ -378,8 +496,11 @@ def main():
         print("=" * 80)
         print()
         print(f"Source workspace:  {source_workspace}")
+        if create_backup:
+            print(f"Backup workspace:  {backup_workspace} (isolated, never modified)")
         print(f"Target workspace:  {target_workspace}")
-        print(f"Entities copied:   {entities_copied}")
+        print(f"Mode:              {mode_desc}")
+        print(f"Entities:          {entities_copied}")
         print(f"Relationships:     {rels_copied}")
         print(f"Storage copied:    {size_mb} MB")
         print()
@@ -389,7 +510,17 @@ def main():
             print(f"1. Ensure .env has: NEO4J_WORKSPACE={target_workspace}")
             print(f"2. Restart application server")
             print(f"3. Upload additional documents via WebUI")
-            print(f"4. New entities/relationships will be added to the duplicated baseline")
+            if dual_label:
+                print(f"4. New documents will be able to reference baseline entities")
+                print(f"5. Baseline entities are visible in both '{source_workspace}' and '{target_workspace}' workspaces")
+                if create_backup:
+                    print()
+                    print(f"💾 Safety Net:")
+                    print(f"   - If baseline gets corrupted, restore from '{backup_workspace}'")
+                    print(f"   - Backup is isolated (single-label only, never modified)")
+            else:
+                print(f"4. New documents will only link to entities within '{target_workspace}'")
+                print(f"5. '{source_workspace}' and '{target_workspace}' are completely independent")
         
     except KeyboardInterrupt:
         print("\n\n❌ Duplication cancelled by user")
