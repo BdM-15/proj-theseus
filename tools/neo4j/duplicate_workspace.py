@@ -5,15 +5,35 @@ Duplicates an existing Neo4j workspace and its rag_storage folder to create
 a baseline snapshot that can be extended with additional documents without
 reprocessing the original RFP.
 
+CRITICAL SCENARIOS:
+1. Pure Baseline Backup (single-label, baseline-only filter):
+   - Source: afcapv_adab_iss_2025 (PURE baseline, no dual-labels)
+   - Target: afcapv_adab_iss_2025_backup
+   - Filter: baseline-only (excludes dual-labeled nodes)
+   - Result: 1,321 entities (pure baseline snapshot)
+   
+2. Contaminated Baseline (single-label, no filter):
+   - Source: afcapv_adab_iss_2025 (has dual-labels with pwsdocs)
+   - Target: afcapv_adab_iss_2025_backup
+   - Filter: none (copies ALL nodes with source label)
+   - Result: 2,642 entities (baseline + extended workspace entities)
+   
+3. Baseline Extension (dual-label):
+   - Source: afcapv_adab_iss_2025 (baseline)
+   - Target: afcapv_adab_iss_2025_pwsdocs (extended workspace)
+   - Mode: dual-label (adds target label to baseline nodes)
+   - Result: Baseline entities visible in BOTH workspaces
+
 Usage:
     python tools/duplicate_workspace.py
 
 Features:
 - Interactive prompts with validation
+- Baseline purity detection (warns if source has dual-labels)
+- Optional baseline-only filter (excludes dual-labeled nodes)
 - Copies Neo4j nodes/relationships with new workspace label
 - Duplicates rag_storage vector databases and metadata
-- Option to update .env file
-- Dry-run mode
+- Dry-run mode with accurate preview counts
 - Progress indicators and summary report
 """
 
@@ -99,7 +119,53 @@ class WorkspaceDuplicator:
             relationships = session.run(rel_query).single()['count']
             return entities, relationships
     
-    def duplicate_neo4j_workspace(self, source: str, target: str, dry_run: bool = False, dual_label: bool = True) -> Tuple[int, int]:
+    def analyze_workspace_purity(self, workspace: str) -> dict:
+        """Analyze if workspace has dual-labeled nodes (contaminated baseline)
+        
+        Returns:
+            dict with keys:
+            - total_nodes: Total nodes with workspace label
+            - pure_nodes: Nodes with ONLY workspace label + entity types
+            - contaminated_nodes: Nodes with other workspace labels
+            - other_workspaces: List of other workspace labels found
+            - is_pure: Boolean if workspace is a pure baseline
+        """
+        query = f"""
+        MATCH (n:`{workspace}`)
+        WITH n, 
+             [label IN labels(n) WHERE label <> '{workspace}' 
+              AND label NOT IN ['concept', 'section', 'document', 'deliverable', 
+                                'requirement', 'organization', 'location', 'equipment', 
+                                'program', 'person', 'clause', 'evaluation_factor', 
+                                'event', 'technology', 'table', 'other', 'UNKNOWN',
+                                'statement_of_work', 'workload', 'strategic_theme',
+                                'submission_instruction', 'entity', 'relationship']
+             ] as workspace_labels
+        RETURN 
+            count(n) as total_nodes,
+            sum(CASE WHEN size(workspace_labels) = 0 THEN 1 ELSE 0 END) as pure_nodes,
+            sum(CASE WHEN size(workspace_labels) > 0 THEN 1 ELSE 0 END) as contaminated_nodes,
+            collect(DISTINCT workspace_labels) as all_workspace_labels
+        """
+        
+        with self.driver.session(database=self.neo4j_database) as session:
+            result = session.run(query).single()
+            
+            # Flatten nested list of workspace labels
+            other_workspaces = []
+            for labels_list in result['all_workspace_labels']:
+                other_workspaces.extend(labels_list)
+            other_workspaces = list(set(other_workspaces))  # Deduplicate
+            
+            return {
+                'total_nodes': result['total_nodes'],
+                'pure_nodes': result['pure_nodes'],
+                'contaminated_nodes': result['contaminated_nodes'],
+                'other_workspaces': other_workspaces,
+                'is_pure': result['contaminated_nodes'] == 0
+            }
+    
+    def duplicate_neo4j_workspace(self, source: str, target: str, dry_run: bool = False, dual_label: bool = True, baseline_only: bool = False) -> Tuple[int, int]:
         """
         Duplicate Neo4j workspace by adding target label to source nodes.
         
@@ -109,6 +175,8 @@ class WorkspaceDuplicator:
             dry_run: If True, only preview without making changes
             dual_label: If True, add target label to existing nodes (baseline inheritance)
                        If False, create separate nodes with only target label (full copy)
+            baseline_only: If True, only copy nodes with ONLY source label (pure baseline)
+                          If False, copy ALL nodes with source label (including dual-labeled)
         
         Returns:
             Tuple of (entities_copied, relationships_copied)
@@ -119,22 +187,61 @@ class WorkspaceDuplicator:
             print(f"  [DRY RUN] Would copy {entities} entities and {rels} relationships ({mode_desc})")
             return entities, rels
         
+        # Build WHERE clause for baseline-only filtering
+        entity_types = ['concept', 'section', 'document', 'deliverable', 'requirement', 
+                       'organization', 'location', 'equipment', 'program', 'person', 
+                       'clause', 'evaluation_factor', 'event', 'technology', 'table', 
+                       'other', 'UNKNOWN', 'statement_of_work', 'workload', 
+                       'strategic_theme', 'submission_instruction', 'entity', 'relationship']
+        entity_types_str = "', '".join(entity_types)
+        
+        if baseline_only:
+            # Filter: Only nodes with source label + entity types (no other workspace labels)
+            where_clause = f"""
+            WHERE all(label IN labels(n) WHERE label = '{source}' OR label IN ['{entity_types_str}'])
+            """
+        else:
+            where_clause = ""  # No filter, copy all nodes with source label
+        
         if dual_label:
             # Dual-label mode: Add target label to source nodes (baseline inheritance)
             # This allows new documents in target workspace to reference baseline entities
             copy_nodes_query = f"""
             MATCH (n:`{source}`)
+            {where_clause}
             SET n:`{target}`
             RETURN count(n) as count
             """
         else:
-            # Single-label mode: Create separate copy (original behavior)
+            # Single-label mode: Create separate copy with ALL labels preserved
+            # CRITICAL: Must copy entity type labels (requirement, deliverable, etc.)
             copy_nodes_query = f"""
+            MATCH (n:`{source}`)
+            WITH n, properties(n) as props,
+                 [label IN labels(n) WHERE label <> '{source}'] as entity_labels
+            CREATE (n2:`{target}`)
+            SET n2 = props
+            WITH n2, entity_labels
+            CALL apoc.create.addLabels(n2, entity_labels) YIELD node
+            RETURN count(node) as count
+            """
+            
+            # Fallback if APOC not available - WARNING: loses entity type labels!
+            copy_nodes_fallback = f"""
             MATCH (n:`{source}`)
             CREATE (n2:`{target}`)
             SET n2 = properties(n)
             RETURN count(n2) as count
             """
+        
+        # Add baseline-only filter to relationship queries if needed
+        if baseline_only:
+            rel_where_clause = f"""
+            WHERE all(label IN labels(a) WHERE label = '{source}' OR label IN ['{entity_types_str}'])
+              AND all(label IN labels(b) WHERE label = '{source}' OR label IN ['{entity_types_str}'])
+            """
+        else:
+            rel_where_clause = ""
         
         if dual_label:
             # Dual-label mode: Relationships already exist on the same nodes
@@ -148,6 +255,7 @@ class WorkspaceDuplicator:
             # Single-label mode: Need to duplicate relationships to new nodes
             copy_rels_query = f"""
             MATCH (a:`{source}`)-[r]->(b:`{source}`)
+            {rel_where_clause}
             MATCH (a2:`{target}` {{entity_id: a.entity_id}})
             MATCH (b2:`{target}` {{entity_id: b.entity_id}})
             WITH a2, b2, r, type(r) as rel_type, properties(r) as props
@@ -158,6 +266,7 @@ class WorkspaceDuplicator:
             # Fallback if APOC not available
             copy_rels_fallback = f"""
             MATCH (a:`{source}`)-[r]->(b:`{source}`)
+            {rel_where_clause}
             MATCH (a2:`{target}` {{entity_id: a.entity_id}})
             MATCH (b2:`{target}` {{entity_id: b.entity_id}})
             CREATE (a2)-[r2:INFERRED_RELATIONSHIP]->(b2)
@@ -169,12 +278,25 @@ class WorkspaceDuplicator:
             # Copy/label nodes
             action = "Adding target label to" if dual_label else "Copying entities from"
             print(f"  {action} '{source}' baseline...")
-            result = session.run(copy_nodes_query)
-            entities_copied = result.single()['count']
+            
             if dual_label:
+                result = session.run(copy_nodes_query)
+                entities_copied = result.single()['count']
                 print(f"    ✓ Added '{target}' label to {entities_copied} baseline entities")
             else:
-                print(f"    ✓ Copied {entities_copied} entities")
+                # Single-label mode: Try APOC-enhanced copy first
+                try:
+                    result = session.run(copy_nodes_query)
+                    entities_copied = result.single()['count']
+                    print(f"    ✓ Copied {entities_copied} entities (with entity type labels)")
+                except Exception as e:
+                    if 'apoc' in str(e).lower():
+                        print(f"    ⚠️  APOC not available, using fallback (entity type labels will be lost!)")
+                        result = session.run(copy_nodes_fallback)
+                        entities_copied = result.single()['count']
+                        print(f"    ✓ Copied {entities_copied} entities (workspace label only)")
+                    else:
+                        raise
             
             # Handle relationships
             if dual_label:
@@ -353,9 +475,17 @@ def main():
         create_backup = False
         backup_workspace = f"{source_workspace}_backup"
         
-        if not duplicator.workspace_exists(backup_workspace):
+        # Skip backup prompt if target IS the backup (single-label backup scenario)
+        if target_workspace == backup_workspace:
+            print(f"ℹ️  Target is the backup workspace, skipping redundant backup creation")
+            print()
+        elif not duplicator.workspace_exists(backup_workspace):
             print("💾 Backup Protection:")
             print(f"  Create safety backup '{backup_workspace}' before extending baseline?")
+            print()
+            print("  ⚠️  Answer 'n' if you ARE creating the backup (single-label copy)")
+            print("  ⚠️  Answer 'y' only if extending baseline (dual-label mode)")
+            print()
             print("  → Protects baseline from accidental deletion")
             print("  → Single-label copy (isolated, never modified)")
             print("  → Can restore baseline if working copy gets corrupted")
@@ -367,31 +497,77 @@ def main():
             print(f"ℹ️  Backup '{backup_workspace}' already exists, skipping backup creation")
             print()
         
-        # Step 5: Choose duplication mode
-        print("🔀 Duplication Mode:")
-        print("  [1] Dual-label (recommended): Add new workspace label to baseline entities")
-        print("      → Baseline entities visible in BOTH workspaces")
-        print("      → New documents can reference baseline entities")
-        print("      → Use this to extend baseline with additional documents")
-        print()
-        print("  [2] Single-label (full copy): Create separate copy with new label only")
-        print("      → Baseline and new workspace are completely independent")
-        print("      → No cross-workspace connections possible")
-        print("      → Use this for testing or complete isolation")
-        print()
+        # Step 5: Choose duplication mode (skip if creating backup - always single-label)
+        if target_workspace.endswith('_backup'):
+            dual_label = False
+            print("ℹ️  Backup mode detected: Using single-label copy (isolated workspace)")
+            print()
+        else:
+            print("🔀 Duplication Mode:")
+            print("  [1] Dual-label (recommended): Add new workspace label to baseline entities")
+            print("      → Baseline entities visible in BOTH workspaces")
+            print("      → New documents can reference baseline entities")
+            print("      → Use this to extend baseline with additional documents")
+            print()
+            print("  [2] Single-label (full copy): Create separate copy with new label only")
+            print("      → Baseline and new workspace are completely independent")
+            print("      → No cross-workspace connections possible")
+            print("      → Use this for testing or complete isolation")
+            print("      ⚠️  WARNING: Copies ALL nodes with source label (including dual-labeled)")
+            print()
+            
+            while True:
+                mode_input = input("Select mode (1 or 2): ").strip()
+                if mode_input == '1':
+                    dual_label = True
+                    break
+                elif mode_input == '2':
+                    dual_label = False
+                    break
+                else:
+                    print("  ❌ Invalid selection. Enter 1 or 2.")
+            
+            print()
         
-        while True:
-            mode_input = input("Select mode (1 or 2): ").strip()
-            if mode_input == '1':
-                dual_label = True
-                break
-            elif mode_input == '2':
-                dual_label = False
-                break
+        # Step 5b: Baseline purity check and filtering (single-label mode only)
+        baseline_only = False
+        if not dual_label:
+            print("🔍 Analyzing source workspace purity...")
+            purity = duplicator.analyze_workspace_purity(source_workspace)
+            
+            if not purity['is_pure']:
+                print(f"  ⚠️  WARNING: Source workspace has DUAL-LABELED nodes!")
+                print(f"     Total nodes:        {purity['total_nodes']}")
+                print(f"     Pure baseline:      {purity['pure_nodes']} (only '{source_workspace}' label)")
+                print(f"     Contaminated:       {purity['contaminated_nodes']} (has other workspace labels)")
+                if purity['other_workspaces']:
+                    print(f"     Other workspaces:   {', '.join(purity['other_workspaces'])}")
+                print()
+                print("  📋 SCENARIOS:")
+                print("     [1] Copy ALL nodes (baseline + extended)")
+                print(f"         → Will copy {purity['total_nodes']} entities (CONTAMINATED backup)")
+                print("         → Includes nodes from other workspaces")
+                print()
+                print("     [2] Copy PURE BASELINE only (recommended)")
+                print(f"         → Will copy {purity['pure_nodes']} entities (CLEAN backup)")
+                print(f"         → Excludes dual-labeled nodes")
+                print()
+                
+                while True:
+                    filter_input = input("Select copy mode (1 or 2): ").strip()
+                    if filter_input == '1':
+                        baseline_only = False
+                        break
+                    elif filter_input == '2':
+                        baseline_only = True
+                        break
+                    else:
+                        print("  ❌ Invalid selection. Enter 1 or 2.")
+                print()
             else:
-                print("  ❌ Invalid selection. Enter 1 or 2.")
-        
-        print()
+                print(f"  ✅ Source workspace is PURE baseline ({purity['pure_nodes']} entities)")
+                print(f"     No dual-labeled nodes detected")
+                print()
         
         # Step 6: Dry run option
         dry_run_input = input("Run in dry-run mode (preview only)? (y/n): ").strip().lower()
@@ -402,12 +578,17 @@ def main():
         # Step 7: Confirmation
         entities, rels = duplicator.get_workspace_stats(source_workspace)
         mode_desc = "Dual-label (baseline inheritance)" if dual_label else "Single-label (full copy)"
+        if baseline_only:
+            mode_desc += " - BASELINE ONLY (excludes dual-labeled nodes)"
         print("📋 Duplication Summary:")
         print(f"  Source:      {source_workspace} ({entities} entities, {rels} relationships)")
         if create_backup:
             print(f"  Backup:      {backup_workspace} (safety copy, single-label)")
         print(f"  Target:      {target_workspace}")
         print(f"  Mode:        {mode_desc}")
+        if baseline_only:
+            purity = duplicator.analyze_workspace_purity(source_workspace)
+            print(f"  Filter:      Pure baseline only ({purity['pure_nodes']} of {purity['total_nodes']} entities)")
         print(f"  Execution:   {'DRY RUN (preview only)' if dry_run else 'LIVE (will modify data)'}")
         print()
         
@@ -436,7 +617,8 @@ def main():
                 source_workspace,
                 backup_workspace,
                 dry_run,
-                dual_label=False  # Always single-label for backups
+                dual_label=False,  # Always single-label for backups
+                baseline_only=baseline_only  # Use same filter as target
             )
             print()
             
@@ -462,7 +644,8 @@ def main():
             source_workspace, 
             target_workspace,
             dry_run,
-            dual_label
+            dual_label,
+            baseline_only
         )
         print()
         
