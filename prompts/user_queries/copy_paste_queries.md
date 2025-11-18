@@ -37,15 +37,6 @@ Organize by criticality level and flag any requirements we don't currently meet.
 
 **Why This Works**: Triggers compliance_checklist.md user prompt behavior by requesting "comprehensive compliance checklist" + "organized by criticality" + "capability gaps." Even without programmatic injection, query phrasing aligns with Shipley compliance matrix methodology.
 
-**What You'll Get**:
-
-- ✅ All MANDATORY requirements (SHALL/MUST) with showstopper flags
-- ⚠️ Important requirements (SHOULD) with scoring impact
-- ℹ️ Optional requirements (MAY) with strategic value assessment
-- 📊 Compliance summary matrix (% compliant, gaps, teaming needs)
-- 🎯 Section L ↔ Section M mapping (submission instructions → evaluation factors)
-
-**Shipley Principle**: "Compliance is the foundation, not the ceiling. Know 100% of requirements BEFORE writing begins."
 
 ---
 
@@ -57,14 +48,6 @@ List all MANDATORY requirements (SHALL/MUST modal verbs OR criticality ≥0.80) 
 
 **Why This Works**: Focuses on showstoppers by explicitly requesting "MANDATORY" + "SHALL/MUST" + "compliance gaps" + "mitigation."
 
-**What You'll Get**:
-
-- Filtered list of only MANDATORY requirements
-- Compliance status: ✅ Compliant | ⚠️ Partial | ❌ Gap
-- Mitigation options for gaps (teaming partner, certification timeline, subcontractor)
-- Risk assessment (HIGH if any mandatory gap = rejection risk)
-
-**Use Case**: Bid/No-Bid decision - if any mandatory gap can't be mitigated, consider no-bid.
 
 ---
 
@@ -76,13 +59,6 @@ Verify all Section L submission instructions map to Section M evaluation factors
 
 **Why This Works**: Requests "Section L ↔ M mapping" + "orphaned instructions" + "missing guidance" - triggers cross-reference analysis.
 
-**What You'll Get**:
-
-- ✅ Properly mapped instructions (e.g., "10-page technical volume" → Factor 1: Technical Approach)
-- ❌ Orphaned instructions (required but not scored - administrative only)
-- ⚠️ Evaluation factors without clear submission format (opportunity for Q&A question)
-
-**Shipley Principle**: "If Section L doesn't say it, you can't submit it. If Section M doesn't score it, don't waste pages on it."
 
 ---
 
@@ -105,15 +81,6 @@ Include compliance cross-check to verify 100% requirement coverage.
 
 **Why This Works**: Requests "outline aligned to evaluation factors" + "page allocation by weight" + "requirement mapping" + "compliance cross-check" - triggers proposal_outline_generation.md behavior.
 
-**What You'll Get**:
-
-- 📋 Full proposal structure (Volume I: Technical, Volume II: Management, Volume III: Past Performance, Volume IV: Cost)
-- 📏 Page budgets per section (weighted by evaluation factor importance)
-- 📌 Requirement-to-section mapping (ensures 100% coverage)
-- 🎯 Win theme integration points (where to emphasize discriminators)
-- 👥 Section assignment guide (effort estimates, writer recommendations)
-
-**Shipley Principle**: "Outline to the evaluation criteria. Evaluators score what they can find, not what you intended to say."
 
 ---
 
@@ -127,26 +94,6 @@ I have [X] total pages for [Volume Name]. Show how to allocate pages across sect
 
 **Why This Works**: Specifies page limit + requests "proportional allocation" + "weight-based" + "mandatory requirement adjustments."
 
-**What You'll Get**:
-
-```
-Technical Approach (40% weight): 12 pages (40% × 30)
-  - Adjustment: +2 pages (high requirement density - 18 mandatory requirements)
-  - Final: 14 pages
-
-Management Approach (30% weight): 9 pages (30% × 30)
-  - Adjustment: -1 page (fewer requirements - 8 total)
-  - Final: 8 pages
-
-Past Performance (20% weight): 6 pages (20% × 30)
-  - Adjustment: +1 page (need 5 project references per Section L)
-  - Final: 7 pages
-
-Buffer for Graphics/Tables: 1 page
-Total: 30 pages (within limit)
-```
-
-**Shipley Principle**: "Allocate pages to scoring weights. Don't spend 10 pages on a 10% factor."
 
 ---
 
@@ -165,12 +112,6 @@ For proposal Section [X.X: Section Name], provide:
 
 **Why This Works**: Focuses on specific section + requests "requirements" + "win themes" + "proof points" + "action captions."
 
-**What You'll Get**:
-
-- Detailed content outline for that section
-- Shipley action caption examples ("ISO 9001 Certified QC Process Eliminates Costly Rework")
-- Past performance references to include as proof
-- Warning about page budget (if section has many requirements but few pages)
 
 ---
 
@@ -194,23 +135,6 @@ For each theme:
 
 **Why This Works**: Requests "win themes" + "Shipley formula" + "customer benefit" + "discriminator" + "proof" triggers win_theme_identification.md behavior.
 
-**What You'll Get**:
-
-```
-WIN THEME 1: Zero-Downtime Transition
-
-Customer Benefit: "You will experience zero service disruptions during transition"
-Your Discriminator: "because our 90-day phased methodology minimizes operational risk"
-Proof: "validated by 12 incumbent transitions with 99.7% on-time delivery and zero contract deficiencies"
-
-Where to Use:
-✅ Executive Summary (lead theme)
-✅ Technical Volume Opener
-✅ Section 2.4: Transition Plan (primary location)
-✅ Action Caption: "Proven 90-Day Phased Transition Eliminates Downtime"
-```
-
-**Shipley Principle**: "Theme statements link customer benefits to discriminating features. Strategies = things to do. Themes = things to say."
 
 ---
 
@@ -222,28 +146,6 @@ Create a competitive analysis matrix comparing our discriminators to likely comp
 
 **Why This Works**: Requests "competitive matrix" + "discriminators" + "ghost themes" triggers competitive analysis + subtle differentiation strategy.
 
-**What You'll Get**:
-
-```
-┌─────────────────────────┬────────┬──────────┬────────┬────────┐
-│ Discriminator           │ Your Co│ Comp A   │ Incumb │ Comp B │
-├─────────────────────────┼────────┼──────────┼────────┼────────┤
-│ Navy MBOS Experience    │  15 yrs│    0 yrs │  5 yrs │  3 yrs │
-│ On-Time Delivery Rate   │  99.7% │    ?     │   87%  │  92%   │
-│ ISO 9001 Certified      │  ✅    │    ❌    │   ✅   │  ✅    │
-│ CMMI Level 3            │  ✅    │    ❌    │   ❌   │  ❌    │
-└─────────────────────────┴────────┴──────────┴────────┴────────┘
-
-Your Strongest Differentiators:
-1. Navy MBOS Experience (15 years vs. 0-5 for competitors)
-2. CMMI Level 3 (only company with this certification)
-
-Ghost Theme Opportunity:
-"You will receive consistent process maturity through CMMI Level 3 certified methodology, ensuring predictable quality and eliminating the rework cycles that plague ad-hoc approaches."
-→ Emphasizes YOUR strength (CMMI) while implying competitor weakness (no certification = ad-hoc = rework)
-```
-
-**Shipley Principle**: "Ghost themes highlight competitor weaknesses WITHOUT naming them. Focus on customer benefit of YOUR strength."
 
 ---
 
@@ -257,22 +159,6 @@ For [Section Name or Theme], generate Shipley-style action captions for graphics
 
 **Why This Works**: Requests "action captions" + "Shipley formula" + "win themes" + "customer benefit" triggers visual reinforcement strategy.
 
-**What You'll Get**:
-
-```
-THEME: Performance Excellence / Quality Assurance
-
-❌ Weak Caption: "Quality Control Process"
-✅ Strong Caption (Action): "ISO 9001 Certified QC Process Eliminates Costly Rework and Delays"
-
-❌ Weak Caption: "Project Timeline"
-✅ Strong Caption (Action): "Proven 90-Day Phased Transition Minimizes Operational Downtime"
-
-❌ Weak Caption: "Organizational Chart"
-✅ Strong Caption (Action): "SDVOSB Partnership Achieves Socioeconomic Goals While Delivering Technical Excellence"
-```
-
-**Shipley Principle**: "Action captions should answer 'So what?' - start with customer benefit, use active verbs, include proof when possible."
 
 ---
 
@@ -294,21 +180,6 @@ Generate 15-25 questions ready to submit to the Contracting Officer, with exact 
 
 **Why This Works**: Requests "clarification questions" + "ambiguities" + "risk reduction" + "evaluation criteria" triggers generate_qfg.md behavior.
 
-**What You'll Get**:
-
-```
-CATEGORY 1: RISK REDUCTION - AMBIGUITY CLARIFICATION (5 questions)
-
-QUESTION 1:
-RFP Reference: Section L Para 4.3.1, Section M Para 5.2.3
-Risk: Unclear page limit scope
-Recommended Question:
-"Section L, Paragraph 4.3.1 specifies a 30-page limit for the Technical Volume. Section M, Paragraph 5.2.3 requires detailed past performance narratives. Does the 30-page limit include past performance narratives, or are they submitted as a separate attachment not counted against the page limit?"
-
-Strategic Value:
-- PRIMARY: Clarifies page limit → enables accurate proposal planning
-- SECONDARY: If separate attachment allowed, increases space for win themes
-- COMPETITIVE: Competitors may not catch this, risk exceeding limit
 
 ---
 
@@ -333,12 +204,6 @@ What changed in Amendment [NUMBER]? Provide summary of modifications and generat
 
 **Why This Works**: Requests "amendment changes" + "Q&A questions" + "ambiguities" triggers change analysis + strategic question generation.
 
-**What You'll Get**:
-
-- Amendment summary (additions, modifications, removals)
-- Impact assessment (HIGH/MEDIUM/LOW priority changes)
-- Triggered Q&A questions (new ambiguities introduced by amendment)
-- Proposal revision recommendations (which sections need rework)
 
 ---
 
@@ -361,26 +226,6 @@ Rank by relevance score and recommend top 3-5 for proposal inclusion.
 
 **Why This Works**: Requests "relevant past performance" + "scope similarity" + "recency" + "quality" triggers past performance selection algorithm.
 
-**What You'll Get**:
-
-```
-HIGHLY RELEVANT (Score 95/100):
-Contract ABC-2021 (Navy IT Modernization)
-├─ Scope Similarity: 95% (cloud migration, NIST 800-171, 24/7 support)
-├─ Value Similarity: $45M vs. $50M target (90% match)
-├─ Recency: 2021-2024 (within 3 years)
-├─ Performance: Excellent (CPARS 4.8/5.0)
-├─ Customer: Same (Navy)
-└─ Use in: Factor 3 - Past Performance (primary reference)
-
-MEDIUM RELEVANT (Score 75/100):
-Contract DEF-2022 (DoD Help Desk)
-├─ Scope Similarity: 75% (help desk, ITIL, different domain)
-├─ Value Similarity: $30M vs. $50M target (60% match)
-[... analysis continues ...]
-```
-
-**Shipley Principle**: "Past performance confidence = relevance + recency + quality. Government evaluators assign HIGH/SUBSTANTIAL/LIMITED/NO confidence based on these factors."
 
 ---
 
@@ -392,29 +237,6 @@ Based on our proposed past performance references, predict the government's conf
 
 **Why This Works**: Requests "confidence prediction" + "past performance assessment" triggers Shipley confidence scoring methodology.
 
-**What You'll Get**:
-
-```
-PREDICTED CONFIDENCE: SUBSTANTIAL CONFIDENCE
-
-Rationale:
-✅ 3 highly relevant contracts (scope 85%+ match)
-✅ All CPARS ratings ≥ 4.5/5.0 (Excellent/Very Good)
-✅ No adverse performance incidents
-✅ 2 of 3 references are Same Customer (Navy)
-✅ All within past 5 years (recency met)
-
-Risks to Confidence:
-⚠️ Contract ABC completed 1 year ago (reference less current)
-⚠️ Contract DEF ongoing (no final CPARS until completion)
-
-Mitigation:
-- Supplement with customer testimonial letters
-- Provide interim CPARS for Contract DEF
-- Emphasize zero deficiencies across all contracts
-```
-
-**Shipley Principle**: "Government assigns confidence, not just ratings. You need relevant + recent + quality to get SUBSTANTIAL or HIGH confidence."
 
 ---
 
@@ -444,42 +266,6 @@ Prioritize fixes by rejection risk (mandatory gaps) vs. scoring risk (important 
 
 **Why This Works**: Requests "compliance assessment" + "Shipley 4-level" + "non-compliant" + "fix actions" triggers compliance_assessment.md behavior.
 
-**What You'll Get**:
-
-```
-┌─────────────────────────────────────────────────────────┐
-│          COMPLIANCE ASSESSMENT SUMMARY                  │
-├─────────────────────────────────────────────────────────┤
-│ OVERALL COMPLIANCE: 87% (174 of 200 requirements)       │
-│                                                          │
-│ ✅ COMPLIANT:            150 requirements (75%)         │
-│ ⚠️ PARTIALLY COMPLIANT:  24 requirements (12%)          │
-│ ❌ NON-COMPLIANT:         3 requirements (1.5%)         │
-│ ⭕ NOT ADDRESSED:         23 requirements (11.5%)       │
-│                                                          │
-│ RISK ASSESSMENT: HIGH RISK                              │
-│ Reason: 3 MANDATORY requirements NOT ADDRESSED          │
-│ Action: Fix before submission or recommend no-bid       │
-└─────────────────────────────────────────────────────────┘
-
-PRIORITY 1 - SHOWSTOPPERS (3 requirements - FIX IMMEDIATELY):
-
-❌ NOT ADDRESSED: REQ-055 - ISO 9001 Certification
-RFP Reference: Section H-2, Para 3.1
-Why Critical: MANDATORY requirement (SHALL provide certification)
-Current Status: NOT MENTIONED in proposal
-Required Fix:
-1. Add to Quality Assurance section (2.3)
-2. If NOT certified: Commit to certification within 6 months
-3. Provide draft QMS documentation in appendix
-4. Get COR approval for commit-to-obtain plan
-Effort: HIGH (40 hours if commit-to-obtain, or no-bid if not acceptable)
-Deadline: Red Team review (3 days)
-
-[... continue for all showstoppers ...]
-```
-
-**Shipley Principle**: "Score your own proposal like the government will score it. Fix gaps before Red Team, not after submission."
 
 ---
 
@@ -493,13 +279,6 @@ How compliant is [Section Name] in my proposal draft? Show which requirements ar
 
 **Why This Works**: Focuses on specific section + requests "compliance" + "missing requirements" + "strengthening actions."
 
-**What You'll Get**:
-
-- Section compliance score (% of assigned requirements addressed)
-- Compliant requirements (✅ well-addressed with proof)
-- Partially compliant requirements (⚠️ addressed but weak - needs strengthening)
-- Not addressed requirements (⭕ missing - must add)
-- Effort estimate to bring section to 100% compliance
 
 ---
 
@@ -510,7 +289,7 @@ How compliant is [Section Name] in my proposal draft? Show which requirements ar
 ### Query 7.1: Complete Workload Driver Analysis (All PWS/SOW Sections)
 
 ```
-Review the PWS and provide me a total list of workload drivers for all services described. Workload could be frequencies, quantities, hours, coverage, equipment lists, service levels, performance standards, deliverable schedules, or any other metric that drives labor or material requirements. 
+Review the PWS and provide me a total list of workload drivers for all services described. Workload could be frequencies, quantities, hours, coverage, equipment lists, service levels, performance standards, deliverable schedules, or any other metric that drives labor or material requirements.
 
 Focus on totality and not samples. I need ALL workload drivers available across the entire PWS/SOW.
 ```
@@ -519,7 +298,7 @@ Focus on totality and not samples. I need ALL workload drivers available across 
 
 **Why This Works**: Simple query allows LightRAG's knowledge graph to surface the most relevant workload entities and relationships across the entire document without over-constraining retrieval. The system already knows about workload drivers from entity extraction.
 
-**What You'll Get**:
+---
 
 ```
 COMPLETE WORKLOAD DRIVER ANALYSIS
@@ -922,16 +701,20 @@ Training & Knowledge Transfer:
 ### Query 7.2: Workload Drivers for Specific PWS Section/Appendix
 
 ```
+
 Review the PWS and provide me a total list of workload drivers for the services described in [PWS Section X or Appendix Y]. Workload could be frequencies, quantities, hours, coverage, equipment lists, service levels, performance standards, deliverable schedules, or any other metric that drives labor or material requirements.
 
 Focus on totality and not samples. I need ALL workload drivers available for this specific section.
+
 ```
 
 **Example**: "Review the PWS and provide me a total list of workload drivers for the services described in Appendix F."
 
 **Why This Works**: Simple query allows LightRAG's knowledge graph to surface the most relevant workload entities and relationships without over-constraining retrieval. The system already knows about workload drivers from entity extraction - complex prompt engineering can actually interfere with semantic search quality.
 
-**What You'll Get**:
+---
+
+### Query 7.3: Compare Extracted Workload to Government Estimate
 
 ```
 
@@ -977,92 +760,21 @@ CDRL Requirements:
 
 ---
 
-### Query 7.3: Compare Extracted Workload to Government Estimates
+### Query 7.3: Compare Extracted Workload to Government Estimate
 
 ```
+Compare the extracted workload drivers to the Government's IGCE/Independent Estimate provided in the RFP. Identify:
+1. Workload drivers present in PWS but not quantified in Government estimate
+2. Government estimate categories that exceed extracted PWS workload
+3. Gaps between actual PWS requirements and Government labor/cost assumptions
 
-Extract all workload drivers from the PWS/SOW and compare them to any government-provided workload estimates (if found in Section J, Attachment B, IGCE, or Exhibit B). Identify any workload metrics that appear in the government estimate but are missing from the PWS, or workload requirements in the PWS not reflected in government estimates.
-
-ORGANIZATION REQUIREMENT: Organize the comparison by PWS section hierarchy. For each section, show:
-
-1. PWS-stated workload (with paragraph references)
-2. Government estimate workload (with exhibit/attachment references)
-3. Gaps or discrepancies between the two
-
-This section-by-section comparison enables easy cross-referencing and identifies exactly where ambiguities exist.
-
+Provide analysis for each major service category.
 ```
 
-**Why This Works**: Requests "workload comparison" + "government estimates" + "identify gaps" triggers data validation mode without staffing calculations.
+**Example**: "Compare the workload I extracted from the PWS to the Government's labor estimate in Attachment J-10. Where are the gaps?"
 
-**What You'll Get**:
+**Why This Works**: Uses knowledge graph to query both WORKLOAD_DRIVER entities (from PWS extraction) and GOVERNMENT_ESTIMATE entities (from IGCE/J-10/pricing documents). Enables direct gap analysis to identify where Government underestimated workload (price realism opportunity) or overestimated (cost efficiency opportunity).
 
-```
-
-WORKLOAD DATA COMPARISON
-(Organized by PWS Section with Cross-References)
-
-═══════════════════════════════════════════════════════════════════════
-PWS SECTION 3.1: HELPDESK SUPPORT SERVICES
-═══════════════════════════════════════════════════════════════════════
-
-PWS-Stated Workload:
-├─ User Base: 2,500 authorized users (PWS Para 3.1.1)
-├─ Ticket Volume: 500/month average (PWS Para 3.1.2.1)
-├─ Peak Volume: 750/month during surge periods (PWS Para 3.1.2.2)
-├─ Call Volume: 1,200 calls/month (PWS Para 3.1.3)
-└─ Coverage: 24/7/365 (PWS Para 3.1.4)
-
-Government Estimate (Exhibit B, Page 12):
-├─ User Base: 2,500 (MATCHES PWS Para 3.1.1) ✅
-├─ Ticket Volume: 500/month average only (PARTIAL - missing peak) ⚠️
-├─ Call Volume: NOT MENTIONED ❌
-└─ Coverage: 24/7 (MATCHES PWS Para 3.1.4) ✅
-
-Gaps Identified in Section 3.1:
-⚠️ Peak ticket volume (750/month) not in government estimate - may cause underestimation
-❌ Call volume (1,200/month) not quantified in Exhibit B - separate from ticket volume
-
-═══════════════════════════════════════════════════════════════════════
-PWS SECTION 3.2: NETWORK OPERATIONS & MAINTENANCE
-═══════════════════════════════════════════════════════════════════════
-
-PWS-Stated Workload:
-├─ Network Devices: 450 routers/switches (PWS Para 3.2.1.1)
-├─ Servers: 500 total (120 physical + 380 virtual) (PWS Para 3.2.1.2)
-├─ Sites: 5 locations (3 CONUS, 2 OCONUS) (PWS Para 3.2.4)
-└─ Coverage: 24/7/365 NOC monitoring (PWS Para 3.2.2.1)
-
-Government Estimate (Exhibit B, Page 14):
-├─ Network Devices: 450 (MATCHES PWS Para 3.2.1.1) ✅
-├─ Servers: 500 (MATCHES PWS Para 3.2.1.2) ✅
-├─ Sites: 5 locations (MATCHES PWS Para 3.2.4) ✅
-└─ Geographic Details: Only mentions "5 sites" - no CONUS/OCONUS breakdown ⚠️
-
-Gaps Identified in Section 3.2:
-⚠️ OCONUS travel requirements not quantified in Exhibit B (PWS Para 3.2.4.2 specifies annual visits)
-
-Workload Gaps Identified:
-
-⚠️ PWS Requirement NOT in Government Estimate:
-
-- Peak ticket volume (750/month) - Government estimate only shows average (500/month)
-- OCONUS travel requirements (Sites 4 & 5) - Not mentioned in Exhibit B
-- CDRL workload - 17 deliverables not quantified in government estimate
-
-⚠️ Government Estimate Item NOT Explicitly in PWS:
-
-- "35 staff" mentioned in Exhibit B - No staffing specified in PWS
-- "Coverage factor 1.0" - No coverage factor stated in PWS requirements
-
-RECOMMENDATION:
-Use PWS-stated workload as authoritative source. Government estimate appears to
-underestimate peak volumes and CDRL effort. Recommend Q&A question to clarify
-if government estimate is ceiling or if bottom-up approach from PWS is expected.
-
-```
-
-**Use Case**: Workload data validation, BOE documentation, identification of ambiguities requiring Q&A clarification.
 
 ---
 
@@ -1094,129 +806,6 @@ Organize by PWS section and provide total FTE requirement with breakdown by labo
 
 **Why This Works**: Requests "FTE calculation" + "coverage factors" + "labor category mix" triggers staffing analysis mode using workload data as input.
 
-**What You'll Get**:
-
-```
-
-FTE STAFFING ANALYSIS
-(Based on Workload from Query 7.1, Organized by PWS Section Hierarchy)
-
-═══════════════════════════════════════════════════════════════════════
-PWS SECTION 3.0: PERFORMANCE REQUIREMENTS
-═══════════════════════════════════════════════════════════════════════
-
-PWS SECTION 3.1: HELPDESK SUPPORT SERVICES
-───────────────────────────────────────────────────────────────────────
-
-Workload Input (from Query 7.1):
-├─ User Base: 2,500 authorized users
-├─ Ticket Volume: 500/month average, 750/month peak
-├─ Coverage: 24/7/365
-└─ Performance SLA: 90% answered within 60 seconds, 70% first call resolution
-
-FTE Calculation:
-
-Tier 1 Helpdesk Agents (24/7):
-├─ Calculation Method: Coverage-based (24/7 requires multiple shifts)
-├─ Base Coverage: 168 hours/week ÷ 40 hours/FTE = 4.2 FTE
-├─ Coverage Factor: 4.2 × 1.15 (leave/training/attrition) = 4.83 FTE
-├─ Peak Adjustment: +0.5 FTE (750 vs. 500 ticket surge = 50% increase)
-├─ Quality Factor: +0.37 FTE (90% answer rate requires buffer for call spikes)
-└─ TOTAL: 5.7 FTE (rounded to 6 FTE for shift coverage)
-
-Tier 2 Specialists (8x5 + on-call):
-├─ Calculation Method: Workload-based (escalations from Tier 1)
-├─ Escalation Rate: 30% of tickets (70% first call resolution = 30% escalate)
-├─ Monthly Escalations: 500 × 30% = 150 tickets
-├─ Handle Time: 2 hours per escalated ticket (avg)
-├─ Monthly Hours: 150 × 2 = 300 hours
-├─ FTE Required: 300 hours ÷ 160 hours/month = 1.875 FTE
-├─ On-call Coverage: +0.2 FTE (30-minute response time)
-└─ TOTAL: 2.1 FTE (rounded to 2 FTE)
-
-Helpdesk Supervisor:
-├─ Calculation Method: Span of control
-├─ Team Size: 6 Tier 1 + 2 Tier 2 = 8 staff
-├─ Span of Control: 1 supervisor per 8-12 staff (industry standard)
-└─ TOTAL: 1.0 FTE
-
-SECTION 3.1 SUBTOTAL: 9.0 FTE
-├─ Tier 1 Helpdesk Agent: 6.0 FTE
-├─ Tier 2 Specialist: 2.0 FTE
-└─ Helpdesk Supervisor: 1.0 FTE
-
-═══════════════════════════════════════════════════════════════════════
-PWS SECTION 3.2: NETWORK OPERATIONS & MAINTENANCE
-═══════════════════════════════════════════════════════════════════════
-
-Workload Input (from Query 7.1):
-├─ Network Devices: 450 routers/switches
-├─ Servers: 500 (120 physical + 380 virtual)
-├─ Coverage: 24/7/365 NOC monitoring
-├─ Sites: 5 locations (3 CONUS, 2 OCONUS)
-└─ SLA: 99.9% uptime, 4-hour MTTR
-
-FTE Calculation:
-
-NOC Analysts (24/7 Monitoring):
-├─ Calculation Method: Coverage-based + device density
-├─ Base Coverage: 4.2 FTE (24/7)
-├─ Coverage Factor: 4.2 × 1.15 = 4.83 FTE
-├─ Device Density Adjustment: 950 devices ÷ 200 devices/analyst = 4.75 analysts
-├─ Higher of Coverage or Density: 4.83 FTE
-└─ TOTAL: 5.0 FTE (rounded for shift coverage)
-
-Network Engineers (8x5 + on-call):
-├─ Calculation Method: Maintenance workload-based
-├─ Monthly Maintenance Events:
-│ ├─ Router/Switch Updates: (450 ÷ 4) ÷ 12 = ~9/month
-│ ├─ Server Patching: 500 ÷ 12 = ~42/month
-│ ├─ Firewall Audits: 25/month
-│ └─ Total Events: ~76/month
-├─ Avg Time per Event: 3 hours
-├─ Monthly Hours: 76 × 3 = 228 hours
-├─ FTE Required: 228 ÷ 160 = 1.425 FTE
-├─ Site Support (travel): +0.5 FTE (OCONUS sites require periodic visits)
-├─ On-call Coverage: +0.3 FTE (30-minute on-site for P1)
-└─ TOTAL: 2.2 FTE (rounded to 2.5 FTE)
-
-Senior Network Architect:
-├─ Calculation Method: Technical oversight for complex environment
-├─ Justification: 5 sites + 99.9% uptime SLA requires senior expertise
-└─ TOTAL: 1.0 FTE
-
-Network Manager:
-├─ Calculation Method: Program oversight
-├─ Team Size: 5 NOC + 2.5 Engineers = 7.5 staff
-└─ TOTAL: 0.5 FTE (part-time oversight)
-
-SECTION 3.2 SUBTOTAL: 9.0 FTE
-├─ NOC Analyst: 5.0 FTE
-├─ Network Engineer: 2.5 FTE
-├─ Senior Network Architect: 1.0 FTE
-└─ Network Manager: 0.5 FTE
-
-═══════════════════════════════════════════════════════════════════════
-TOTAL STAFFING REQUIREMENT (ALL SECTIONS)
-═══════════════════════════════════════════════════════════════════════
-
-Helpdesk Support: 9.0 FTE
-Network Operations: 9.0 FTE
-Cybersecurity: 8.5 FTE (calculated similarly)
-Asset Management: 6.5 FTE (calculated similarly)
-Program Management: 3.0 FTE (calculated similarly)
-───────────────────────────────────
-TOTAL: 36.0 FTE
-
-Labor Category Breakdown:
-├─ Entry Level (Help Desk, Field Tech): 12.0 FTE (33%)
-├─ Mid Level (Analysts, Engineers): 15.5 FTE (43%)
-├─ Senior Level (Architects, Specialists): 5.5 FTE (15%)
-└─ Management (Supervisors, PM): 3.0 FTE (8%)
-
-```
-
-**Use Case**: Staffing plan development, pricing inputs for labor, cost realism justification.
 
 ---
 
@@ -1230,66 +819,6 @@ Compare my calculated FTE requirements to the government's staffing estimate (if
 
 **Why This Works**: Requests "FTE comparison" + "variance justification" + "workload-based rationale" triggers cost realism defense mode.
 
-**What You'll Get**:
-
-```
-
-FTE VARIANCE ANALYSIS
-
-Your Bottom-Up Calculation: 36.0 FTE
-Government Estimate (Exhibit B): 33.0 FTE
-Variance: +3.0 FTE (+9.1%)
-
-Variance Breakdown by Service Area:
-
-PWS SECTION 3.1: HELPDESK
-├─ Your Estimate: 9.0 FTE
-├─ Government Estimate: 7.0 FTE
-├─ Variance: +2.0 FTE (+28.6%)
-└─ Justification:
-├─ Coverage Factor: Government used 5.0 FTE for 24/7 coverage
-│ Your calculation: 5.7 FTE (includes 15% leave/training/attrition)
-│ Basis: Industry standard coverage factor 1.15 for continuous operations
-├─ Peak Workload: Government estimate based on average (500 tickets/month)
-│ Your calculation: Sized for peak (750 tickets/month per PWS Para 3.1.2)
-│ Basis: PWS requires maintaining 90% answer rate during peak periods
-└─ SLA Compliance: 90% answer within 60 seconds requires buffer capacity
-Your calculation: +0.37 FTE quality factor
-Basis: Queuing theory for service level achievement
-
-PWS SECTION 3.2: NETWORK OPERATIONS
-├─ Your Estimate: 9.0 FTE
-├─ Government Estimate: 8.5 FTE
-├─ Variance: +0.5 FTE (+5.9%)
-└─ Justification:
-├─ OCONUS Site Support: Government may not have accounted for travel burden
-│ Your calculation: +0.5 FTE for quarterly/annual OCONUS visits
-│ Basis: PWS Para 3.2.4 requires support for 2 OCONUS locations
-└─ 99.9% Uptime SLA: Requires redundant NOC coverage
-Your calculation: 5.0 NOC analysts (allows for overlap/surge)
-Government estimate: Appears to use 4.5 FTE (insufficient for redundancy)
-
-OVERALL ASSESSMENT: JUSTIFIED VARIANCE
-
-Your 36.0 FTE estimate is 9.1% above government estimate, within acceptable
-variance range (<10%). Key drivers:
-
-1. Realistic coverage factors (1.15 vs. 1.0)
-2. Peak workload sizing (750 vs. 500 tickets/month)
-3. OCONUS travel burden (+0.5 FTE)
-4. SLA compliance buffers (99.9% uptime, 90% answer rate)
-
-RECOMMENDATION:
-Proceed with 36.0 FTE for pricing. Document variance rationale in cost volume
-with citations to specific PWS paragraphs. Prepare detailed BOE showing:
-
-- Coverage factor calculations (24/7 shifts × 1.15)
-- Peak vs. average workload analysis
-- SLA compliance modeling (queuing theory for 90% answer rate)
-
-```
-
-**Use Case**: Cost realism narrative, BOE documentation, proposal justification for FTE variance.
 
 ---
 
@@ -1303,113 +832,6 @@ Based on my calculated FTE requirements, recommend labor category mix optimizati
 
 **Why This Works**: Requests "labor mix optimization" + "cost reduction" + "PWS compliance" triggers price-to-win staffing strategy.
 
-**What You'll Get**:
-
-```
-
-LABOR MIX OPTIMIZATION ANALYSIS
-
-Current Staffing Mix (Baseline):
-├─ Entry Level: 12.0 FTE @ $75K = $900K
-├─ Mid Level: 15.5 FTE @ $115K = $1,782K
-├─ Senior Level: 5.5 FTE @ $155K = $853K
-└─ Management: 3.0 FTE @ $140K = $420K
-TOTAL LABOR COST: $3,955K/year
-
-OPTIMIZATION OPPORTUNITY 1: Helpdesk Labor Mix
-Current Mix:
-├─ Tier 1 (Entry): 6.0 FTE @ $75K = $450K
-└─ Tier 2 (Mid): 2.0 FTE @ $115K = $230K
-
-Optimized Mix:
-├─ Tier 1 (Entry): 7.0 FTE @ $75K = $525K (+1.0 FTE)
-├─ Tier 2 (Mid): 1.5 FTE @ $115K = $173K (-0.5 FTE)
-└─ Tier 2 Lead (Senior): 0.5 FTE @ $155K = $78K (new oversight role)
-SUBTOTAL: $776K (vs. $680K baseline = +$96K)
-
-Analysis: NOT COST-EFFECTIVE
-Adding junior staff increases cost due to lower productivity (requires more
-FTE to handle same workload). REJECT this optimization.
-
-OPTIMIZATION OPPORTUNITY 2: Network Operations Labor Mix
-Current Mix:
-├─ NOC Analyst (Mid): 5.0 FTE @ $115K = $575K
-├─ Network Engineer (Mid): 2.5 FTE @ $115K = $288K
-└─ Senior Architect (Senior): 1.0 FTE @ $155K = $155K
-
-Optimized Mix:
-├─ NOC Analyst (Entry): 3.0 FTE @ $75K = $225K (shift 3 to entry level)
-├─ NOC Analyst (Mid): 2.0 FTE @ $115K = $230K (retain 2 experienced)
-├─ Network Engineer (Mid): 2.0 FTE @ $115K = $230K (reduce 0.5 FTE)
-├─ Network Engineer (Senior): 0.5 FTE @ $155K = $78K (elevate 0.5 for oversight)
-└─ Senior Architect (Senior): 1.0 FTE @ $155K = $155K (retain)
-SUBTOTAL: $918K (vs. $1,018K baseline = -$100K SAVINGS)
-
-Analysis: COST-EFFECTIVE ✅
-├─ Savings: $100K/year (9.8% reduction)
-├─ Compliance Risk: LOW - Senior oversight maintained for complex issues
-├─ PWS Compliance: ✅ - Entry-level NOC analysts can monitor dashboards,
-│ escalate to mid/senior for troubleshooting
-└─ SLA Risk: LOW - 99.9% uptime maintained with 2.5 FTE senior oversight
-
-OPTIMIZATION OPPORTUNITY 3: Asset Management Labor Mix
-Current Mix:
-├─ Field Technician (Entry): 6.0 FTE @ $75K = $450K
-└─ Asset Manager (Mid): 1.0 FTE @ $115K = $115K
-
-Optimized Mix:
-├─ Field Technician (Entry): 5.5 FTE @ $75K = $413K (-0.5 FTE automation)
-├─ Senior Field Tech (Mid): 0.5 FTE @ $115K = $58K (team lead role)
-└─ Asset Manager (Mid): 1.0 FTE @ $115K = $115K (retain)
-SUBTOTAL: $586K (vs. $565K baseline = +$21K)
-
-Analysis: NOT COST-EFFECTIVE - Automation reduces FTE but increases labor mix cost.
-Alternative: Retain 6.0 entry-level FTE, propose automation tool for efficiency.
-
-═══════════════════════════════════════════════════════════════════════
-RECOMMENDED OPTIMIZED STAFFING
-═══════════════════════════════════════════════════════════════════════
-
-Entry Level: 12.0 FTE → 12.0 FTE (no change) @ $75K = $900K
-Mid Level: 15.5 FTE → 13.5 FTE (-2.0 FTE) @ $115K = $1,553K
-Senior Level: 5.5 FTE → 7.5 FTE (+2.0 FTE) @ $155K = $1,163K
-Management: 3.0 FTE → 3.0 FTE (no change) @ $140K = $420K
-──────────────────────────────────────────
-TOTAL: 36.0 FTE → 36.0 FTE (same headcount)
-TOTAL COST: $3,955K → $4,036K (+$81K = +2.0%)
-
-Wait, optimization INCREASED cost? Yes, because:
-
-- Moving mid-level to senior oversight actually costs more
-- Insight: Labor mix optimization isn't always cost reduction
-- Better strategy: Reduce total FTE count if possible
-
-ALTERNATIVE OPTIMIZATION: Reduce Total FTE Count
-
-Target: 33.0 FTE (match government estimate)
-Strategy: Eliminate 3.0 FTE through:
-
-1. Automation tools (reduce Field Tech by 1.0 FTE) = -$75K
-2. Multi-skilled staff (combine roles, reduce by 1.0 FTE) = -$115K
-3. Vendor-managed services (outsource low-value tasks, reduce by 1.0 FTE) = -$75K
-
-TOTAL SAVINGS: $265K/year (6.7% reduction)
-
-Risk Assessment:
-⚠️ SLA Compliance Risk: MEDIUM - Reduced buffer may impact 99.9% uptime
-⚠️ PWS Compliance Risk: LOW - All mandatory requirements still met
-⚠️ Quality Risk: MEDIUM - Less staff redundancy during peak/surge periods
-
-FINAL RECOMMENDATION:
-Option A: Maintain 36.0 FTE at $3,955K (conservative, low risk)
-Option B: Reduce to 34.0 FTE at $3,825K (moderate risk, 3.3% savings)
-Option C: Reduce to 33.0 FTE at $3,690K (match govt estimate, higher risk)
-
-Recommended: Option B (34.0 FTE) - Balances cost competitiveness with SLA achievement
-
-```
-
-**Use Case**: Price-to-win strategy, labor cost optimization, risk-adjusted staffing.
 
 ---
 

@@ -9,6 +9,7 @@
 User reports that workload extraction queries are returning **QASP performance objectives** instead of actual **PWS workload drivers** - a significant regression from pre-branch-013b behavior.
 
 **Example Issue:**
+
 - **Query**: "Review the PWS and provide me a total list of workload drivers for the services described in Appendix F"
 - **Expected Output**: "8 facilities", "1,600 daily visitors", "24/7 operations", "7-10 deliveries/week", etc.
 - **Actual Output**: "Performance Objective PO-C1", "PO-F1", "PO-F2"... (QASP surveillance metrics)
@@ -56,6 +57,7 @@ workload_stats = await enrich_workload_metadata(
 ### Evidence
 
 **User's Working Query (Pre-013b)**:
+
 ```
 Review the PWS and provide me a total list of workload drivers for the services described in PWS Appendix F. Workload could be frequencies, quantities, hours, coverage, equipment lists...etc., that can be used to help develop a Bases of Estimate for Labor Totals/Full Time Equivalents. Focus on totality and not samples. We need all the workload available.
 ```
@@ -63,18 +65,21 @@ Review the PWS and provide me a total list of workload drivers for the services 
 **Result**: Clean extraction of actual PWS workload data
 
 **Same Query (Post-013b)**:
+
 - Returns QASP performance objectives instead
 - Knowledge graph appears to prioritize QASP_OBJECTIVE entities over WORKLOAD_DRIVER entities
 
 ## Entity Type Confusion
 
 From ontology (46 government contracting entity types):
+
 - **WORKLOAD_DRIVER**: Actual operational requirements (facilities, volumes, frequencies, deadlines)
 - **QASP_OBJECTIVE**: Performance surveillance metrics (PO-XX references, thresholds for surveillance)
 - **PERFORMANCE_STANDARD**: Quality/service level expectations
 - **SERVICE_LEVEL**: SLA/response time requirements
 
 **Hypothesis**: The workload enrichment process may be:
+
 1. Creating relationships between REQUIREMENT → QASP_OBJECTIVE that shouldn't exist
 2. Altering retrieval weights so QASP entities rank higher than WORKLOAD entities
 3. Misclassifying workload data as QASP data during enrichment
@@ -84,6 +89,7 @@ From ontology (46 government contracting entity types):
 ### 1. Check Workload Enrichment Logic
 
 **File**: `src/inference/workload_enrichment.py`
+
 - What entities does it enrich?
 - Does it touch QASP_OBJECTIVE entities?
 - Does it create relationships that confuse workload vs. QASP?
@@ -91,12 +97,14 @@ From ontology (46 government contracting entity types):
 ### 2. Check Relationship Inference
 
 **File**: `src/inference/semantic_post_processor.py`
+
 - Are EVALUATES, FULFILLS, or other relationships being created between PWS_SECTION → QASP_OBJECTIVE?
 - Should these relationships only connect PWS_SECTION → WORKLOAD_DRIVER?
 
 ### 3. Test Without Workload Enrichment
 
 **Experiment**:
+
 ```python
 # In semantic_post_processor.py, comment out Step 4:
 # logger.info("\n🏗️ Step 4: Enriching requirements with workload metadata...")
@@ -113,6 +121,7 @@ From ontology (46 government contracting entity types):
 **Question**: When user asks for "workload drivers for Appendix F", what Cypher query is LightRAG generating?
 
 **Files to check**:
+
 - LightRAG's query generation logic (in `lightrag` pip package)
 - Does it filter by entity_type?
 - Does it use semantic similarity that might rank QASP higher than WORKLOAD?
@@ -122,6 +131,7 @@ From ontology (46 government contracting entity types):
 **Check**: Are QASP objectives being incorrectly labeled as WORKLOAD_DRIVER during initial extraction?
 
 **Tool**: Query Neo4j directly
+
 ```cypher
 // Find all QASP objectives
 MATCH (n)
@@ -147,6 +157,7 @@ LIMIT 50
 ### Immediate (Stop the Bleeding)
 
 1. **Simplify user-facing prompts** ✅ DONE
+
    - Reverted Query 7.1, 7.2, 7.3 to simple working format
    - Removed overly complex prompt engineering that may interfere with retrieval
 
@@ -157,12 +168,14 @@ LIMIT 50
 ### Short-Term (Diagnose)
 
 3. **Test without workload enrichment**
+
    - Comment out Step 4 in semantic_post_processor.py
    - Reprocess same RFP
    - Test Query 7.2 on Appendix F
    - Compare results
 
 4. **Query Neo4j directly**
+
    - Examine QASP vs WORKLOAD entity distribution
    - Check relationships from PWS sections
    - Identify if entity types are confused
@@ -175,15 +188,18 @@ LIMIT 50
 ### Long-Term (Fix)
 
 6. **If workload enrichment is the problem**:
+
    - Redesign enrichment to NOT touch QASP entities
    - Add entity type filtering to enrichment logic
    - Only enrich WORKLOAD_DRIVER and REQUIREMENT entities
 
 7. **If relationship inference is the problem**:
+
    - Fix relationship detection to separate QASP from PWS workload
    - Add explicit filtering: PWS_SECTION → WORKLOAD_DRIVER (not QASP_OBJECTIVE)
 
 8. **If LightRAG retrieval is the problem**:
+
    - May need to add entity_type filtering to user_prompt
    - Example: "Only retrieve WORKLOAD_DRIVER entities, exclude QASP_OBJECTIVE"
 
@@ -194,11 +210,13 @@ LIMIT 50
 ## Success Criteria
 
 **Test Query**:
+
 ```
 Review the PWS and provide me a total list of workload drivers for the services described in Appendix F. Workload could be frequencies, quantities, hours, coverage, equipment lists...etc. Focus on totality and not samples. We need all the workload available.
 ```
 
 **Expected Output**:
+
 ```
 Appendix F Workload Drivers:
 
@@ -231,6 +249,7 @@ F.2.5 Deliverables:
 ```
 
 **MUST NOT Output**:
+
 ```
 ❌ Performance Objective PO-C1: no more than two (2) customer service desk coverage discrepancies
 ❌ Performance Objective PO-F1: threshold: no violations allowed
