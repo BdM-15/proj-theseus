@@ -118,6 +118,7 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
            • submission_instruction
            • strategic_theme
            • statement_of_work
+           • performance_metric
 
         3. **STRICTLY FORBIDDEN entity types - NEVER USE THESE:**
 
@@ -235,6 +236,15 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
       - MAY = optional (contractor discretion)
       - Extract modal verb context in description
 
+      **Performance Metrics vs. Requirements (QASP Separation):**
+
+      - **REQUIREMENT (Action)**: "Contractor shall clean equipment daily" (Workload)
+      - **PERFORMANCE_METRIC (Measurement)**: "No more than 2 errors per month" (Surveillance)
+      - **CRITICAL**: If a sentence contains BOTH, extract TWO entities!
+        - Text: "Clean daily with 95% accuracy."
+        - Entity 1 (REQUIREMENT): "Daily cleaning"
+        - Entity 2 (PERFORMANCE_METRIC): "95% accuracy"
+
       **Program and Equipment Identification:**
 
       - Major acquisition programs: MCPP II, Navy MBOS, JPALS, etc.
@@ -249,6 +259,13 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
       - DOCUMENT type: "J-02000000 Performance Work Statement" (for section linkage)
       - STATEMENT_OF_WORK type: "Performance Work Statement" (for semantic content)
         Why: Preserves both structural (attachment) and semantic (work definition) relationships
+
+      **Q: Text says "Clean daily; no more than 2 errors per month" - One entity or two?**
+      A: TWO entities!
+
+      - REQUIREMENT: "Daily cleaning" (The work to be done)
+      - PERFORMANCE_METRIC: "No more than 2 errors per month" (The standard)
+        Why: Workload (cost driver) must be separated from Surveillance (risk driver).
 
       **Q: Text says "Contractor shall have 5 years experience" - REQUIREMENT or EVALUATION_FACTOR?**
       A: REQUIREMENT (experience requirement)
@@ -1296,6 +1313,13 @@ Algorithm: Extract section number from requirement source, map section to factor
     - **modal_verb**: Extract exact modal verb used (e.g., "shall", "must", "should", "may", "will"). Use "none" if descriptive requirement.
     - **description**: Full requirement description. DO NOT prepend [MANDATORY] brackets - criticality is in separate field.
 
+    **Special Format for PERFORMANCE_METRIC entities (4 fields REQUIRED):**
+
+    entity|entity_name|PERFORMANCE_METRIC|threshold|description
+
+    - **threshold**: The specific value/limit (e.g., "95%", "< 2 errors", "100%").
+    - **description**: Full description of the metric and inspection method.
+
     **Criticality Derivation Rules for REQUIREMENT entities:**
     - **MANDATORY**: modal_verb is "shall", "must", or "will" AND subject is Contractor/Offeror/Personnel
     - **IMPORTANT**: modal_verb is "should" AND subject is Contractor/Offeror/Personnel
@@ -1326,6 +1350,8 @@ Algorithm: Extract section number from requirement source, map section to factor
     entity|COTS Solutions Usage|REQUIREMENT|OPTIONAL|may|Contractor may use commercial off-the-shelf solutions where appropriate for technical approach flexibility.
     entity|Integrated Logistics Support|STRATEGIC_THEME|Cross-cutting capability for supply chain and maintenance coordination.
     entity|Performance Work Statement|STATEMENT_OF_WORK|Detailed task descriptions and performance objectives for contract execution.
+    entity|95% Cleanliness Rate|PERFORMANCE_METRIC|95%|Acceptable Quality Level for facility cleanliness inspections.
+    entity|Zero Alcohol Violations|PERFORMANCE_METRIC|0 violations|Strict compliance standard for alcohol policy enforcement.
 
 2.  **Relationship Extraction & Output:**
 
@@ -1378,6 +1404,7 @@ Algorithm: Extract section number from requirement source, map section to factor
       - **RELATED_TO**: Semantic similarity, shared topics, or thematic connection
       - **SUPPORTS**: One entity enables/supports another
       - **DEFINES**: One entity defines/explains another
+      - **MEASURED_BY**: Requirement is measured by a Performance Metric
 
     - **ONTOLOGY-GROUNDED RELATIONSHIP EXAMPLES:**
 
@@ -1529,7 +1556,20 @@ Algorithm: Extract section number from requirement source, map section to factor
 
       Why: Strategic themes and requirements aligned on veteran employment create meaningful support/thematic relationships.
 
-      **Example 10: NOT Extracting Forced Relationships**
+      **Example 10: Requirement-Metric Separation (MEASURED_BY)**
+
+      Entities extracted:
+
+      - entity|Daily Equipment Cleaning|REQUIREMENT|MANDATORY|shall|Contractor shall clean all fitness equipment daily
+      - entity|Cleaning Error Threshold|PERFORMANCE_METRIC|< 2 errors/month|No more than 2 missed cleanings per month allowed
+
+      Relationships to extract:
+
+      ```
+      relation|Daily Equipment Cleaning|Cleaning Error Threshold|MEASURED_BY|Daily cleaning requirement performance is measured by the error threshold
+      ```
+
+      **Example 11: NOT Extracting Forced Relationships**
 
       Entities extracted:
 
@@ -1629,7 +1669,7 @@ Algorithm: Extract section number from requirement source, map section to factor
 **FINAL REMINDER - ENTITY TYPE COMPLIANCE:**
 
 Before outputting, verify EVERY entity uses one of the 17 ALLOWED types:
-✅ organization, concept, event, technology, person, location, requirement, clause, section, document, deliverable, program, equipment, evaluation_factor, submission_instruction, strategic_theme, statement_of_work
+✅ organization, concept, event, technology, person, location, requirement, clause, section, document, deliverable, program, equipment, evaluation_factor, submission_instruction, strategic_theme, statement_of_work, performance_metric
 
 ❌ NEVER output: other, UNKNOWN, process, table, plan, policy, standard, system, regulation, framework
 

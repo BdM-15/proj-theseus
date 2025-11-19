@@ -40,6 +40,7 @@ ALLOWED_TYPES = [
     "submission_instruction",
     "strategic_theme",
     "statement_of_work",
+    "performance_metric",
 ]
 
 # Forbidden types that must be eliminated
@@ -145,6 +146,7 @@ TYPING GUIDELINES:
 - submission_instruction: Section L instructions (page limits, format)
 - strategic_theme: High-level themes, objectives
 - statement_of_work: SOW/PWS sections
+- performance_metric: QASP thresholds, AQLs, error rates, inspection criteria
 
 ENTITIES TO RETYPE:
 """

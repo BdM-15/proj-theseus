@@ -108,6 +108,9 @@ def configure_raganything_args():
         
         # Work scope (Semantic detection regardless of location)
         "statement_of_work",        # PWS/SOW/SOO content (may be Section C or attachment)
+        
+        # Performance standards (QASP, surveillance, metrics)
+        "performance_metric",       # Distinct from requirements: accuracy, frequency, response times
     ]
     
     # Chunking configuration (optimized for focused extraction)

@@ -1410,6 +1410,48 @@ Capture entity_name, entity_type, and description. Contact details and addresses
 
 ---
 
+## Entity Type 18: PERFORMANCE_METRIC
+
+### Content Signals
+
+- **Thresholds**: "95% accuracy", "< 2 errors", "100% compliance"
+- **AQLs**: "Acceptable Quality Level", "AQL 4.0"
+- **Error Rates**: "Error rate not to exceed 1%"
+- **Frequencies**: "No more than 1 per month", "Zero defects"
+- **Inspection Criteria**: "Random sampling", "100% inspection"
+
+### Structural Patterns
+
+- QASP tables (Quality Assurance Surveillance Plan)
+- Performance Requirements Summary (PRS) matrices
+- "Standard" column in PWS tables
+- "Metric" or "Measure" labels
+
+### Context Clues
+
+- Near "surveillance", "inspection", "deduction"
+- "Government will monitor..."
+- "Performance standard is..."
+- "Disincentive for failure..."
+
+### Detection: Metric vs Requirement
+
+**REQUIREMENT**: The action/work to be done
+- "Contractor shall clean floors daily"
+
+**PERFORMANCE_METRIC**: The standard of measurement
+- "95% of floor area free of debris"
+- "No more than 2 valid complaints per month"
+
+**CRITICAL**: Extract these as SEPARATE entities!
+- Link them: REQUIREMENT --MEASURED_BY--> PERFORMANCE_METRIC
+
+### Basic Attributes
+
+Capture entity_name, entity_type, and description. Threshold values preserved in description.
+
+---
+
 ## Summary: Priority Order for Entity Extraction
 
 When processing an RFP, prioritize extraction in this order:
@@ -1419,11 +1461,12 @@ When processing an RFP, prioritize extraction in this order:
 3. **EVALUATION_FACTOR** - Critical for proposal planning
 4. **SUBMISSION_INSTRUCTION** - Determines proposal structure
 5. **REQUIREMENT** - Core work obligations
-6. **STATEMENT_OF_WORK** - Work scope definition
-7. **ANNEX** - Supporting documents and references
-8. **CLAUSE** - Regulatory compliance requirements
-9. **STRATEGIC_THEME** - Competitive intelligence
-10. **Standard Entities** - Organizations, concepts, events, etc.
+6. **PERFORMANCE_METRIC** - Standards for requirement acceptance
+7. **STATEMENT_OF_WORK** - Work scope definition
+8. **ANNEX** - Supporting documents and references
+9. **CLAUSE** - Regulatory compliance requirements
+10. **STRATEGIC_THEME** - Competitive intelligence
+11. **Standard Entities** - Organizations, concepts, events, etc.
 
 **Why This Order Matters**: Early entities provide context for later entities. Knowing the PROGRAM helps classify requirements. Knowing SECTIONS helps attribute entities to locations.
 

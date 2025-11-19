@@ -113,6 +113,8 @@ async def process_document_with_semantic_inference(
         # The Neo4j post-processor will read/write directly from/to Neo4j
         logger.info(f"🤖 Running Neo4j-native semantic knowledge graph enhancement...")
         from src.inference.semantic_post_processor import enhance_knowledge_graph
+        from src.inference.metric_decomposition import decompose_metrics
+        from src.inference.neo4j_graph_io import Neo4jGraphIO
         
         # Get LLM function - Neo4j processor will use it
         if not llm_func:
@@ -121,6 +123,22 @@ async def process_document_with_semantic_inference(
                 "relationships_inferred": 0,
                 "error": "No LLM function"
             }
+            
+        # Initialize Neo4j IO
+        neo4j_io = Neo4jGraphIO()
+        
+        # Run Metric Decomposition (Phase 2) - Split Requirements vs Metrics
+        logger.info("🔬 Running Metric Decomposition (Phase 2)...")
+        try:
+            decomposition_result = await decompose_metrics(
+                neo4j_io=neo4j_io,
+                llm_func=llm_func,
+                batch_size=20
+            )
+            logger.info(f"✅ Metric Decomposition complete: {decomposition_result}")
+        except Exception as e:
+            logger.error(f"❌ Metric Decomposition failed: {e}")
+            # Continue to enhancement even if decomposition fails
         
         inference_result = await enhance_knowledge_graph(
             rag_storage_path=global_args.working_dir,
