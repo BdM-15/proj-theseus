@@ -208,10 +208,9 @@ subfactors:
 ```json
 {
   "entity_name": "Factor 2: Maintenance Approach",
-  "entity_type": "EVALUATION_FACTOR",
-  "description": "Evaluation of offeror's maintenance approach including staffing, philosophy, and transition",
-  "factor_id": "M2",
-  "relative_importance": "Most Important",
+  "entity_type": "evaluation_factor",
+  "description": "Evaluation of offeror's maintenance approach including staffing, philosophy, and transition (Factor M2)",
+  "importance": "Most Important",
   "subfactors": [
     "M2.1 Staffing Plan",
     "M2.2 Maintenance Philosophy",
@@ -236,16 +235,14 @@ Technical Merit (100 points)
 ```json
 {
   "entity_name": "Technical Merit",
-  "entity_type": "EVALUATION_FACTOR",
-  "description": "Point-scored evaluation of technical solution quality",
-  "factor_id": "TECH_MERIT",
-  "evaluated_by_rating": "Point Score",
+  "entity_type": "evaluation_factor",
+  "description": "Point-scored evaluation of technical solution quality found in Selection Criteria",
+  "weight": "100 points",
   "subfactors": [
     "Understanding (40pt)",
     "Solution Quality (35pt)",
     "Risk Mitigation (25pt)"
-  ],
-  "section_origin": "Selection Criteria"
+  ]
 }
 ```
 
@@ -326,13 +323,11 @@ Contracting.Officer@navy.mil by March 15, 2025, 2:00 PM EST.
 ```json
 {
   "entity_name": "Technical Volume Submission Requirements",
-  "entity_type": "SUBMISSION_INSTRUCTION",
-  "guides_factor": "M1, M2, M3",
-  "page_limits": "25 pages maximum",
-  "format_requirements": "12pt Times New Roman, 1-inch margins, single-spaced",
-  "delivery_method": "Electronic via email to Contracting.Officer@navy.mil",
-  "deadline": "2025-03-15T14:00:00-05:00",
-  "file_format": "PDF"
+  "entity_type": "submission_instruction",
+  "description": "Submission requirements for Technical Volume including page limits and format. Guides Factors M1-M3. Deadline: 2025-03-15.",
+  "page_limit": "25 pages maximum",
+  "format_reqs": "12pt Times New Roman, 1-inch margins, single-spaced, PDF format",
+  "volume": "Technical Volume"
 }
 ```
 
@@ -488,13 +483,13 @@ The Contractor shall provide Tier 1 and Tier 2 help desk support
 ```json
 {
   "entity_name": "24/7 Help Desk Support Requirement",
-  "entity_type": "REQUIREMENT",
-  "requirement_type": "FUNCTIONAL",
-  "criticality_level": "MANDATORY",
-  "priority_score": 100,
+  "entity_type": "requirement",
+  "description": "Contractor shall provide Tier 1 and Tier 2 help desk support 24 hours per day, 7 days per week. (Source: Section C.3.1.2)",
+  "req_type": "FUNCTIONAL",
+  "criticality": "MANDATORY",
   "modal_verb": "shall",
-  "subject": "Contractor",
-  "section_origin": "Section C.3.1.2"
+  "labor_drivers": ["24/7 coverage", "Tier 1 support", "Tier 2 support"],
+  "material_needs": []
 }
 ```
 
@@ -512,13 +507,8 @@ contractor personnel working on-site.
 ```json
 {
   "entity_name": "Government-Furnished Office Space",
-  "entity_type": "REQUIREMENT",
-  "requirement_type": "INFORMATIONAL",
-  "criticality_level": "INFORMATIONAL",
-  "priority_score": 0,
-  "modal_verb": "will",
-  "subject": "Government",
-  "section_origin": "Section C.3.2.1"
+  "entity_type": "concept",
+  "description": "Government will provide office space and desktop computers for contractor personnel. (Source: Section C.3.2.1)"
 }
 ```
 
@@ -536,13 +526,13 @@ The system should maintain 99.9% uptime during business hours
 ```json
 {
   "entity_name": "99.9% Uptime SLA",
-  "entity_type": "REQUIREMENT",
-  "requirement_type": "PERFORMANCE",
-  "criticality_level": "IMPORTANT",
-  "priority_score": 75,
+  "entity_type": "requirement",
+  "description": "The system should maintain 99.9% uptime during business hours (6 AM - 6 PM EST). (Source: Section C.3.3.1)",
+  "req_type": "PERFORMANCE",
+  "criticality": "IMPORTANT",
   "modal_verb": "should",
-  "subject": "Contractor (implied)",
-  "section_origin": "Section C.3.3.1"
+  "labor_drivers": [],
+  "material_needs": []
 }
 ```
 
@@ -615,12 +605,8 @@ maintenance for ground support equipment at Naval Air Station (NAS) locations...
 ```json
 {
   "entity_name": "Navy Mobile Bay Organic Support",
-  "entity_type": "PROGRAM",
-  "program_name": "Navy Mobile Bay Organic Support",
-  "program_acronym": "Navy MBOS",
-  "program_scope": "Organic ground support equipment maintenance at NAS locations",
-  "parent_organization": "Navy",
-  "section_origin": "Document Title, Section C.1.0"
+  "entity_type": "program",
+  "description": "Navy Mobile Bay Organic Support (Navy MBOS) program provides organic maintenance for ground support equipment at Naval Air Station (NAS) locations. (Source: Section C.1.0)"
 }
 ```
 
@@ -694,18 +680,9 @@ Capture entity_name, entity_type, and description. Work statement location and t
 
 ### Examples from Real RFPs
 
-"performance_standards": true | false (PWS-specific),
-"prescription_level": "High (SOW)" | "Medium (PWS)" | "Low (SOO)"
-}
-
-```
-
-### Examples from Real RFPs
-
 **Example 1: PWS (Performance-Based)**
 
 ```
-
 Attachment J-0200000-18: Performance Work Statement
 
 3.1 MAINTENANCE SERVICES
@@ -718,21 +695,21 @@ on all GSE to achieve:
 - Mean time between failures (MTBF) ≥ 500 hours
 
 Performance shall be measured monthly against these standards.
-
-````
+```
 
 **Extracted Entity**:
 
 ```json
 {
   "entity_name": "Maintenance Services PWS",
-  "entity_type": "STATEMENT_OF_WORK",
+  "entity_type": "statement_of_work",
+  "description": "Performance Work Statement for maintenance services including availability and fix rate standards. Located in Attachment J-0200000-18.",
   "work_type": "PWS",
   "location": "Attachment J-0200000-18",
   "performance_standards": true,
   "prescription_level": "Medium (PWS)"
 }
-````
+```
 
 **Example 2: SOW (Prescriptive)**
 
@@ -751,7 +728,8 @@ Task 1: Software Development
 ```json
 {
   "entity_name": "Software Development SOW",
-  "entity_type": "STATEMENT_OF_WORK",
+  "entity_type": "statement_of_work",
+  "description": "Statement of Work for software development tasks including Agile methodology and tool requirements. Located in Section C.",
   "work_type": "SOW",
   "location": "Section C",
   "hierarchical_structure": true,
@@ -797,18 +775,9 @@ Capture entity_name, entity_type, and description. Attachment numbering and pare
 
 ### Examples from Real RFPs
 
-"prefix_pattern": "J-" | "Attachment " | "Annex " | "A-",
-"content_type": "SOW" | "Specifications" | "Maps" | "Data" | "Sample" | "Clauses",
-"parent_section": "Section J" (inferred from prefix),
-"file_reference": "Equipment_List.pdf" (if separate file)
-}
+**Example from Navy MBOS**
 
 ```
-
-### Example from Navy MBOS
-
-```
-
 Section J: List of Attachments
 
 The following documents are incorporated by reference:
@@ -816,8 +785,7 @@ The following documents are incorporated by reference:
 J-0200000-18: Performance Work Statement (PWS)
 J-0300000-12: Equipment List and Specifications
 J-0400000-05: Site Layout and Facility Maps
-
-````
+```
 
 **Extracted Entities** (3 annexes):
 
@@ -825,30 +793,30 @@ J-0400000-05: Site Layout and Facility Maps
 [
   {
     "entity_name": "J-0200000-18 Performance Work Statement",
-    "entity_type": "ANNEX",
-    "original_numbering": "J-0200000-18",
+    "entity_type": "document",
+    "description": "Performance Work Statement (PWS) attachment J-0200000-18.",
     "prefix_pattern": "J-",
     "content_type": "SOW",
     "parent_section": "Section J"
   },
   {
     "entity_name": "J-0300000-12 Equipment List",
-    "entity_type": "ANNEX",
-    "original_numbering": "J-0300000-12",
+    "entity_type": "document",
+    "description": "Equipment List and Specifications attachment J-0300000-12.",
     "prefix_pattern": "J-",
     "content_type": "Specifications",
     "parent_section": "Section J"
   },
   {
     "entity_name": "J-0400000-05 Site Layout Maps",
-    "entity_type": "ANNEX",
-    "original_numbering": "J-0400000-05",
+    "entity_type": "document",
+    "description": "Site Layout and Facility Maps attachment J-0400000-05.",
     "prefix_pattern": "J-",
     "content_type": "Maps",
     "parent_section": "Section J"
   }
 ]
-````
+```
 
 ---
 
@@ -917,20 +885,9 @@ Capture entity_name, entity_type, and description. Clause supplements (FAR/DFARS
 
 ### Examples from Real RFPs
 
-"clause_number": "FAR 52.212-4" | "DFARS 252.204-7012",
-"agency_supplement": "FAR" | "DFARS" | "AFFARS" | "NMCARS",
-"clause_title": "Contract Terms and Conditions—Commercial Products and Commercial Services",
-"section_attribution": "Section I" | "Section K",
-"incorporation_method": "Full Text" | "By Reference",
-"date": "JAN 2024" (clause effective date)
-}
+**Example from Navy RFP**
 
 ```
-
-### Example from Navy RFP
-
-```
-
 Section I: Contract Clauses
 
 52.212-4 Contract Terms and Conditions—Commercial Products
@@ -942,8 +899,7 @@ Commercial Services (JAN 2024)
 
 252.204-7012 Safeguarding Covered Defense Information and
 Cyber Incident Reporting (DEC 2019)
-
-````
+```
 
 **Extracted Entities** (3 clauses):
 
@@ -951,31 +907,36 @@ Cyber Incident Reporting (DEC 2019)
 [
   {
     "entity_name": "FAR 52.212-4 Contract Terms and Conditions",
-    "entity_type": "CLAUSE",
+    "entity_type": "clause",
+    "description": "Contract Terms and Conditions—Commercial Products and Commercial Services (JAN 2024). Found in Section I.",
     "clause_number": "FAR 52.212-4",
-    "agency_supplement": "FAR",
-    "clause_title": "Contract Terms and Conditions—Commercial Products and Commercial Services",
+    "regulation": "FAR",
     "section_attribution": "Section I",
+    "incorporation_method": "Full Text",
     "date": "JAN 2024"
   },
   {
     "entity_name": "FAR 52.212-5 Required Statutes",
-    "entity_type": "CLAUSE",
+    "entity_type": "clause",
+    "description": "Contract Terms and Conditions Required To Implement Statutes or Executive Orders (JAN 2024). Found in Section I.",
     "clause_number": "FAR 52.212-5",
-    "agency_supplement": "FAR",
+    "regulation": "FAR",
     "section_attribution": "Section I",
+    "incorporation_method": "Full Text",
     "date": "JAN 2024"
   },
   {
     "entity_name": "DFARS 252.204-7012 Cybersecurity",
-    "entity_type": "CLAUSE",
+    "entity_type": "clause",
+    "description": "Safeguarding Covered Defense Information and Cyber Incident Reporting (DEC 2019). Found in Section I.",
     "clause_number": "DFARS 252.204-7012",
-    "agency_supplement": "DFARS",
+    "regulation": "DFARS",
     "section_attribution": "Section I",
+    "incorporation_method": "Full Text",
     "date": "DEC 2019"
   }
 ]
-````
+```
 
 ---
 
@@ -1410,48 +1371,6 @@ Capture entity_name, entity_type, and description. Contact details and addresses
 
 ---
 
-## Entity Type 18: PERFORMANCE_METRIC
-
-### Content Signals
-
-- **Thresholds**: "95% accuracy", "< 2 errors", "100% compliance"
-- **AQLs**: "Acceptable Quality Level", "AQL 4.0"
-- **Error Rates**: "Error rate not to exceed 1%"
-- **Frequencies**: "No more than 1 per month", "Zero defects"
-- **Inspection Criteria**: "Random sampling", "100% inspection"
-
-### Structural Patterns
-
-- QASP tables (Quality Assurance Surveillance Plan)
-- Performance Requirements Summary (PRS) matrices
-- "Standard" column in PWS tables
-- "Metric" or "Measure" labels
-
-### Context Clues
-
-- Near "surveillance", "inspection", "deduction"
-- "Government will monitor..."
-- "Performance standard is..."
-- "Disincentive for failure..."
-
-### Detection: Metric vs Requirement
-
-**REQUIREMENT**: The action/work to be done
-- "Contractor shall clean floors daily"
-
-**PERFORMANCE_METRIC**: The standard of measurement
-- "95% of floor area free of debris"
-- "No more than 2 valid complaints per month"
-
-**CRITICAL**: Extract these as SEPARATE entities!
-- Link them: REQUIREMENT --MEASURED_BY--> PERFORMANCE_METRIC
-
-### Basic Attributes
-
-Capture entity_name, entity_type, and description. Threshold values preserved in description.
-
----
-
 ## Summary: Priority Order for Entity Extraction
 
 When processing an RFP, prioritize extraction in this order:
@@ -1461,12 +1380,11 @@ When processing an RFP, prioritize extraction in this order:
 3. **EVALUATION_FACTOR** - Critical for proposal planning
 4. **SUBMISSION_INSTRUCTION** - Determines proposal structure
 5. **REQUIREMENT** - Core work obligations
-6. **PERFORMANCE_METRIC** - Standards for requirement acceptance
-7. **STATEMENT_OF_WORK** - Work scope definition
-8. **ANNEX** - Supporting documents and references
-9. **CLAUSE** - Regulatory compliance requirements
-10. **STRATEGIC_THEME** - Competitive intelligence
-11. **Standard Entities** - Organizations, concepts, events, etc.
+6. **STATEMENT_OF_WORK** - Work scope definition
+7. **ANNEX** - Supporting documents and references
+8. **CLAUSE** - Regulatory compliance requirements
+9. **STRATEGIC_THEME** - Competitive intelligence
+10. **Standard Entities** - Organizations, concepts, events, etc.
 
 **Why This Order Matters**: Early entities provide context for later entities. Knowing the PROGRAM helps classify requirements. Knowing SECTIONS helps attribute entities to locations.
 
@@ -1477,7 +1395,10 @@ When processing an RFP, prioritize extraction in this order:
 Before finalizing entity extraction, validate:
 
 1. ✅ **No orphan entities**: Every entity should link to at least one other entity
-2. ✅ **Consistent naming**: "Navy MBOS" not "MBOS" in one place and "Navy Mobile Bay Organic Support" in another
+2. ✅ **Consistent naming (Canonicalization)**:
+   - Normalize names to their canonical form.
+   - Example: If "ISS" and "Installation Support Services (ISS)" both appear, use "Installation Support Services (ISS)" for BOTH.
+   - Do NOT create two separate entities for the same concept.
 3. ✅ **Metadata completeness**: Critical fields populated (factor_id, criticality_level, etc.)
 4. ✅ **Subject validation**: "Government shall" ≠ MANDATORY requirement (it's INFORMATIONAL)
 5. ✅ **Content over labels**: Don't trust "Section M" label; verify it contains evaluation criteria

@@ -119,7 +119,7 @@ async def _infer_relationships_batch(entities: List[Dict], existing_rels: List[D
         # Format: entity_123 | requirement | Task Order Management Plan (TOMP) | Contractor shall develop...
         entity_table = "ID | Type | Name | Description\n" + ("-" * 80) + "\n"
         entity_table += "\n".join([
-            f"{e['id']} | {e['entity_type']} | {e['entity_name']} | {e.get('description', '')[:80]}"
+            f"{e['id']} | {e['entity_type']} | {e['entity_name']} | {e.get('description', '')[:5000]}"
             for e in batch_entities
         ])
         
@@ -352,14 +352,14 @@ async def _resolve_orphan_patterns(
         'id': o['id'],
         'name': o['entity_name'],
         'type': o.get('entity_type'),
-        'description': o.get('description', '')[:300]
+        'description': o.get('description', '')[:5000]
     } for o in orphaned], indent=2)
     
     candidate_json = json.dumps([{
         'id': c['id'],
         'name': c['entity_name'],
         'type': c.get('entity_type'),
-        'description': c.get('description', '')[:200]
+        'description': c.get('description', '')[:5000]
     } for c in priority_candidates], indent=2)
     
     # LLM prompt optimized for orphan resolution
@@ -465,7 +465,7 @@ async def _infer_relationships_multi_algorithm(
     # Agnostic: Deliverables with submission requirements (Task Orders, CDRLs)
     deliverables_with_instructions = [
         e for e in entities_by_type.get('deliverable', [])
-        if any(term in (e.get('description', '') + e.get('entity_name', '')).lower() 
+        if any(term in (str(e.get('description', '')) + str(e.get('entity_name', ''))).lower() 
                for term in ['submit', 'provide', 'page', 'format', 'volume', 'shall include', 
                            'maximum', 'minimum', 'font', 'address', 'respond'])
     ]
@@ -474,7 +474,7 @@ async def _infer_relationships_multi_algorithm(
     requirements_with_instructions = [
         e for e in entities_by_type.get('requirement', [])
         if e.get('modal_verb') in ['shall', 'must'] and 
-           any(term in e.get('entity_name', '').lower() 
+           any(term in str(e.get('entity_name', '')).lower() 
                for term in ['submit', 'provide', 'proposal', 'response', 'volume', 
                            'page limit', 'format', 'electronic', 'hard copy'])
     ]
@@ -494,14 +494,14 @@ async def _infer_relationships_multi_algorithm(
             'id': i['id'],
             'name': i['entity_name'],
             'type': i.get('entity_type'),
-            'description': i.get('description', '')[:200]
+            'description': i.get('description', '')[:5000]
         } for i in all_instruction_entities], indent=2)
         
         factors_json = json.dumps([{
             'id': f['id'],
             'name': f['entity_name'],
             'type': f.get('entity_type'),
-            'description': f.get('description', '')[:200]
+            'description': f.get('description', '')[:5000]
         } for f in eval_factors], indent=2)
         
         prompt = f"""{prompt_instructions}
@@ -539,7 +539,7 @@ Return ONLY valid JSON array:
             'id': f['id'],
             'name': f['entity_name'],
             'type': f.get('entity_type'),
-            'description': f.get('description', '')[:300]
+            'description': f.get('description', '')[:5000]
         } for f in eval_factors], indent=2)
         
         prompt = f"""{prompt_instructions}
@@ -579,7 +579,8 @@ Return ONLY valid JSON array:
         Returns:
             True if main factor/subfactor (linkable), False if supporting entity
         """
-        name_lower = entity.get('entity_name', '').lower()
+        # CRITICAL: Neo4j can return None for null values, so use 'or' to ensure string
+        name_lower = (entity.get('entity_name') or '').lower()
         
         # STRICT KEEP: Explicit main factor patterns only
         main_factor_patterns = [
@@ -646,14 +647,14 @@ Return ONLY valid JSON array:
             'id': r['id'],
             'name': r['entity_name'],
             'type': r.get('entity_type'),
-            'description': r.get('description', '')[:500]  # Increased from 200 to capture full semantic context
+            'description': r.get('description', '')[:5000]  # Increased from 200 to capture full semantic context
         } for r in requirements], indent=2)
         
         factors_json = json.dumps([{
             'id': f['id'],
             'name': f['entity_name'],
             'type': f.get('entity_type'),
-            'description': f.get('description', '')[:500]  # Increased from 200 to capture evaluation criteria/topics
+            'description': f.get('description', '')[:5000]  # Increased from 200 to capture evaluation criteria/topics
         } for f in main_eval_factors], indent=2)
         
         prompt = f"""{prompt_instructions}
@@ -710,14 +711,14 @@ Return ONLY valid JSON array:
                 'id': r['id'],
                 'name': r['entity_name'],
                 'type': r.get('entity_type'),
-                'description': r.get('description', '')[:300]
+                'description': r.get('description', '')[:5000]
             } for r in requirements], indent=2)
             
             deliv_json = json.dumps([{
                 'id': d['id'],
                 'name': d['entity_name'],
                 'type': d.get('entity_type'),
-                'description': d.get('description', '')[:200]
+                'description': d.get('description', '')[:5000]
             } for d in deliverables], indent=2)
             
             prompt = f"""{prompt_instructions}
@@ -752,14 +753,14 @@ Return ONLY valid JSON array:
                 'id': w['id'],
                 'name': w['entity_name'],
                 'type': w.get('entity_type'),
-                'description': w.get('description', '')[:300]
+                'description': w.get('description', '')[:5000]
             } for w in work_statements], indent=2)
             
             deliv_json = json.dumps([{
                 'id': d['id'],
                 'name': d['entity_name'],
                 'type': d.get('entity_type'),
-                'description': d.get('description', '')[:200]
+                'description': d.get('description', '')[:5000]
             } for d in deliverables], indent=2)
             
             prompt = f"""{prompt_instructions}
@@ -804,7 +805,7 @@ Return ONLY valid JSON array:
             'id': d['id'],
             'name': d['entity_name'],
             'type': d.get('entity_type'),
-            'description': d.get('description', '')[:200]
+            'description': d.get('description', '')[:5000]
         } for d in documents], indent=2)
         
         prompt = f"""{prompt_instructions}
@@ -846,7 +847,7 @@ Return ONLY valid JSON array:
             'id': e['id'],
             'name': e['entity_name'],
             'type': e.get('entity_type'),
-            'description': e.get('description', '')[:150]
+            'description': e.get('description', '')[:5000]
         } for e in concept_pool + high_value_entities], indent=2)
         
         prompt = f"""{prompt_instructions}
@@ -876,8 +877,9 @@ Return ONLY valid JSON array:
     
     heuristic_count = 0
     for entity in entities:
-        desc = entity.get('description', '').lower()
-        name = entity.get('entity_name', '').lower()
+        # CRITICAL: Neo4j can return None for null values, so use 'or' to ensure string
+        desc = (entity.get('description') or '').lower()
+        name = (entity.get('entity_name') or '').lower()
         
         # Pattern: CDRL cross-reference (e.g., "CDRL A001")
         import re
@@ -887,7 +889,8 @@ Return ONLY valid JSON array:
         for match in matches:
             cdrl_id = match.replace(' ', '').upper()
             for deliv in deliverables:
-                if cdrl_id in deliv.get('entity_name', '').upper() or cdrl_id in deliv.get('description', '').upper():
+                # CRITICAL: Neo4j can return None for null values, so use 'or' to ensure string
+                if cdrl_id in (deliv.get('entity_name') or '').upper() or cdrl_id in (deliv.get('description') or '').upper():
                     all_relationships.append({
                         'source_id': entity['id'],
                         'target_id': deliv['id'],

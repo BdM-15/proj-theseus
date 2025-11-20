@@ -96,62 +96,160 @@ async def process_document_with_semantic_inference(
     if discarded_count > 0:
         logger.info(f"🚫 Filtered {discarded_count} discarded content blocks (keeping {filtered_count}/{original_count} legitimate items)")
     
-    # Step 2: Insert filtered content using official RAG-Anything API
-    # This ensures GenericModalProcessor only sees legitimate content (tables, images, equations)
-    await rag_instance.insert_content_list(
-        content_list=filtered_content,
-        file_path=file_path,
-        doc_id=doc_id
-    )
-    
-    # Check if Neo4j storage is enabled - proceed with Neo4j-aware post-processing
+    # Check if Neo4j storage is enabled - use custom ontology extraction BEFORE standard processing
     import os
     if os.getenv("GRAPH_STORAGE") == "Neo4JStorage":
-        logger.info("📊 Neo4j storage detected - running Neo4j-native semantic enhancement")
+        logger.info("📊 Neo4j storage detected - using custom ontology extraction (bypassing LightRAG)")
         
-        # Skip GraphML wait and validation - proceed directly to semantic enhancement
-        # The Neo4j post-processor will read/write directly from/to Neo4j
-        logger.info(f"🤖 Running Neo4j-native semantic knowledge graph enhancement...")
-        from src.inference.semantic_post_processor import enhance_knowledge_graph
-        from src.inference.metric_decomposition import decompose_metrics
-        from src.inference.neo4j_graph_io import Neo4jGraphIO
+        # Extract text from content_list for ontology processing
+        # MinerU provides: {'type': 'text'/'table'/'image', 'text': '...', 'page_idx': N}
+        from src.extraction.json_extractor import JsonExtractor
         
-        # Get LLM function - Neo4j processor will use it
-        if not llm_func:
-            logger.error("❌ No LLM function available for semantic enhancement")
-            return {
-                "relationships_inferred": 0,
-                "error": "No LLM function"
+        # Combine all text content for chunking
+        text_chunks = []
+        for item in filtered_content:
+            content_text = item.get('text', '')  # MinerU uses 'text' field, not 'content'
+            if content_text and content_text.strip():
+                text_chunks.append(content_text)
+        
+        if not text_chunks:
+            logger.error("❌ No text content found in MinerU output")
+            return {"error": "No text content"}
+        
+        full_text = "\n\n".join(text_chunks)
+        logger.info(f"📝 Extracted {len(text_chunks)} content blocks ({len(full_text)} chars total)")
+        
+        # Use LightRAG's chunking strategy for consistent extraction
+        import tiktoken
+        chunk_size = int(os.getenv("CHUNK_SIZE", "8192"))
+        chunk_overlap = int(os.getenv("CHUNK_OVERLAP_TOKEN_SIZE", "1024"))
+        
+        tokenizer = tiktoken.get_encoding("cl100k_base")
+        tokens = tokenizer.encode(full_text)
+        
+        # Create overlapping chunks
+        chunked_texts = []
+        start = 0
+        while start < len(tokens):
+            end = min(start + chunk_size, len(tokens))
+            chunk_tokens = tokens[start:end]
+            chunk_text = tokenizer.decode(chunk_tokens)
+            chunked_texts.append(chunk_text)
+            start += (chunk_size - chunk_overlap)  # Overlap for context
+        
+        logger.info(f"🔪 Chunked text into {len(chunked_texts)} chunks ({chunk_size} tokens, {chunk_overlap} overlap)")
+        
+        # Run custom ontology extraction on each chunk
+        logger.info("🚀 Running custom ontology extraction with Pydantic schema...")
+        extractor = JsonExtractor()
+        
+        all_entities = []
+        all_relationships = []
+        
+        try:
+            for i, chunk_text in enumerate(chunked_texts):
+                logger.info(f"   Processing chunk {i+1}/{len(chunked_texts)}...")
+                extraction_result = await extractor.extract(chunk_text)
+                all_entities.extend(extraction_result.entities)
+                all_relationships.extend(extraction_result.relationships)
+            
+            # Merge results (de-duplicate entities by name)
+            unique_entities = {}
+            for entity in all_entities:
+                if entity.entity_name not in unique_entities:
+                    unique_entities[entity.entity_name] = entity
+            
+            all_entities = list(unique_entities.values())
+            
+            logger.info(f"✅ Extracted {len(all_entities)} unique entities, {len(all_relationships)} relationships from {len(chunked_texts)} chunks")
+            
+            # Convert Pydantic extraction to LightRAG custom_kg format
+            custom_kg = {
+                "chunks": [],
+                "entities": [],
+                "relationships": []
             }
             
-        # Initialize Neo4j IO
-        neo4j_io = Neo4jGraphIO()
-        
-        # Run Metric Decomposition (Phase 2) - Split Requirements vs Metrics
-        logger.info("🔬 Running Metric Decomposition (Phase 2)...")
-        try:
-            decomposition_result = await decompose_metrics(
-                neo4j_io=neo4j_io,
+            # Add chunks
+            for i, chunk_text in enumerate(chunked_texts):
+                custom_kg["chunks"].append({
+                    "content": chunk_text,
+                    "source_id": doc_id,
+                    "file_path": file_path,
+                    "chunk_order_index": i
+                })
+            
+            # Convert entities
+            for entity in all_entities:
+                custom_kg["entities"].append({
+                    "entity_name": entity.entity_name,
+                    "entity_type": entity.entity_type,
+                    "description": entity.description,
+                    "source_id": doc_id,
+                    "file_path": file_path
+                })
+            
+            # Convert relationships
+            for rel in all_relationships:
+                custom_kg["relationships"].append({
+                    "src_id": rel.source_entity.entity_name,
+                    "tgt_id": rel.target_entity.entity_name,
+                    "description": rel.description,
+                    "keywords": rel.relationship_type,
+                    "weight": 1.0,
+                    "source_id": doc_id
+                })
+            
+            # Insert custom KG into LightRAG (bypasses its extraction)
+            logger.info("💾 Inserting custom ontology into LightRAG...")
+            await rag_instance.lightrag.ainsert_custom_kg(custom_kg, full_doc_id=doc_id)
+            logger.info("✅ Custom ontology inserted into knowledge graph")
+            
+            # Run semantic post-processing
+            logger.info("🤖 Running semantic enhancement...")
+            from src.inference.semantic_post_processor import enhance_knowledge_graph
+            
+            if not llm_func:
+                logger.error("❌ No LLM function available for semantic enhancement")
+                return {
+                    "entities_extracted": len(extraction_result.entities),
+                    "relationships_extracted": len(extraction_result.relationships),
+                    "error": "No LLM function for enhancement"
+                }
+            
+            inference_result = await enhance_knowledge_graph(
+                rag_storage_path=global_args.working_dir,
                 llm_func=llm_func,
-                batch_size=20
+                batch_size=50
             )
-            logger.info(f"✅ Metric Decomposition complete: {decomposition_result}")
+            
+            logger.info("✅ Neo4j semantic enhancement complete")
+            logger.info(f"   Entities extracted: {len(all_entities)}")
+            logger.info(f"   Relationships extracted: {len(all_relationships)}")
+            logger.info(f"   Entities corrected: {inference_result.get('entities_corrected', 0)}")
+            logger.info(f"   Relationships inferred: {inference_result.get('relationships_inferred', 0)}")
+            logger.info(f"   View results in Neo4j Browser: http://localhost:7474")
+            
+            return {
+                "entities_extracted": len(all_entities),
+                "relationships_extracted": len(all_relationships),
+                **inference_result
+            }
+            
         except Exception as e:
-            logger.error(f"❌ Metric Decomposition failed: {e}")
-            # Continue to enhancement even if decomposition fails
-        
-        inference_result = await enhance_knowledge_graph(
-            rag_storage_path=global_args.working_dir,
-            llm_func=llm_func,
-            batch_size=50
+            logger.error(f"❌ Custom ontology extraction failed: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return {"error": str(e)}
+    
+    else:
+        # NetworkX storage - use standard RAG-Anything processing
+        logger.info("📊 NetworkX storage detected - using standard LightRAG extraction")
+        await rag_instance.insert_content_list(
+            content_list=filtered_content,
+            file_path=file_path,
+            doc_id=doc_id
         )
-        
-        logger.info(f"✅ Neo4j semantic enhancement complete")
-        logger.info(f"   Entities corrected: {inference_result.get('entities_corrected', 0)}")
-        logger.info(f"   Relationships inferred: {inference_result.get('relationships_inferred', 0)}")
-        logger.info(f"   View results in Neo4j Browser: http://localhost:7474")
-        
-        return inference_result
     
     # Step 2: ROBUST - Wait for GraphML with exponential backoff (NetworkX storage only)
     # CRITICAL: LightRAG writes to default/ subdirectory, not root working_dir

@@ -100,8 +100,9 @@ async def initialize_raganything():
     # Ensure it's set in the current process environment so MinerU subprocess inherits it
     os.environ["MINERU_DEVICE_MODE"] = device
     
-    # Note: HF_TOKEN and HF_HUB_DISABLE_SYMLINKS_WARNING are automatically
-    # inherited by MinerU subprocess if set in environment
+    # Note: All other MinerU variables (MINERU_LANG, MINERU_FORMULA_ENABLE, MINERU_TABLE_MERGE_ENABLE,
+    # MINERU_PDF_RENDER_TIMEOUT, CUDA_VISIBLE_DEVICES, HF_TOKEN, HF_HUB_DISABLE_SYMLINKS_WARNING, etc.)
+    # are automatically inherited by MinerU subprocess from os.environ after dotenv loads .env
     
     # Create RAG-Anything configuration (does NOT accept device parameter)
     config = RAGAnythingConfig(

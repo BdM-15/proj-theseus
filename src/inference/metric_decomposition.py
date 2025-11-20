@@ -64,9 +64,14 @@ async def decompose_metrics(
     # Filter for candidates that likely contain metrics
     candidates = []
     for req in requirements:
-        desc = req.get('description', '').lower()
-        name = req.get('entity_name', '').lower()
-        text = f"{name} {desc}"
+        desc = req.get('description', '')
+        name = req.get('entity_name', '')
+        
+        # Handle None values safely
+        if desc is None: desc = ""
+        if name is None: name = ""
+        
+        text = f"{name} {desc}".lower()
         
         if any(kw in text for kw in METRIC_KEYWORDS):
             candidates.append(req)
@@ -152,7 +157,8 @@ If "action" is "SPLIT", the original entity is updated to be the Requirement, an
 """
         
         try:
-            response = await llm_func(prompt, model=model, temperature=temperature)
+            # Do not pass model as kwarg to avoid collision with LightRAG's bound model
+            response = await llm_func(prompt, temperature=temperature)
             
             # Parse JSON
             response_clean = response.strip()

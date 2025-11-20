@@ -76,6 +76,21 @@ async def enrich_workload_metadata(
     with open(prompt_path, 'r', encoding='utf-8') as f:
         prompt_instructions = f.read()
     
+    # Load chunk store to access raw text
+    workspace = neo4j_io.workspace
+    chunk_store_path = Path(f"rag_storage/{workspace}/kv_store_text_chunks.json")
+    chunk_store = {}
+    if chunk_store_path.exists():
+        logger.info(f"Loading text chunks from {chunk_store_path}...")
+        try:
+            with open(chunk_store_path, 'r', encoding='utf-8') as f:
+                chunk_store = json.load(f)
+            logger.info(f"Loaded {len(chunk_store)} text chunks")
+        except Exception as e:
+            logger.error(f"Failed to load chunk store: {e}")
+    else:
+        logger.warning(f"Chunk store not found at {chunk_store_path}")
+    
     # Get all requirement entities
     all_entities = neo4j_io.get_all_entities()
     # STRICTLY filter for 'requirement' type.
@@ -107,13 +122,40 @@ async def enrich_workload_metadata(
         # Build entity lookup by elementId (same pattern as other algorithms)
         id_to_entity = {req['id']: req for req in batch}
         
-        # Build entity JSON (matching pattern from Algorithms 1-6)
-        requirements_json = json.dumps([{
-            'id': req['id'],  # Neo4j elementId
-            'name': req.get('entity_name', 'Unnamed'),
-            'type': 'requirement',
-            'description': req.get('description', '')[:300]
-        } for req in batch], indent=2)
+        # Build entity JSON with RAW TEXT from chunks
+        batch_data = []
+        for req in batch:
+            # Resolve raw text from chunks
+            raw_text = ""
+            source_ids = req.get('source_id', '')
+            if source_ids and chunk_store:
+                chunk_ids = source_ids.split('<SEP>')
+                # Take first 3 chunks to get enough context (usually sufficient)
+                selected_chunks = chunk_ids[:3] 
+                chunks_content = []
+                for cid in selected_chunks:
+                    if cid in chunk_store:
+                        chunks_content.append(chunk_store[cid].get('content', ''))
+                
+                if chunks_content:
+                    raw_text = "\n---\n".join(chunks_content)
+            
+            # Fallback to description if no chunks found
+            if not raw_text:
+                raw_text = req.get('description', '')
+            
+            # Truncate to reasonable limit (e.g. 100000 chars) to fit in context
+            # Increased to 100k to leverage Grok-4's 2M context window
+            display_text = raw_text[:100000] + "..." if len(raw_text) > 100000 else raw_text
+
+            batch_data.append({
+                'id': req['id'],
+                'name': req.get('entity_name', 'Unnamed'),
+                'type': 'requirement',
+                'text_content': display_text 
+            })
+            
+        requirements_json = json.dumps(batch_data, indent=2)
         
         # Build prompt
         prompt = f"""{prompt_instructions}
