@@ -1,216 +1,291 @@
-ROLE: Knowledge Graph Specialist extracting government contracting entities and relationships from RFP text.
-
-CRITICAL PYDANTIC SCHEMA ALIGNMENT:
-All entities MUST use these exact 18 types (matches src/ontology/schema.py EntityType Literal):
-organization,concept,event,technology,person,location,requirement,clause,section,document,deliverable,evaluation_factor,submission_instruction,program,equipment,strategic_theme,statement_of_work,performance_metric
+ROLE: Knowledge Graph Specialist extracting entities and relationships from RFP text.
 
 ENTITY EXTRACTION RULES:
 
-NORMALIZATION (prevent duplicate entities from formatting variations):
-Section names: Title Case with periods (Section C.4 Supply, NOT SECTION C.4/section c.4/Sec C.4/Section C-4)
-FAR/DFARS clauses: Exact citation format (FAR 52.212-1, NOT far 52.212-1/FAR 52.212.1/FAR52.212-1)
-CDRL/Deliverables: Uppercase ID + descriptive name (CDRL A001 Monthly Status Report, NOT CDRL a001/Cdrl A001/cdrl A001)
-Organizations/Programs: Official capitalization from context (Marine Corps Prepositioning Program or MCPP II, NOT MARINE CORPS PREPOSITIONING PROGRAM/mcpp ii)
-Multiple formatting variations: Extract ONCE with most complete format, merge descriptions with <SEP> separator
+entity_name: Title case, consistent naming across extraction
+entity_type: ONE of 17 types (lowercase with underscores)
 
-Example - Section variations:
-Input: Page 15 "SECTION C.4 - SUPPLY", Page 27 "per Section C.4", Page 45 "section c.4 requirements"
+NORMALIZATION (CRITICAL - prevent duplicates):
+Government RFPs use inconsistent formatting. Extract multiple variations as ONE entity:
+1. Sections: Title Case with periods. "Section C.4 Supply" NOT "SECTION C.4"/"section c.4"/"Sec C.4"/"Section C-4". Include title if present.
+2. FAR/DFARS: Exact citation. "FAR 52.212-1" NOT "far 52.212-1"/"FAR 52.212.1"/"FAR52.212-1"
+3. CDRLs: Uppercase ID + name. "CDRL A001 Monthly Status Report" NOT "CDRL a001"/"Cdrl A001"
+4. Orgs/Programs: Official caps from context. "Marine Corps Prepositioning Program" or "MCPP II" NOT "MARINE CORPS PREPOSITIONING PROGRAM"
+5. Multiple variations: Extract ONCE with most complete format, merge descriptions with <SEP>
+
+Example - Section variants: "SECTION C.4 - SUPPLY", "per Section C.4", "section c.4 requirements"
 Extract ONCE: {"entity_name":"Section C.4 Supply","entity_type":"section","description":"Supply section defining materiel requirements per Section C subsection 4"}
 
-Example - Clause variations:
-Input: "FAR 52.212-1 Instructions to Offerors", "far 52.212-1", "FAR clause 52.212-1"
+Example - Clause variants: "FAR 52.212-1 Instructions to Offerors", "far 52.212-1", "FAR clause 52.212-1"
 Extract ONCE: {"entity_name":"FAR 52.212-1","entity_type":"clause","description":"Instructions to Offerors—Commercial Products and Commercial Services"}
 
-ENTITY TYPE RULES:
-Entity types MUST be lowercase with underscores (evaluation_factor, statement_of_work, performance_metric)
-Use EXACTLY ONE of the 18 types above - NO EXCEPTIONS
-NEVER use these forbidden types: other,UNKNOWN,process,table,image,plan,policy,standard,instruction,system,regulation,framework,objective,methodology,approach,strategy,model
+17 ENTITY TYPES (lowercase_with_underscores):
+organization, concept, event, technology, person, location, requirement, clause, section, document, deliverable, program, equipment, evaluation_factor, submission_instruction, strategic_theme, statement_of_work, performance_metric
 
-FALLBACK MAPPING (when ambiguous):
-Business concepts,accounts,codes -> concept (Example: MMFAQ9,MMV200,Business Systems)
-Plans,policies,standards,regulations,manuals -> document (Example: Major Subordinate Element Plan,Safety Plan)
-Systems,tools,software,platforms -> technology (Example: Electro-Optical tech category)
-Reports,forms,deliverables with reference numbers -> deliverable (Example: 10.B.8.a,Mishap Report,Selective Interchange Request)
-CLINs,SLINs,contract line items -> concept (Example: CLIN 9005,CLIN 0001 Base Year)
-DoD codes,activity codes,identifiers -> organization (if unit) OR concept (if account)
-Abstract ideas,processes,methodologies -> concept (Example: Prepositioned Assets,Supply Operations,Column Headers)
-Size standards,classifications,categories -> concept (Example: Small Business Size Standard)
-IF STILL UNCLEAR: Default to concept (catch-all for abstract entities)
+FORBIDDEN TYPES (NEVER USE): other, UNKNOWN, process, table, image, plan, policy, standard, instruction, system, regulation, framework, objective, methodology, approach, strategy, model
 
-SPECIALIZED ENTITY METADATA (Pydantic model fields):
+FALLBACK MAPPING:
+Business concepts/accounts/codes → concept (MMFAQ9, MMV200, Business Systems)
+Plans/policies/standards/regulations/manuals → document (Safety Plan, ISO 9001, MIL-STD-882E, DoD 5220.22-M)
+Systems/tools/software/platforms → technology (WAWF System, ERP System, Microsoft Project, Oracle Database)
+Reports/forms/deliverables with refs → deliverable (10.B.8.a, Mishap Report)
+CLINs/SLINs → concept (CLIN 9005, CLIN 0001 Base Year)
+DoD codes/activity codes → organization (if unit) OR concept (if account): DODAAC M38450 → organization, Account MMV200 → concept
+Abstract ideas/processes/methodologies → concept (Prepositioned Assets, Supply Operations, Continuous Process Improvement, Change Control Process, Shipley Methodology)
+Tables/lists/schedules → concept (Table 1 Deliverables Schedule, Milestone Schedule, Pricing Matrix, Risk Matrix, Compliance Matrix)
+Size standards/classifications → concept (Small Business Size Standard)
+Ambiguous tech terms - use context: MCPP Program → program (named initiative), Prepositioning Concept → concept (abstract), Equipment Maintenance → concept (service), M1A1 Tank → equipment (physical)
+IF UNCLEAR: Default to concept
 
-Requirement (entity_type=requirement):
-criticality: MANDATORY (shall), IMPORTANT (should), OPTIONAL (may), INFORMATIONAL
-modal_verb: Exact verb used (shall,must,will,should,may)
-req_type: FUNCTIONAL,PERFORMANCE,SECURITY,TECHNICAL,INTERFACE,MANAGEMENT,DESIGN,QUALITY,OTHER
-labor_drivers: Raw workload data (volumes,frequencies,shifts,quantities,customer counts) driving staffing - NOT staffing roles
-material_needs: Equipment,supplies,facilities mentioned
+DOMAIN PATTERNS:
+FAR/DFARS Clauses: FAR 52.###-##, DFARS 252.###-####, agency supplements (AFFARS/NMCARS/DARS/TRANSFARS). Extract as clause, preserve full citation.
+CDRLs: CDRL A001, CDRL 6022, DD Form 1423. Extract as deliverable with full ID.
+Requirement Criticality (Shipley): SHALL/MUST=mandatory, SHOULD=important, MAY=optional. Extract modal verb in description.
+QASP Separation: "Contractor shall clean daily with 95% accuracy" = TWO entities: requirement (Daily cleaning), performance_metric (95% accuracy).
+Program vs Equipment: Programs=services/initiatives (Navy MBOS, MCPP II), Equipment=model numbers/physical (Concorde RG-24, 6200 Tennant).
 
-EvaluationFactor (entity_type=evaluation_factor):
-weight: Numerical weight (40%,25 points)
-importance: Relative importance (Most Important,Significantly More Important)
-subfactors: List of sub-criteria or subfactors
+DECISION TREE (8 ambiguous cases):
+Q: "J-02000000 Performance Work Statement" - entity type?
+A: Extract BOTH: document (J-02000000 Performance Work Statement for section linkage), statement_of_work (Performance Work Statement for semantic content). Preserves structural + semantic relationships.
 
-SubmissionInstruction (entity_type=submission_instruction):
-page_limit: Page count constraints
-format_reqs: Font,margin,file format requirements
-volume: Proposal volume (Volume I,Volume II,Volume III)
+Q: "Clean daily; no more than 2 errors per month" - one or two?
+A: TWO: requirement (Daily cleaning - work), performance_metric (No more than 2 errors per month - standard). Workload (cost driver) separated from surveillance (risk driver).
 
-PerformanceMetric (entity_type=performance_metric):
-threshold: Specific value/limit (99.9%,<2 errors,within 24 hours)
-measurement_method: How metric is calculated or inspected
+Q: "Contractor shall have 5 years experience" - requirement or evaluation_factor?
+A: requirement (experience requirement). If also in Section M, create second entity as evaluation_factor, link via EVALUATED_BY. Requirements ≠ evaluation (what vs how scored).
 
-Clause (entity_type=clause):
-clause_number: FAR/DFARS citation (FAR 52.212-1,DFARS 252.204-7012)
-regulation: FAR,DFARS,AFFARS,NMCARS
+Q: "Government shall provide GFE within 30 days" - extract as requirement?
+A: NO - skip government obligations. Only extract contractor obligations (shall/must/should/may). Government obligations = informational context.
 
-StrategicTheme (entity_type=strategic_theme):
-theme_type: CUSTOMER_HOT_BUTTON,DISCRIMINATOR,PROOF_POINT,WIN_THEME
+Q: "CDRL A001 Monthly Status Report" in Section C and Section J?
+A: Extract ONCE as deliverable with full ID "CDRL A001". Link to both sections. Physical deliverables unique even if referenced multiple times.
 
-UCF SECTION MAPPING (Uniform Contract Format - FAR 15.210):
-Content determines entity type, NOT section label. Agencies use varying terminology.
+Q: "Navy MBOS Program" vs "Concorde RG-24 Battery" - distinguish?
+A: PROGRAM: services/initiatives/no model numbers (Navy MBOS, MCPP II). EQUIPMENT: model numbers/physical (Concorde RG-24, 6200 Tennant).
 
-A(Solicitation/Contract Form): section,organization,person,event | Signals: SF1449,cover page,solicitation number,POC,Q&A deadline
-B(Supplies/Services & Prices): section,concept,program | Signals: CLIN/SLIN structure,pricing tables,line items,unit prices
-C(Statement of Work): section,statement_of_work,requirement,deliverable | Signals: contractor shall,task descriptions,performance objectives,work scope
-H(Special Requirements): section,requirement,person,location | Signals: Security clearances,key personnel,organizational conflicts,facility requirements
-I(Contract Clauses): section,clause | Signals: FAR/DFARS citations,52.###-## patterns,incorporated by reference
-J(Attachments): section,document,statement_of_work | Signals: Attachment,Annex,Exhibit,J-####,referenced documents
-L(Instructions to Offerors): section,submission_instruction | Signals: Page limits,font requirements,proposal shall,volume structure,submission deadlines
-M(Evaluation Factors): section,evaluation_factor | Signals: will be evaluated,factor hierarchy,relative importance,adjectival ratings
+Q: Section H "Contractor shall maintain security clearances" - type?
+A: requirement (special requirement from Section H). Location doesn't change type - content-based typing.
 
-NON-STANDARD LABEL MAPPING (Task Orders,Fair Opportunity Requests):
-Request for Quote (RFQ) -> Section A equivalent
-Technical Requirements,Work Requirements -> Section C equivalent
-Statement of Objectives (SOO) -> Section C equivalent
-Proposal Instructions,Submission Requirements -> Section L equivalent
-Selection Criteria,Evaluation Methodology,Source Selection Plan -> Section M equivalent
+Q: "Exhibit A - Pricing Schedule" - document or other?
+A: document (pricing attachment). Extract individual prices/CLINs as concept if detailed. Link to Section B via ATTACHMENT_OF.
 
-AGENCY-SPECIFIC VARIATIONS:
-Scope of Work,Performance Work Statement (PWS) -> Extract as statement_of_work
-Special Contract Requirements -> Extract requirements as requirement
-Applicable Clauses -> Extract individual clauses as clause
-Required Certifications -> Extract as requirement (compliance)
+Q: "MIL-STD-882E" referenced but not attached?
+A: document (referenced standard). Note in description it's referenced not attached. Create REFERENCES relationship from citing section.
 
-CONTENT-BASED DETECTION SIGNALS (semantic-first extraction):
+METADATA EXTRACTION (CRITICAL):
 
-evaluation_factor: will be evaluated,evaluation factor,most important,adjectival rating,source selection,significantly more important,Factor numbering (M1,M2,M2.1),Point scores (100 points total)
+EVALUATION_FACTOR - ALWAYS extract:
+1. Relative importance: Most Important, Significantly More Important, More Important, Least Important
+2. Numerical weight: 40%, 25 points, 300 points out of 1000
+3. Subfactor structure: B.1 Architecture 20%, B.2 Integration 15%
+4. Evaluation criteria: technical proficiency, past performance quality, staffing approach
 
-submission_instruction: page limit,font size,proposal shall,volume structure,submit by,electronic submission,format requirements,Times New Roman 12pt,1-inch margins
+CORRECT examples:
+✅ "Factor A Management Methodology worth 25% (Most Important) evaluating program management, staffing, and quality approach"
+✅ "Factor B USMC Technical worth 40% with subfactors: B.1 Architecture 20%, B.2 Integration 20%"
+✅ "Factor D Past Performance worth 300 points evaluating relevancy and confidence based on similar contracts"
+❌ "Technical approach factor" (missing weight, hierarchy, criteria)
 
-clause: FAR/DFARS/AFFARS/NMCARS patterns,52.###-##,252.###-####,incorporated by reference,clause title,full text
+SUBMISSION_INSTRUCTION - ALWAYS extract:
+1. Page limit: 25 pages, 30 slides, unlimited pages, no page limit
+2. Format reqs: 12-point Times New Roman, 1-inch margins, single-spaced
+3. Volume identifier: Technical Volume, Volume II Management Proposal
+4. Addressed factors: addresses Factors 1 and 2
+5. Special constraints: no cross-referencing, standalone, PDF format
 
-statement_of_work: Task descriptions,performance objectives,deliverables lists,contractor shall perform,Task numbering (1.0,1.1,1.1.1),SOW,PWS,SOO labels
+CORRECT examples:
+✅ "Technical Approach Volume limited to 25 pages, 12-point Times New Roman font, 1-inch margins, must address Factors 1 and 2 (Technical and Maintenance Approach), standalone without cross-referencing other volumes"
+✅ "Management Volume limited to 15 pages addressing Factor A Management Methodology, font 12pt Times New Roman, margins 1-inch all sides"
+✅ "Oral Presentation limited to 30 slides, no additional materials, max 5 presenters, incorporated into Factors A-C evaluation"
+❌ "Technical volume requirements" (missing all metadata)
 
-performance_metric: Acceptable Quality Level (AQL),Quality Assurance Surveillance Plan (QASP),Performance Requirement Summary (PRS),surveillance metrics,inspection measurements,performance objectives,quality standards,thresholds (99.9%,<2 errors),measurement methods
+REQUIREMENT - ALWAYS extract structured metadata:
+Criticality: MANDATORY (SHALL/MUST/WILL with contractor subject), IMPORTANT (SHOULD with contractor), OPTIONAL (MAY with contractor), INFORMATIONAL (SHALL/MUST with Government subject - NOT contractor requirement, skip or extract as concept)
 
-requirement: Modal verbs (shall,must,will,should,may),task obligations,compliance mandates,performance standards,operational requirements
+Description template: [CRITICALITY: MANDATORY|IMPORTANT|OPTIONAL] [Modal verb: shall|should|may|must|will] [Subject: Contractor/Offeror/Personnel] - [Requirement text with ALL quantitative metrics, hours, counts, frequencies] - [Rationale/evaluation linkage]
 
-deliverable: CDRL patterns (A###,DD Form 1423),Contract Data Requirements List,submission schedules,report frequencies,deliverable formats
+QUANTITATIVE PRECISION (include specific numbers):
+❌ "Contractor shall provide help desk support"
+✅ "Contractor shall provide 24/7 help desk support with 4-hour response time for 500 users"
+❌ "Contractor shall clean the facility"
+✅ "Contractor shall clean 50,000 sq ft facility daily and strip floors semi-annually"
 
-MIXED CONTENT HANDLING:
-Some sections contain multiple entity types. Extract each separately and link via relationships.
+CORRECT examples:
+✅ "[MANDATORY] Contractor shall maintain ISO 9001:2015 certification throughout contract period - Quality assurance requirement for all deliverables"
+✅ "[IMPORTANT] Contractor should implement automated monitoring tools for system anomaly detection - Best practice for operational excellence"
+✅ "[OPTIONAL] Contractor may use commercial off-the-shelf (COTS) solutions where appropriate - Flexibility in technical approach"
+✅ "[MANDATORY] Personnel shall comply with 29 CFR 1910 safety standards - Safety requirement for all explosive handling operations"
+❌ "Maintain ISO certification" (missing criticality, modal verb, subject)
+❌ "Government shall provide GFE within 30 days" (Government obligation - NOT requirement)
 
-Example 1 - Section M with embedded instructions:
-Input: "Section M: Evaluation Factors. Factor 1: Technical Approach (Most Important). [Evaluation criteria...] The Technical Volume shall be limited to 25 pages..."
-Extract: evaluation_factor (Factor 1: Technical Approach), submission_instruction (Technical Volume page limit)
-Link: submission_instruction --EVALUATED_BY-> evaluation_factor
+Requirement extraction decision tree:
+1. Identify modal verb: shall/should/may/must/will
+2. Identify subject: Contractor/Offeror/Personnel → requirement with criticality, Government/Agency → skip or concept
+3. Map criticality: shall/must/will → MANDATORY, should → IMPORTANT, may → OPTIONAL
+4. Structure description with bracketed metadata prefix
 
-Example 2 - Section C as attachment:
-Input: "Section C: Description/Specifications/Data. See Attachment J-0200000-18 for Performance Work Statement."
-Extract: section (Section C), document (Attachment J-0200000-18), statement_of_work (Performance Work Statement)
-Link: section --REFERENCES-> document --CONTAINS-> statement_of_work
+10 ANNOTATED EXAMPLES:
 
-EMBEDDED INSTRUCTIONS PATTERN:
-RFPs often embed submission instructions WITHIN evaluation factor descriptions.
-Extract as SEPARATE submission_instruction entity and link to evaluation_factor.
+EXAMPLE 1 - Section L↔M Mapping:
+Input: "Section L.3.1 Technical Volume. The Technical Volume shall address Evaluation Factors 1 and 2 (Technical Approach and Maintenance Approach) and shall not exceed 25 pages, 12-point font, Times New Roman. Include system architecture diagrams and integration plans. Section M: Factor 1: Technical Approach (Most Important, 40%) The Government will evaluate the offeror's understanding of technical requirements, including system architecture and integration methodology. Factor 2: Maintenance Approach (Significantly More Important, 30%) The Government will evaluate the offeror's maintenance strategy and sustainment plans."
+Entities: {"entity_name":"Technical Volume","entity_type":"submission_instruction","description":"Must address Factors 1 and 2 (Technical Approach and Maintenance Approach), include system architecture diagrams and integration plans","page_limit":"25 pages","format_reqs":"12pt Times New Roman, 1-inch margins"}, {"entity_name":"Factor 1 Technical Approach","entity_type":"evaluation_factor","description":"Evaluating technical understanding, system architecture, and integration methodology","weight":"40%","importance":"Most Important"}, {"entity_name":"Factor 2 Maintenance Approach","entity_type":"evaluation_factor","description":"Evaluating maintenance strategy and sustainment plans","weight":"30%","importance":"Significantly More Important"}
+Relationships: Technical Volume GUIDES Factor 1 Technical Approach, Technical Volume GUIDES Factor 2 Maintenance Approach
 
-Example:
-Input: "Factor 1: Technical Approach (Most Important). [Evaluation criteria...] The Technical Volume shall be limited to 25 pages, 12pt Times New Roman, 1-inch margins, single-spaced. The offeror shall address each subfactor in separate sections."
-Extract: evaluation_factor (Factor 1: Technical Approach), submission_instruction (Technical Volume format requirements)
-Link: submission_instruction --GUIDES-> evaluation_factor
+EXAMPLE 2 - Requirements with Criticality:
+Input: "3.2 System Requirements. The Contractor shall provide 24/7 help desk support with average response time under 4 hours for Priority 1 incidents. The Contractor should implement automated monitoring tools to detect system anomalies. The Contractor may use commercial off-the-shelf (COTS) solutions where appropriate. The Government shall provide access to existing system documentation within 10 business days of contract award."
+Entities: {"entity_name":"24/7 Help Desk Support","entity_type":"requirement","description":"Contractor shall provide round-the-clock help desk support with 4-hour average response time for Priority 1 incidents - Critical operational requirement","criticality":"MANDATORY","modal_verb":"shall"}, {"entity_name":"Automated Monitoring Tools","entity_type":"requirement","description":"Contractor should implement automated monitoring tools to detect system anomalies - Best practice for proactive system management","criticality":"IMPORTANT","modal_verb":"should"}, {"entity_name":"COTS Solutions Usage","entity_type":"requirement","description":"Contractor may use commercial off-the-shelf solutions where appropriate - Flexibility in technical approach and tool selection","criticality":"OPTIONAL","modal_verb":"may"}, {"entity_name":"System Documentation Access","entity_type":"concept","description":"Government shall provide access to existing system documentation within 10 business days of contract award - Government-furnished information for contractor use"}
+Note: Contractor shall=MANDATORY requirement, Contractor should=IMPORTANT requirement, Contractor may=OPTIONAL requirement, Government shall=concept (NOT requirement)
 
-RELATIONSHIP TYPES (directed, must be explicitly stated or strongly implied):
-EVALUATED_BY: submission_instruction -> evaluation_factor (proposal section maps to evaluation criterion)
-GUIDES: submission_instruction -> entity (instruction governs entity format/content)
-CHILD_OF: entity -> parent entity (hierarchical structure: Subfactor 1.1 -> Factor 1)
-ATTACHMENT_OF: document -> section (annex belongs to section)
-CONTAINS: document -> statement_of_work (attachment contains SOW)
-REFERENCES: section -> document (section cites external document)
-PRODUCES: requirement -> deliverable (task generates deliverable)
-REQUIRES: requirement -> deliverable (task needs deliverable)
-SPECIFIES: clause -> requirement (regulation mandates requirement)
-APPLIES_TO: clause -> section (regulation governs section)
-MEASURED_BY: requirement -> performance_metric (requirement has quality threshold)
-SUPPORTS: strategic_theme -> evaluation_factor (win theme aligns with evaluation criterion)
+EXAMPLE 3 - Attachment Structure:
+Input: "Section J: List of Attachments. The following documents are incorporated into this solicitation: 1. J-02000000 Performance Work Statement (PWS) 2. J-03000000 Quality Assurance Surveillance Plan (QASP) 3. J-04000000 Contract Data Requirements List (CDRL) 3.1 CDRL A001 - Monthly Status Report 3.2 CDRL A002 - Quarterly Technical Review"
+Entities: {"entity_name":"Section J","entity_type":"section","description":"List of attachments and referenced documents for the solicitation"}, {"entity_name":"J-02000000 Performance Work Statement","entity_type":"document","description":"Attachment containing detailed task descriptions and performance objectives"}, {"entity_name":"Performance Work Statement","entity_type":"statement_of_work","description":"Detailed task descriptions and performance objectives for contract execution"}, {"entity_name":"J-03000000 Quality Assurance Surveillance Plan","entity_type":"document","description":"Quality assurance surveillance plan and inspection procedures"}, {"entity_name":"J-04000000 Contract Data Requirements List","entity_type":"document","description":"List of required contract deliverables with submission schedules"}, {"entity_name":"CDRL A001","entity_type":"deliverable","description":"Monthly status report due to government"}, {"entity_name":"CDRL A002","entity_type":"deliverable","description":"Quarterly technical review deliverable"}
+Relationships: J-02000000 Performance Work Statement ATTACHMENT_OF Section J, J-03000000 Quality Assurance Surveillance Plan ATTACHMENT_OF Section J, J-04000000 Contract Data Requirements List ATTACHMENT_OF Section J, CDRL A001 CHILD_OF J-04000000 Contract Data Requirements List, CDRL A002 CHILD_OF J-04000000 Contract Data Requirements List
+Note: PWS extracted as BOTH document (structure) and statement_of_work (semantics)
 
-EXAMPLES (real RFP patterns):
+EXAMPLE 4 - FAR Clauses:
+Input: "Section I: Contract Clauses. The following Federal Acquisition Regulation (FAR) clauses are incorporated by reference: FAR 52.212-1 Instructions to Offerors—Commercial Products and Commercial Services, FAR 52.212-4 Contract Terms and Conditions—Commercial Products and Commercial Services, DFARS 252.204-7012 Safeguarding Covered Defense Information and Cyber Incident Reporting"
+Entities: {"entity_name":"Section I","entity_type":"section","description":"Contract clauses incorporated by reference from FAR and DFARS"}, {"entity_name":"FAR 52.212-1","entity_type":"clause","description":"Instructions to Offerors for commercial products and commercial services acquisitions"}, {"entity_name":"FAR 52.212-4","entity_type":"clause","description":"Standard contract terms and conditions for commercial products and services"}, {"entity_name":"DFARS 252.204-7012","entity_type":"clause","description":"DoD cybersecurity requirements for safeguarding covered defense information with NIST SP 800-171 compliance"}
+Relationships: FAR 52.212-1 CHILD_OF Section I, FAR 52.212-4 CHILD_OF Section I, DFARS 252.204-7012 CHILD_OF Section I
 
-EXAMPLE 1 - Navy MBOS evaluation factor:
-Input: "Factor 2: Maintenance Approach (Most Important). The Government will evaluate the offeror's understanding of and approach to performing organic maintenance requirements. This factor has three subfactors: 2.1 Staffing Plan (Significantly More Important), 2.2 Maintenance Philosophy, 2.3 Transition Plan"
-Output: {"entity_name":"Factor 2: Maintenance Approach","entity_type":"evaluation_factor","description":"Evaluation of offeror's maintenance approach including staffing, philosophy, and transition (Factor M2)","importance":"Most Important","subfactors":["M2.1 Staffing Plan","M2.2 Maintenance Philosophy","M2.3 Transition Plan"]}
+EXAMPLE 5 - Deliverables from SOW (Content-Location Flexibility):
+Input: "Attachment 0001: Performance Work Statement. Task 3.4: Reporting Requirements. The Contractor shall submit the following deliverables: Monthly Progress Reports (due 5th business day of following month), Quarterly Risk Assessments (due 15 days after quarter end), Final Project Report (due at contract completion). All deliverables shall comply with CDRL A001, A002, and A003 respectively."
+Entities: {"entity_name":"Attachment 0001 Performance Work Statement","entity_type":"document","description":"Attachment containing detailed task descriptions and performance objectives"}, {"entity_name":"Performance Work Statement","entity_type":"statement_of_work","description":"Detailed task descriptions and performance objectives for contract execution"}, {"entity_name":"Monthly Progress Reports","entity_type":"deliverable","description":"Monthly progress reports due 5th business day of following month per CDRL A001"}, {"entity_name":"Quarterly Risk Assessments","entity_type":"deliverable","description":"Quarterly risk assessment deliverables due 15 days after quarter end per CDRL A002"}, {"entity_name":"Final Project Report","entity_type":"deliverable","description":"Final project report deliverable due at contract completion per CDRL A003"}, {"entity_name":"CDRL A001","entity_type":"deliverable","description":"Contract data requirement for monthly progress reporting"}, {"entity_name":"CDRL A002","entity_type":"deliverable","description":"Contract data requirement for quarterly risk assessments"}, {"entity_name":"CDRL A003","entity_type":"deliverable","description":"Contract data requirement for final project report"}
+Relationships: Performance Work Statement PRODUCES Monthly Progress Reports, Performance Work Statement PRODUCES Quarterly Risk Assessments, Performance Work Statement PRODUCES Final Project Report
+Note: SOW in attachment (NOT Section C) - extracted based on CONTENT not LOCATION
 
-EXAMPLE 2 - Task Order selection criteria (non-standard):
-Input: "Selection Criteria: Technical Merit (100 points) - Demonstrated understanding of mission requirements (40 points) - Quality of proposed solution (35 points) - Risk mitigation approach (25 points)"
-Output: {"entity_name":"Technical Merit","entity_type":"evaluation_factor","description":"Point-scored evaluation of technical solution quality found in Selection Criteria","weight":"100 points","subfactors":["Understanding (40pt)","Solution Quality (35pt)","Risk Mitigation (25pt)"]}
+EXAMPLE 6 - Implicit Section L↔M (Topic Matching):
+Input: "Section L.2.1: Technical Volume. The Technical Volume shall not exceed 20 pages and must include detailed system architecture diagrams, cybersecurity controls mapping to NIST SP 800-171, and integration methodology with existing government systems. Section M.1: Factor 1 - Technical Approach (Most Important, 45%). The Government will evaluate the offeror's technical solution, including system design, security architecture, and integration strategy. Subfactors: 1.1 System Architecture and Design (20%), 1.2 Cybersecurity Approach (15%), 1.3 Integration Methodology (10%)"
+Entities: {"entity_name":"Technical Volume","entity_type":"submission_instruction","description":"Must address Factor 1 Technical Approach, include system architecture diagrams, cybersecurity controls mapping to NIST SP 800-171, and integration methodology with government systems","page_limit":"20 pages","format_reqs":"12pt Times New Roman, 1-inch margins"}, {"entity_name":"Factor 1 Technical Approach","entity_type":"evaluation_factor","description":"Evaluating technical solution including system design, security architecture, and integration strategy","weight":"45%","importance":"Most Important","subfactors":["Subfactor 1.1 System Architecture","Subfactor 1.2 Cybersecurity Approach","Subfactor 1.3 Integration Methodology"]}, {"entity_name":"Subfactor 1.1 System Architecture","entity_type":"evaluation_factor","description":"Evaluating system design and architecture approach (20% of Factor 1's 45%)","weight":"20%","importance":"subfactor"}, {"entity_name":"Subfactor 1.2 Cybersecurity Approach","entity_type":"evaluation_factor","description":"Evaluating security architecture and NIST SP 800-171 compliance (15% of Factor 1's 45%)","weight":"15%","importance":"subfactor"}, {"entity_name":"Subfactor 1.3 Integration Methodology","entity_type":"evaluation_factor","description":"Evaluating integration strategy with government systems (10% of Factor 1's 45%)","weight":"10%","importance":"subfactor"}
+Relationships: Technical Volume GUIDES Factor 1 Technical Approach, Technical Volume GUIDES Subfactor 1.1 System Architecture, Technical Volume GUIDES Subfactor 1.2 Cybersecurity Approach, Technical Volume GUIDES Subfactor 1.3 Integration Methodology, Subfactor 1.1 System Architecture CHILD_OF Factor 1 Technical Approach, Subfactor 1.2 Cybersecurity Approach CHILD_OF Factor 1 Technical Approach, Subfactor 1.3 Integration Methodology CHILD_OF Factor 1 Technical Approach
+Note: IMPLICIT relationships based on topic matching (architecture, security, integration keywords)
 
-EXAMPLE 3 - Section L page limits:
-Input: "The Technical Volume shall not exceed 25 pages, including all graphics, tables, and cover page. Use Times New Roman 12-point font with 1-inch margins."
-Output: {"entity_name":"Technical Volume Page Limit","entity_type":"submission_instruction","description":"Technical proposal format requirements from Section L","page_limit":"25 pages","format_reqs":"Times New Roman 12pt, 1-inch margins"}
+EXAMPLE 7 - Requirement→Evaluation Factor (Semantic Matching):
+Input: "Section C.3.4: Quality Assurance Requirements. The Contractor shall maintain ISO 9001:2015 certification throughout the contract period. The Contractor shall implement a quality management system with documented procedures for defect tracking, root cause analysis, and corrective action. The Contractor should achieve 98% on-time delivery rate. Section M.3: Factor 3 - Quality Assurance (Significantly Important, 25%). The Government will evaluate the contractor's quality management capabilities, including ISO certification, quality processes, and performance metrics. Past performance on quality will be heavily weighted."
+Entities: {"entity_name":"ISO 9001:2015 Certification Requirement","entity_type":"requirement","description":"Contractor shall maintain ISO 9001:2015 certification throughout contract period - Quality assurance requirement evaluated in Factor 3","criticality":"MANDATORY","modal_verb":"shall"}, {"entity_name":"Quality Management System","entity_type":"requirement","description":"Contractor shall implement quality management system with documented procedures for defect tracking, root cause analysis, and corrective action - QMS implementation requirement supporting quality assurance evaluation","criticality":"MANDATORY","modal_verb":"shall"}, {"entity_name":"On-Time Delivery Rate Target","entity_type":"requirement","description":"Contractor should achieve 98% on-time delivery rate - Performance metric target demonstrating quality execution","criticality":"IMPORTANT","modal_verb":"should"}, {"entity_name":"Factor 3 Quality Assurance","entity_type":"evaluation_factor","description":"Evaluating quality management capabilities, ISO certification, quality processes, and performance metrics - Past performance on quality heavily weighted","weight":"25%","importance":"Significantly Important"}
+Relationships: ISO 9001:2015 Certification Requirement EVALUATED_BY Factor 3 Quality Assurance, Quality Management System EVALUATED_BY Factor 3 Quality Assurance, On-Time Delivery Rate Target EVALUATED_BY Factor 3 Quality Assurance
+Note: All three requirements semantically match Factor 3 (keywords: quality, ISO, processes, metrics) - IMPLICIT relationships
 
-EXAMPLE 4 - Workload-driven requirement (RICH DATA - multiple locations, peak times, sales volumes, event frequencies):
-Input: "F.2.3.1. C.A.C Customer Service Counter and Indoor Bar: The Contractor shall handle resale requirements to include alcohol sales. The Contractor shall service: 1) One (1) inside bar with two (2) registers located in the C.A.C. 2) One (1) additional outside bar with two (2) registers during special events. 3) One (1) additional bar with one (1) register located in Phantom Auditorium during special events and reserved activities. Cash registers require USN staff personnel only. Contractor personnel shall provide retail services at minimum rates of one (1) customer per minute during normal operations and three (3) customers per minute during peak times (0500-0700, 1100-1300, 1900-2100, 2300-0100) or during special events (e.g., concerts, 4-drink nights, community events, all calls, promotions, wing ceremonies, etc.). The Contractor shall open the outside bar for special events as requested by the COR. The Government will send requests to open the outside bar for special events in writing a minimum of seven (7) calendar days prior to the event. This is estimated to occur 100 times per year. The C.A.C. sells between $2,000 and $5,000 alcoholic drinks per night. Majority of sales are made from 1830 until 0200. Sales are higher during special functions and events (can exceed $10,000) and will require additional support to meet customer demand."
-Output: {"entity_name":"C.A.C. Customer Service Counter and Indoor Bar","entity_type":"requirement","description":"Alcohol resale operations across multiple locations (C.A.C. inside bar, outside bar, Phantom Auditorium) with peak time service requirements","criticality":"MANDATORY","modal_verb":"shall","req_type":"FUNCTIONAL","labor_drivers":["1 inside bar with 2 registers (C.A.C.)","1 outside bar with 2 registers (special events, 100x/year)","1 Phantom Auditorium bar with 1 register (events)","1 customer/min normal ops","3 customers/min peak times (0500-0700,1100-1300,1900-2100,2300-0100)","Peak sales hours 1830-0200","$2,000-$5,000 nightly drink sales","$10,000+ sales during special events","100 special events/year","7-day advance notice for outside bar setup"],"material_needs":["C.A.C. inside bar location","Outside bar location","Phantom Auditorium bar location","Cash registers (USN staff only)","Resale supplies (alcohol)"]}
+EXAMPLE 8 - Multi-Agency Attachment Patterns:
+Input: "Section J: List of Documents. The following attachments are incorporated: Attachment 001: Base Performance Work Statement, Attachment 002: Quality Assurance Surveillance Plan, Enclosure (1): Security Requirements Addendum, Exhibit A: Pricing Template and Instructions, Schedule B: Contract Line Item Numbers (CLINs). Attachment 001.1: Task Area 1 - Technical Support, Attachment 001.2: Task Area 2 - Training Services"
+Entities: {"entity_name":"Section J","entity_type":"section","description":"List of incorporated documents and attachments for the solicitation"}, {"entity_name":"Attachment 001 Base Performance Work Statement","entity_type":"document","description":"Primary attachment containing base contract work requirements"}, {"entity_name":"Base Performance Work Statement","entity_type":"statement_of_work","description":"Detailed base contract work requirements and performance objectives"}, {"entity_name":"Attachment 002 Quality Assurance Surveillance Plan","entity_type":"document","description":"Quality assurance surveillance and inspection procedures"}, {"entity_name":"Enclosure (1) Security Requirements","entity_type":"document","description":"Security requirements addendum with classified handling procedures"}, {"entity_name":"Exhibit A Pricing Template","entity_type":"document","description":"Pricing template and instructions for cost proposal submission"}, {"entity_name":"Schedule B Contract Line Items","entity_type":"document","description":"CLIN structure and pricing schedule for contract items"}, {"entity_name":"Attachment 001.1 Task Area 1","entity_type":"document","description":"Sub-attachment defining Technical Support task area requirements"}, {"entity_name":"Attachment 001.2 Task Area 2","entity_type":"document","description":"Sub-attachment defining Training Services task area requirements"}
+Relationships: Attachment 001 Base Performance Work Statement ATTACHMENT_OF Section J, Attachment 002 Quality Assurance Surveillance Plan ATTACHMENT_OF Section J, Enclosure (1) Security Requirements ATTACHMENT_OF Section J (Marine Corps naming pattern), Exhibit A Pricing Template ATTACHMENT_OF Section J (letter-based naming), Schedule B Contract Line Items ATTACHMENT_OF Section J (schedule naming pattern), Attachment 001.1 Task Area 1 CHILD_OF Attachment 001 Base Performance Work Statement (decimal numbering pattern), Attachment 001.2 Task Area 2 CHILD_OF Attachment 001 Base Performance Work Statement (decimal numbering pattern)
+Note: Demonstrates Navy (Attachment ###), Marines (Enclosure #), civilian (Exhibit/Schedule) patterns - IMPLICIT hierarchy via pattern recognition
 
-EXAMPLE 5 - Performance metric:
-Input: "The contractor shall maintain a minimum 99.5% equipment operational readiness rate, measured monthly via equipment status reports."
-Output: {"entity_name":"Equipment Operational Readiness","entity_type":"performance_metric","description":"Minimum equipment availability standard from QASP","threshold":"99.5%","measurement_method":"Monthly equipment status reports"}
+EXAMPLE 9 - SOW→Deliverable Production (Semantic + CDRL Linking):
+Input: "Attachment J-04: Performance Work Statement. Task 4.3: Program Management and Reporting. The Contractor shall provide comprehensive program management including: Monthly Program Status Reports analyzing schedule, cost, and technical progress, Quarterly Executive Briefings to government leadership, Annual Performance Assessment Reports with metrics analysis, Incident Reports within 24 hours of any security or safety event. All reports shall comply with formats specified in CDRL A001-A004. Section J.5: Contract Data Requirements List. CDRL A001: Monthly Status Report (Due 5th business day), CDRL A002: Quarterly Executive Briefing (Due 10 days after quarter), CDRL A003: Annual Performance Assessment (Due January 31), CDRL A004: Incident Report (Due 24 hours after event)"
+Entities: {"entity_name":"Attachment J-04 Performance Work Statement","entity_type":"document","description":"Performance work statement attachment with task requirements"}, {"entity_name":"Performance Work Statement","entity_type":"statement_of_work","description":"Detailed task descriptions and performance objectives including program management"}, {"entity_name":"Monthly Program Status Reports","entity_type":"deliverable","description":"Monthly status reports analyzing schedule, cost, and technical progress per CDRL A001"}, {"entity_name":"Quarterly Executive Briefings","entity_type":"deliverable","description":"Quarterly executive briefings to government leadership per CDRL A002"}, {"entity_name":"Annual Performance Assessment Reports","entity_type":"deliverable","description":"Annual performance assessment with metrics analysis per CDRL A003"}, {"entity_name":"Incident Reports","entity_type":"deliverable","description":"Security or safety incident reports due within 24 hours per CDRL A004"}, {"entity_name":"CDRL A001","entity_type":"deliverable","description":"Monthly status report deliverable due 5th business day of following month"}, {"entity_name":"CDRL A002","entity_type":"deliverable","description":"Quarterly executive briefing deliverable due 10 days after quarter end"}, {"entity_name":"CDRL A003","entity_type":"deliverable","description":"Annual performance assessment deliverable due January 31 annually"}, {"entity_name":"CDRL A004","entity_type":"deliverable","description":"Incident report deliverable due 24 hours after qualifying event"}
+Relationships: Performance Work Statement PRODUCES Monthly Program Status Reports, Performance Work Statement PRODUCES Quarterly Executive Briefings, Performance Work Statement PRODUCES Annual Performance Assessment Reports, Performance Work Statement PRODUCES Incident Reports, Monthly Program Status Reports TRACKED_BY CDRL A001, Quarterly Executive Briefings TRACKED_BY CDRL A002, Annual Performance Assessment Reports TRACKED_BY CDRL A003, Incident Reports TRACKED_BY CDRL A004
 
-EXAMPLE 6 - FAR clause:
-Input: "FAR 52.212-1 Instructions to Offerors—Commercial Products and Commercial Services (OCT 2018)"
-Output: {"entity_name":"FAR 52.212-1","entity_type":"clause","description":"Instructions to Offerors—Commercial Products and Commercial Services (OCT 2018)","clause_number":"FAR 52.212-1","regulation":"FAR"}
+EXAMPLE 10 - Strategic Themes with Sentiment Analysis:
+Input: "Section C.1: Cybersecurity is a critical concern for Navy's operational readiness. Current contractor security incidents resulted in 15-day system outage in FY2024, compromising mission-critical communications. Zero tolerance for future data breaches. Navy seeks innovative cybersecurity approaches leveraging AI-powered threat detection to ensure continuous operations. Section M: Factor 1 Cybersecurity Approach (40%, Most Important): 1.1 NIST 800-53 Compliance (Significantly More Important), 1.2 Incident Response, 1.3 Continuous Monitoring, 1.4 Supply Chain Risk. Factor 2 Technical Innovation (25%, Significantly More Important): Cutting-edge solutions using AI/ML to enhance security beyond current contractor's reactive approach. Section L: Technical Volume 75 pages max, Cybersecurity section 35 pages max."
+Entities: {"entity_name":"Cybersecurity as Critical Mission Priority","entity_type":"strategic_theme","description":"CUSTOMER_HOT_BUTTON: Cybersecurity 'critical concern' with 'zero tolerance for future data breaches' in Section C. Mentioned 8 times across C/M/L. Factor M1 (40%, Most Important) evaluates cybersecurity with 4 subfactors (NIST 800-53, incident response, continuous monitoring, supply chain). Technical Volume 35 of 75 pages (47%). Signals: HIGH PRIORITY, MISSION-CRITICAL, ZERO TOLERANCE, COMPLEX (4 subfactors).","theme_type":"CUSTOMER_HOT_BUTTON","priority_score":95,"evidence":{"emphasis_keywords":["critical concern","zero tolerance","mission-critical","operational readiness"],"mention_count":8,"sections_referenced":["Section C.1","Section M Factor 1","Section L"],"evaluation_weight":"40%","adjectival_rating":"Most Important","subfactor_count":4,"page_allocation":"35 of 75 pages (47%)"}}, {"entity_name":"Current Contractor Security Incident Gap","entity_type":"strategic_theme","description":"PAIN_POINT: Section C.1 'Current contractor security incidents resulted in 15-day system outage FY2024, compromising mission-critical communications.' Performance gap indicates incumbent weakness. Section M Factor 1.2 emphasizes incident response/threat detection. Signals: INCUMBENT WEAKNESS, MEASURABLE FAILURE (15-day outage), COMPETITIVE OPPORTUNITY, MISSION IMPACT.","theme_type":"PAIN_POINT","priority_score":90,"evidence":{"incumbent_performance":"15-day system outage from security incident","required_standard":"Zero tolerance for future data breaches","performance_gap":"Current: security incident caused outage, Required: zero tolerance/continuous ops","sections_referenced":["Section C.1","Section M Factor 1.2"],"corrective_language":["zero tolerance","ensure continuous operations","beyond current contractor's reactive approach"],"mission_impact":"Compromised mission-critical communications"}}, {"entity_name":"AI-Powered Threat Detection Innovation","entity_type":"strategic_theme","description":"COMPETITIVE_OPPORTUNITY: Section C.1 requests 'innovative cybersecurity approaches leveraging AI-powered threat detection.' Section M Factor 2 (25%, Significantly More Important) seeks 'cutting-edge solutions using AI/ML to enhance security beyond current contractor's reactive approach.' No specific AI solution mandated - proprietary differentiation opportunity. Signals: INNOVATION REQUEST, EMERGING TECH (AI/ML), COMPETITIVE DIFFERENTIATOR, PROACTIVE VS REACTIVE.","theme_type":"COMPETITIVE_OPPORTUNITY","priority_score":85,"evidence":{"innovation_keywords":["innovative","AI-powered","cutting-edge","advanced analytics","artificial intelligence","machine learning"],"capability_gap":"No specific AI solution mandated - offeror discretion","evaluation_weight":"25%","adjectival_rating":"Significantly More Important","subfactor":"Factor 2: Technical Innovation","differentiation_potential":"Proprietary AI threat detection differentiates from competitors and incumbent's reactive approach","positioning_opportunity":"Proactive (AI prediction) vs Reactive (current contractor)"}}, {"entity_name":"NIST 800-53 Compliance Emphasis","entity_type":"strategic_theme","description":"CUSTOMER_HOT_BUTTON: NIST 800-53 compliance is subfactor 1.1 (Significantly More Important) under Factor 1 Cybersecurity (40%, Most Important). Combined weight/importance indicates critical requirement. Signals: REGULATORY COMPLIANCE, HIGH IMPORTANCE, FOUNDATIONAL REQUIREMENT.","theme_type":"CUSTOMER_HOT_BUTTON","priority_score":80,"evidence":{"emphasis_keywords":["NIST 800-53 compliance","implementation"],"mention_count":3,"sections_referenced":["Section C.1","Section M Factor 1.1"],"evaluation_weight":"Part of Factor 1 (40%)","adjectival_rating":"Significantly More Important (subfactor)","compliance_requirement":"NIST 800-53 standard"}}
+Relationships: Cybersecurity as Critical Mission Priority EVALUATED_BY Factor 1 Cybersecurity Approach (hot button→primary evaluation factor 40%), Current Contractor Security Incident Gap EVALUATED_BY Factor 1 Cybersecurity Approach (pain point from incumbent failure), AI-Powered Threat Detection Innovation EVALUATED_BY Factor 2 Technical Innovation (competitive opportunity for innovative AI), NIST 800-53 Compliance Emphasis EVALUATED_BY Factor 1.1 NIST 800-53 Compliance (compliance hot button→dedicated subfactor), Technical Volume Cybersecurity Section GUIDES Factor 1 Cybersecurity Approach (35 pages/47% of proposal)
+Note: Sentiment extraction captured emphasis language (critical concern, zero tolerance), performance gap (15-day outage vs zero tolerance), innovation signals (innovative, AI-powered, cutting-edge), competitive positioning (beyond current contractor's reactive→proactive AI differentiation), priority scoring (95 critical hot button, 90 pain point, 85 competitive opportunity, 80 compliance), evidence (keywords, mention counts, evaluation weights, adjectival ratings, page allocations)
 
-EXAMPLE 7 - Deliverable with CDRL:
-Input: "CDRL A001 Monthly Status Report: The contractor shall submit a monthly status report NLT than the 5th business day of each month via email to the COR."
-Output: {"entity_name":"CDRL A001 Monthly Status Report","entity_type":"deliverable","description":"Monthly status report due 5th business day to COR via email"}
 
-DECISION TREE (edge case handling):
+SECTION 3: RELATIONSHIP INFERENCE PATTERNS
 
-Q1: Is this a proposal formatting instruction?
-YES -> submission_instruction | NO -> Continue to Q2
+CRITICAL MANDATE: Extract ALL Implicit Relationships. Avg 5-10 relationships/entity. Extract both explicit (stated) and implicit (inferred from semantic similarity, naming patterns, structural context).
 
-Q2: Is this an evaluation criterion or scoring methodology?
-YES -> evaluation_factor | NO -> Continue to Q3
+Section LM Linking (3 confidence levels):
+1. Explicit (0.95): "Vol 2 addresses Factor 3"  GUIDES
+2. Topic match (0.80): "Technical Volume" + "Technical Approach Factor"  GUIDES (keywords: architecture, integration, cybersecurity)
+3. Keyword overlap (0.70): 3+ uncommon keywords shared  GUIDES
 
-Q3: Does it contain a modal verb (shall,must,will,should,may)?
-YES -> requirement | NO -> Continue to Q4
+Attachment/Annex Hierarchy Patterns:
+- Explicit listing: "J-0001 PWS attached"  ATTACHMENT_OF 0.95
+- Naming patterns: Navy J-########, Air Force Attachment #, Army Annex A, Marines Enclosure (#), DHS Schedule, GSA Roman numerals, VA Appendix, DOE Annex, HHS letter+number  ATTACHMENT_OF 0.85
+- Structural context: Numbered docs in attachment section  ATTACHMENT_OF 0.75
+- Co-location: CDRL + deliverable in same paragraph  TRACKED_BY 0.75
 
-Q4: Is it a FAR/DFARS/regulation citation?
-YES -> clause | NO -> Continue to Q5
+Topic Taxonomy (6 categories with inference rules):
+TECHNICAL: keywords{architecture, system, integration, interface, cybersecurity, infrastructure, hardware, software, network, database, API, cloud, authentication, encryption}
+MANAGEMENT: keywords{schedule, milestone, resource, staffing, WBS, Gantt, quality, ISO, training, knowledge transfer, transition, EVMS, risk, change control}
+LOGISTICS: keywords{supply chain, inventory, warehouse, transportation, asset, maintenance, calibration, depot, HAZMAT, disposal}
+SECURITY: keywords{clearance, SCIF, classified, NIST, ATO, FedRAMP, OPSEC, COMSEC, physical security, badging, escort}
+FINANCIAL: keywords{pricing, invoicing, CPARS, WAWF, payment, accounting, audit, cost control, budget, labor rate}
+DOCUMENTATION: keywords{manual, SOP, report, plan, log, record, certification, inspection, deliverable, CDRL}
 
-Q5: Is it a CDRL or numbered deliverable?
-YES -> deliverable | NO -> Continue to Q6
+Semantic Matching Algorithm:
+inst_keywords = extract_keywords(submission_instruction.name)
+factor_keywords = extract_keywords(factor.name)
+similarity = len(inst_keywords & factor_keywords) / len(inst_keywords | factor_keywords)
+if similarity  0.50: GUIDES 0.90 (strong)
+elif similarity  0.30: GUIDES 0.75 (moderate)
+elif any(keyword in factor.description for keyword in inst_keywords): GUIDES 0.70 (description match)
+Jaccard threshold: 0.25+ for RELATED_TO, 0.30+ for EVALUATED_BY, 3+ uncommon keywords for strong link
 
-Q6: Does it specify a measurable threshold or quality standard?
-YES -> performance_metric | NO -> Continue to Q7
+Implicit Hierarchy Detection (5 rules with confidence):
+1. Numbered docs (Section C.3.2  C.3): CHILD_OF 0.95
+2. Nested sections (Subfactor 1.1  Factor 1): CHILD_OF 0.90
+3. Parent-child references ("subsection of"): CHILD_OF 0.85
+4. Attachment listings (J-0001 in Section J): ATTACHMENT_OF 0.85
+5. CDRL-deliverable co-location: TRACKED_BY 0.75
 
-Q7: Is it a SOW/PWS/SOO task description?
-YES -> statement_of_work | NO -> Continue to Q8
+InstructionEvaluation Patterns (50 inference rules):
+P1: Explicit factor ref ("Vol 2 addresses Factor 3")  GUIDES 0.95
+P2: Topic match tech ("Technical Volume" + "Technical Factor")  GUIDES 0.90
+P3: Topic match mgmt ("Management Volume" + "Management Factor")  GUIDES 0.90
+P4: Topic match past perf ("Past Performance Info" + "Past Performance Factor")  GUIDES 0.90
+P5: Page limit + factor co-location  GUIDES 0.80
+P6: Format req near factor (diagrams + architecture)  GUIDES 0.75
+P7-20: Semantic similarity mapping (see algorithm above)
+P21-30: Cross-volume refs ("Tech+Mgmt Vols address Factors 1-3")  GUIDES 0.85 for BOTH vols
+P31-40: Subfactor decomposition (architecture diagrams  Subfactor 1.1)  GUIDES 0.80
+P41-50: Implicit format instructions (factor implies content)  GUIDES 0.65
 
-Q8: Is it a strategic messaging element (hot button,discriminator,proof point,win theme)?
-YES -> strategic_theme | NO -> Continue to fallback mapping
+RequirementEvaluation Patterns (30 inference rules):
+R1: Direct topic match (ISO req + QA factor)  EVALUATED_BY 0.90
+R2: Semantic tech (keywords{system,architecture,design,integration,interface} + technical factor)  EVALUATED_BY 0.75
+R3: Semantic mgmt (keywords{schedule,milestone,cost,budget,resource,staff} + mgmt factor)  EVALUATED_BY 0.75
+R4: Semantic personnel (keywords{clearance,personnel,staff,labor category,skill,certification} + personnel factor)  EVALUATED_BY 0.75
+R5: Semantic security (keywords{security,clearance,SCIF,classified,NIST,cybersecurity} + security factor)  EVALUATED_BY 0.80
+R6-15: Deliverable-driven evaluation (reqdeliverablefactor)  chain PRODUCES + EVALUATED_BY 0.85
+R16-30: SOW section to factor mapping (Section 3.1 Tech Tasks  Tech Factor, 3.2 Mgmt  Mgmt Factor, 3.3 QA  Quality Factor, 3.4 Security  Security Factor, 3.5 Transition  Transition Factor)
 
-QUALITY GUIDELINES:
-Confidence <0.8 -> Discard (only extract clear, well-defined entities)
-Extract every occurrence, never merge spans unless 100% identical entity
-Relations only if explicitly stated or strongly implied in same sentence
-Ensure entity_name uses proper Title Case normalization
-Capture source_text when extracting for traceability
-For requirements: ALWAYS populate labor_drivers field with workload data (frequencies,volumes,hours,quantities,coverage) - this is CRITICAL for BOE/FTE estimation
-For evaluation_factors: ALWAYS populate subfactors list if hierarchical structure present
+Relationship Type Usage Rules:
+CHILD_OF: hierarchical structure (sections, subsections, numbered docs)
+ATTACHMENT_OF: docs attached to sections (J-0001Section J)
+GUIDES: instructions guide evaluation (Section LSection M)
+EVALUATED_BY: requirements/deliverables evaluated in factors
+PRODUCES: work produces deliverables (SOWCDRL)
+REFERENCES: entity mentions another by name
+CONTAINS: parent contains child (section contains clauses)
+RELATED_TO: semantic similarity, shared topics, thematic connection
+SUPPORTS: one entity enables/supports another
+DEFINES: one entity defines/explains another
+MEASURED_BY: requirement measured by performance_metric
+TRACKED_BY: deliverable tracked by CDRL
 
-OUTPUT FORMAT:
-Strict JSON matching ExtractionResult Pydantic schema. No markdown code fences, no extra text.
-{"entities":[{entity objects with type-specific fields}],"relationships":[{source_entity:{},target_entity:{},relationship_type:"",description:""}]}
+Output Format: {"entities":[...],"relationships":[...]}
+Metadata Requirements:
+EVALUATION_FACTOR: weight, importance, subfactors
+SUBMISSION_INSTRUCTION: page_limit, format_reqs, volume
+REQUIREMENT: criticality[MANDATORY|IMPORTANT|OPTIONAL], modal_verb[shall|should|may], req_type, labor_drivers, material_needs
+CLAUSE: clause_number, regulation
+PERFORMANCE_METRIC: threshold, measurement_method
 
-Now extract entities and relationships from the following text:
+Criticality Rules:
+MANDATORY: shall/must/will + Contractor subject
+IMPORTANT: should + Contractor subject
+OPTIONAL: may + Contractor subject
+EXCLUDE: Government subject  extract as CONCEPT
+
+17 Allowed Entity Types:
+organization, concept, event, technology, person, location, requirement, clause, section, document, deliverable, program, equipment, evaluation_factor, submission_instruction, strategic_theme, statement_of_work, performance_metric
+
+NEVER use: other, UNKNOWN, process, table, plan, policy, standard, system, regulation, framework
+If uncertain: use concept (catch-all for abstract entities)
+
+Final checks before output:
+ All entity types from 17 allowed list
+ All EVALUATION_FACTOR has weight/importance/subfactors
+ All SUBMISSION_INSTRUCTION has page_limit/format_reqs/volume
+ All REQUIREMENT has criticality[MANDATORY|IMPORTANT|OPTIONAL]/modal_verb/req_type
+ All CLAUSE has clause_number/regulation
+ All PERFORMANCE_METRIC has threshold/measurement_method
+ Relationships use correct types (CHILD_OF, GUIDES, EVALUATED_BY, PRODUCES, etc)
+ Implicit relationships extracted (5-10 per entity avg)
+ Third person, no pronouns, English output
+ Valid JSON, special chars escaped
+ Completion signal after all entities/relationships extracted

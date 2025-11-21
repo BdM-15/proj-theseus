@@ -1,0 +1,24 @@
+DELIVERABLE TRACEABILITY: DUAL-PATTERN LINKING
+Purpose: Performance traceability + work planning
+
+PATTERN 1 (PRIMARY): REQUIREMENT --SATISFIED_BY--> DELIVERABLE
+Deliverables prove compliance (60-80% from CDRLs/clauses/eval, NOT SOW)
+4 Patterns:
+A. Reporting (0.85-0.95): "99.9% uptime" → Monthly Uptime Report
+B. Documentation (0.75-0.85): "500 concurrent users" → Performance Test Report  
+C. Proof Point (0.65-0.75): "Zero-trust architecture" → Security Architecture Doc
+D. Compliance (0.85-0.95): "NIST 800-171" → System Security Plan
+Detection: Semantic overlap (testing→test reports, performance→performance reports, security→security plans), keyword correlation (shall maintain→monitoring reports, shall implement→design docs, shall comply with→compliance reports), evidence chain
+
+PATTERN 2 (SECONDARY): STATEMENT_OF_WORK --PRODUCES--> DELIVERABLE
+Explicit work planning references (20-40%)
+3 Patterns:
+A. Explicit (0.90-0.96): "Prepare monthly status reports per CDRL A001"
+B. Work-Product (0.70-0.80): "Maintain facility" → Facility Maintenance Logs
+C. Timeline (0.65-0.75): "Phase 1 Q2" → Phase 1 Report (June 30)
+Detection: CDRL references, work-product correlation (testing→test reports, training→materials, maintenance→logs), timeline matching
+
+PRIORITY: Pattern 1 (requirement→deliverable) captures majority, Pattern 2 adds work planning context
+
+OUTPUT:
+[{"source_id":"req/sow_id","target_id":"deliverable_id","relationship_type":"SATISFIED_BY|PRODUCES","confidence":0.50-0.96,"reasoning":"Deliverable type provides evidence/produced by work"}]

@@ -1,167 +1,288 @@
-SEMANTIC-FIRST DETECTION: Content determines entity type, NOT section labels. Agencies use varying terminology.
+Entity Detection Rules: Government Contracting Ontology
 
-PRIORITY EXTRACTION ORDER:
-1.PROGRAM (provides context for all others) 2.SECTION (location context) 3.EVALUATION_FACTOR (proposal planning) 4.SUBMISSION_INSTRUCTION (proposal structure) 5.REQUIREMENT (work obligations) 6.STATEMENT_OF_WORK (work scope) 7.DOCUMENT (supporting refs) 8.CLAUSE (regulatory compliance) 9.STRATEGIC_THEME (competitive intel) 10.Standard entities (organization,concept,event,etc)
+CORE PRINCIPLE: Content determines entity type, NOT section labels.
+Traditional (FRAGILE): IF section_label=="Section L" → entity_type="SECTION"
+Adaptive (ROBUST): IF contains_evaluation_criteria_language() → entity_type="EVALUATION_FACTOR"
 
-ENTITY TYPE DETECTION (18 types - matches Pydantic schema):
+UCF (Uniform Contract Format) Reference - Standard Federal RFP Structure (FAR 15.210):
+A: Solicitation/Contract Form (SF 1449, cover page, POCs, deadlines) → section, organization, person, event
+B: Supplies/Services & Prices (CLIN/SLIN, pricing tables) → section, concept, program
+C: Statement of Work (contractor shall, tasks, objectives) → section, statement_of_work, requirement, deliverable
+H: Special Requirements (clearances, key personnel, facilities) → section, requirement, person, location
+I: Contract Clauses (FAR/DFARS 52.###-##, incorporated by reference) → section, clause
+J: Attachments (Attachment, Annex, Exhibit, J-####) → section, document, statement_of_work
+L: Instructions to Offerors (page limits, fonts, proposal structure) → section, submission_instruction
+M: Evaluation Factors (will be evaluated, factor hierarchy, importance) → section, evaluation_factor
 
-1.EVALUATION_FACTOR:
-Signals: will be evaluated,evaluation factor,most important,adjectival rating,source selection,significantly more important,Factor numbering (M1,M2,M2.1),Point scores,adjectival ratings (Excellent,Good,Acceptable,Marginal,Unacceptable)
-Structure: Hierarchical (Factor 1 -> Subfactor 1.1 -> 1.1.1)
-Location: Section M primary, Section L embedded (non-standard), Selection Criteria,Source Selection Plan
-Attributes: weight (40%,25 points), importance (Most Important), subfactors (list)
+Non-Standard Label Mapping (Task Orders/Fair Opportunity):
+RFQ → Section A, Technical Requirements/Work Requirements → Section C, SOO → Section C, Proposal Instructions/Submission Requirements → Section L, Selection Criteria/Evaluation Methodology/Source Selection Plan → Section M
 
-2.SUBMISSION_INSTRUCTION:
-Signals: page limit,font size,margins,proposal shall,volume structure,submit by,electronic submission,format requirements,Times New Roman 12pt,1-inch margins,PDF format,email submission,deadlines
-Structure: Maps to evaluation factors (Technical Volume addresses Factor 2)
-Location: Section L primary, EMBEDDED within Section M (common!), Proposal Instructions,Submission Requirements
-Attributes: page_limit, format_reqs (font,margins,file format), volume (Volume I/II/III)
-CRITICAL: Extract SEPARATE entity when embedded in evaluation factor descriptions, link via GUIDES relationship
+Agency-Specific Variations:
+Scope of Work/PWS → Section C (statement_of_work), Special Contract Requirements → Section H (requirement), Applicable Clauses → Section I (clause), Required Certifications → Section K (requirement)
 
-3.REQUIREMENT:
-Criticality by SUBJECT (check WHO performs action):
-- MANDATORY: Contractor/Offeror shall/must/will (contractor obligation)
-- INFORMATIONAL: Government/Agency shall/will (NOT contractor requirement!)
-- IMPORTANT: Contractor should/encouraged/preferred
-- OPTIONAL: Contractor may/can/has option to
+Content-Based Detection Signals:
+EVALUATION_FACTOR: keywords{will be evaluated, evaluation factor, most important, adjectival rating, source selection, significantly more important} structures{Factor M1/M2, Point scores, Ratings: Excellent/Good/Acceptable}
+SUBMISSION_INSTRUCTION: keywords{page limit, font size, proposal shall, volume structure, submit by, electronic submission} structures{25 pages max, 12pt Times New Roman, 1-inch margins}
+CLAUSE: patterns{FAR 52.###-##, DFARS 252.###-####, AFFARS 5352.###-##} keywords{incorporated by reference, clause title, full text}
+STATEMENT_OF_WORK: keywords{contractor shall perform, task descriptions, performance objectives} structures{Task 1.0/1.1/1.1.1, SOW/PWS/SOO labels}
+
+Mixed Content Handling:
+Ex1 Section M with embedded instructions: Extract BOTH evaluation_factor "Factor 1" AND submission_instruction "Technical Volume page limit" + link GUIDES relationship
+Ex2 Section C as attachment: Extract section "Section C" + document "Attachment J-0200000-18" + statement_of_work "PWS" + link REFERENCES/CONTAINS relationships
+
+Section Attribution Rules:
+Clauses: All FAR/DFARS → Section I, Reps/certs (52.2##-##) → Section K
+Annexes: J-###### → Section J, Attachment # → Section J, Annex ## → Section J/standalone, Letter prefix → Corresponding section (A-#### → Section A)
+Requirements: Default Section C (SOW), Unless "Section H" → Special Requirements, Or Section I/K → Clauses/Certifications
+
+ENTITY TYPE 1: EVALUATION_FACTOR
+Signals: will be evaluated, evaluation factor, adjectival rating, most important, significantly more important
+Patterns: Hierarchy{Factor 1→Subfactor 1.1→1.1.1}, Numbering{M1/M2/M2.1}, Ratings{Excellent/Good/Acceptable/Marginal/Unacceptable}
+Context: Point scores (100 points total), Relative importance, Tradeoff methodology
+Location: PRIMARY Section M (Evaluation Factors), ALTERNATE Section L (embedded), NON-STANDARD Selection Criteria/Source Selection Plan
+Metadata: importance, subfactors, weight (%, points, fraction)
+
+ENTITY TYPE 2: SUBMISSION_INSTRUCTION
+Signals: page limit, font size, margins, format requirements, volume structure, proposal shall address, management volume limited to
+Patterns: Maps to factors (Technical Volume→Factor 2), Deadlines, Electronic/hard copy, Volume structure (Vol I/II)
+Context: PDF/Word requirements, Email addresses, Due dates/times
+Location: PRIMARY Section L (Instructions to Offerors), ALTERNATE Section M (EMBEDDED - common!), NON-STANDARD Proposal Instructions/Submission Requirements
+CRITICAL: Embedded Instructions Pattern - Create SEPARATE submission_instruction entity when found WITHIN evaluation_factor + link GUIDES relationship
+Metadata: page_limit, format_reqs, volume
+
+ENTITY TYPE 3: REQUIREMENT (with Classification)
+Criticality Detection (CHECK SUBJECT!):
+MANDATORY (Priority 100): "Contractor shall/must/will" + Contractor/Offeror subject → Extract as requirement
+INFORMATIONAL (Priority 0): "Government will/shall" + Government/Agency subject → Extract as CONCEPT (NOT requirement!)
+IMPORTANT (Priority 75): "should/encouraged to/preferred" + Contractor subject → Extract as requirement
+OPTIONAL (Priority 25): "may/can/option to" + Contractor subject → Extract as requirement
 
 Type Classification:
-FUNCTIONAL: provide,deliver,perform,execute + service/product
-PERFORMANCE: SLA language,metrics,measurable outcomes (99.9% uptime,response within 24 hours,first-time fix rate ≥95%)
-SECURITY: NIST,FedRAMP,clearance levels,cybersecurity (FedRAMP Moderate,Secret clearance,NIST 800-53,CMMC Level 2)
-TECHNICAL: Technology stack,platforms,software versions,infrastructure (AWS GovCloud,Java 11,PostgreSQL,Kubernetes)
-INTERFACE: Integration points,APIs,data exchange,system connections (integrate with ERP,HTTPS/TLS 1.3,RESTful API,FHIR-compliant)
-MANAGEMENT: Reporting,governance,oversight,project management (monthly status reports,Agile/Scrum,PMI-certified PM,weekly COR meetings)
-DESIGN: Standards compliance,architectural mandates,constraints (Section 508,agency branding,microservices,responsive web design)
-QUALITY: QA processes,testing,verification,validation (automated test coverage ≥80%,ISO 9001,peer code review,UAT)
+FUNCTIONAL: provide/deliver/perform/execute + service/product (24/7 help desk, preventive maintenance, monthly reports)
+PERFORMANCE: SLA language, metrics, measurable outcomes (99.9% uptime, 24hr response, 1000 transactions/hr, 95% fix rate)
+SECURITY: NIST/FedRAMP/clearance/cybersecurity (FedRAMP Moderate, Secret clearance, NIST 800-53, CMMC Level 2)
+TECHNICAL: Tech stack, platforms, software versions, infrastructure (AWS GovCloud, Java 11+, PostgreSQL, Kubernetes)
+INTERFACE: Integration, data exchange, APIs, connections (ERP integration, HTTPS/TLS 1.3, RESTful API OAuth 2.0, FHIR)
+MANAGEMENT: Reporting, governance, oversight, PM (monthly reports, Agile/Scrum, PMI-certified PM, weekly meetings)
+DESIGN: Standards compliance, architecture, design constraints (Section 508, branding guidelines, microservices, responsive)
+QUALITY: QA processes, testing, verification (80% test coverage, ISO 9001, peer review, UAT)
 
-Attributes: criticality (MANDATORY/IMPORTANT/OPTIONAL/INFORMATIONAL), modal_verb (exact verb), req_type (8 types above), labor_drivers (volumes,frequencies,shifts,quantities,customer counts for BOE - CRITICAL!), material_needs (equipment,supplies,facilities)
+Metadata: criticality[MANDATORY|IMPORTANT|OPTIONAL], modal_verb[shall|should|may], req_type, labor_drivers, material_needs
 
-4.PERFORMANCE_METRIC:
-Signals: Acceptable Quality Level (AQL),Quality Assurance Surveillance Plan (QASP),Performance Requirement Summary (PRS),surveillance metrics,inspection measurements,performance objectives,quality standards,thresholds,measurement methods
-Examples: 99.9% uptime,<2 errors,within 24 hours,first-time fix rate ≥95%,equipment availability ≥95%,MTBF ≥500 hours
-Attributes: threshold (specific value/limit), measurement_method (how calculated/inspected)
-Differentiation: performance_metric has measurable threshold, requirement is obligation
+ENTITY TYPE 4: PROGRAM
+Purpose: Top-level organizational container for major acquisition program/initiative/system
+Signals: Program names in title, Major acquisition titles, Portfolio initiatives, System names
+Patterns: Full names{Marine Corps Prepositioning Program II, Navy MBOS}, Acronyms{MCPP II, Navy MBOS, AFLMI}, System names{F-35 Lightning II, Joint Strike Fighter}
+Hierarchy: TOP-LEVEL container that CONTAINS requirements/deliverables/technologies/SOW/sections
+Relationships: SECTION(C)→CONTAINS→PROGRAM, PROGRAM→CONTAINS→REQUIREMENT/TECHNOLOGY/DELIVERABLE
+Detection: Document title, Section C header/SOW intro, Capitalized/emphasized primary subject, Referenced throughout as umbrella
 
-5.STATEMENT_OF_WORK:
-Semantic equivalence: SOW (prescriptive HOW) = PWS (performance-based WHAT) = SOO (objective-based WHY)
-Signals: Task descriptions,performance objectives,deliverables lists,contractor shall perform,Task numbering (1.0,1.1,1.1.1),SOW/PWS/SOO labels,work scope,outcomes
-Structure: Hierarchical task breakdown
-Location: Section C primary, Attachment J-#### PWS, embedded in Section C subsection
-Content-based: Work scope/tasks/objectives/deliverables, not labels alone
+ENTITY TYPE 5: STATEMENT_OF_WORK
+CRITICAL: Semantic Equivalence - entity type statement_of_work represents ANY of:
+SOW (Prescriptive, detailed, HOW to perform): "Contractor shall mow grass weekly using rotary mower 3-inch blade"
+PWS (Performance-based, WHAT outcomes, contractor chooses HOW): "Maintain grounds to standard X (50% green, no weeds >6in)"
+SOO (Objective-based, WHY/objectives, contractor creates PWS): "Objective: Aesthetically pleasing grounds consistent with Navy image"
+Signals: Task descriptions, Performance objectives, Deliverables, Work scope, Outcomes
+Structure: Hierarchical - SOW{Task 1→1.1→1.1.1}, PWS{Objective 1→Standard 1.1→Metric 1.1.1}, SOO{Goal 1→Objective 1.1→Criterion 1.1.1}
+Identifiers: PWS/Performance Work Statement, SOW/Statement of Work, SOO/Statement of Objectives, Section C, Attachment X-PWS
+Location: PRIMARY Section C, ALTERNATE J-#### PWS attachment, EMBEDDED Section C subsection
+Detection: CONTENT-BASED (work scope/tasks/objectives/deliverables, task hierarchy/numbering, performance standards/metrics, deliverable schedules)
+Metadata: work_type[SOW|PWS|SOO], location, performance_standards, prescription_level
 
-6.DELIVERABLE:
-Signals: CDRL patterns (A###,B###,####), DD Form 1423,Contract Data Requirements List,submission schedules,report frequencies,deliverable formats,shall submit/deliver/provide
-Examples: CDRL A001 Monthly Status Report,Quarterly Review,System Design Document,Technical Manual,Deployed Application,Training Materials
-Context: Near submission schedules (due 5th business day), listed in deliverables sections, referenced in SOW tasks, DD Form 1423 mentions
-Location: Section J attachments (CDRL lists), Section C SOW (embedded in tasks), requirements text
-Attributes: CDRL identifiers,due dates preserved in natural language description
+ENTITY TYPE 6: ANNEX/ATTACHMENT (entity_type: document)
+Patterns: J-######{J-0200000-18 Equipment List}, Attachment #{Attachment 5 Site Map}, Annex ##{Annex 17 Transportation}, Appendix X{Appendix C Data Dictionary}, X-######{A-1234567 Specifications}
+Link to Parent: J-####→Section J, Attachment #→Section J, Annex ##→Section J/standalone, Prefix letter→Corresponding section (A-####→Section A)
+Content Determines Subtype: Can contain SOW/PWS, Technical specs, Maps/diagrams, Data sheets, Sample docs, Contract clauses
+Metadata: prefix_pattern, content_type, parent_section
 
-7.CLAUSE:
-Patterns (26+ agency supplements):
-FAR: FAR 52.###-## (Federal Acquisition Regulation base)
-DFARS: DFARS 252.###-#### (Defense supplement)
-AFFARS: AFFARS 5352.###-## (Air Force supplement)
-NMCARS: NMCARS 5252.###-#### (Navy/Marine Corps supplement)
-Others: HSAR,DOSAR,GSAM,VAAR,DEAR,NFS,AIDAR,CAR,DIAR,DOLAR,EDAR,EPAAR,FEHBAR,HHSAR,HUDAR,IAAR,JAR,LIFAR,NRCAR,SOFARS,TAR (22+ additional)
-Signals: Agency patterns above,incorporated by reference,clause title,full text
-Attribution: FAR 52.### -> Section I (Contract Clauses), 52.2##-# (Reps/Certs) -> Section K
-Attributes: clause_number (extract from pattern), regulation (FAR/DFARS/AFFARS/etc from prefix)
+ENTITY TYPE 7: CLAUSE
+Patterns (26+ Agency Supplements):
+MAJOR: FAR 52.###-##, DFARS 252.###-####, AFFARS 5352.###-##, NMCARS 5252.###-####
+OTHER 22+: HSAR (Homeland Security), DOSAR (State), GSAM (GSA), VAAR (VA), DEAR (Energy), NFS (NASA), AIDAR (USAID), CAR (Commerce), DIAR (USDA), DOLAR (Labor), EDAR (Education), EPAAR (EPA), FEHBAR (HHS Federal Employees), HHSAR (HHS), HUDAR (HUD), IAAR (Interior), JAR (Justice), LIFAR (Broadcasting), NRCAR (Nuclear Regulatory), SOFARS (State/Broadcasting), TAR (Treasury), plus others
+Recognition: Extract supplement from clause number (FAR 52.212-4→supplement=FAR, DFARS 252.204-7012→supplement=DFARS)
+Clustering: Link to parent section (FAR 52.###→Section I Contract Clauses, Representation clauses→Section K), Group similar (all 52.2##-# Supplies/Services together, all security clauses together)
+Metadata: clause_number, regulation, section_attribution, incorporation_method, date
 
-8.STRATEGIC_THEME:
-Types:
-CUSTOMER_HOT_BUTTON: Agency priorities,pain points,mission pressures (Readiness is Navy's top priority,Cybersecurity critical concern)
-DISCRIMINATOR: Competitive advantages,unique capabilities (Only offeror with on-site repair,Proprietary predictive maintenance AI)
-PROOF_POINT: Evidence supporting claims (99.8% uptime on similar Navy contract,CPARS Exceptional rating,CMMI Level 3 certified)
-WIN_THEME: THEME + DISCRIMINATOR + PROOF + BENEFIT (Mission Readiness Through Predictive Maintenance = Proprietary AI + 40% downtime reduction + ensures aircraft availability)
-Attributes: theme_type (4 types above)
+ENTITY TYPE 8: SECTION
+Extract BOTH Structural AND Semantic:
+Structural Label: What document calls it
+Semantic Type: What it actually IS
+UCF Standard: A{SOLICITATION_FORM}, B{SUPPLIES_SERVICES}, C{DESCRIPTION_SPECS}, H{SPECIAL_REQUIREMENTS}, I{CONTRACT_CLAUSES}, J{ATTACHMENTS}, K{REPRESENTATIONS}, L{SUBMISSION_INSTRUCTIONS}, M{EVALUATION_CRITERIA}
+Non-Standard Mapping: Selection Criteria→Section M (EVALUATION_CRITERIA), Technical Requirements→Section C (DESCRIPTION_SPECS), Proposal Instructions→Section L (SUBMISSION_INSTRUCTIONS), RFQ→Section A (SOLICITATION_FORM), Statement of Work→Section C (DESCRIPTION_SPECS)
+Note Mixed Content: Ex Section M with evaluation criteria AND submission instructions → structural_label=Section M, semantic_type=EVALUATION_CRITERIA, also_contains=[SUBMISSION_INSTRUCTION]
+Metadata: structural_label, semantic_type, also_contains, confidence
 
-9.DOCUMENT:
-Signals: Attachment references (Attachment 1,J-0200000-18,Annex A,Exhibit B), referenced documents (See Section X,incorporated by reference), standards (MIL-STD-882E,ISO 9001,NIST SP 800-53), forms (SF 1449,DD Form 254), prior contracts
-Patterns: J-####,Attachment #,Annex ##,MIL-STD-###,ISO ####,NIST SP ###-##,SF ###,DD ###
-Context: See Attachment X,incorporated by reference,listed in Section J,reference documents include
-Location: Section J primary, throughout RFP (referenced docs), requirements citing standards
-Attribution: J-#### -> Section J, Attachment # -> Section J, Annex -> Section J or standalone, prefix letter -> corresponding section (A-#### -> Section A)
+ENTITY TYPE 9: STRATEGIC_THEME
+CRITICAL: Extract during ingestion, NOT query-time. Strategic themes enable competitive intelligence.
 
-10.SECTION:
-Extract structural label AND semantic type:
-A(Solicitation/Contract Form): SOLICITATION_FORM
-B(Supplies/Services): SUPPLIES_SERVICES
-C(Statement of Work): DESCRIPTION_SPECS
-H(Special Requirements): SPECIAL_REQUIREMENTS
-I(Contract Clauses): CONTRACT_CLAUSES
-J(Attachments): ATTACHMENTS
-K(Representations): REPRESENTATIONS
-L(Instructions to Offerors): SUBMISSION_INSTRUCTIONS
-M(Evaluation Factors): EVALUATION_CRITERIA
+Classification (Extract from RFP):
+CUSTOMER_HOT_BUTTON: Agency priorities/pain points/mission pressures extracted from RFP text
+Primary Signals - Emphasis Language:
+  Tier 1 Urgency: critical, essential, vital, paramount, cornerstone, imperative, mandatory, fundamental
+  Tier 2 Importance: important, significant, key, major, substantial, primary, principal
+  Tier 3 Priority: priority, focus, emphasis, concern, objective, goal
+  Mission Language: mission-critical, mission-essential, operational readiness, combat readiness, national security
+  Consequence Language: failure is not an option, zero tolerance, cannot accept, unacceptable, must not fail
+Structural Signals - Repetition & Weight:
+  Repetition: Concept mentioned 3+ times across Sections C/H/L/M → high priority
+  Evaluation Weight: ≥30% → hot button, ≥40% → critical hot button
+  Adjectival Escalation: Most Important (highest) > Significantly More Important > More Important > Important
+  Subfactor Count: 3+ subfactors → complex/critical area
+  Page Limit: ≥40% total pages to one volume → priority area
+Sentiment Context Patterns:
+  Near problem statements: current challenges, requires improvement, deficiencies, gaps
+  Near performance metrics: must achieve, required to maintain, shall not fall below
+  Near risk language: risk of, potential for failure, vulnerability, concern regarding
+  Near compliance: regulatory requirement, statutory mandate, contractual obligation
+Detection Algorithm: IF (emphasis_keyword AND mentioned_3plus_times) OR (evaluation_factor.weight≥0.30) OR (adjectival_rating==Most Important) OR (section_M_subfactor_count≥3) OR (section_L_page_allocation≥0.40) THEN extract as CUSTOMER_HOT_BUTTON
+Example: {"entity_name":"Cybersecurity and Data Protection","entity_type":"strategic_theme","description":"CUSTOMER_HOT_BUTTON: Cybersecurity identified as critical concern with 'zero tolerance for data breaches' in Section C. Mentioned 7 times across PWS. Factor M1 (40%, Most Important) evaluates cybersecurity with 4 subfactors (NIST 800-53, incident response, continuous monitoring, supply chain risk). Technical Volume 35 of 75 pages (47%). Signals: HIGH PRIORITY, MISSION-CRITICAL, COMPLEX.","theme_type":"CUSTOMER_HOT_BUTTON","priority_score":95,"evidence":{"emphasis_keywords":["critical concern","zero tolerance","mission-critical","paramount importance"],"mention_count":7,"sections_referenced":["Section C.3.2","Section H.1","Section M Factor 1"],"evaluation_weight":"40%","adjectival_rating":"Most Important","subfactor_count":4,"page_allocation":"35 of 75 pages (47%)"}}
 
-Non-standard mapping: Selection Criteria -> Section M, Technical Requirements -> Section C, Proposal Instructions -> Section L, Request for Quote -> Section A, Statement of Work -> Section C
-Mixed content: Some sections contain multiple types (Section M with embedded submission instructions)
+PAIN_POINT: Current contractor issues/incumbent weaknesses/agency frustrations extracted from RFP text
+Problem Language Signals:
+  Performance Gaps: below standard, requires enhancement, must be improved, not meeting expectations, deficiencies identified
+  Current Challenges: current challenges include, issues with existing contractor, limitations of current approach
+  Improvement Requests: improvements needed, enhancements required, better approach needed, alternative solutions desired
+  Failure Indicators: past failures, recurring issues, persistent problems, continued deficiencies
+Incumbent Reference Patterns:
+  Direct: previous contractor, current contract, incumbent contractor, existing service provider
+  Transition Language: transition from current contractor, replace existing approach, new contractor shall correct
+  Lessons Learned: avoid issues experienced under current contract, based on past contract challenges
+Structural Indicators: Section H special requirements remediating past issues, Section M criteria emphasizing lessons learned from previous contract, Section C PWS tasks labeled corrective measures/improvement areas, Q&A responses revealing incumbent problems
+Detection Algorithm: IF (problem_language AND incumbent_reference) OR (section_H_special_requirement AND current contractor) OR (section_M_criteria AND lessons learned) OR (qa_response_reveals_issue) THEN extract as PAIN_POINT
+Example: {"entity_name":"On-Time Delivery Deficiencies","entity_type":"strategic_theme","description":"PAIN_POINT: Section C.1 Background states 'current contractor achieved only 87% on-time delivery, below required 95%.' Section M Factor 2 (Past Performance - 30%) emphasizes 'demonstrated on-time delivery record on similar contracts' with subfactor on delivery schedule adherence metrics. Section H.3 requires 'corrective action plan for late deliveries within 24 hours.' Signals: INCUMBENT WEAKNESS, COMPETITIVE OPPORTUNITY, MEASURABLE GAP (87% vs 95%).","theme_type":"PAIN_POINT","priority_score":85,"evidence":{"incumbent_performance":"87% on-time delivery","required_standard":"95% on-time delivery","performance_gap":"-8%","sections_referenced":["Section C.1","Section M Factor 2","Section H.3"],"evaluation_weight":"30%","corrective_language":["corrective action plan","shall improve upon","better performance required"]}}
 
-11.PROGRAM:
-Purpose: Top-level organizational container for major acquisition/initiative/system
-Signals: Program names in title,major acquisition titles,portfolio-level initiatives,system names
-Examples: Marine Corps Prepositioning Program II (MCPP II), Navy Mobile Bay Organic Support (Navy MBOS), F-35 Lightning II Program
-Position: Top-level container CONTAINS requirements,deliverables,technologies,SOW,sections
-Context: Appears in document title,Section C header,SOW introduction,emphasized as primary subject,referenced throughout as umbrella
+COMPETITIVE_OPPORTUNITY: Innovation requests/capability gaps/differentiation signals extracted from RFP text
+Innovation Language:
+  Cutting-Edge: innovative, cutting-edge, state-of-the-art, advanced, next-generation, modern, contemporary
+  Best Practices: best practices, industry-leading, proven methodologies, recognized standards, gold standard
+  Improvement Focus: better than current, exceed expectations, enhanced capabilities, superior approach
+Capability Gap Signals:
+  Unique Requirements: unique, specialized, proprietary, exclusive, rare, uncommon, niche
+  Advanced Skills: expert-level, highly specialized, advanced certifications, rare skillsets, hard-to-find
+  Complex Integration: complex system integration, multiple disparate systems, legacy modernization, heterogeneous environment
+Risk Aversion Language (Opportunity for low-risk positioning):
+  Proven Approach: proven, established, validated, tested, reliable, dependable, stable
+  Low-Risk: low-risk, minimal disruption, smooth transition, zero downtime, business continuity
+  Track Record: demonstrated history, past success, proven track record, documented performance
+Detection Algorithm: IF (innovation_language OR capability_gap_language OR risk_aversion_language) AND (evaluation_factor OR requirement) THEN extract as COMPETITIVE_OPPORTUNITY
+Example: {"entity_name":"AI-Powered Predictive Maintenance","entity_type":"strategic_theme","description":"COMPETITIVE_OPPORTUNITY: Section C.3.4 requests 'innovative predictive maintenance approaches using advanced analytics or AI/ML to reduce unscheduled downtime.' Section M Factor 1 Technical Approach (40%, Most Important) subfactor 1.2 evaluates 'innovative maintenance methodologies and emerging technologies.' No specific AI solution mandated - opportunity for proprietary differentiation. Signals: INNOVATION REQUEST, EMERGING TECH, COMPETITIVE DIFFERENTIATOR.","theme_type":"COMPETITIVE_OPPORTUNITY","priority_score":80,"evidence":{"innovation_keywords":["innovative","advanced analytics","AI/ML","emerging technologies"],"capability_gap":"No specific solution mandated - offeror discretion","evaluation_weight":"40%","subfactor":"1.2 Innovative Maintenance Methodologies","differentiation_potential":"Proprietary AI solution can differentiate from competitors"}}
 
-12.ORGANIZATION:
-Signals: Companies (General Dynamics IT,Lockheed Martin,small business names), agencies (DoD,GSA,DLA), military units (Marine Corps,NAVAIR,SPAWAR,I MEF), commands (Naval Air Systems Command), departments (Contracting Office,PMO)
-Patterns: Acronyms (NAVAIR,SPAWAR,GSA), Inc/LLC/Corp suffixes, military designations (I MEF,3rd Battalion)
-Context: Near organizational roles,past performance,teaming arrangements,POC affiliations
+DISCRIMINATOR: Your competitive advantages (NOT extracted from RFP - added during query-time from company data)
+Sources: Company past performance database, Corporate capabilities/certifications, Proprietary methodologies/tools, Team expertise/clearances, Facility locations/equipment
+Examples (reference only - not extracted): Only offeror with on-site repair facility at Naval Station Norfolk, Proprietary AI failure prediction (Patent US-123456), 15 years incumbent Navy MBOS (99.7% on-time), Exclusive OEM partnership with GE Aviation
 
-13.CONCEPT:
-Signals: Budget/pricing (CLIN 0001,Base Year Services,Option Period 2), technical concepts (Agile Development,DevSecOps,Zero Trust), business concepts (Small Business Set-Aside,Joint Venture), processes (Change Control,Risk Management), abstract ideas (Readiness,Sustainability), definitions (terms being defined)
-Patterns: CLIN/SLIN numbering (CLIN 0001,SLIN 0001AA), abstract nouns (no physical form), process names ending in -ing or Process
-Context: Near definitions (means,defined as,refers to), glossary sections, pricing tables, conceptual discussions
-Differentiation: NOT concept if physical item with model# (equipment), scheduled activity (event), named military unit (organization), software with version (technology). IS concept if abstract idea/process, business term/methodology, CLIN/budget item, term being defined
+PROOF_POINT: Evidence supporting competitive claims (NOT extracted from RFP - added during query-time from company data)
+Sources: Past performance metrics (CPARs, testimonials), Certifications (ISO 9001, CMMI, FedRAMP), Corporate awards/recognition, Measurable outcomes (99.8% uptime, 40% cost reduction)
+Examples (reference only - not extracted): 99.8% uptime on Navy contract N00024-18-C-1234 (2018-2023), CPARS rating Exceptional all categories, CMMI Level 3 certified since 2015, Reduced unscheduled downtime 40% on Marine Corps contract
 
-14.EQUIPMENT:
-Signals: Model numbers (M1A1 Tank,Concorde RG-24,6200 Tennant Floor Scrubber), military equipment (TAMCN numbers,NSN), physical assets (Generator Set,HVAC System,Forklift), vehicles (HMMWV,MRAP,Aircraft), hardware (Servers,Workstations,Network Equipment)
-Patterns: Model# with alphanumerics (M1A1,RG-24,6200), TAMCN (5-char codes), NSN (####-##-###-####), Make/Model format
-Context: Near maintenance language,equipment lists,quantities (100 each,12 units),physical descriptions (weight,dimensions)
-Differentiation: EQUIPMENT = physical item you can touch (M1A1 Tank,Generator Set,Server Hardware), TECHNOLOGY = software/system/platform (Windows Server 2022,ServiceNow Platform,SINCGARS Radio System)
+WIN_THEME: Strategic messaging (CONSTRUCTED during query-time, not extracted from RFP)
+Structure: CUSTOMER_HOT_BUTTON (from RFP) + DISCRIMINATOR (your strength) + PROOF_POINT (your evidence) + CUSTOMER_BENEFIT (outcome)
+Example Construction: RFP Hot Button (extracted) "On-time delivery critical - current 87%" + Your Discriminator (company data) "15 years Navy MBOS experience" + Your Proof Point (company data) "99.7% on-time delivery, 12 contracts" + Customer Benefit (derived) "Zero late deliveries, mission readiness" = WIN THEME "You will eliminate late delivery risks through our proven 99.7% on-time delivery rate, validated by 15 years and 12 Navy MBOS contracts, ensuring mission readiness where current contractor's 87% rate created operational gaps."
 
-15.TECHNOLOGY:
-Signals: Software (Windows Server 2022,Oracle Database 19c,Python 3.11), platforms (AWS GovCloud,Azure Government,ServiceNow), systems (SINCGARS Radio System,GCSS-MC,TBMCS), protocols (TLS 1.3,HTTPS,SFTP), standards (IPv6,802.11ac,Ethernet)
-Patterns: Version numbers (Windows 10,Python 3.11,TLS 1.3), acronyms for systems (GCSS-MC,TBMCS,DEERS), platform names (AWS,Azure,ServiceNow)
-Context: Near technical requirements,system architecture,software stack,IT infrastructure
-Differentiation: TECHNOLOGY = software/logical system/protocol (AWS GovCloud,SINCGARS System,Windows Server), EQUIPMENT = physical hardware (Dell Server,SINCGARS Radio Unit,Network Switch)
+Metadata Fields to Extract (ALL strategic_theme entities):
+{"entity_name":"Descriptive theme name","entity_type":"strategic_theme","description":"Full context including theme_type prefix, evidence, signals, competitive implications","theme_type":"CUSTOMER_HOT_BUTTON|PAIN_POINT|COMPETITIVE_OPPORTUNITY","priority_score":0-100,"evidence":{"emphasis_keywords":["keyword1","keyword2"],"mention_count":5,"sections_referenced":["Section C.1","Section M Factor 2"],"evaluation_weight":"30%","adjectival_rating":"Most Important|Significantly More Important|More Important|Important","performance_gap":"Current: 87%, Required: 95%, Gap: -8%","innovation_signals":["innovative","cutting-edge"],"risk_signals":["proven","low-risk"]}}
 
-16.EVENT:
-Signals: Milestones (Kickoff Meeting,Final Delivery,Contract Award), scheduled activities (Monthly Review,Quarterly Assessment,Annual Update), deadlines (Q&A Deadline: March 15 2025,Proposal Due Date), periods (Base Period,Option Year 2,Ship Availability), processes with timing (CAL Signing,Annual Inspection)
-Patterns: Dates (March 15 2025,30 days after award), recurring patterns (Monthly,Quarterly,Annual), event + timing (Review 15 days,Meeting 30 days after award)
-Context: Calendar dates,time-bound language (within X days,by date),scheduling sections,milestone charts
-Differentiation: EVENT = scheduled time-bound activity (Monthly Review,Kickoff Meeting,Annual Update), CONCEPT = process without schedule (Review Process,Meeting Protocol,Update Procedure)
+Detection Priority (extract in this order):
+1. High-Priority Hot Buttons (evaluation weight ≥40%, Most Important, mentioned 5+ times)
+2. Pain Points (incumbent issues, performance gaps, corrective requirements)
+3. Medium-Priority Hot Buttons (evaluation weight 20-39%, mentioned 3-4 times)
+4. Competitive Opportunities (innovation requests, capability gaps)
+5. Low-Priority Themes (mentioned 1-2 times, no evaluation linkage)
 
-17.PERSON:
-Signals: Names (Jane Smith,John Doe,CDR Michael Johnson), titles (Contracting Officer,Program Manager,COR,Technical POC), roles (Key Personnel,Project Lead,Security Officer), contact info (near email,phone,office)
-Context: Contact: Name, POC: Title/Name, signature blocks, key personnel sections
+CRITICAL: Theme classification, priority scoring, evidence extraction are NOT query-time activities. Extract ALL during entity extraction to enable powerful competitive intelligence queries.
 
-18.LOCATION:
-Signals: Bases (Naval Air Station Pensacola,Camp Lejeune,Fort Bragg), cities/states (Arlington VA,San Diego CA), facilities (Building 123,Warehouse 5,Depot Maintenance), geographic areas (CONUS,OCONUS,PACOM AOR), countries (Host Nation,Japan,Germany)
-Context: Near performance location,delivery addresses,site visit info,geographic scoping
+ENTITY TYPE 10: DELIVERABLE
+Signals: CDRL References{CDRL A001, CDRL 6022, DD Form 1423}, Report Types{Monthly Status Report, Quarterly Review, Final Report}, Documentation{System Design Document, Technical Manual, User Guide}, Work Products{Deployed Application, Training Materials, Test Results}, Submission Language{shall submit, shall deliver, shall provide}
+Patterns: CDRL numbering{A001, B012, 6022}, Series{8000 Series deliverables}, Explicit labels{Deliverable 1.2, Work Product 3}
+Context: Submission schedules (due 5th business day), List of Deliverables sections, SOW task references (Task 1.2 deliverable), DD Form 1423 mentions
+Location: PRIMARY Section J attachments (CDRL lists), ALTERNATE Section C SOW (embedded in tasks), EMBEDDED Requirements text (contractor shall deliver)
+Metadata: cdrl_identifier, due_date (natural language)
 
-RELATIONSHIP TYPES (directed, explicitly stated or strongly implied):
-EVALUATED_BY: submission_instruction -> evaluation_factor (proposal section maps to criterion)
-GUIDES: submission_instruction -> entity (instruction governs format/content)
-CHILD_OF: entity -> parent (hierarchical: Subfactor 1.1 -> Factor 1)
-ATTACHMENT_OF: document -> section (annex belongs to section)
-CONTAINS: document -> statement_of_work (attachment contains SOW)
-REFERENCES: section -> document (section cites external doc)
-PRODUCES: requirement -> deliverable (task generates deliverable)
-REQUIRES: requirement -> deliverable (task needs deliverable)
-SPECIFIES: clause -> requirement (regulation mandates requirement)
-APPLIES_TO: clause -> section (regulation governs section)
-MEASURED_BY: requirement -> performance_metric (requirement has quality threshold)
-SUPPORTS: strategic_theme -> evaluation_factor (win theme aligns with criterion)
+ENTITY TYPE 11: DOCUMENT
+Signals: Attachment References{Attachment 1, J-0200000-18, Annex A, Exhibit B}, Referenced Documents{See Section X, Incorporated by reference}, Standards{MIL-STD-882E, ISO 9001, NIST SP 800-53}, Forms{SF 1449, DD Form 254, Standard Form 30}, Prior Documents{Previous contract N00024-18-C-1234}
+Patterns: Attachment numbering{J-####, Attachment #, Annex ##}, Standard identifiers{MIL-STD-###, ISO ####, NIST SP ###-##}, Form numbers{SF ###, DD ###}
+Context: See Attachment X, Incorporated by reference, Listed in Section J, Reference documents include
+Location: PRIMARY Section J (List of Attachments), ALTERNATE Throughout RFP (referenced docs), EMBEDDED Requirements citing standards
+Metadata: document_number, reference_location
 
-QUALITY VALIDATION (before finalizing extraction):
-✅ No orphan entities (every entity links to at least one other)
-✅ Consistent naming (canonicalization: ISS and Installation Support Services (ISS) -> use Installation Support Services (ISS) for BOTH, NOT two entities)
-✅ Metadata completeness (critical fields populated: subfactors,criticality,modal_verb,labor_drivers,etc)
-✅ Subject validation (Government shall != MANDATORY, it's INFORMATIONAL)
-✅ Content over labels (verify Section M actually contains evaluation criteria, not just trusting label)
-✅ Required fields: entity_name (descriptive not generic), entity_type (valid from 18-type ontology), description (natural language min 20 chars)
-✅ Cross-reference integrity: EVALUATION_FACTOR.factor_id -> SUBMISSION_INSTRUCTION.guides_factor, REQUIREMENT -> EVALUATION_FACTOR relationship, ANNEX prefix -> parent SECTION linkage, CLAUSE -> SECTION attribution
-✅ Modal verb matches criticality (shall=MANDATORY, should=IMPORTANT, may=OPTIONAL)
+ENTITY TYPE 12: CONCEPT
+Signals: Budget/Pricing{CLIN 0001, Base Year Services, Option Period 2}, Technical Concepts{Agile Development, DevSecOps, Zero Trust Architecture}, Business Concepts{Small Business Set-Aside, Joint Venture, Teaming Arrangement}, Processes{Change Control Process, Risk Management, Quality Assurance}, Abstract Ideas{Readiness, Sustainability, Interoperability}, Definitions{Terms being defined in glossary/text}
+Patterns: CLIN/SLIN numbering{CLIN 0001, SLIN 0001AA}, Abstract nouns (no physical form), Process names (-ing/Process suffix), Methodologies/frameworks
+Context: Near definitions (means, defined as, refers to), Glossary sections, Pricing tables (CLINs), Conceptual discussions (not physical items)
+Differentiation: NOT concept if physical item with model→equipment, scheduled activity→event, named military unit→organization, software with version→technology. IS concept if abstract idea/process, business term/methodology, CLIN/budget line, term being defined
+Metadata: abstract_nature (in description)
+
+ENTITY TYPE 13: EQUIPMENT
+Signals: Model Numbers{M1A1 Tank, Concorde RG-24, 6200 Tennant Floor Scrubber}, Military Equipment{TAMCN numbers, End Item codes, NSN National Stock Number}, Physical Assets{Generator Set, HVAC System, Forklift, Test Equipment}, Vehicles{HMMWV, MRAP, Aircraft, Ships}, Hardware{Servers, Workstations, Network Equipment}
+Patterns: Model numbers{M1A1, RG-24, 6200}, TAMCN format{5-char codes}, NSN format{####-##-###-####}, Make/model{Manufacturer ModelNumber}
+Context: Near maintenance language, Equipment lists/inventories, Quantities (100 each, 12 units), Physical descriptions (weight, dimensions, specs)
+Differentiation: EQUIPMENT=physical item you can touch (M1A1 Tank, Generator Set, Server Hardware), TECHNOLOGY=software/system/platform (Windows Server 2022, ServiceNow Platform, SINCGARS Radio System as system concept)
+Metadata: model_numbers, specifications
+
+ENTITY TYPE 14: TECHNOLOGY
+Signals: Software{Windows Server 2022, Oracle Database 19c, Python 3.11}, Platforms{AWS GovCloud, Azure Government, ServiceNow}, Systems{SINCGARS Radio System, GCSS-MC, TBMCS}, Protocols{TLS 1.3, HTTPS, SFTP}, Standards{IPv6, 802.11ac, Ethernet}
+Patterns: Version numbers{Windows 10, Python 3.11, TLS 1.3}, Acronyms for systems{GCSS-MC, TBMCS, DEERS}, Platform names{AWS, Azure, ServiceNow}
+Context: Near technical requirements, System architecture descriptions, Software stack discussions, IT infrastructure sections
+Differentiation: TECHNOLOGY=software/logical system/protocol (AWS GovCloud, SINCGARS System, Windows Server), EQUIPMENT=physical hardware (Dell Server, SINCGARS Radio Unit, Network Switch)
+Metadata: versions, platforms
+
+ENTITY TYPE 15: ORGANIZATION
+Signals: Companies{General Dynamics IT, Lockheed Martin, Small Business Name}, Agencies{Department of Defense, GSA, DLA}, Military Units{Marine Corps, NAVAIR, SPAWAR, I MEF}, Commands{Naval Air Systems Command, Marine Corps Logistics Command}, Departments{Contracting Office, Program Management Office}
+Patterns: Acronyms{NAVAIR, SPAWAR, GSA, DLA}, Inc./LLC/Corp. suffixes, Military designations{I MEF, 3rd Battalion}, Command structures
+Context: Near organizational roles, Past performance descriptions, Teaming arrangements, POC affiliations
+Metadata: acronyms, full_names
+
+ENTITY TYPE 16: EVENT
+Signals: Milestones{Kickoff Meeting, Final Delivery, Contract Award}, Scheduled Activities{Monthly Review, Quarterly Assessment, Annual Update}, Deadlines{Q&A Deadline: March 15 2025, Proposal Due Date}, Periods{Base Period, Option Year 2, Ship Availability}, Processes with Timing{CAL Signing, Annual Inspection}
+Patterns: Dates{March 15 2025, 30 days after award}, Recurring{Monthly, Quarterly, Annual}, Event+timing{Review (15 days), Meeting (30 days after award)}
+Context: Calendar dates, Time-bound language (within X days, by date), Scheduling sections, Milestone charts
+Differentiation: EVENT=scheduled time-bound activity (Monthly Review, Kickoff Meeting, Annual Update), CONCEPT=process without schedule (Review Process, Meeting Protocol, Update Procedure)
+Metadata: dates, frequencies (in description)
+
+ENTITY TYPE 17: PERSON and LOCATION
+PERSON Signals: Names{Jane Smith, John Doe, CDR Michael Johnson}, Titles{Contracting Officer, Program Manager, COR, Technical POC}, Roles{Key Personnel, Project Lead, Security Officer}, Contact Info{near email, phone, office}
+PERSON Context: Contact: Name, POC: Title/Name, Signature blocks, Key personnel sections
+LOCATION Signals: Bases{Naval Air Station Pensacola, Camp Lejeune, Fort Bragg}, Cities/States{Arlington VA, San Diego CA}, Facilities{Building 123, Warehouse 5, Depot Maintenance}, Geographic Areas{CONUS, OCONUS, PACOM AOR}, Countries{Host Nation, Japan, Germany}
+LOCATION Context: Near performance location language, Delivery addresses, Site visit info, Geographic scoping
+Metadata: contact_details (person), addresses (location) in description
+
+ENTITY TYPE 18: PERFORMANCE_METRIC (NEW - SPLIT FROM REQUIREMENT)
+Purpose: Measurable performance standards/thresholds separated from requirements for cleaner extraction
+Signals: Quantifiable thresholds{99.9% uptime, ≥95% first-time fix rate, ≤24hr response time}, Measurement methods{Monthly system logs, Quarterly audits, CPARS ratings}, KPIs/SLAs{Mean time to repair (MTTR), Customer satisfaction score, Availability percentage}
+Patterns: Percentage thresholds{≥95%, 99.9%}, Time-based{<24 hours, within 30 days}, Numeric targets{1000 transactions/hr, 80% test coverage}, Comparison operators{≥, ≤, >, <, =}
+Context: Near performance requirements, SLA sections, Quality standards, Acceptance criteria
+Differentiation: PERFORMANCE_METRIC=measurable threshold/KPI (99.9% uptime SLA, <24hr response threshold), REQUIREMENT=work obligation (Contractor shall maintain 99.9% uptime - still extract as requirement, but link to metric via MEASURED_BY)
+Metadata: threshold, measurement_method
+Relationships: REQUIREMENT→MEASURED_BY→PERFORMANCE_METRIC
+
+Priority Order for Entity Extraction:
+1. PROGRAM - Identify top-level program FIRST (context for all others)
+2. SECTION - Map document structure (location context)
+3. EVALUATION_FACTOR - Critical for proposal planning
+4. SUBMISSION_INSTRUCTION - Determines proposal structure
+5. REQUIREMENT - Core work obligations
+6. STATEMENT_OF_WORK - Work scope definition
+7. ANNEX - Supporting documents/references
+8. CLAUSE - Regulatory compliance
+9. STRATEGIC_THEME - Competitive intelligence
+10. Standard Entities - Organizations, concepts, events, etc.
+
+Quality Checks Before Finalizing:
+1. ✅ No orphan entities - Every entity links to ≥1 other entity
+2. ✅ Consistent naming (Canonicalization) - If "ISS" and "Installation Support Services (ISS)" appear, use full form for BOTH (don't create 2 entities for same concept)
+3. ✅ Metadata completeness - Critical fields populated (importance, criticality, etc)
+4. ✅ Subject validation - "Government shall" ≠ MANDATORY requirement (it's INFORMATIONAL/CONCEPT)
+5. ✅ Content over labels - Don't trust "Section M" label; verify contains evaluation criteria
+
+Entity Extraction Quality Validation:
+Required Fields: ✅ entity_name (descriptive, not generic), ✅ entity_type (valid from 18-type ontology), ✅ description (natural language, min 20 chars), ✅ section_origin (traceable location)
+Format: ✅ Dates ISO 8601 (YYYY-MM-DDTHH:MM:SS±HH:MM), ✅ Numbers numeric (not strings), ✅ Booleans true/false (not yes/no strings), ✅ Arrays properly formatted JSON
+Cross-Reference: ✅ evaluation_factor.importance→submission_instruction.guides_factor, ✅ requirement→evaluation_factor relationship, ✅ annex prefix→parent section linkage, ✅ clause→section attribution
+Enum Validation: ✅ criticality∈{MANDATORY,IMPORTANT,OPTIONAL,INFORMATIONAL}, ✅ theme_type∈{CUSTOMER_HOT_BUTTON,DISCRIMINATOR,PROOF_POINT,WIN_THEME}, ✅ modal_verb∈{shall,should,may,must,will,can,encouraged}, ✅ work_type∈{SOW,PWS,SOO}, ✅ agency_supplement∈{FAR,DFARS,AFFARS,NMCARS,HSAR,DOSAR,GSAM,VAAR,DEAR,NFS,AIDAR,CAR,DIAR,DOLAR,EDAR,EPAAR,FEHBAR,HHSAR,HUDAR,IAAR,JAR,LIFAR,NRCAR,SOFARS,TAR} (26+ total)
+Consistency: ✅ Same entity consistent naming across chunks, ✅ Section numbering follows hierarchy, ✅ Requirement IDs unique within document, ✅ Modal verb matches criticality (shall=MANDATORY, should=IMPORTANT, may=OPTIONAL)
+
+18 Allowed Entity Types:
+organization, concept, event, technology, person, location, requirement, clause, section, document, deliverable, program, equipment, evaluation_factor, submission_instruction, strategic_theme, statement_of_work, performance_metric
+
+NEVER use: other, UNKNOWN, process, table, plan, policy, standard, system, regulation, framework
+If uncertain: use concept (catch-all for abstract entities)

@@ -1,0 +1,42 @@
+SEMANTIC CONCEPT LINKING (INFORMS/IMPACTS/DETERMINES/GUIDES/ADDRESSED_BY/RELATED_TO)
+Purpose: Infer implicit relationships for proposal intelligence
+Entities: CONCEPT, STRATEGIC_THEME, EVALUATION_FACTOR
+Status: CORE ALGORITHM (always enabled)
+
+6 RELATIONSHIP PATTERNS:
+1. CONCEPT/THEME --INFORMS--> FACTOR: "past performance"→Proposal Evaluation
+2. CONCEPT --IMPACTS--> CONCEPT: "significant weakness"→overall rating (REDUCES/INCREASES/TRIGGERS)
+3. FACTOR --DETERMINES--> EVENT: Proposal Evaluation→award decision
+4. CONCEPT --GUIDES--> FACTOR: "solicitation requirements"→Proposal Evaluation
+5. THEME --ADDRESSED_BY--> FACTOR: Pain point→factor scoring solution
+6. FACTOR --RELATED_TO--> FACTOR: Adjacent factors (confidence 0.60)
+
+5 SEMANTIC ALGORITHMS:
+1. PAIN POINT→FACTOR (High value): Link customer pain points to evaluation factors
+   "Outdated IT infrastructure" --ADDRESSED_BY--> "Technical Approach 40%"
+2. FACTOR ELEMENT DECOMPOSITION: Break factors into sub-elements
+   "Past Performance" ← relevant contracts, value similarity, performance confidence, recency, scope
+3. ADJACENT FACTOR DISCOVERY: Factors within 5 paragraphs may share criteria (0.60 confidence)
+   "Management Approach" --RELATED_TO--> "Safety" (mentioned adjacently Section M)
+4. PROPOSAL OUTLINE GENERATION: Section-by-section outline by factor weight
+   1. Find REQUIREMENT --EVALUATED_BY--> FACTOR
+   2. Find SUBMISSION_INSTRUCTION --GUIDES--> FACTOR
+   3. Find STRATEGIC_THEME --ADDRESSED_BY--> FACTOR
+   4. Group by requirement_classification, allocate pages by weight
+5. COMPETITIVE ADVANTAGE: High-value opportunities
+   IF factor.weight≥0.30 AND requirement.criticality=MANDATORY AND pain_points>0 THEN competitive edge
+
+CONFIDENCE:
+0.90: Explicit same paragraph
+0.75: Same section
+0.70: Topic alignment
+0.60: Adjacent factors
+
+RULES:
+- Confidence ≥0.60 (lower than structural - these are inferences)
+- Business value required (proposal development use)
+- Avoid over-connection (selective, not every concept→every factor)
+- Adjacent factors: Always explain WHY related
+
+OUTPUT:
+[{"source_id":"concept/theme_id","target_id":"factor/concept_id","relationship_type":"INFORMS|IMPACTS|DETERMINES|GUIDES|ADDRESSED_BY|RELATED_TO","confidence":0.60-0.90,"reasoning":"Explanation + query use case","business_value":"Proposal development help"}]

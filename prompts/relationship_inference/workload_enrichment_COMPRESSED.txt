@@ -1,0 +1,51 @@
+WORKLOAD ENRICHMENT ANALYSIS
+Purpose: Extract workload metadata for labor staffing planning + BOM development
+Output: Enriched requirement entities with BOE categories, labor drivers, material needs, complexity
+
+7 BOE CATEGORIES (standard):
+1. Labor: FTEs, contractors, skill requirements, effort indicators (hours/week, 24/7, shifts)
+   Keywords: staff, personnel, FTE, contractor, labor, workforce, team, operator, technician
+2. Materials: Equipment, supplies, consumables, infrastructure
+   Keywords: equipment, supplies, materials, parts, tools, consumables, goods, inventory
+3. ODCs: Travel, subcontractors, licenses, permits, certifications, training costs
+   Keywords: travel, subcontractor, vendor, training, license, permit, TDY, conference
+4. QA: Inspection, quality control, compliance verification, testing, validation
+   Keywords: inspection, QC, QA, compliance, testing, validation, verification, audit
+5. Logistics: Transportation, delivery, storage, warehousing, supply chain, distribution
+   Keywords: transportation, delivery, shipping, warehousing, storage, distribution
+6. Lifecycle: Maintenance, sustainment, long-term operations, replacement, disposal
+   Keywords: maintenance, sustainment, O&M, lifecycle, replacement, disposal, preventive
+7. Compliance: Regulatory, policy adherence, documentation, reporting, legal obligations
+   Keywords: compliance, regulation, policy, documentation, reporting, legal, FAR, DFARS
+
+LABOR DRIVER ANALYSIS (if Labor category):
+Categories: Management (PM, Task Lead), Technical (Engineers, Analysts), Operations (Technicians, Operators), Administrative (Clerks, Coordinators), Specialized (Security, Medical, QA)
+Effort indicators EXTRACT EXACT: "3 FTE", "24/7 coverage", "8-hour shifts", "40 hours/week", "5000 personnel", frequencies (Daily, Weekly, Monthly, 3x/week), hours (0800-1700, 2000 annual hours)
+EXCLUSION: Do NOT include performance metrics (95% uptime, 100% compliance) in labor drivers
+
+MATERIAL NEEDS ANALYSIS (if Materials category):
+Categories: Equipment, Consumables, Technology, Infrastructure
+Quantity indicators EXTRACT EXACT: "50 laptops", "3 vehicles", "200 meals/day", "50,000 sq ft"
+
+COMPLEXITY SCORE (1-10):
+Simple (1-3): Basic tasks, standard procedures, minimal coordination
+Moderate (4-6): Multiple steps, some coordination, specialized skills
+Complex (7-10): High coordination, specialized expertise, mission-critical
+Factors: Coordination (how many entities?), Expertise (certifications?), Criticality (impact if fails?), Frequency (one-time or high-volume recurring?)
+
+CONFIDENCE (0.0-1.0):
+0.9-1.0: Explicit text mention
+0.7-0.9: Strong inference from context
+0.5-0.7: Moderate inference, some ambiguity
+0.3-0.5: Weak inference
+0.0-0.3: Speculative
+
+ANALYSIS RULES:
+1. Multiple BOE categories common (most requirements span 2-4 categories)
+2. Prioritize explicit evidence: Direct mentions > Implied > Possible
+3. Labor=people, Materials=physical things, ODCs=external costs
+4. Empty arrays OK (don't fabricate data)
+5. Complexity correlates with BOE diversity (4+ categories often 7-10 complexity)
+
+OUTPUT:
+{"entity_id":"entity_123","has_workload_metric":true,"workload_categories":["Labor","Materials","QA"],"boe_relevance":{"Labor":0.95,"Materials":0.8,"QA":0.7},"labor_drivers":["Janitorial Staff (3 FTE minimum)","24/7 Coverage","Shift Rotation (3 shifts/day)"],"material_needs":["Cleaning equipment/supplies","PPE","Floor maintenance machinery"],"complexity_score":6,"complexity_rationale":"24/7 staffing coordination, shift management, health/safety compliance","effort_estimate":"Explicit: 3 FTE, 24/7, 3 shifts (NO ESTIMATION if not stated)","enriched_by":"workload_analysis_v1"}

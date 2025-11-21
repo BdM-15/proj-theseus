@@ -1241,99 +1241,177 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
       ]
       ```
 
-      **Example 10: Strategic Themes and Win Themes (Concept Clustering)**
+      **Example 10: Strategic Themes with Sentiment Analysis (CUSTOMER_HOT_BUTTON, PAIN_POINT, COMPETITIVE_OPPORTUNITY)**
 
       Input Text:
 
       ```
-      Section C.1: Background and Objectives
+      Section C.1: Background and Mission Context
 
-      The Navy seeks a contractor to provide innovative sustainment solutions
-      leveraging predictive maintenance technology and data analytics to reduce
-      operational downtime and total cost of ownership. The program emphasizes
-      green energy initiatives and environmental sustainability aligned with Navy
-      climate action goals. Veterans hiring and small business partnerships are
-      critical program priorities.
+      Cybersecurity is a critical concern for the Navy's operational readiness.
+      Current contractor security incidents resulted in a 15-day system outage
+      in FY2024, compromising mission-critical communications. Zero tolerance
+      for future data breaches. The Navy seeks innovative cybersecurity
+      approaches leveraging AI-powered threat detection to ensure continuous
+      operations and protect classified information.
+
+      Section M: Evaluation Factors
+
+      Factor 1: Cybersecurity Approach (40% - Most Important)
+
+      The Government will evaluate the offeror's cybersecurity strategy,
+      including:
+      1.1 NIST 800-53 Compliance and Implementation (Significantly More Important)
+      1.2 Incident Response and Threat Detection Capabilities
+      1.3 Continuous Monitoring and Vulnerability Management
+      1.4 Supply Chain Risk Management
+
+      Factor 2: Technical Innovation (25% - Significantly More Important)
+
+      The Government seeks cutting-edge solutions using advanced analytics,
+      artificial intelligence, or machine learning to enhance security posture
+      beyond current contractor's reactive approach.
+
+      Section L: Proposal Instructions
+
+      Technical Volume shall not exceed 75 pages. Cybersecurity section shall
+      comprise 35 pages maximum, addressing each subfactor of Factor 1.
       ```
 
-      Extracted Entities:
+      Extracted Entities (STRATEGIC_THEME with sentiment analysis):
 
       ```json
       [
         {
-          "entity_name": "Innovative Sustainment Solutions",
+          "entity_name": "Cybersecurity as Critical Mission Priority",
           "entity_type": "strategic_theme",
-          "description": "Win theme emphasizing innovation in maintenance and sustainment approaches"
+          "description": "CUSTOMER_HOT_BUTTON: Cybersecurity identified as 'critical concern' with 'zero tolerance for future data breaches' language in Section C. Mentioned 8 times across Sections C, M, L. Factor M1 (40% weight, Most Important) evaluates cybersecurity with 4 subfactors (NIST 800-53 compliance, incident response, continuous monitoring, supply chain risk). Technical Volume allocates 35 of 75 total pages (47%) to cybersecurity. Signals: HIGH PRIORITY, MISSION-CRITICAL, ZERO TOLERANCE, COMPLEX REQUIREMENTS (4 subfactors).",
+          "theme_type": "CUSTOMER_HOT_BUTTON",
+          "priority_score": 95,
+          "evidence": {
+            "emphasis_keywords": [
+              "critical concern",
+              "zero tolerance",
+              "mission-critical",
+              "operational readiness"
+            ],
+            "mention_count": 8,
+            "sections_referenced": [
+              "Section C.1",
+              "Section M Factor 1",
+              "Section L"
+            ],
+            "evaluation_weight": "40%",
+            "adjectival_rating": "Most Important",
+            "subfactor_count": 4,
+            "page_allocation": "35 of 75 pages (47%)"
+          }
         },
         {
-          "entity_name": "Predictive Maintenance Technology",
+          "entity_name": "Current Contractor Security Incident Gap",
           "entity_type": "strategic_theme",
-          "description": "Technology-focused win theme highlighting data-driven preventive maintenance"
+          "description": "PAIN_POINT: Section C.1 states 'Current contractor security incidents resulted in 15-day system outage in FY2024, compromising mission-critical communications.' Performance gap indicates incumbent weakness in incident prevention and response. Section M Factor 1.2 emphasizes 'incident response and threat detection capabilities' (subfactor evaluation). Signals: INCUMBENT WEAKNESS, MEASURABLE FAILURE (15-day outage), COMPETITIVE OPPORTUNITY, MISSION IMPACT (compromised communications).",
+          "theme_type": "PAIN_POINT",
+          "priority_score": 90,
+          "evidence": {
+            "incumbent_performance": "15-day system outage from security incident",
+            "required_standard": "Zero tolerance for future data breaches",
+            "performance_gap": "Current: security incident caused outage, Required: zero tolerance/continuous operations",
+            "sections_referenced": ["Section C.1", "Section M Factor 1.2"],
+            "corrective_language": [
+              "zero tolerance",
+              "ensure continuous operations",
+              "beyond current contractor's reactive approach"
+            ],
+            "mission_impact": "Compromised mission-critical communications"
+          }
         },
         {
-          "entity_name": "Reduced Operational Downtime",
+          "entity_name": "AI-Powered Threat Detection Innovation",
           "entity_type": "strategic_theme",
-          "description": "Performance-focused win theme targeting availability and uptime improvements"
+          "description": "COMPETITIVE_OPPORTUNITY: Section C.1 requests 'innovative cybersecurity approaches leveraging AI-powered threat detection.' Section M Factor 2 Technical Innovation (25%, Significantly More Important) seeks 'cutting-edge solutions using advanced analytics, artificial intelligence, or machine learning to enhance security posture beyond current contractor's reactive approach.' No specific AI solution mandated - opportunity for proprietary differentiation. Signals: INNOVATION REQUEST, EMERGING TECH (AI/ML), COMPETITIVE DIFFERENTIATOR, PROACTIVE VS REACTIVE POSITIONING.",
+          "theme_type": "COMPETITIVE_OPPORTUNITY",
+          "priority_score": 85,
+          "evidence": {
+            "innovation_keywords": [
+              "innovative",
+              "AI-powered",
+              "cutting-edge",
+              "advanced analytics",
+              "artificial intelligence",
+              "machine learning"
+            ],
+            "capability_gap": "No specific AI solution mandated - offeror discretion for proprietary approach",
+            "evaluation_weight": "25%",
+            "adjectival_rating": "Significantly More Important",
+            "subfactor": "Factor 2: Technical Innovation",
+            "differentiation_potential": "Proprietary AI threat detection differentiates from competitors and incumbent's reactive approach",
+            "positioning_opportunity": "Proactive (AI prediction) vs Reactive (current contractor)"
+          }
         },
         {
-          "entity_name": "Total Cost of Ownership Reduction",
+          "entity_name": "NIST 800-53 Compliance Emphasis",
           "entity_type": "strategic_theme",
-          "description": "Cost-focused win theme emphasizing lifecycle cost savings"
-        },
-        {
-          "entity_name": "Green Energy Initiatives",
-          "entity_type": "strategic_theme",
-          "description": "Environmental win theme aligned with Navy climate action and sustainability goals"
-        },
-        {
-          "entity_name": "Veterans Hiring Priority",
-          "entity_type": "strategic_theme",
-          "description": "Socioeconomic win theme supporting veteran employment objectives"
-        },
-        {
-          "entity_name": "Small Business Partnerships",
-          "entity_type": "strategic_theme",
-          "description": "Small business win theme emphasizing teaming and subcontracting commitments"
+          "description": "CUSTOMER_HOT_BUTTON: NIST 800-53 compliance is subfactor 1.1 (Significantly More Important) under Factor 1 Cybersecurity (40%, Most Important). Combined weight/importance indicates critical requirement. Mentioned in Section C and M. Signals: REGULATORY COMPLIANCE, HIGH IMPORTANCE (subfactor rated Significantly More Important), FOUNDATIONAL REQUIREMENT.",
+          "theme_type": "CUSTOMER_HOT_BUTTON",
+          "priority_score": 80,
+          "evidence": {
+            "emphasis_keywords": ["NIST 800-53 compliance", "implementation"],
+            "mention_count": 3,
+            "sections_referenced": ["Section C.1", "Section M Factor 1.1"],
+            "evaluation_weight": "Part of Factor 1 (40%)",
+            "adjectival_rating": "Significantly More Important (subfactor)",
+            "compliance_requirement": "NIST 800-53 standard"
+          }
         }
       ]
       ```
 
-      Extracted Relationships (semantic clustering):
+      Extracted Relationships (connecting hot buttons to evaluation factors):
 
       ```json
       [
         {
-          "source_entity": "Predictive Maintenance Technology",
-          "target_entity": "Innovative Sustainment Solutions",
-          "relationship_type": "SUPPORTS",
-          "description": "Technology enabler supporting innovation theme"
+          "source_entity": "Cybersecurity as Critical Mission Priority",
+          "target_entity": "Factor 1 Cybersecurity Approach",
+          "relationship_type": "EVALUATED_BY",
+          "description": "Customer hot button evaluated in primary evaluation factor (40% weight)"
         },
         {
-          "source_entity": "Predictive Maintenance Technology",
-          "target_entity": "Reduced Operational Downtime",
-          "relationship_type": "SUPPORTS",
-          "description": "Technology approach reduces downtime through prediction"
+          "source_entity": "Current Contractor Security Incident Gap",
+          "target_entity": "Factor 1 Cybersecurity Approach",
+          "relationship_type": "EVALUATED_BY",
+          "description": "Pain point from incumbent failure evaluated in cybersecurity factor"
         },
         {
-          "source_entity": "Reduced Operational Downtime",
-          "target_entity": "Total Cost of Ownership Reduction",
-          "relationship_type": "SUPPORTS",
-          "description": "Uptime improvements drive cost savings"
+          "source_entity": "AI-Powered Threat Detection Innovation",
+          "target_entity": "Factor 2 Technical Innovation",
+          "relationship_type": "EVALUATED_BY",
+          "description": "Competitive opportunity for innovative AI solution evaluated in technical innovation factor"
         },
         {
-          "source_entity": "Green Energy Initiatives",
-          "target_entity": "Environmental Sustainability",
-          "relationship_type": "RELATED_TO",
-          "description": "Environmental themes aligned with climate action"
+          "source_entity": "NIST 800-53 Compliance Emphasis",
+          "target_entity": "Factor 1.1 NIST 800-53 Compliance",
+          "relationship_type": "EVALUATED_BY",
+          "description": "Compliance hot button evaluated in dedicated subfactor"
         },
         {
-          "source_entity": "Veterans Hiring Priority",
-          "target_entity": "Small Business Partnerships",
-          "relationship_type": "RELATED_TO",
-          "description": "Socioeconomic themes supporting diverse teaming"
+          "source_entity": "Technical Volume Cybersecurity Section",
+          "target_entity": "Factor 1 Cybersecurity Approach",
+          "relationship_type": "GUIDES",
+          "description": "35-page cybersecurity section (47% of proposal) guides Factor 1 response"
         }
       ]
       ```
+
+      Note: Sentiment extraction captured:
+
+      - Emphasis language: "critical concern", "zero tolerance", "mission-critical"
+      - Performance gap: 15-day outage (incumbent) vs zero tolerance (requirement)
+      - Innovation signals: "innovative", "AI-powered", "cutting-edge", "advanced analytics"
+      - Competitive positioning: "beyond current contractor's reactive approach" → opportunity for proactive AI-based differentiation
+      - Priority scoring: 95 (critical hot button), 90 (pain point), 85 (competitive opportunity), 80 (compliance hot button)
+      - Evidence: Keywords, mention counts, evaluation weights, adjectival ratings, page allocations
 
     - **Relationship Patterns to Recognize:**
 

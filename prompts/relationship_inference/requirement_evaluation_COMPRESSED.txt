@@ -1,0 +1,38 @@
+REQUIREMENT→EVALUATION FACTOR MAPPING (EVALUATED_BY)
+Purpose: Link requirements to evaluation factors for effort allocation + proposal optimization
+Pattern: REQUIREMENT --EVALUATED_BY--> EVALUATION_FACTOR ("Weekly status reports"→Management Approach 30%)
+
+4 INFERENCE PATTERNS:
+1. TOPIC ALIGNMENT (0.80): Requirement topic matches factor
+   "24/7 help desk" → "Technical Approach - Help Desk Operations"
+2. CRITICALITY MAPPING (0.75): MANDATORY→high-weight factors
+   "Weekly status reports" (MANDATORY) → Management Approach
+3. CONTENT PROXIMITY (0.70): Near each other in document (location-agnostic)
+4. EXPLICIT CROSS-REF (0.95): "see Section M, Factor 3: Quality Control"
+
+TOPIC CATEGORIES:
+Technical: IT systems, uptime, cloud, integration → Technical Approach/Capability/Architecture
+Management: status reports, schedules, risk → Management/Program Management/Risk Management
+Performance: experience, past performance → Past Performance/Demonstrated Experience
+Personnel: qualifications, staffing, key personnel → Key Personnel/Staffing/Qualifications
+Quality: ISO certification, audits → Quality Control/Assurance/Management
+Transition: phase-in, continuity, zero downtime → Transition/Phase-In Plan
+
+REQUIREMENT TYPE OVERRIDE (0.85):
+requirement_type field overrides keyword matching:
+FUNCTIONAL → Technical Approach
+PERFORMANCE → Performance Standards
+SECURITY → Security Factor or Technical Approach
+MANAGEMENT → Management Approach
+
+RULES:
+- One requirement→multiple factors allowed (cybersecurity→Technical+Security)
+- Skip INFORMATIONAL (government obligations, criticality_level=0)
+- Skip administrative (contract period, delivery addresses)
+- MANDATORY requirements (criticality_level≥0.80) → has EVALUATED_BY
+- Confidence ≥0.70
+
+EXPECTED: 75% MANDATORY requirements mapped, 0% INFORMATIONAL mapped
+
+OUTPUT:
+[{"source_id":"requirement_id","target_id":"factor_id","relationship_type":"EVALUATED_BY","confidence":0.70-0.95,"reasoning":"Pattern name + topic/type"}]

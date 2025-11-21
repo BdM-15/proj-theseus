@@ -996,64 +996,282 @@ Capture entity_name, entity_type, and description. Section semantic types and su
 
 ## Entity Type 9: STRATEGIC_THEME
 
+### CRITICAL: Extract During Ingestion, Not Query-Time
+
+Strategic themes enable competitive intelligence. **Extract ALL sentiment/emphasis patterns during entity extraction** to enable powerful win theme queries.
+
 ### Type Classification
 
 #### CUSTOMER_HOT_BUTTON
 
-Agency priorities, pain points, mission pressures
+Agency priorities, pain points, mission pressures - **EXTRACT FROM RFP TEXT DURING INGESTION**
 
-**Signals**:
+**Primary Signals** (Emphasis Language):
 
-- "critical", "essential", "priority"
-- "emphasize", "significant concern"
-- "mission-critical", "high-priority"
+- **Tier 1 Urgency**: "critical", "essential", "vital", "paramount", "cornerstone", "imperative", "mandatory", "fundamental"
+- **Tier 2 Importance**: "important", "significant", "key", "major", "substantial", "primary", "principal"
+- **Tier 3 Priority**: "priority", "focus", "emphasis", "concern", "objective", "goal"
+- **Mission Language**: "mission-critical", "mission-essential", "operational readiness", "combat readiness", "national security"
+- **Consequence Language**: "failure is not an option", "zero tolerance", "cannot accept", "unacceptable", "must not fail"
+
+**Structural Signals** (Repetition & Weight):
+
+- **Repetition Detection**: Concept/topic mentioned 3+ times across Sections C, H, L, M → high priority
+- **Evaluation Weight**: Factors ≥30% weight → hot button, Factors ≥40% → critical hot button
+- **Adjectival Escalation**: "Most Important" (highest) > "Significantly More Important" > "More Important" > "Important"
+- **Subfactor Count**: Factors with 3+ subfactors → complex/critical area
+- **Page Limit Emphasis**: Section L allocates ≥40% total pages to one volume → priority area
+
+**Sentiment Context Patterns**:
+
+- Near problem statements: "current challenges", "requires improvement", "deficiencies", "gaps"
+- Near performance metrics: "must achieve", "required to maintain", "shall not fall below"
+- Near risk language: "risk of", "potential for failure", "vulnerability", "concern regarding"
+- Near compliance language: "regulatory requirement", "statutory mandate", "contractual obligation"
+
+**Detection Algorithm**:
+
+```
+IF (emphasis_keyword AND mentioned_3plus_times) OR
+   (evaluation_factor.weight >= 0.30) OR
+   (adjectival_rating == "Most Important") OR
+   (section_M_subfactor_count >= 3) OR
+   (section_L_page_allocation >= 0.40)
+THEN extract as CUSTOMER_HOT_BUTTON
+```
+
+**Examples with Context**:
+
+```json
+{
+  "entity_name": "Cybersecurity and Data Protection",
+  "entity_type": "strategic_theme",
+  "description": "CUSTOMER_HOT_BUTTON: Cybersecurity identified as critical concern with 'zero tolerance for data breaches' language in Section C. Mentioned 7 times across PWS. Factor M1 (40% weight, Most Important) evaluates cybersecurity approach with 4 subfactors (NIST 800-53, incident response, continuous monitoring, supply chain risk). Technical Volume allocated 35 of 75 total pages (47%). Signals: HIGH PRIORITY, MISSION-CRITICAL, COMPLEX REQUIREMENTS.",
+  "theme_type": "CUSTOMER_HOT_BUTTON",
+  "priority_score": 95,
+  "evidence": {
+    "emphasis_keywords": [
+      "critical concern",
+      "zero tolerance",
+      "mission-critical",
+      "paramount importance"
+    ],
+    "mention_count": 7,
+    "sections_referenced": [
+      "Section C.3.2",
+      "Section H.1",
+      "Section M Factor 1"
+    ],
+    "evaluation_weight": "40%",
+    "adjectival_rating": "Most Important",
+    "subfactor_count": 4,
+    "page_allocation": "35 of 75 pages (47%)"
+  }
+}
+```
+
+#### PAIN_POINT
+
+Current contractor issues, incumbent weaknesses, agency frustrations - **EXTRACT FROM RFP TEXT**
+
+**Problem Language Signals**:
+
+- **Performance Gaps**: "below standard", "requires enhancement", "must be improved", "not meeting expectations", "deficiencies identified"
+- **Current Challenges**: "current challenges include", "issues with existing contractor", "limitations of current approach"
+- **Improvement Requests**: "improvements needed", "enhancements required", "better approach needed", "alternative solutions desired"
+- **Failure Indicators**: "past failures", "recurring issues", "persistent problems", "continued deficiencies"
+
+**Incumbent Reference Patterns**:
+
+- **Direct References**: "previous contractor", "current contract", "incumbent contractor", "existing service provider"
+- **Transition Language**: "transition from current contractor", "replace existing approach", "new contractor shall correct"
+- **Lessons Learned**: "avoid issues experienced under current contract", "based on past contract challenges"
+
+**Structural Indicators**:
+
+- Section H special requirements that remediate past issues
+- Section M evaluation criteria emphasizing "lessons learned from previous contract"
+- Section C PWS tasks labeled "corrective measures" or "improvement areas"
+- Q&A responses revealing incumbent problems
+
+**Detection Algorithm**:
+
+```
+IF (problem_language AND incumbent_reference) OR
+   (section_H_special_requirement AND "current contractor") OR
+   (section_M_criteria AND "lessons learned") OR
+   (qa_response_reveals_issue)
+THEN extract as PAIN_POINT
+```
 
 **Examples**:
 
-- "Readiness is the Navy's top priority"
-- "Cybersecurity is a critical concern"
-- "Mission availability must be maintained"
+```json
+{
+  "entity_name": "On-Time Delivery Deficiencies",
+  "entity_type": "strategic_theme",
+  "description": "PAIN_POINT: Section C.1 Background states 'current contractor achieved only 87% on-time delivery rate, below the required 95% standard.' Section M Factor 2 (Past Performance - 30% weight) emphasizes 'demonstrated record of on-time delivery on similar contracts' with subfactor on 'delivery schedule adherence metrics.' Section H.3 requires 'corrective action plan for late deliveries within 24 hours.' Signals: INCUMBENT WEAKNESS, COMPETITIVE OPPORTUNITY, MEASURABLE GAP (87% vs 95%).",
+  "theme_type": "PAIN_POINT",
+  "priority_score": 85,
+  "evidence": {
+    "incumbent_performance": "87% on-time delivery",
+    "required_standard": "95% on-time delivery",
+    "performance_gap": "-8%",
+    "sections_referenced": ["Section C.1", "Section M Factor 2", "Section H.3"],
+    "evaluation_weight": "30%",
+    "corrective_language": [
+      "corrective action plan",
+      "shall improve upon",
+      "better performance required"
+    ]
+  }
+}
+```
+
+#### COMPETITIVE_OPPORTUNITY
+
+Innovation requests, capability gaps, differentiation signals - **EXTRACT FROM RFP TEXT**
+
+**Innovation Language**:
+
+- **Cutting-Edge Requests**: "innovative", "cutting-edge", "state-of-the-art", "advanced", "next-generation", "modern", "contemporary"
+- **Best Practices**: "best practices", "industry-leading", "proven methodologies", "recognized standards", "gold standard"
+- **Improvement Focus**: "better than current", "exceed expectations", "enhanced capabilities", "superior approach"
+
+**Capability Gap Signals**:
+
+- **Unique Requirements**: "unique", "specialized", "proprietary", "exclusive", "rare", "uncommon", "niche"
+- **Advanced Skills**: "expert-level", "highly specialized", "advanced certifications", "rare skillsets", "hard-to-find"
+- **Complex Integration**: "complex system integration", "multiple disparate systems", "legacy modernization", "heterogeneous environment"
+
+**Risk Aversion Language** (Opportunity for Low-Risk Positioning):
+
+- **Proven Approach**: "proven", "established", "validated", "tested", "reliable", "dependable", "stable"
+- **Low-Risk**: "low-risk", "minimal disruption", "smooth transition", "zero downtime", "business continuity"
+- **Track Record**: "demonstrated history", "past success", "proven track record", "documented performance"
+
+**Detection Algorithm**:
+
+```
+IF (innovation_language OR capability_gap_language OR risk_aversion_language) AND
+   (evaluation_factor OR requirement)
+THEN extract as COMPETITIVE_OPPORTUNITY
+```
+
+**Examples**:
+
+```json
+{
+  "entity_name": "AI-Powered Predictive Maintenance",
+  "entity_type": "strategic_theme",
+  "description": "COMPETITIVE_OPPORTUNITY: Section C.3.4 requests 'innovative predictive maintenance approaches using advanced analytics or AI/ML to reduce unscheduled downtime.' Section M Factor 1 Technical Approach (40%, Most Important) subfactor 1.2 evaluates 'innovative maintenance methodologies and use of emerging technologies.' No specific AI solution mandated - opportunity for proprietary differentiation. Signals: INNOVATION REQUEST, EMERGING TECH, COMPETITIVE DIFFERENTIATOR.",
+  "theme_type": "COMPETITIVE_OPPORTUNITY",
+  "priority_score": 80,
+  "evidence": {
+    "innovation_keywords": [
+      "innovative",
+      "advanced analytics",
+      "AI/ML",
+      "emerging technologies"
+    ],
+    "capability_gap": "No specific solution mandated - offeror discretion",
+    "evaluation_weight": "40%",
+    "subfactor": "1.2 Innovative Maintenance Methodologies",
+    "differentiation_potential": "Proprietary AI solution can differentiate from competitors"
+  }
+}
+```
 
 #### DISCRIMINATOR
 
-Competitive advantages, unique capabilities
+Your competitive advantages (NOT extracted from RFP - added during query-time from company data)
 
-**Examples**:
+**Note**: Discriminators are **NOT** extracted from RFP text. They come from:
 
-- "Only offeror with on-site repair facility"
-- "Proprietary predictive maintenance AI"
-- "Incumbent knowledge of legacy systems"
-- "Exclusive partnership with OEM"
+- Company past performance database
+- Corporate capabilities/certifications
+- Proprietary methodologies/tools
+- Team expertise/clearances
+- Facility locations/equipment
+
+**Examples** (for reference - not extracted during ingestion):
+
+- "Only offeror with on-site repair facility at Naval Station Norfolk"
+- "Proprietary AI-powered failure prediction (Patent #US-123456)"
+- "15 years incumbent knowledge on Navy MBOS contracts (99.7% on-time delivery)"
+- "Exclusive OEM partnership with GE Aviation for engine maintenance"
 
 #### PROOF_POINT
 
-Evidence supporting competitive claims
+Evidence supporting competitive claims (NOT extracted from RFP - added during query-time from company data)
 
-**Examples**:
+**Note**: Proof points are **NOT** extracted from RFP text. They come from:
 
-- "99.8% uptime on similar Navy contract"
-- "CPARS rating: Exceptional (all categories)"
-- "CMMI Level 3 certified organization"
-- "150 certified technicians on staff"
+- Past performance metrics (CPARs, customer testimonials)
+- Certifications (ISO 9001, CMMI, FedRAMP)
+- Corporate awards/recognition
+- Measurable outcomes (99.8% uptime, 40% cost reduction)
+
+**Examples** (for reference - not extracted during ingestion):
+
+- "99.8% system uptime on similar Navy contract N00024-18-C-1234 (2018-2023)"
+- "CPARS rating: Exceptional in all categories (Quality, Schedule, Cost Control)"
+- "CMMI Level 3 certified organization since 2015"
+- "Reduced unscheduled downtime by 40% on Marine Corps contract M00264-20-C-5678"
 
 #### WIN_THEME
 
-Strategic messaging combining discriminator + proof + customer benefit
+Strategic messaging combining discriminator + proof + customer benefit (CONSTRUCTED during query-time, not extracted from RFP)
 
-**Structure**: THEME + DISCRIMINATOR + PROOF POINT + CUSTOMER BENEFIT
+**Structure**: CUSTOMER_HOT_BUTTON (from RFP) + DISCRIMINATOR (your strength) + PROOF_POINT (your evidence) + CUSTOMER_BENEFIT (outcome)
 
-**Example**:
+**Example Win Theme Construction**:
 
 ```
-THEME: "Mission Readiness Through Predictive Maintenance"
-DISCRIMINATOR: "Proprietary AI-powered failure prediction"
-PROOF POINT: "Reduced unscheduled downtime 40% on similar contract"
-CUSTOMER BENEFIT: "Ensures aircraft availability for critical missions"
+RFP Hot Button (extracted): "On-time delivery critical - current contractor at 87%"
++ Your Discriminator (company data): "15 years Navy MBOS experience"
++ Your Proof Point (company data): "99.7% on-time delivery rate, 12 contracts"
++ Customer Benefit (derived): "Zero late deliveries, mission readiness assured"
+= WIN THEME: "You will eliminate late delivery risks through our proven 99.7% on-time delivery rate, validated by 15 years and 12 Navy MBOS contracts, ensuring mission readiness where the current contractor's 87% rate created operational gaps."
 ```
+
+### Metadata Fields to Extract
+
+**For ALL strategic_theme entities, extract**:
+
+```json
+{
+  "entity_name": "Descriptive theme name",
+  "entity_type": "strategic_theme",
+  "description": "Full context including theme_type prefix, evidence, signals, and competitive implications",
+  "theme_type": "CUSTOMER_HOT_BUTTON | PAIN_POINT | COMPETITIVE_OPPORTUNITY",
+  "priority_score": 0-100,
+  "evidence": {
+    "emphasis_keywords": ["keyword1", "keyword2"],
+    "mention_count": 5,
+    "sections_referenced": ["Section C.1", "Section M Factor 2"],
+    "evaluation_weight": "30%",
+    "adjectival_rating": "Most Important | Significantly More Important | More Important | Important",
+    "performance_gap": "Current: 87%, Required: 95%, Gap: -8%",
+    "innovation_signals": ["innovative", "cutting-edge"],
+    "risk_signals": ["proven", "low-risk"]
+  }
+}
+```
+
+### Detection Priority
+
+**Extract strategic themes in this order**:
+
+1. **High-Priority Hot Buttons** (evaluation weight ≥40%, "Most Important", mentioned 5+ times)
+2. **Pain Points** (incumbent issues, performance gaps, corrective requirements)
+3. **Medium-Priority Hot Buttons** (evaluation weight 20-39%, mentioned 3-4 times)
+4. **Competitive Opportunities** (innovation requests, capability gaps)
+5. **Low-Priority Themes** (mentioned 1-2 times, no evaluation linkage)
 
 ### Basic Attributes
 
-Capture entity_name, entity_type, and description. Theme classification (hot button/discriminator/proof point) and competitive context are advanced analysis best performed during query-time.
+**CRITICAL CHANGE**: Theme classification, priority scoring, and evidence extraction are **NOT** query-time activities. Extract ALL of this during entity extraction to enable powerful competitive intelligence queries.
 
 ---
 

@@ -1,18 +1,42 @@
 # Prompt Compression Analysis: Intelligence vs. Formatting
 
 **Date**: November 21, 2025  
-**Current Prompt**: 284,942 chars (~71,236 tokens)  
-**Target**: 90% reduction WITHOUT losing domain intelligence  
+**Branch**: 022a-prompt-compression (protecting perfect run on 022)  
+**Current Prompt**: 284,942 chars (~71,236 tokens) from **15 FILES**  
+**Target**: 36-48% reduction WITHOUT losing domain intelligence  
 **Critical Requirement**: Preserve ALL government contracting ontology expertise
 
 ---
 
 ## 🔬 Current State Analysis
 
+### Prompt Source Architecture (15 Files Total)
+
+The system prompt is assembled from:
+
+1. **prompts/extraction/grok_json_prompt.md** - Base JSON formatting instructions
+2. **prompts/extraction/entity_detection_rules.md** - Entity classification rules (17 types)
+3. **prompts/extraction/entity_extraction_prompt.md** - Main extraction instructions + 10 annotated examples
+4. **prompts/relationship_inference/\*.md** (12 files):
+   - attachment_section_linking.md
+   - clause_clustering.md
+   - deliverable_traceability.md
+   - document_hierarchy.md
+   - document_section_linking.md
+   - evaluation_hierarchy.md
+   - instruction_evaluation_linking.md
+   - requirement_evaluation.md
+   - semantic_concept_linking.md
+   - sow_deliverable_linking.md
+   - system_prompt.md (stub)
+   - workload_enrichment.md
+
+**Construction Code**: `src/extraction/json_extractor.py` → `_load_full_system_prompt()`
+
 ### Token Economics (Perfect Run - 4 Chunks)
 
 ```
-System Prompt:  71,236 tokens (284,942 chars)
+System Prompt:  71,236 tokens (284,942 chars from 15 files)
 Chunk 1:         8,192 tokens
 Chunk 2:         8,192 tokens
 Chunk 3:         8,192 tokens
@@ -22,12 +46,21 @@ Per Extraction: 103,004 tokens (system + 1 chunk)
 Total 4 Chunks: 355,180 tokens
 
 Cost per doc:   $0.057 (input only)
-90% compression would save: $0.051 per doc
+36% compression would save: $0.021 per doc
+48% compression would save: $0.027 per doc
 ```
 
 ### The Critical Question
 
 **Is the 285K prompt actually USING those tokens for intelligence, or is most of it formatting waste?**
+
+**Previous Compression Attempt Failed**: The aggressive 89% compression (284K → 30K) removed critical intelligence:
+
+- Result: 111 entities vs 368 baseline (70% regression)
+- Cause: Removed examples, domain knowledge, and inference patterns
+- Proof: Compression removed SUBSTANCE, not just formatting
+
+**Key Learning**: Must preserve ALL 10 annotated examples, 50+ relationship inference patterns, and decision trees.
 
 ---
 
@@ -235,20 +268,22 @@ Output: {"entity_name":"Factor 2: Maintenance Approach","entity_type":"evaluatio
 4. **Tables**: `| col | col |` → Pipe-separated inline or colon format
 5. **Horizontal Rules**: `---` → Skip (visual separators unnecessary)
 6. **Checkmarks**: `✅`, `❌` → CORRECT/WRONG prefix
-7. **Numbered Lists**: `1. item` → Inline comma-separated
-8. **Bullet Lists**: `- item` → Inline comma-separated
+7. **Numbered Lists**: `1. item` → Inline comma-separated when appropriate
+8. **Bullet Lists**: `- item` → Inline comma-separated when appropriate
 9. **Whitespace**: Multiple newlines → Single newline between sections
 
 ### What Gets PRESERVED (100% Intelligence)
 
 1. **Entity Types**: All 17 types with exact names
-2. **Normalization Rules**: Section formatting, clause citations, CDRL format
+2. **Normalization Rules**: Section formatting, clause citations, CDRL format (proven critical in perfect run)
 3. **UCF Section Mapping**: A-M sections with entity types and content signals
 4. **Detection Signals**: Phrase patterns for semantic-first extraction
 5. **Specialized Metadata**: labor_drivers, subfactors, threshold, modal_verb, etc.
-6. **Examples**: All 5+ real RFP examples (minimal formatting only)
-7. **Decision Trees**: Edge case handling rules
-8. **Relationship Types**: EVALUATED_BY, GUIDES, CHILD_OF, ATTACHMENT_OF, etc.
+6. **ALL 10 ANNOTATED EXAMPLES**: Section L↔M mapping, requirements with criticality, attachment structure, FAR clauses, deliverables from SOW, implicit relationships, requirement→evaluation mapping, multi-agency patterns, SOW→deliverable production, strategic themes
+7. **Decision Trees**: 8 decision rules for ambiguous cases (proven to prevent entity loss)
+8. **Relationship Types**: EVALUATED_BY, GUIDES, CHILD_OF, ATTACHMENT_OF, PRODUCES, TRACKED_BY, etc.
+9. **50+ Relationship Inference Patterns**: Topic taxonomy, agency naming conventions, semantic keyword banks, implicit hierarchy detection, L↔M mapping rules, requirement→factor mapping
+10. **Domain Knowledge**: FAR/DFARS patterns, Shipley methodology, QASP separation, UCF variations
 
 ---
 
@@ -306,15 +341,25 @@ Cost savings per doc: $0.028 (4 chunks)
 
 ### Intelligence Validation Tests
 
-**Before deploying ANY compression, validate against perfect run**:
+**Before deploying ANY compression, validate against perfect run baseline**:
 
-1. ✅ **Entity Count**: Must extract 330-345 entities (baseline: 339)
-2. ✅ **Relationship Count**: Must extract 147-162 relationships (baseline: 154)
-3. ✅ **Workload Drivers**: Must capture all labor_drivers from Appendix F
-4. ✅ **Schema Compliance**: Must reject malformed relationships (3/543 rejection rate)
+1. ✅ **Entity Count**: Must extract 355-381 entities (baseline: 368 ±3.5%)
+2. ✅ **Relationship Count**: Must extract 147-162 relationships (baseline: 154 ±5%)
+3. ✅ **Workload Drivers**: Must capture labor_drivers from workload-dense chunks (chunk 3 proven critical)
+4. ✅ **Schema Compliance**: Error rate ≤1.3% (perfect run achieved 1.0%)
 5. ✅ **Normalization**: Must merge "SECTION C.4" variants into single entity
 6. ✅ **Section Mapping**: Must correctly classify evaluation_factor from Section M
 7. ✅ **Detection Signals**: Must extract submission_instruction from embedded L-in-M patterns
+8. ✅ **Query Quality**: 98%+ workload query accuracy (validated in perfect run)
+
+### Previous Failure Analysis
+
+**Aggressive Compression Attempt (89% reduction)**:
+- Compressed prompts: 284K → 30K chars
+- Results: 111 entities (70% regression)
+- Error: Chunk 3 Pydantic validation failure (workload-dense section)
+- Root cause: Removed critical examples showing how to extract workload requirements
+- Lesson: Cannot remove examples/patterns, only formatting
 
 ### A/B Testing Protocol
 
@@ -327,9 +372,9 @@ def test_compressed_vs_original():
     original_result = extract_with_prompt(doc, ORIGINAL_PROMPT_285K)
     compressed_result = extract_with_prompt(doc, COMPRESSED_PROMPT_150K)
 
-    # Validate counts within 5%
-    assert abs(len(compressed_result.entities) - 339) <= 17  # ±5%
-    assert abs(len(compressed_result.relationships) - 154) <= 8
+    # Validate counts within 3.5%
+    assert abs(len(compressed_result.entities) - 368) <= 13  # ±3.5%
+    assert abs(len(compressed_result.relationships) - 154) <= 8  # ±5%
 
     # Test 2: Workload driver completeness (qualitative)
     original_labor = extract_labor_drivers(original_result)
@@ -338,12 +383,12 @@ def test_compressed_vs_original():
     # Must capture same BOE intelligence
     assert len(compressed_labor) >= len(original_labor) * 0.95
 
-    # Test 3: Schema compliance (rejection rate)
-    original_rejects = original_result.validation_errors
-    compressed_rejects = compressed_result.validation_errors
+    # Test 3: Schema compliance (error rate)
+    original_error_rate = original_result.validation_errors / original_result.total_entities
+    compressed_error_rate = compressed_result.validation_errors / compressed_result.total_entities
 
-    # Similar rejection rate (malformed relationships)
-    assert abs(compressed_rejects - 3) <= 2  # ±2 errors acceptable
+    # Must maintain <1.3% error rate (perfect run: 1.0%)
+    assert compressed_error_rate <= 0.013
 ````
 
 ---
@@ -354,7 +399,7 @@ def test_compressed_vs_original():
 
 **Target**: 182K chars (~45,500 tokens) - removes ONLY formatting, keeps ALL intelligence
 
-**Changes**:
+**Changes** (apply to all 15 prompt files):
 
 1. Strip markdown headers (`###` → plain text with `:`)
 2. Remove bold/italic (`**text**` → text)
@@ -362,22 +407,31 @@ def test_compressed_vs_original():
 4. Convert tables to pipe-separated inline format
 5. Remove horizontal rules
 6. Replace checkmarks with CORRECT/WRONG
-7. Convert bullet lists to comma-separated inline
+7. Convert bullet lists to comma-separated inline (preserve lists where structure matters)
 8. Reduce whitespace (multiple newlines → single newline)
+
+**Files to Compress**:
+
+- prompts/extraction/grok_json_prompt.md
+- prompts/extraction/entity_detection_rules.md
+- prompts/extraction/entity_extraction_prompt.md
+- prompts/relationship_inference/\*.md (12 files)
 
 **Validation**:
 
-- Run against perfect run document (Appendix F)
-- Assert 339 entities ±5%
-- Assert 154 relationships ±5%
-- Validate workload driver completeness (qualitative review)
+- Run against perfect run document (afcapv_adab_iss_2025_pwstst)
+- Assert 368 entities ±3.5% (355-381 range)
+- Assert 154 relationships ±5% (147-162 range)
+- Validate workload driver completeness (manual review chunk 3)
+- Confirm 98%+ workload query accuracy
 
 **Rollback Criteria**:
 
-- Entity count drops below 322 (95% of baseline)
+- Entity count drops below 355 (96.5% of baseline)
 - Relationship count drops below 147
 - Any workload drivers missing from labor_drivers field
-- Extraction quality subjectively worse
+- Workload query accuracy drops below 95%
+- Error rate exceeds 1.3%
 
 ### Phase 2: Aggressive Compression (48% reduction)
 
@@ -385,21 +439,25 @@ def test_compressed_vs_original():
 
 **Additional Changes** (ONLY if Phase 1 passes validation):
 
-1. Inline examples (remove multi-line formatting)
+1. Inline examples (remove multi-line formatting while preserving content)
 2. Compact Pydantic schemas to inline notation
 3. Ultra-dense signal lists (comma-separated, no formatting)
-4. Merge redundant rules
+4. Merge redundant rules across the 12 relationship inference files
 
 **Validation**: Same A/B tests as Phase 1
 
-### Phase 3: Example Optimization (Future)
+**Risk**: Higher - may impact example clarity
 
-**Hypothesis**: Can we use FEWER but BETTER examples?
+### Phase 3: Example Optimization (Future - Only if Phase 2 succeeds)
 
-Current: 5+ full examples (~8,000 chars total)  
-Target: 3 high-value examples (~5,000 chars)
+**Hypothesis**: Can we identify lowest-value examples through ablation testing?
 
-**Test**: Remove lowest-value examples one-by-one, validate extraction quality
+Current: 10 annotated examples in entity_extraction_prompt.md  
+Target: Identify 3-5 highest-value examples
+
+**Test Protocol**: Remove examples one-by-one, validate extraction quality after each removal
+
+**Safety**: STOP immediately if entity count drops below 355
 
 ---
 
@@ -407,21 +465,30 @@ Target: 3 high-value examples (~5,000 chars)
 
 ### Why This Matters
 
-1. **Cost Efficiency**: 36-48% token reduction = 36-48% cost reduction
+1. **Cost Efficiency**: 36-48% token reduction = 36-48% cost reduction ($0.021-$0.027 savings per doc)
 2. **Context Window**: More room for larger chunks if needed
 3. **Latency**: Fewer tokens = faster inference
-4. **EOF Errors**: Shorter prompts reduce risk of truncation
+4. **Model Compatibility**: Shorter prompts reduce risk of EOF truncation errors
 
 ### Why This is Safe
 
-1. **Zero Intelligence Loss**: All domain expertise preserved (entity types, rules, examples)
+1. **Zero Intelligence Loss**: All domain expertise preserved (entity types, rules, examples, patterns)
 2. **Format is Cosmetic**: Markdown helps humans, not LLMs
 3. **LLMs Parse Text**: Model doesn't need bold/bullets/tables to understand
 4. **Validation Gates**: Won't deploy if quality degrades
+5. **Protected Baseline**: Perfect run preserved on branch 022, experiments isolated on 022a
 
-### The Perfect Run Proves It
+### The Perfect Run Proves the Intelligence Works
 
-The 339/154 extraction with 3 rejected relationships happened WITH the bloated 285K prompt. **We know the intelligence works**. Now we're just removing the packaging.
+The 368 entities / 154 relationships / 98%+ query accuracy happened WITH the bloated 285K prompt across 15 files. **We know the intelligence works**. The previous 89% compression failed because it removed SUBSTANCE (examples, patterns, domain knowledge). This conservative approach removes only PACKAGING (markdown formatting).
+
+### Critical Learnings from Failed Attempt
+
+1. **Cannot compress examples** - The 10 annotated examples are HIGH-VALUE tokens
+2. **Cannot compress inference patterns** - 50+ relationship rules are proven critical
+3. **Cannot compress decision trees** - Edge case handling prevents entity loss
+4. **CAN compress formatting** - Markdown overhead is pure waste for LLMs
+5. **Must validate against workload-dense chunks** - Chunk 3 failure revealed compression risk
 
 ---
 
@@ -429,16 +496,38 @@ The 339/154 extraction with 3 rejected relationships happened WITH the bloated 2
 
 **Recommendation**: YES - Conservative compression (36% reduction) is LOW RISK, HIGH REWARD
 
+**Risk Assessment**:
+
+- **Format-only changes**: Removing markdown has zero semantic impact
+- **All intelligence preserved**: 10 examples, 50+ patterns, decision trees intact
+- **Validation gates**: Won't deploy unless 368±13 entities achieved
+- **Protected baseline**: Branch 022 remains untouched, can rollback instantly
+- **Proven failure mode**: We know what NOT to compress (examples/patterns)
+
 **Next Steps**:
 
-1. Create compressed versions of the 3 prompt files
-2. Update `json_extractor.py` to use compressed prompts (feature flag)
-3. Run A/B test against perfect run document
-4. Validate all intelligence metrics
-5. If successful, merge to main and update Phase 2 of migration plan
+1. Create compressed versions of 15 prompt files (format-only changes)
+2. Store as `*_COMPRESSED.txt` files alongside originals
+3. Update `json_extractor.py` to support feature flag (already implemented)
+4. Run A/B test against perfect run document (afcapv_adab_iss_2025_pwstst)
+5. Validate all intelligence metrics:
+   - Entity count: 368 ±3.5%
+   - Relationship count: 154 ±5%
+   - Workload drivers: Manual review chunk 3
+   - Query accuracy: 98%+ on workload analysis
+6. If successful → Commit to 022a, document results, consider Phase 2
+7. If failed → Delete 022a, return to 022, document why
 
-**Estimated Timeline**: 2-3 hours for implementation + validation
+**Estimated Timeline**: 3-4 hours for implementation + validation
+
+**Cost Savings if Successful**: $0.021 per document × scale = significant at volume
 
 ---
 
-**Awaiting approval to proceed with Phase 1 conservative compression.**
+**Branch Structure**:
+
+- `022` (PROTECTED): Perfect run baseline (368 entities, 154 relationships, 1.0% error rate)
+- `022a-prompt-compression` (ACTIVE): Experimental compression work
+- Rollback strategy: `git checkout 022; git branch -D 022a`
+
+**Awaiting approval to proceed with Phase 1 conservative compression (format-only removal).**

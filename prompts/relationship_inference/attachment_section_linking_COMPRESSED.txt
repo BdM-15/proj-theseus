@@ -1,0 +1,29 @@
+ATTACHMENT→SECTION LINKING (ATTACHMENT_OF)
+Purpose: Link top-level attachments/annexes to parent RFP sections
+Pattern: ANNEX/DOCUMENT --ATTACHMENT_OF--> SECTION (J-02000000→Section J)
+≠ CHILD_OF: attachment→section vs document→document
+
+3 PATTERNS:
+1. NAMING (1.0): Prefix match
+   J-###### → Section J, A-###### → Section A, H-###### → Section H
+   Attachment/Annex/Exhibit → Section J default
+2. EXPLICIT (0.95): Listed under section heading
+   "Section J includes: J-02000000 PWS..."
+3. CONTENT (0.70): Topic alignment
+   Pricing → Section B, PWS/SOW → Section C or J, Key Personnel → Section H
+
+AGENCY PATTERNS:
+DoD: J-######## → J
+GSA: Exhibit (pricing) → B, Attachment → J
+NASA: Annex ## → J
+DoE: Exhibit (pricing) → B, Attachment → J
+State: Annex X → J
+
+RULES:
+- TOP-LEVEL ONLY (not sub-attachments - use CHILD_OF)
+- Confidence ≥0.70
+- One section per attachment
+- Work statements flexible: Section C inline, J-attached, Section H, technical annexes
+
+OUTPUT:
+[{"source_id":"annex_id","target_id":"section_id","relationship_type":"ATTACHMENT_OF","confidence":0.70-1.0,"reasoning":"Pattern + match details"}]
