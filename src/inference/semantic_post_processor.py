@@ -33,8 +33,10 @@ import os
 logger = logging.getLogger(__name__)
 
 
-async def _call_llm_async(prompt: str, system_prompt: str = None, model: str = "grok-4-fast-reasoning", temperature: float = 0.1) -> str:
+async def _call_llm_async(prompt: str, system_prompt: str = None, model: str = None, temperature: float = 0.1) -> str:
     """Async wrapper for LLM calls"""
+    if model is None:
+        model = os.getenv("LLM_MODEL", "grok-4-fast-reasoning")
     return await openai_complete_if_cache(
         model=model,
         prompt=prompt,
@@ -915,7 +917,7 @@ Return ONLY valid JSON array:
 
 
 async def _semantic_post_processor_neo4j(
-    llm_model_name: str = "grok-4-fast-reasoning",
+    llm_model_name: str = None,
     temperature: float = 0.1
 ) -> Dict:
     """
@@ -934,6 +936,10 @@ async def _semantic_post_processor_neo4j(
     Returns:
         Dict with processing statistics
     """
+    if llm_model_name is None:
+        llm_model_name = os.getenv("LLM_MODEL", "grok-4-fast-reasoning")
+    
+    logger.info("🔧 Starting Neo4j semantic post-processing...")
     start_time = time.time()
     
     # Initialize Neo4j I/O

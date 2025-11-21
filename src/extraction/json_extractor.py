@@ -118,6 +118,7 @@ Output the result strictly as a JSON object matching the schema defined in the f
     async def extract(self, text: str) -> ExtractionResult:
         """
         Extracts entities from the given text using Grok 4 in JSON mode.
+        Returns empty result on malformed JSON to allow graceful continuation.
         """
         try:
             # Log chunk size for debugging
@@ -133,7 +134,7 @@ Output the result strictly as a JSON object matching the schema defined in the f
                     {"role": "user", "content": text}
                 ],
                 response_format={"type": "json_object"},
-                temperature=0.1, # Low temperature for deterministic structure
+                temperature=0.1,
                 max_tokens=32000 # Maximize output token limit for large extractions
             )
             
@@ -147,7 +148,6 @@ Output the result strictly as a JSON object matching the schema defined in the f
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse JSON response: {e}")
                 logger.error(f"Response preview (first 500 chars): {content[:500]}")
-                logger.error(f"Response preview (last 500 chars): {content[-500:]}")
                 
                 # Try to extract JSON from markdown code blocks if present
                 if "```json" in content:
@@ -158,9 +158,11 @@ Output the result strictly as a JSON object matching the schema defined in the f
                         content = json_match.group(1)
                         data = json.loads(content)
                     else:
-                        raise
+                        logger.warning(f"⚠️ Malformed JSON - skipping chunk and continuing")
+                        return ExtractionResult(entities=[], relationships=[])
                 else:
-                    raise
+                    logger.warning(f"⚠️ Malformed JSON - skipping chunk and continuing")
+                    return ExtractionResult(entities=[], relationships=[])
             
             # Pre-validate and clean relationships before Pydantic validation
             # Handle both old format (strings) and new format (entity objects)
@@ -244,6 +246,11 @@ Output the result strictly as a JSON object matching the schema defined in the f
             
             logger.info(f"Successfully extracted {len(result.entities)} entities")
             return result
+            
+        except Exception as e:
+            logger.error(f"❌ Unexpected error during extraction: {e}")
+            logger.error(f"Returning empty result to allow processing to continue")
+            return ExtractionResult(entities=[], relationships=[])
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON response: {e}")

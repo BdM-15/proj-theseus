@@ -106,11 +106,15 @@ async def process_document_with_semantic_inference(
         from src.extraction.json_extractor import JsonExtractor
         
         # Combine all text content for chunking
+        # CRITICAL: Only process type='text' blocks (not tables/images)
+        # This matches Perfect Run behavior (421 text blocks → 339 entities)
         text_chunks = []
         for item in filtered_content:
-            content_text = item.get('text', '')  # MinerU uses 'text' field, not 'content'
-            if content_text and content_text.strip():
-                text_chunks.append(content_text)
+            # Filter ONLY text blocks (exclude tables and images)
+            if item.get('type') == 'text':
+                content_text = item.get('text', '')  # MinerU uses 'text' field, not 'content'
+                if content_text and content_text.strip():
+                    text_chunks.append(content_text)
         
         if not text_chunks:
             logger.error("❌ No text content found in MinerU output")

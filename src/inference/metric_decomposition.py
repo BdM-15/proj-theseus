@@ -19,6 +19,7 @@ LLM to split them into:
 Linked via: REQUIREMENT --MEASURED_BY--> PERFORMANCE_METRIC
 """
 
+import os
 import logging
 import json
 from typing import Dict, List, Callable, Awaitable
@@ -39,7 +40,7 @@ async def decompose_metrics(
     neo4j_io: Neo4jGraphIO,
     llm_func: Callable[[str, str, str, float], Awaitable[str]],
     batch_size: int = 20,
-    model: str = "grok-4-fast-reasoning",
+    model: str = None,
     temperature: float = 0.0
 ) -> Dict[str, any]:
     """
@@ -55,6 +56,9 @@ async def decompose_metrics(
     Returns:
         Dict with decomposition statistics
     """
+    if model is None:
+        model = os.getenv("LLM_MODEL", "grok-4-fast-reasoning")
+    
     logger.info("🔬 Starting metric decomposition...")
     
     # Get all requirement entities

@@ -117,7 +117,7 @@ async def initialize_raganything():
     # Define LLM function (xAI Grok wrapper)
     async def llm_model_func(prompt, system_prompt=None, history_messages=[], **kwargs):
         return await openai_complete_if_cache(
-            "grok-4-fast-reasoning",
+            os.getenv("LLM_MODEL", "grok-4-fast-reasoning"),
             prompt,
             system_prompt=system_prompt,
             history_messages=history_messages,
@@ -130,7 +130,7 @@ async def initialize_raganything():
     async def vision_model_func(prompt, system_prompt=None, history_messages=[], image_data=None, messages=None, **kwargs):
         if messages:
             return await openai_complete_if_cache(
-                "grok-4-fast-reasoning", "", system_prompt=None, history_messages=[],
+                os.getenv("LLM_MODEL", "grok-4-fast-reasoning"), "", system_prompt=None, history_messages=[],
                 messages=messages, api_key=xai_api_key, base_url=xai_base_url, **kwargs
             )
         elif image_data:
@@ -146,7 +146,7 @@ async def initialize_raganything():
             if system_prompt:
                 messages.insert(0, {"role": "system", "content": system_prompt})
             return await openai_complete_if_cache(
-                "grok-4-fast-reasoning", "", system_prompt=None, history_messages=[],
+                os.getenv("LLM_MODEL", "grok-4-fast-reasoning"), "", system_prompt=None, history_messages=[],
                 messages=messages,
                 api_key=xai_api_key, base_url=xai_base_url, **kwargs
             )
@@ -170,7 +170,7 @@ async def initialize_raganything():
             else:
                 truncated_texts.append(text)
         
-        return await openai_embed(truncated_texts, model="text-embedding-3-large", api_key=openai_api_key)
+        return await openai_embed(truncated_texts, model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-large"), api_key=openai_api_key)
     
     # Get embedding dimension from environment (flexibility for different models)
     embedding_dim = int(os.getenv("EMBEDDING_DIM", "3072"))

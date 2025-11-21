@@ -61,13 +61,13 @@ def configure_raganything_args():
     
     # LLM Configuration - xAI Grok
     global_args.llm_binding = "openai"
-    global_args.llm_model_name = "grok-4-fast-reasoning"
+    global_args.llm_model_name = os.getenv("LLM_MODEL", "grok-4-fast-reasoning")
     global_args.llm_binding_host = xai_base_url
     global_args.llm_api_key = xai_api_key
     
     # Embedding Configuration - OpenAI (MUST use OpenAI endpoint, not xAI!)
     global_args.embedding_binding = "openai"
-    global_args.embedding_model_name = "text-embedding-3-large"
+    global_args.embedding_model_name = os.getenv("EMBEDDING_MODEL", "text-embedding-3-large")
     global_args.embedding_binding_host = "https://api.openai.com/v1"  # OpenAI endpoint for embeddings
     global_args.embedding_api_key = openai_api_key
     global_args.embedding_dim = int(os.getenv("EMBEDDING_DIM", "3072"))  # Environment-driven for flexibility

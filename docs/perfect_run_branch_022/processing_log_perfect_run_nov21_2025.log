@@ -1,0 +1,163 @@
+2025-11-21 08:49:21 | INFO     | src.utils.logging_config  | [92mProcessing Log:[0m   processing.log [96m(RFP extraction, semantic inference)[0m
+2025-11-21 08:49:36 | INFO     | src.core.prompt_loader    | Loaded prompt: extraction/entity_extraction_prompt (101735 chars)
+2025-11-21 08:49:36 | INFO     | src.core.prompt_loader    | Loaded prompt: extraction/entity_detection_rules (44299 chars)
+2025-11-21 08:49:40 | INFO     | nano-vectordb             | Init {'embedding_dim': 3072, 'metric': 'cosine', 'storage_file': './rag_storage\\afcapv_adab_iss_2025_pwstst\\vdb_entities.json'} 0 data
+2025-11-21 08:49:40 | INFO     | nano-vectordb             | Init {'embedding_dim': 3072, 'metric': 'cosine', 'storage_file': './rag_storage\\afcapv_adab_iss_2025_pwstst\\vdb_relationships.json'} 0 data
+2025-11-21 08:49:41 | INFO     | src.server.initialization | ✅ Disabled LightRAG's fictional example entities (prevents ontology contamination)
+2025-11-21 08:49:41 | INFO     | nano-vectordb             | Init {'embedding_dim': 3072, 'metric': 'cosine', 'storage_file': './rag_storage\\afcapv_adab_iss_2025_pwstst\\vdb_entities.json'} 0 data
+2025-11-21 08:49:41 | INFO     | nano-vectordb             | Init {'embedding_dim': 3072, 'metric': 'cosine', 'storage_file': './rag_storage\\afcapv_adab_iss_2025_pwstst\\vdb_relationships.json'} 0 data
+2025-11-21 08:49:41 | INFO     | raganything_server        | ✅ Custom endpoints registered: /insert, /documents/upload (multimodal + semantic inference)
+2025-11-21 08:49:41 | INFO     | raganything_server        | 
+2025-11-21 08:49:41 | INFO     | raganything_server        | [96m════════════════════════════════════════════════════════════════════════════════[0m
+2025-11-21 08:49:41 | INFO     | raganything_server        | [1m[95m🔄 PROCESSING PIPELINE FLOW[0m
+2025-11-21 08:49:41 | INFO     | raganything_server        | [96m════════════════════════════════════════════════════════════════════════════════[0m
+2025-11-21 08:49:41 | INFO     | raganything_server        | [93m1.[0m [1mDocument Upload[0m
+2025-11-21 08:49:41 | INFO     | raganything_server        |    [96m└─>[0m MinerU multimodal parser (images/tables/equations)
+2025-11-21 08:49:41 | INFO     | raganything_server        | 
+2025-11-21 08:49:41 | INFO     | raganything_server        | [93m2.[0m [1mLightRAG Chunking[0m [96m(8192 tokens, 15% overlap)[0m
+2025-11-21 08:49:41 | INFO     | raganything_server        |    [96m└─>[0m Multiple focused extraction passes (prevents attention decay)
+2025-11-21 08:49:41 | INFO     | raganything_server        | 
+2025-11-21 08:49:41 | INFO     | raganything_server        | [93m3.[0m [1mEntity Extraction[0m [96m(17 custom types)[0m
+2025-11-21 08:49:41 | INFO     | raganything_server        |    [96m├─>[0m Custom extraction prompts (~2,605 lines)
+2025-11-21 08:49:41 | INFO     | raganything_server        |    [96m├─>[0m Grok-4-fast-reasoning LLM
+2025-11-21 08:49:41 | INFO     | raganything_server        |    [96m└─>[0m Semantic-first detection (UCF patterns)
+2025-11-21 08:49:41 | INFO     | raganything_server        | 
+2025-11-21 08:49:41 | INFO     | raganything_server        | [93m4.[0m [1mRelationship Extraction[0m
+2025-11-21 08:49:41 | INFO     | raganything_server        |    [96m└─>[0m LightRAG automatic relationship inference
+2025-11-21 08:49:41 | INFO     | raganything_server        | 
+2025-11-21 08:49:41 | INFO     | raganything_server        | [93m5.[0m [1mSemantic Post-Processing[0m [92m(Auto-triggered)[0m
+2025-11-21 08:49:41 | INFO     | raganything_server        |    [96m├─>[0m Entity type correction
+2025-11-21 08:49:41 | INFO     | raganything_server        |    [96m├─>[0m LLM relationship inference (Section L↔M, Annex linkage)
+2025-11-21 08:49:41 | INFO     | raganything_server        |    [96m└─>[0m Metadata enrichment
+2025-11-21 08:49:41 | INFO     | raganything_server        | 
+2025-11-21 08:49:41 | INFO     | raganything_server        | [93m6.[0m [1mKnowledge Graph Storage[0m [96m(Neo4JStorage)[0m
+2025-11-21 08:49:41 | INFO     | raganything_server        |    [96m├─>[0m Neo4j enterprise graph database
+2025-11-21 08:49:41 | INFO     | raganything_server        |    [96m├─>[0m Multi-workspace isolation
+2025-11-21 08:49:41 | INFO     | raganything_server        |    [96m└─>[0m APOC subgraph queries for cross-RFP intelligence
+2025-11-21 08:49:41 | INFO     | raganything_server        | [96m════════════════════════════════════════════════════════════════════════════════[0m
+2025-11-21 08:49:41 | INFO     | raganything_server        | 
+2025-11-21 08:49:41 | INFO     | raganything_server        | [96m════════════════════════════════════════════════════════════════════════════════[0m
+2025-11-21 08:49:41 | INFO     | raganything_server        | [1m[95m🌐 SERVER ENDPOINTS[0m
+2025-11-21 08:49:41 | INFO     | raganything_server        | [96m════════════════════════════════════════════════════════════════════════════════[0m
+2025-11-21 08:49:41 | INFO     | raganything_server        | [92mWebUI:[0m              [94mhttp://localhost:9621/webui[0m
+2025-11-21 08:49:41 | INFO     | raganything_server        | [92mAPI Docs:[0m           [94mhttp://localhost:9621/docs[0m
+2025-11-21 08:49:41 | INFO     | raganything_server        | [92mNeo4j Browser:[0m      [94mhttp://localhost:7474[0m
+2025-11-21 08:49:41 | INFO     | raganything_server        | [92mNeo4j Aura:[0m         [94mhttps://console.neo4j.io[0m [93m(recommended)[0m
+2025-11-21 08:49:41 | INFO     | raganything_server        | 
+2025-11-21 08:49:41 | INFO     | raganything_server        | [93mWorking Directory:[0m  ./rag_storage
+2025-11-21 08:49:41 | INFO     | raganything_server        | [93mCurrent Workspace:[0m  [1mafcapv_adab_iss_2025_pwstst[0m
+2025-11-21 08:49:41 | INFO     | raganything_server        | 
+2025-11-21 08:49:41 | INFO     | raganything_server        | [92m▸ LLM Configuration:[0m
+2025-11-21 08:49:41 | INFO     | raganything_server        |   [96mExtraction:[0m       grok-4-fast-reasoning
+2025-11-21 08:49:41 | INFO     | raganything_server        |   [96mReasoning:[0m        grok-4-fast-reasoning
+2025-11-21 08:49:41 | INFO     | raganything_server        |   [96mEmbeddings:[0m       text-embedding-3-large (3072D)
+2025-11-21 08:49:41 | INFO     | raganything_server        | [96m════════════════════════════════════════════════════════════════════════════════[0m
+2025-11-21 08:49:41 | INFO     | raganything_server        | 
+2025-11-21 08:53:22 | INFO     | src.server.routes         | 🔔 ENDPOINT CALLED: /documents/upload with file: Atch 1 ADAB ISS PWS_4 April 25.pdf
+2025-11-21 08:53:22 | INFO     | src.server.routes         | 📄 Processing Atch 1 ADAB ISS PWS_4 April 25.pdf via WebUI /documents/upload endpoint
+2025-11-21 08:53:22 | INFO     | src.server.routes         | 📄 Processing Atch 1 ADAB ISS PWS_4 April 25.pdf
+2025-11-21 08:53:22 | INFO     | src.server.routes         | 🔧 Using RAG-Anything + LLM semantic inference (format-agnostic)
+2025-11-21 08:54:33 | INFO     | root                      | [MinerU] Processing pages:   0%|          | 0/70 [00:00<?, ?it/s]
+[... MinerU processing progress bars omitted for brevity ...]
+2025-11-21 08:54:43 | INFO     | root                      | [MinerU] Processing pages: 100%|##########| 70/70 [00:10<00:00,  6.49it/s]
+2025-11-21 08:54:46 | INFO     | src.server.routes         | 🚫 Filtered 72 discarded content blocks (keeping 474/546 legitimate items)
+2025-11-21 08:54:46 | INFO     | src.server.routes         | 📊 Neo4j storage detected - using custom ontology extraction (bypassing LightRAG)
+2025-11-21 08:54:46 | INFO     | src.server.routes         | 📝 Extracted 421 content blocks (125954 chars total)
+2025-11-21 08:54:46 | INFO     | src.server.routes         | 🔪 Chunked text into 4 chunks (8192 tokens, 1024 overlap)
+2025-11-21 08:54:46 | INFO     | src.server.routes         | 🚀 Running custom ontology extraction with Pydantic schema...
+2025-11-21 08:54:46 | INFO     | src.server.routes         |    Processing chunk 1/4...
+2025-11-21 08:54:46 | INFO     | src.extraction.json_extractor | Sending extraction request to grok-4-fast-reasoning (Length: 40206 chars, ~8192 tokens)
+2025-11-21 08:55:31 | INFO     | src.extraction.json_extractor | Successfully extracted 52 entities
+2025-11-21 08:55:31 | INFO     | src.server.routes         |    Processing chunk 2/4...
+2025-11-21 08:55:31 | INFO     | src.extraction.json_extractor | Sending extraction request to grok-4-fast-reasoning (Length: 39131 chars, ~8192 tokens)
+2025-11-21 08:56:23 | INFO     | src.extraction.json_extractor | Successfully extracted 62 entities
+2025-11-21 08:56:23 | INFO     | src.server.routes         |    Processing chunk 3/4...
+2025-11-21 08:56:23 | INFO     | src.extraction.json_extractor | Sending extraction request to grok-4-fast-reasoning (Length: 40483 chars, ~8192 tokens)
+2025-11-21 08:58:18 | WARNING  | src.extraction.json_extractor | ⚠️ Skipped 1 malformed relationships (total: 97)
+2025-11-21 08:58:18 | INFO     | src.extraction.json_extractor | Successfully extracted 144 entities
+2025-11-21 08:58:18 | INFO     | src.server.routes         |    Processing chunk 4/4...
+2025-11-21 08:58:18 | INFO     | src.extraction.json_extractor | Sending extraction request to grok-4-fast-reasoning (Length: 21130 chars, ~4223 tokens)
+2025-11-21 08:59:53 | INFO     | src.extraction.json_extractor | Successfully extracted 129 entities
+2025-11-21 08:59:53 | INFO     | src.server.routes         | ✅ Extracted 368 unique entities, 274 relationships from 4 chunks
+2025-11-21 08:59:53 | INFO     | src.server.routes         | 💾 Inserting custom ontology into LightRAG...
+2025-11-21 09:00:12 | INFO     | src.server.routes         | ✅ Custom ontology inserted into knowledge graph
+2025-11-21 09:00:12 | INFO     | src.server.routes         | 🤖 Running semantic enhancement...
+2025-11-21 09:00:12 | INFO     | src.inference.semantic_post_processor | ================================================================================
+2025-11-21 09:00:12 | INFO     | src.inference.semantic_post_processor | 🧠 SEMANTIC POST-PROCESSING: LLM-Powered Graph Enhancement
+2025-11-21 09:00:12 | INFO     | src.inference.semantic_post_processor | ================================================================================
+2025-11-21 09:00:12 | INFO     | src.inference.semantic_post_processor | 📊 Neo4j storage detected - using Cypher-based semantic enhancement
+2025-11-21 09:00:12 | INFO     | src.inference.semantic_post_processor | 🔧 Starting Neo4j semantic post-processing...
+2025-11-21 09:00:12 | INFO     | src.inference.semantic_post_processor | 📊 Initializing Neo4j connection...
+2025-11-21 09:00:12 | INFO     | src.inference.semantic_post_processor | 📥 Step 1: Loading knowledge graph from Neo4j...
+2025-11-21 09:00:12 | INFO     | src.inference.neo4j_graph_io |   📊 Fetched 368 entities from Neo4j
+2025-11-21 09:00:12 | INFO     | src.inference.neo4j_graph_io |   📊 Fetched 269 relationships from Neo4j
+2025-11-21 09:00:12 | INFO     | src.inference.semantic_post_processor | 🔧 Step 2: Correcting entity types with LLM...
+2025-11-21 09:00:12 | INFO     | src.inference.semantic_post_processor | ✅ No entity type corrections needed
+2025-11-21 09:00:12 | INFO     | src.inference.semantic_post_processor | 🔗 Step 3: Inferring missing relationships with multi-algorithm approach...
+2025-11-21 09:00:12 | INFO     | src.inference.semantic_post_processor |   [Algorithm 4/8] Deliverable Traceability: 146 requirements + 5 work statements × 45 deliverables
+2025-11-21 09:00:50 | INFO     | src.inference.semantic_post_processor |     → Pattern 1 (Requirement→Deliverable): 29 relationships
+2025-11-21 09:01:13 | INFO     | src.inference.semantic_post_processor |     → Pattern 2 (WorkStatement→Deliverable): 19 relationships
+2025-11-21 09:01:13 | INFO     | src.inference.semantic_post_processor |     → Total Deliverable Traceability: 48 relationships (Pattern 1: 29, Pattern 2: 19)
+2025-11-21 09:01:13 | INFO     | src.inference.semantic_post_processor |   [Algorithm 5/8] Document Hierarchy (All Document Types): 51 document entities
+2025-11-21 09:02:07 | INFO     | src.inference.semantic_post_processor |     → Found 32 document hierarchy relationships
+2025-11-21 09:02:07 | INFO     | src.inference.semantic_post_processor |   [Algorithm 7/8] Heuristic CDRL Pattern Matching
+2025-11-21 09:02:07 | INFO     | src.inference.semantic_post_processor |     → Found 0 heuristic relationships
+2025-11-21 09:02:07 | INFO     | src.inference.semantic_post_processor |   [Algorithm 8/8] Orphan Pattern Resolution
+2025-11-21 09:02:07 | INFO     | src.inference.neo4j_graph_io |   📊 Found 88 truly orphaned entities in Neo4j
+2025-11-21 09:02:07 | INFO     | src.inference.semantic_post_processor |     → Found 88 orphaned entities
+2025-11-21 09:02:07 | INFO     | src.inference.semantic_post_processor |     → Using 88 orphans × 165 candidates for inference
+2025-11-21 09:03:18 | INFO     | src.inference.semantic_post_processor |     → Found 74 orphan relationships
+2025-11-21 09:03:18 | INFO     | src.inference.semantic_post_processor |     → Found 74 orphan pattern relationships
+2025-11-21 09:03:18 | INFO     | src.inference.semantic_post_processor |   ✅ Total relationships from all algorithms: 154
+2025-11-21 09:03:18 | INFO     | src.inference.semantic_post_processor | 💾 Creating 154 new relationships in Neo4j...
+2025-11-21 09:03:18 | INFO     | src.inference.neo4j_graph_io |   💾 Created 154 new relationships in Neo4j
+2025-11-21 09:03:18 | INFO     | src.inference.semantic_post_processor | 🏗️ Step 4: Enriching requirements with workload metadata...
+2025-11-21 09:03:18 | INFO     | src.inference.workload_enrichment | 🏗️ Starting workload enrichment...
+2025-11-21 09:03:18 | INFO     | src.inference.workload_enrichment | Loading text chunks from rag_storage\afcapv_adab_iss_2025_pwstst\kv_store_text_chunks.json...
+2025-11-21 09:03:18 | INFO     | src.inference.workload_enrichment | Loaded 4 text chunks
+2025-11-21 09:03:18 | INFO     | src.inference.neo4j_graph_io |   📊 Fetched 368 entities from Neo4j
+2025-11-21 09:03:18 | INFO     | src.inference.workload_enrichment | Found 146 requirement entities to enrich
+2025-11-21 09:03:18 | INFO     | src.inference.workload_enrichment |   Processing batch 1/3 (50 requirements)...
+2025-11-21 09:16:15 | INFO     | src.inference.neo4j_graph_io |   ✅ Updated 45 entities with new properties in Neo4j
+2025-11-21 09:16:15 | INFO     | src.inference.workload_enrichment |     ✓ Enriched 45 requirements
+2025-11-21 09:16:15 | INFO     | src.inference.workload_enrichment |   Processing batch 2/3 (50 requirements)...
+[... batch 2 warnings about invalid entity_ids omitted for brevity ...]
+2025-11-21 09:21:37 | INFO     | src.inference.neo4j_graph_io |   ✅ Updated 50 entities with new properties in Neo4j
+2025-11-21 09:21:37 | INFO     | src.inference.workload_enrichment |     ✓ Enriched 108 requirements
+2025-11-21 09:21:37 | INFO     | src.inference.workload_enrichment |   Processing batch 3/3 (46 requirements)...
+[... batch 3 warnings about invalid entity_ids omitted for brevity ...]
+2025-11-21 09:26:37 | INFO     | src.inference.neo4j_graph_io |   ✅ Updated 33 entities with new properties in Neo4j
+2025-11-21 09:26:37 | INFO     | src.inference.workload_enrichment |     ✓ Enriched 98 requirements
+2025-11-21 09:26:37 | INFO     | src.inference.workload_enrichment | ✓ Workload enrichment complete: 128/146 requirements
+2025-11-21 09:26:37 | INFO     | src.inference.workload_enrichment |   BOE category distribution: {'Labor': 112, 'Materials': 10, 'ODCs': 0, 'QA': 1, 'Logistics': 11, 'Lifecycle': 0, 'Compliance': 16}
+2025-11-21 09:26:37 | INFO     | src.inference.semantic_post_processor | ✅ Workload enrichment complete:
+2025-11-21 09:26:37 | INFO     | src.inference.semantic_post_processor |   Requirements enriched: 128
+2025-11-21 09:26:37 | INFO     | src.inference.semantic_post_processor |   Enrichment rate:       87.7%
+2025-11-21 09:26:37 | INFO     | src.inference.semantic_post_processor |   BOE categories used:   Labor:112, Materials:10, QA:1, Logistics:11, Compliance:16
+2025-11-21 09:26:37 | INFO     | src.inference.semantic_post_processor | ================================================================================
+2025-11-21 09:26:37 | INFO     | src.inference.semantic_post_processor | ✅ SEMANTIC POST-PROCESSING COMPLETE (Neo4j)
+2025-11-21 09:26:37 | INFO     | src.inference.semantic_post_processor | ================================================================================
+2025-11-21 09:26:37 | INFO     | src.inference.semantic_post_processor |   Entities corrected:      0
+2025-11-21 09:26:37 | INFO     | src.inference.semantic_post_processor |   Relationships inferred:  154
+2025-11-21 09:26:37 | INFO     | src.inference.semantic_post_processor |   Requirements enriched:   128
+2025-11-21 09:26:37 | INFO     | src.inference.semantic_post_processor |   Processing time:         1584.77s
+2025-11-21 09:26:37 | INFO     | src.inference.semantic_post_processor | ================================================================================
+2025-11-21 09:26:37 | INFO     | src.inference.semantic_post_processor | 📊 Entity Type Distribution:
+2025-11-21 09:26:37 | INFO     | src.inference.semantic_post_processor |   requirement                   :  146
+2025-11-21 09:26:37 | INFO     | src.inference.semantic_post_processor |   deliverable                   :   45
+2025-11-21 09:26:37 | INFO     | src.inference.semantic_post_processor |   section                       :   31
+2025-11-21 09:26:37 | INFO     | src.inference.semantic_post_processor |   concept                       :   30
+2025-11-21 09:26:37 | INFO     | src.inference.semantic_post_processor |   performance_metric            :   28
+2025-11-21 09:26:37 | INFO     | src.inference.semantic_post_processor |   location                      :   24
+2025-11-21 09:26:37 | INFO     | src.inference.semantic_post_processor |   document                      :   20
+2025-11-21 09:26:37 | INFO     | src.inference.semantic_post_processor |   organization                  :   12
+2025-11-21 09:26:37 | INFO     | src.inference.semantic_post_processor |   person                        :   12
+2025-11-21 09:26:37 | INFO     | src.inference.semantic_post_processor |   equipment                     :    8
+2025-11-21 09:26:37 | INFO     | src.server.routes         | ✅ Neo4j semantic enhancement complete
+2025-11-21 09:26:37 | INFO     | src.server.routes         |    Entities extracted: 368
+2025-11-21 09:26:37 | INFO     | src.server.routes         |    Relationships extracted: 274
+2025-11-21 09:26:37 | INFO     | src.server.routes         |    Entities corrected: 0
+2025-11-21 09:26:37 | INFO     | src.server.routes         |    Relationships inferred: 154
+2025-11-21 09:26:37 | INFO     | src.server.routes         |    View results in Neo4j Browser: http://localhost:7474
+2025-11-21 09:26:37 | INFO     | src.server.routes         | ✅ Processing complete for Atch 1 ADAB ISS PWS_4 April 25.pdf
+2025-11-21 09:26:37 | INFO     | src.server.routes         |    Relationships inferred: 154

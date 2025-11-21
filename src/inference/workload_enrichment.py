@@ -29,6 +29,7 @@ Output properties added to REQUIREMENT entities:
 - enriched_by: String identifier ("workload_analysis_v1")
 """
 
+import os
 import logging
 import json
 from typing import Dict, List, Callable, Awaitable
@@ -49,7 +50,7 @@ async def enrich_workload_metadata(
     neo4j_io: Neo4jGraphIO,
     llm_func: Callable[[str, str, str, float], Awaitable[str]],
     batch_size: int = 50,
-    model: str = "grok-4-fast-reasoning",
+    model: str = None,
     temperature: float = 0.1
 ) -> Dict[str, any]:
     """
@@ -65,6 +66,9 @@ async def enrich_workload_metadata(
     Returns:
         Dict with enrichment statistics
     """
+    if model is None:
+        model = os.getenv("LLM_MODEL", "grok-4-fast-reasoning")
+    
     logger.info("🏗️ Starting workload enrichment...")
     
     # Load enrichment prompt

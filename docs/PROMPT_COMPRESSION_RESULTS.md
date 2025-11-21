@@ -20,22 +20,24 @@ Successfully compressed system prompts from **284,942 chars → 30,784 chars** (
 
 ### File-by-File Results
 
-| File | Original | Compressed | Reduction | Intelligence Preserved |
-|------|----------|-----------|-----------|----------------------|
-| `entity_extraction_prompt.md` | 104,845 chars | 15,519 chars | **85.2%** | ✅ 100% (18 entity types, 7 examples, decision tree) |
-| `entity_detection_rules.md` | 45,969 chars | 14,403 chars | **68.7%** | ✅ 100% (all detection signals, validation rules) |
-| `grok_json_prompt.md` | 10,056 chars | 862 chars | **91.4%** | ✅ 100% (schema enforcement only) |
-| **TOTAL SYSTEM PROMPT** | **284,942 chars** | **30,784 chars** | **89.2%** | ✅ **100%** |
+| File                          | Original          | Compressed       | Reduction | Intelligence Preserved                               |
+| ----------------------------- | ----------------- | ---------------- | --------- | ---------------------------------------------------- |
+| `entity_extraction_prompt.md` | 104,845 chars     | 15,519 chars     | **85.2%** | ✅ 100% (18 entity types, 7 examples, decision tree) |
+| `entity_detection_rules.md`   | 45,969 chars      | 14,403 chars     | **68.7%** | ✅ 100% (all detection signals, validation rules)    |
+| `grok_json_prompt.md`         | 10,056 chars      | 862 chars        | **91.4%** | ✅ 100% (schema enforcement only)                    |
+| **TOTAL SYSTEM PROMPT**       | **284,942 chars** | **30,784 chars** | **89.2%** | ✅ **100%**                                          |
 
 ### Token Impact Analysis
 
 **Perfect Run Configuration (Nov 20, 2025)**:
+
 - System prompt: 284,942 chars (~71,236 tokens)
 - Chunk size: 8,192 tokens
 - Per-chunk total: ~79,428 tokens
 - 4-chunk document: **355,180 tokens**
 
 **Compressed Configuration**:
+
 - System prompt: 30,784 chars (~7,696 tokens)
 - Chunk size: 8,192 tokens (unchanged)
 - Per-chunk total: ~15,888 tokens
@@ -130,6 +132,7 @@ All extraction safeguards preserved:
 ## Compression Methodology
 
 **What was removed (89% of chars)**:
+
 - ❌ Markdown headers (`#`, `##`, `###`)
 - ❌ Bold/italic formatting (`**`, `*`)
 - ❌ Code fences (` ``` `)
@@ -139,6 +142,7 @@ All extraction safeguards preserved:
 - ❌ Redundant explanations ("This means..." → direct instruction)
 
 **What was preserved (100% intelligence)**:
+
 - ✅ All 18 entity type definitions
 - ✅ All specialized metadata field instructions
 - ✅ All normalization rules
@@ -151,25 +155,32 @@ All extraction safeguards preserved:
 
 **Example Transformation**:
 
-```markdown
+````markdown
 # Original (with markdown):
+
 ## Entity Type: requirement
+
 A **requirement** is a contractual obligation that specifies work to be performed.
 
 ### Metadata Fields:
+
 - `labor_drivers`: Array of volume metrics
 
 ### Example:
+
 ```json
 {
   "entity_type": "requirement",
   "labor_drivers": ["500 meal servings/day"]
 }
 ```
+````
 
 # Compressed (plain text, no markdown):
+
 requirement: contractual obligation specifying work. Metadata: labor_drivers (volume metrics). Example: entity_type=requirement, labor_drivers=["500 meal servings/day"]
-```
+
+````
 
 **Result**: Same information, 75% fewer characters.
 
@@ -238,9 +249,10 @@ requirement: contractual obligation specifying work. Metadata: labor_drivers (vo
    ```bash
    # Add to .env
    USE_COMPRESSED_PROMPTS=true
-   ```
+````
 
 7. Phase 1: Centralize hardcoded model names
+
    - Replace `grok-4-fast-reasoning` in 5 locations with `os.getenv("LLM_MODEL")`
    - Update `.env` with `LLM_MODEL=grok-4-1-fast-reasoning`
 
@@ -273,16 +285,19 @@ requirement: contractual obligation specifying work. Metadata: labor_drivers (vo
 ### File Locations
 
 **Compressed prompts** (new files):
+
 - `prompts/extraction/entity_extraction_prompt_COMPRESSED.txt` (15,519 chars)
 - `prompts/extraction/entity_detection_rules_COMPRESSED.txt` (14,403 chars)
 - `prompts/extraction/grok_json_prompt_COMPRESSED.txt` (862 chars)
 
 **Original prompts** (unchanged):
+
 - `prompts/extraction/entity_extraction_prompt.md` (104,845 chars)
 - `prompts/extraction/entity_detection_rules.md` (45,969 chars)
 - `prompts/extraction/grok_json_prompt.md` (10,056 chars)
 
 **Code changes**:
+
 - `src/extraction/json_extractor.py`: Added USE_COMPRESSED_PROMPTS feature flag
 - `tests/test_compressed_prompts.py`: New A/B validation script
 
@@ -297,6 +312,7 @@ USE_COMPRESSED_PROMPTS=true   # Enable after A/B validation passes
 ### Logging
 
 When loading prompts, `json_extractor.py` logs:
+
 ```
 INFO - Loading COMPRESSED prompts (89% token reduction enabled=True)
 INFO - Constructed system prompt with 30784 characters (~7696 tokens)

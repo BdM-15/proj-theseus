@@ -29,6 +29,7 @@ python test_neo4j_quick.py
 **Purpose**: Validate compressed prompts (89% token reduction) maintain extraction quality
 
 **What it tests**:
+
 - ✅ Entity count matches perfect run baseline ±5% (339 entities)
 - ✅ Relationship count matches baseline ±5% (154 relationships)
 - ✅ Workload driver completeness ≥95%
@@ -40,6 +41,7 @@ python test_neo4j_quick.py
 **Use when**: Before enabling `USE_COMPRESSED_PROMPTS=true` in production
 
 **Example output**:
+
 ```
 🔵 PHASE 1: Extract with ORIGINAL prompts (baseline)
   ✓ Entities: 341
