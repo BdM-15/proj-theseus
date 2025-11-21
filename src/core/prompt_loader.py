@@ -13,11 +13,15 @@ Philosophy: Prompts are training data, not code.
 from pathlib import Path
 from typing import Dict
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
 # Cache for loaded prompts (in-memory)
 _prompt_cache: Dict[str, str] = {}
+
+# Check if compressed prompts should be used
+USE_COMPRESSED_PROMPTS = os.getenv("USE_COMPRESSED_PROMPTS", "false").lower() == "true"
 
 
 def load_prompt(prompt_name: str, use_cache: bool = True) -> str:
@@ -47,8 +51,17 @@ def load_prompt(prompt_name: str, use_cache: bool = True) -> str:
         logger.debug(f"Loaded prompt from cache: {prompt_name}")
         return _prompt_cache[prompt_name]
     
-    # Build file path
-    prompt_path = Path("prompts") / f"{prompt_name}.md"
+    # Determine file extension based on compression setting
+    if USE_COMPRESSED_PROMPTS:
+        # Try compressed version first
+        prompt_path = Path("prompts") / f"{prompt_name}_COMPRESSED.txt"
+        if not prompt_path.exists():
+            # Fall back to uncompressed if compressed doesn't exist
+            logger.warning(f"Compressed prompt not found: {prompt_path}, falling back to .md")
+            prompt_path = Path("prompts") / f"{prompt_name}.md"
+    else:
+        # Use uncompressed .md files
+        prompt_path = Path("prompts") / f"{prompt_name}.md"
     
     if not prompt_path.exists():
         raise FileNotFoundError(
