@@ -1,401 +1,247 @@
-# Workload Enrichment Analysis for Government Contracting Requirements
+WORKLOAD ENRICHMENT ANALYSIS (GOVERNMENT CONTRACTING REQUIREMENTS)
 
-## Objective
+OBJECTIVE
+Enrich each REQUIREMENT entity with workload metadata needed for:
+- Labor staffing planning (FTEs, shifts, coverage)
+- Bill of Materials (equipment, consumables, infrastructure)
+- Complexity and confidence signals for pricing and BOE
 
-Analyze RFP requirements to extract workload metadata for labor staffing planning and Bill of Materials (BOM) development. This enables capture managers to:
+You are NOT inventing costs or FTEs. You are only:
+- Extracting explicit workload signals from text
+- Making bounded, explainable inferences when text strongly implies workload
 
-- **Staff proposals** with accurate labor categories and effort estimates
-- **Build BOMs** with required materials, equipment, and ODCs
-- **Assess risk** based on requirement complexity and dependencies
-- **Estimate costs** aligned with Basis of Estimate (BOE) categories
+OUTPUT FIELDS (PER REQUIREMENT)
+For each requirement with any workload implication, output an enrichment object:
 
----
-
-## Analysis Framework
-
-For each requirement, identify:
-
-1. **BOE Categories** - Which cost categories apply to this requirement?
-2. **Labor Drivers** - What labor skills, roles, or FTEs are needed?
-3. **Material Needs** - What equipment, supplies, or physical assets are required?
-4. **Complexity Assessment** - How difficult is this requirement to fulfill?
-5. **Confidence Level** - How certain are you about this analysis?
-
----
-
-## BOE Categories (7 Standard Categories)
-
-Classify each requirement into one or more of these categories:
-
-### 1. **Labor**
-
-- Direct labor (FTEs, contractors, technicians)
-- Skill requirements (engineers, analysts, managers)
-- Effort indicators (hours/week, shift coverage, 24/7 operations)
-- **Keywords**: staff, personnel, FTE, contractor, labor, workforce, team, operator, technician, engineer, analyst, manager
-
-### 2. **Materials**
-
-- Physical goods (supplies, equipment, parts)
-- Consumables (cleaning supplies, uniforms, food)
-- Infrastructure (facilities, buildings, office space)
-- **Keywords**: equipment, supplies, materials, parts, tools, consumables, goods, inventory, stock
-
-### 3. **ODCs (Other Direct Costs)**
-
-- Travel (TDY, site visits, conferences)
-- Subcontractors/vendors
-- Licenses, permits, certifications
-- Training costs
-- **Keywords**: travel, subcontractor, vendor, training, license, permit, certification, TDY, conference
-
-### 4. **QA (Quality Assurance)**
-
-- Inspection requirements
-- Quality control procedures
-- Compliance verification
-- Testing and validation
-- **Keywords**: inspection, quality control, QC, QA, compliance, testing, validation, verification, audit, review
-
-### 5. **Logistics**
-
-- Transportation and delivery
-- Storage and warehousing
-- Supply chain management
-- Distribution requirements
-- **Keywords**: transportation, delivery, shipping, warehousing, storage, distribution, supply chain, logistics
-
-### 6. **Lifecycle**
-
-- Maintenance and sustainment
-- Long-term operations
-- Replacement cycles
-- End-of-life disposal
-- **Keywords**: maintenance, sustainment, operations, O&M, lifecycle, replacement, disposal, preventive maintenance
-
-### 7. **Compliance**
-
-- Regulatory requirements
-- Policy adherence
-- Documentation and reporting
-- Legal obligations
-- **Keywords**: compliance, regulation, policy, documentation, reporting, legal, FAR, DFARS, certification
-
----
-
-## Labor Driver Analysis
-
-Extract specific labor details when BOE category includes "Labor":
-
-### Labor Categories to Identify:
-
-- **Management**: Program Manager, Task Lead, Supervisor
-- **Technical**: Engineers, Analysts, Specialists
-- **Operations**: Technicians, Operators, Maintenance Staff
-- **Administrative**: Clerks, Coordinators, Support Staff
-- **Specialized**: Security Personnel, Medical Staff, QA Inspectors
-
-### ❌ EXCLUSION RULE:
-
-- Do NOT include Performance Metrics (e.g., "95% uptime", "100% compliance") in Labor Drivers.
-- These belong in the Performance Requirements section, not Workload.
-
-### Effort Indicators (CRITICAL: EXTRACT EXACT NUMBERS, FREQUENCIES, HOURS):
-
-- **Explicit**: "3 FTE", "24/7 coverage", "8-hour shifts", "40 hours/week", "5000 personnel"
-- **Frequencies**: "Daily", "Weekly", "Monthly", "Quarterly", "Annually", "3x per week"
-- **Hours**: "Operating hours 0800-1700", "Response time 2 hours", "2000 annual hours"
-- **Implicit**: "continuous operations" → 24/7 staffing, "daily cleaning" → recurring labor
-- **Quantitative**: If the text says "5000 personnel" or "Frequency: Daily", you MUST include it in the driver description.
-
-### Example Labor Extraction:
-
-```
-Requirement: "Contractor shall provide 24/7 janitorial services with minimum 3 FTE coverage for 5000 personnel. Restrooms cleaned 4x daily."
-Labor Drivers: ["Janitorial Staff (3 FTE)", "24/7 Coverage (shift rotation)", "Cleaning Operations for 5000 personnel", "Frequency: 4x Daily Restroom Cleaning"]
-Effort Quantifiers: "Explicit: 3 FTE minimum, 24/7 coverage, 4x daily frequency"
-```
-
----
-
-## Material Needs Analysis
-
-Extract specific material details when BOE category includes "Materials":
-
-### Material Categories:
-
-- **Equipment**: Heavy machinery, vehicles, tools, instruments
-- **Consumables**: Cleaning supplies, office supplies, food service items
-- **Technology**: Computers, software, communications gear
-- **Infrastructure**: Facilities, buildings, utilities
-
-### Quantity Indicators (CRITICAL: EXTRACT EXACT NUMBERS):
-
-- **Explicit**: "50 laptops", "3 vehicles", "200 meals/day", "50,000 sq ft"
-- **Implicit**: "dining facility for 500" → kitchen equipment, tables, chairs, utensils
-- **Quantitative**: If the text says "50,000 sq ft", you MUST include "50,000 sq ft" in the material need.
-
-### Example Material Extraction:
-
-```
-Requirement: "Contractor shall operate dining facility serving 500 meals per day in 10,000 sq ft facility"
-Material Needs: ["Commercial kitchen equipment", "Dining tables/chairs (100 seats)", "Food service supplies", "Refrigeration units", "Facility maintenance for 10,000 sq ft"]
-Quantity Metrics: "Explicit: 500 meals/day, 10,000 sq ft facility"
-```
-
----
-
-## Complexity Assessment
-
-Rate the difficulty of fulfilling this requirement:
-
-- **Simple** (1-3): Basic tasks, standard procedures, minimal coordination
-
-  - Examples: Submit monthly reports, maintain cleanliness, answer phone calls
-
-- **Moderate** (4-6): Multiple steps, some coordination, specialized skills required
-
-  - Examples: Manage 24/7 operations, coordinate deliveries, perform inspections
-
-- **Complex** (7-10): High coordination, specialized expertise, mission-critical impact
-  - Examples: Develop QC plan, manage multi-vendor supply chain, 24/7 emergency response
-
-### Complexity Factors:
-
-- **Coordination**: How many entities/teams must work together?
-- **Expertise**: Are specialized skills or certifications required?
-- **Criticality**: What's the impact if this requirement fails?
-- **Frequency**: Is this one-time or recurring with high volume?
-
----
-
-## Confidence Scoring
-
-Rate your confidence in each BOE category assignment (0.0-1.0):
-
-- **0.9-1.0**: Explicit mention in requirement text
-
-  - Example: "Contractor shall provide 3 FTE janitorial staff" → Labor: 1.0
-
-- **0.7-0.9**: Strong inference from context
-
-  - Example: "24/7 dining facility operations" → Labor: 0.9 (shift staff implied)
-
-- **0.5-0.7**: Moderate inference, some ambiguity
-
-  - Example: "Maintain facility cleanliness" → Labor: 0.6 (could be labor or contracted service)
-
-- **0.3-0.5**: Weak inference, high uncertainty
-
-  - Example: "Ensure quality service" → QA: 0.4 (vague quality reference)
-
-- **0.0-0.3**: Speculative, minimal evidence
-  - Use only when BOE category is remotely possible but not clearly indicated
-
----
-
-## Output Format (JSON)
-
-For each requirement entity, return:
-
-```json
 {
-  "entity_id": "entity_123",
-  "has_workload_metric": true,
-  "workload_categories": ["Labor", "Materials", "QA"],
-  "boe_relevance": {
-    "Labor": 0.95,
-    "Materials": 0.8,
-    "QA": 0.7
-  },
-  "labor_drivers": [
-    "Janitorial Staff (3 FTE minimum)",
-    "24/7 Coverage Requirement",
-    "Shift Rotation (3 shifts per day)"
-  ],
-  "material_needs": [
-    "Cleaning equipment and supplies",
-    "Protective equipment (PPE)",
-    "Floor maintenance machinery"
-  ],
-  "complexity_score": 6,
-  "complexity_rationale": "Requires 24/7 staffing coordination, multiple shift management, and compliance with health/safety standards",
-  "effort_estimate": "Moderate - 9-12 FTE total (3 per shift × 3 shifts with overlap)",
-  "enriched_by": "workload_analysis_v1"
+   "entity_id": "<requirement_entity_id>",
+   "has_workload_metric": true/false,
+   "workload_categories": [
+      "Labor" | "Materials" | "ODCs" | "QA" | "Logistics" | "Lifecycle" | "Compliance"
+   ],
+   "boe_relevance": {
+      "Labor": 0.0-1.0,
+      "Materials": 0.0-1.0,
+      "ODCs": 0.0-1.0,
+      "QA": 0.0-1.0,
+      "Logistics": 0.0-1.0,
+      "Lifecycle": 0.0-1.0,
+      "Compliance": 0.0-1.0
+   },
+   "labor_drivers": [
+      "<short phrase capturing concrete labor driver>",
+      "..."
+   ],
+   "material_needs": [
+      "<short phrase capturing concrete material/equipment need>",
+      "..."
+   ],
+   "complexity_score": 1-10,
+   "complexity_rationale": "<1-3 sentence explanation>",
+   "effort_estimate": "<echo back ONLY explicit quantities or clearly bounded ranges from text>",
+   "enriched_by": "workload_enrichment_v1"
 }
-```
 
-### Field Definitions:
+If a requirement truly has no workload implication, set:
+- "has_workload_metric": false
+- All other workload fields may be omitted or empty
 
-- **has_workload_metric**: Boolean - Always `true` after enrichment
-- **workload_categories**: Array of BOE category names (max 7, must match standard categories)
-- **boe_relevance**: Object with confidence scores (0.0-1.0) for each identified category
-- **labor_drivers**: Array of labor-related details (empty if no Labor category)
-- **material_needs**: Array of material-related details (empty if no Materials category)
-- **complexity_score**: Integer 1-10 (difficulty rating)
-- **complexity_rationale**: String explaining complexity assessment
-- **effort_estimate**: String with EXPLICIT effort metrics found in text (e.g., "3 FTE", "24/7"). Do NOT estimate/guess FTEs if not stated.
-- **enriched_by**: String identifier for enrichment version (use "workload_analysis_v1")
+7 BOE WORKLOAD CATEGORIES
+Classify workload into these standard categories (multiple allowed):
 
----
+1) LABOR (PEOPLE WORK)
+    FTEs, positions, roles, shifts, coverage, man-hours.
+    Keywords/Signals: staff, personnel, FTE, contractor, workforce, team, operator, technician, engineer, analyst, manager, help desk, 24/7, 8-hour shift, coverage, duty, watch, manned, staffed.
 
-## Analysis Rules
+2) MATERIALS (PHYSICAL THINGS)
+    Equipment, hardware, consumables, facilities, tools, infrastructure.
+    Keywords/Signals: equipment, supplies, materials, parts, tools, consumables, inventory, hardware, servers, vehicles, office space, square feet.
 
-### Rule 1: Multiple BOE Categories are Common
+3) ODCs (OTHER DIRECT COSTS)
+    Travel, subcontractors, licenses, training seats, external services.
+    Keywords/Signals: travel, TDY, per diem, airfare, hotel, subcontractor, vendor, license, permit, certification, tuition, training course, conference.
 
-Most requirements span multiple categories. Examples:
+4) QA (QUALITY/INSPECTION WORK)
+    Inspection, monitoring, audits, testing, validation.
+    Keywords/Signals: inspection, QC, QA, surveillance, audit, verification, validation, test, sample, review, acceptance.
 
-- "Provide 24/7 janitorial services" → Labor (staff) + Materials (supplies) + Compliance (health standards)
-- "Deliver meals to 500 personnel daily" → Labor (cooks) + Materials (food) + Logistics (delivery)
+5) LOGISTICS (MOVEMENT & STORAGE)
+    Transportation, shipping, warehousing, distribution, supply chain.
+    Keywords/Signals: transportation, shipping, delivery, distribution, warehousing, storage, supply chain, staging, kitting.
 
-### Rule 2: Prioritize Explicit Evidence
+6) LIFECYCLE (SUSTAINMENT & MAINTENANCE)
+    O&M, upgrades, repairs, refresh, replacement, disposal.
+    Keywords/Signals: maintenance, sustainment, O&M, repair, replace, upgrade, overhaul, lifecycle, disposal, decommission.
 
-- Direct mentions > Implied needs > Possible inferences
-- High confidence (0.9+) only for explicit text
-- Lower confidence (0.5-0.7) for logical inferences
+7) COMPLIANCE (REGULATORY/REPORTING WORKLOAD)
+    Documentation, reporting, audits, regulatory responses.
+    Keywords/Signals: compliance, regulation, policy, documentation, reporting, legal, FAR, DFARS, recordkeeping.
 
-### Rule 3: Labor vs Materials vs ODCs
+LABOR DRIVER ANALYSIS (WHEN "Labor" IS SELECTED)
+GOAL: Capture what drives labor demand (coverage, roles, volume, frequency), not performance targets.
 
-- **Labor**: People doing work (FTEs, contractors, staff)
-- **Materials**: Physical things being used/consumed (equipment, supplies)
-- **ODCs**: External costs not labor/materials (travel, training, vendors)
+Common labor role groupings:
+- Management: Program Manager, Task Lead, Site Lead, Supervisor.
+- Technical: Engineers, Analysts, Architects, Developers, Specialists.
+- Operations: Technicians, Operators, Maintenance Staff, Help Desk, On-site Support.
+- Administrative: Clerks, Coordinators, Schedulers, Admin Support.
+- Specialized: Security Guards, Medical Personnel, QA Inspectors, Trainers.
 
-### Rule 4: Empty Arrays are OK
+EXTRACT EXACT EFFORT INDICATORS WHEN PRESENT:
+- Counts: "3 FTE", "two additional analysts", "one PM", "3 janitors".
+- Coverage: "24/7", "16x5", "8-hour shifts", "three shifts per day".
+- Volume drivers: "5000 personnel", "500 meals per day", "200 tickets/month".
+- Frequency: "daily", "weekly", "monthly", "quarterly", "4x per day".
+- Hours: "0800-1700", "40 hours per week", "2,000 annual hours".
 
-- If no labor drivers identified → `"labor_drivers": []`
-- If no materials needed → `"material_needs": []`
-- Don't fabricate data - only include what's supported by text
+EXCLUSION RULE (CRITICAL):
+Do NOT put performance targets in labor_drivers.
+- Examples of EXCLUDED items: "95% uptime", "99.9% availability", "100% compliance", "respond within 4 hours".
+- Those belong in PERFORMANCE_METRIC entities, not workload enrichment.
 
-### Rule 5: Complexity Correlates with BOE Diversity
+MATERIAL NEEDS ANALYSIS (WHEN "Materials" IS SELECTED)
+GOAL: Identify concrete physical or technology items that must exist or be provided.
 
-- Single BOE category → Often simpler (1-5)
-- 2-3 BOE categories → Often moderate (4-7)
-- 4+ BOE categories → Often complex (7-10)
-- But consider other factors: criticality, coordination, expertise
+Common material groupings:
+- Equipment: servers, laptops, network gear, vehicles, tools, machinery.
+- Consumables: paper, toner, cleaning supplies, food, fuel, PPE, spare parts.
+- Technology/Software: licenses, subscriptions, specialized software.
+- Facilities/Infrastructure: square footage, dedicated spaces, labs, warehouses.
 
----
+EXTRACT EXACT QUANTITY/SCALING INDICATORS WHEN PRESENT:
+- "50 laptops", "3 vehicles", "500 meals per day", "10,000 sq ft", "two secure racks".
 
-## Example Analysis
+COMPLEXITY SCORE (1-10)
+Provide a single integer 1-10 per requirement:
+- 1-3 (Simple): Basic tasks, standard procedures, minimal coordination, low volume.
+- 4-6 (Moderate): Multiple steps, some coordination, specialized skills OR moderate volume.
+- 7-10 (Complex): High coordination, multiple roles/sites, mission-critical, high volume, or tight timelines.
 
-### Input Requirements:
+Consider:
+- Coordination: How many roles, teams, or locations are involved?
+- Expertise: Are certifications, clearances, or advanced skills required?
+- Criticality: Is this mission-critical or safety-critical?
+- Volume/Frequency: How often and how many (e.g., thousands of users, daily surges)?
 
-```
-1. entity_456 | requirement | "ADAB ISS Requirement" | "Contractor shall provide Installation Support Services (ISS) at Al Dhafra Air Base, including 24/7 dining facility operations, janitorial services, and grounds maintenance for 5000+ personnel."
+CONFIDENCE (IMPLICIT IN boe_relevance)
+Use 0.0-1.0 scores to reflect evidence strength per category:
+- 0.9-1.0: Explicit workload language in text.
+- 0.7-0.9: Strong inference with multiple supporting phrases.
+- 0.5-0.7: Moderate inference, some ambiguity.
+- 0.3-0.5: Weak inference.
+- 0.0-0.3: Speculative; generally avoid selecting the category.
 
-2. entity_789 | requirement | "Monthly Performance Report" | "Contractor shall submit monthly performance reports by the 5th business day of each month, documenting service levels, staffing, and quality metrics."
+ANALYSIS RULES
+1) Most real requirements map to 2-4 workload categories (e.g., Labor + Materials + QA).
+2) Always prefer explicit text over inference. Do NOT fabricate staff counts or equipment if not implied.
+3) Labor = people work, Materials = physical/technology items, ODCs = external non-labor costs.
+4) Empty arrays are allowed. If no labor driver is stated, leave labor_drivers empty.
+5) Higher diversity of categories and stronger signals generally lead to higher complexity_score.
 
-3. entity_234 | requirement | "Quality Control Plan" | "Contractor shall develop and maintain a comprehensive Quality Control Plan addressing inspection procedures, deficiency correction, and continuous improvement."
-```
+BASELINE EXAMPLE 1 – JANITORIAL SERVICES
+Requirement:
+"The Contractor shall provide 24/7 janitorial services for all occupied spaces supporting 5,000 personnel. A minimum of three (3) janitorial staff shall be on duty at any time. Restrooms shall be cleaned a minimum of four (4) times per day. The Contractor shall provide all cleaning equipment, supplies, and associated materials."
 
-### Expected Output:
-
-```json
-[
-  {
-    "entity_id": "entity_456",
-    "has_workload_metric": true,
-    "workload_categories": [
-      "Labor",
-      "Materials",
-      "Logistics",
-      "Lifecycle",
-      "Compliance"
-    ],
-    "boe_relevance": {
-      "Labor": 0.95,
+Expected enrichment:
+{
+   "entity_id": "entity_janitorial",
+   "has_workload_metric": true,
+   "workload_categories": ["Labor", "Materials", "QA"],
+   "boe_relevance": {
+      "Labor": 0.98,
       "Materials": 0.9,
-      "Logistics": 0.75,
-      "Lifecycle": 0.7,
-      "Compliance": 0.8
-    },
-    "labor_drivers": [
-      "24/7 Dining Facility Staff (cooks, servers, dishwashers)",
-      "Janitorial Staff (3-shift coverage)",
-      "Grounds Maintenance Crew",
-      "Supervisory/Management Staff",
-      "Total population supported: 5000+ personnel"
-    ],
-    "material_needs": [
-      "Commercial kitchen equipment (DFAC)",
-      "Food service supplies (utensils, plates, etc.)",
-      "Cleaning equipment and supplies",
-      "Grounds maintenance equipment (mowers, tools)",
-      "Facility maintenance materials"
-    ],
-    "complexity_score": 9,
-    "complexity_rationale": "High complexity due to 24/7 operations, large population (5000+), multiple service areas (dining, janitorial, grounds), and critical mission support role requiring continuous staffing and supply chain management",
-    "effort_estimate": "Explicit: 24/7 operations, 5000+ personnel, 3 service areas",
-    "enriched_by": "workload_analysis_v1"
-  },
-  {
-    "entity_id": "entity_789",
-    "has_workload_metric": true,
-    "workload_categories": ["Labor", "Compliance"],
-    "boe_relevance": {
-      "Labor": 0.6,
-      "Compliance": 0.9
-    },
-    "labor_drivers": [
-      "Report preparation staff (administrative)",
-      "Data collection and analysis (recurring monthly task)"
-    ],
-    "material_needs": [],
-    "complexity_score": 3,
-    "complexity_rationale": "Low complexity - standard reporting requirement with defined format and deadline, minimal coordination required",
-    "effort_estimate": "Explicit: Monthly frequency (by 5th business day)",
-    "enriched_by": "workload_analysis_v1"
-  },
-  {
-    "entity_id": "entity_234",
-    "has_workload_metric": true,
-    "workload_categories": ["Labor", "QA", "Compliance"],
-    "boe_relevance": {
-      "Labor": 0.75,
-      "QA": 1.0,
-      "Compliance": 0.85
-    },
-    "labor_drivers": [
-      "QA/QC Manager (plan development and oversight)",
-      "Quality Inspectors (inspection procedures)",
-      "Subject Matter Experts (technical review)"
-    ],
-    "material_needs": [],
-    "complexity_score": 7,
-    "complexity_rationale": "Moderate-high complexity - requires quality management expertise, documentation development, inspection protocol design, and continuous improvement processes",
-    "effort_estimate": "Implicit: Continuous improvement implies ongoing effort",
-    "enriched_by": "workload_analysis_v1"
-  }
-]
-```
+      "QA": 0.7
+   },
+   "labor_drivers": [
+      "Janitorial Staff (min 3 on duty at all times)",
+      "24/7 coverage across occupied spaces",
+      "Cleaning operations for 5,000 personnel",
+      "Restroom cleaning 4x per day"
+   ],
+   "material_needs": [
+      "Cleaning equipment (mops, buffers, vacuums)",
+      "Cleaning supplies and chemicals",
+      "Personnel protective equipment (PPE)"
+   ],
+   "complexity_score": 7,
+   "complexity_rationale": "24/7 multi-shift staffing, large population (5,000), recurring daily cleanings, Contractor-furnished equipment and supplies.",
+   "effort_estimate": "Explicit: minimum 3 janitorial staff on duty at all times, 24/7 coverage, restrooms cleaned 4x per day.",
+   "enriched_by": "workload_enrichment_v1"
+}
 
----
+BASELINE EXAMPLE 2 – DINING FACILITY
+Requirement:
+"The Contractor shall operate the Installation Dining Facility (DFAC) to serve an average of five hundred (500) meals per day, seven (7) days per week, in a Government-furnished 10,000 square foot facility. The Contractor shall provide all food service personnel necessary to support breakfast, lunch, and dinner meal periods. The Government will furnish major kitchen equipment; the Contractor shall provide small wares, consumables, and cleaning supplies."
 
-## Processing Instructions
+Expected enrichment:
+{
+   "entity_id": "entity_dfac",
+   "has_workload_metric": true,
+   "workload_categories": ["Labor", "Materials", "Logistics", "QA"],
+   "boe_relevance": {
+      "Labor": 0.97,
+      "Materials": 0.9,
+      "Logistics": 0.7,
+      "QA": 0.6
+   },
+   "labor_drivers": [
+      "Food service staff for breakfast, lunch, and dinner, 7 days/week",
+      "Meal preparation and serving for ~500 meals per day",
+      "Dishwashing and cleaning coverage for entire DFAC"
+   ],
+   "material_needs": [
+      "Food ingredients and consumables",
+      "Small wares (utensils, trays, serving implements)",
+      "Cleaning supplies and chemicals"
+   ],
+   "complexity_score": 8,
+   "complexity_rationale": "Continuous 7-day operations, three meals per day, 500 meals/day throughput, mixed Government- and Contractor-furnished equipment, logistics of food and consumables.",
+   "effort_estimate": "Explicit: ~500 meals per day, 7 days per week, 10,000 sq ft facility.",
+   "enriched_by": "workload_enrichment_v1"
+}
 
-1. **Read all requirement entities** in the batch
-2. **Analyze each requirement** independently using the framework above
-3. **Identify BOE categories** with confidence scores (must be in standard 7 categories)
-4. **Extract labor drivers** if Labor category identified
-5. **Extract material needs** if Materials category identified
-6. **Assess complexity** (1-10) with rationale
-7. **Extract effort metrics** (explicit numbers/frequencies only - NO ESTIMATION)
-8. **Output JSON array** with one object per requirement entity
+CAC BAR EXAMPLE – HIGH-THROUGHPUT RETAIL / MORALE SUPPORT WORKLOAD
+Requirement (simplified from CAC workload paragraph):
+"The Contractor shall staff and operate a Consolidated Exchange complex that includes: (1) a full-service BX with 12 checkout lanes, (2) a 3,000 sq ft food court with four branded quick-service restaurants, and (3) a convenience store operating 24/7. The Contractor shall ensure sufficient staffing to support peak weekend and payday traffic, with at least two (2) supervisors on duty during peak hours. The complex serves an installation population of approximately 20,000 personnel and must support extended evening hours until 2200 on weekdays. The Contractor shall provide all consumables, retail supplies, and point-of-sale systems necessary to sustain operations."
 
----
+Expected enrichment:
+{
+   "entity_id": "entity_cac_bar",
+   "has_workload_metric": true,
+   "workload_categories": ["Labor", "Materials", "Logistics", "QA"],
+   "boe_relevance": {
+      "Labor": 0.98,
+      "Materials": 0.9,
+      "Logistics": 0.8,
+      "QA": 0.6
+   },
+   "labor_drivers": [
+      "Retail and food service staff across BX, food court, and convenience store",
+      "12 checkout lanes requiring cashiers during operating hours",
+      "24/7 coverage for convenience store",
+      "Peak weekend/payday surge staffing for ~20,000 personnel",
+      "At least 2 supervisors on duty during peak hours",
+      "Extended evening operations until 2200 on weekdays"
+   ],
+   "material_needs": [
+      "Point-of-sale systems for 12 checkout lanes and food court",
+      "Food and retail consumables inventory",
+      "Cleaning and janitorial supplies for 3,000 sq ft food court and retail spaces"
+   ],
+   "complexity_score": 9,
+   "complexity_rationale": "Multi-venue retail and food operations, 24/7 component, high population (20,000 personnel) with surge periods, extended hours, and supervisory coverage requirements.",
+   "effort_estimate": "Explicit: 12 checkout lanes, 3,000 sq ft food court, 24/7 convenience store, extended hours until 2200 weekdays, at least 2 supervisors during peak hours, population ~20,000.",
+   "enriched_by": "workload_enrichment_v1"
+}
 
-## Quality Checklist
+QUALITY CHECK FOR EACH REQUIREMENT
+- If you select "Labor", labor_drivers should reference specific roles, coverage, volume, or frequency.
+- If you select "Materials", material_needs should mention concrete physical or technology items.
+- Do not invent numbers. Echo only explicit or clearly bounded quantities in effort_estimate.
+- If the text is silent on workload, set has_workload_metric = false and leave workload fields empty.
 
-Before returning results, verify:
-
-- ✅ All `workload_categories` values match standard 7 BOE categories exactly
-- ✅ All `boe_relevance` scores are between 0.0 and 1.0
-- ✅ `complexity_score` is integer 1-10
-- ✅ `has_workload_metric` is always `true`
-- ✅ `enriched_by` is always `"workload_analysis_v1"`
-- ✅ `labor_drivers` array is empty if Labor not in `workload_categories`
-- ✅ `material_needs` array is empty if Materials not in `workload_categories`
-- ✅ JSON is valid and parseable
-
----
-
-**Remember**: This analysis supports real proposal development. Accuracy matters for cost estimation, staffing plans, and BOM creation. Prioritize evidence-based classification over speculation.
+COMMON ERRORS TO AVOID (CRITICAL)
+- Do NOT restate performance thresholds ("95% uptime") as labor_drivers or material_needs; those belong to PERFORMANCE_METRIC entities.
+- Do NOT infer specific FTE counts from vague phrases like "adequate staffing"; only echo counts when numerically or structurally stated (e.g., shifts, 24/7, population).
+- Do NOT assign Materials when the requirement only describes outcomes ("ensure clean facilities") and never mentions tools/equipment/supplies.
+- Do NOT force workload for purely administrative or informational requirements (e.g., contract term, option years, clause boilerplate) – those may legitimately have has_workload_metric = false.
