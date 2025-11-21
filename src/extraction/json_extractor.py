@@ -35,12 +35,20 @@ class JsonExtractor:
         2. Entity Detection Rules (entity_detection_rules.md)
         3. Entity Extraction Prompt (entity_extraction_prompt.md)
         4. Relationship inference rules (prompts/relationship_inference/*.md)
+        
+        Supports compressed prompts via USE_COMPRESSED_PROMPTS env var for 89% token reduction.
         """
         base_path = os.getcwd()
         prompts_dir = os.path.join(base_path, "prompts")
         
+        # Check if compressed prompts should be used (default: False for safety)
+        use_compressed = os.getenv("USE_COMPRESSED_PROMPTS", "false").lower() == "true"
+        suffix = "_COMPRESSED.txt" if use_compressed else ".md"
+        logger.info(f"Loading {'COMPRESSED' if use_compressed else 'ORIGINAL'} prompts (89% token reduction enabled={use_compressed})")
+        
         # 1. Base JSON Instructions
-        json_prompt_path = os.path.join(prompts_dir, "extraction", "grok_json_prompt.md")
+        json_prompt_filename = "grok_json_prompt_COMPRESSED.txt" if use_compressed else "grok_json_prompt.md"
+        json_prompt_path = os.path.join(prompts_dir, "extraction", json_prompt_filename)
         try:
             with open(json_prompt_path, "r", encoding="utf-8") as f:
                 json_instructions = f.read()
@@ -49,7 +57,8 @@ class JsonExtractor:
             raise
 
         # 2. Entity Detection Rules (The "Rules")
-        detection_rules_path = os.path.join(prompts_dir, "extraction", "entity_detection_rules.md")
+        detection_rules_filename = "entity_detection_rules_COMPRESSED.txt" if use_compressed else "entity_detection_rules.md"
+        detection_rules_path = os.path.join(prompts_dir, "extraction", detection_rules_filename)
         detection_rules = ""
         if os.path.exists(detection_rules_path):
             with open(detection_rules_path, "r", encoding="utf-8") as f:
@@ -58,13 +67,14 @@ class JsonExtractor:
             logger.warning(f"Detection rules not found at {detection_rules_path}")
 
         # 3. Entity Extraction Prompt (The "Prompt" with examples)
-        extraction_prompt_path = os.path.join(prompts_dir, "extraction", "entity_extraction_prompt.md")
+        extraction_prompt_filename = "entity_extraction_prompt_COMPRESSED.txt" if use_compressed else "entity_extraction_prompt.md"
+        extraction_prompt_path = os.path.join(prompts_dir, "extraction", extraction_prompt_filename)
         extraction_prompt = ""
         if os.path.exists(extraction_prompt_path):
             with open(extraction_prompt_path, "r", encoding="utf-8") as f:
                 extraction_prompt = f.read()
-                # Strip the "Real Data" section if it exists at the end
-                if "---Real Data---" in extraction_prompt:
+                # Strip the "Real Data" section if it exists at the end (only in original .md files)
+                if not use_compressed and "---Real Data---" in extraction_prompt:
                     extraction_prompt = extraction_prompt.split("---Real Data---")[0]
         else:
             logger.warning(f"Extraction prompt not found at {extraction_prompt_path}")
@@ -102,7 +112,7 @@ The following rules define how to infer relationships between entities.
 Analyze the input text using the Domain Knowledge and Inference Rules provided above.
 Output the result strictly as a JSON object matching the schema defined in the first section.
 """
-        logger.info(f"Constructed system prompt with {len(full_prompt)} characters")
+        logger.info(f"Constructed system prompt with {len(full_prompt)} characters (~{len(full_prompt)//4} tokens)")
         return full_prompt
 
     async def extract(self, text: str) -> ExtractionResult:

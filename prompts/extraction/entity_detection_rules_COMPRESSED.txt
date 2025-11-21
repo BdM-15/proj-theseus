@@ -1,0 +1,167 @@
+SEMANTIC-FIRST DETECTION: Content determines entity type, NOT section labels. Agencies use varying terminology.
+
+PRIORITY EXTRACTION ORDER:
+1.PROGRAM (provides context for all others) 2.SECTION (location context) 3.EVALUATION_FACTOR (proposal planning) 4.SUBMISSION_INSTRUCTION (proposal structure) 5.REQUIREMENT (work obligations) 6.STATEMENT_OF_WORK (work scope) 7.DOCUMENT (supporting refs) 8.CLAUSE (regulatory compliance) 9.STRATEGIC_THEME (competitive intel) 10.Standard entities (organization,concept,event,etc)
+
+ENTITY TYPE DETECTION (18 types - matches Pydantic schema):
+
+1.EVALUATION_FACTOR:
+Signals: will be evaluated,evaluation factor,most important,adjectival rating,source selection,significantly more important,Factor numbering (M1,M2,M2.1),Point scores,adjectival ratings (Excellent,Good,Acceptable,Marginal,Unacceptable)
+Structure: Hierarchical (Factor 1 -> Subfactor 1.1 -> 1.1.1)
+Location: Section M primary, Section L embedded (non-standard), Selection Criteria,Source Selection Plan
+Attributes: weight (40%,25 points), importance (Most Important), subfactors (list)
+
+2.SUBMISSION_INSTRUCTION:
+Signals: page limit,font size,margins,proposal shall,volume structure,submit by,electronic submission,format requirements,Times New Roman 12pt,1-inch margins,PDF format,email submission,deadlines
+Structure: Maps to evaluation factors (Technical Volume addresses Factor 2)
+Location: Section L primary, EMBEDDED within Section M (common!), Proposal Instructions,Submission Requirements
+Attributes: page_limit, format_reqs (font,margins,file format), volume (Volume I/II/III)
+CRITICAL: Extract SEPARATE entity when embedded in evaluation factor descriptions, link via GUIDES relationship
+
+3.REQUIREMENT:
+Criticality by SUBJECT (check WHO performs action):
+- MANDATORY: Contractor/Offeror shall/must/will (contractor obligation)
+- INFORMATIONAL: Government/Agency shall/will (NOT contractor requirement!)
+- IMPORTANT: Contractor should/encouraged/preferred
+- OPTIONAL: Contractor may/can/has option to
+
+Type Classification:
+FUNCTIONAL: provide,deliver,perform,execute + service/product
+PERFORMANCE: SLA language,metrics,measurable outcomes (99.9% uptime,response within 24 hours,first-time fix rate ≥95%)
+SECURITY: NIST,FedRAMP,clearance levels,cybersecurity (FedRAMP Moderate,Secret clearance,NIST 800-53,CMMC Level 2)
+TECHNICAL: Technology stack,platforms,software versions,infrastructure (AWS GovCloud,Java 11,PostgreSQL,Kubernetes)
+INTERFACE: Integration points,APIs,data exchange,system connections (integrate with ERP,HTTPS/TLS 1.3,RESTful API,FHIR-compliant)
+MANAGEMENT: Reporting,governance,oversight,project management (monthly status reports,Agile/Scrum,PMI-certified PM,weekly COR meetings)
+DESIGN: Standards compliance,architectural mandates,constraints (Section 508,agency branding,microservices,responsive web design)
+QUALITY: QA processes,testing,verification,validation (automated test coverage ≥80%,ISO 9001,peer code review,UAT)
+
+Attributes: criticality (MANDATORY/IMPORTANT/OPTIONAL/INFORMATIONAL), modal_verb (exact verb), req_type (8 types above), labor_drivers (volumes,frequencies,shifts,quantities,customer counts for BOE - CRITICAL!), material_needs (equipment,supplies,facilities)
+
+4.PERFORMANCE_METRIC:
+Signals: Acceptable Quality Level (AQL),Quality Assurance Surveillance Plan (QASP),Performance Requirement Summary (PRS),surveillance metrics,inspection measurements,performance objectives,quality standards,thresholds,measurement methods
+Examples: 99.9% uptime,<2 errors,within 24 hours,first-time fix rate ≥95%,equipment availability ≥95%,MTBF ≥500 hours
+Attributes: threshold (specific value/limit), measurement_method (how calculated/inspected)
+Differentiation: performance_metric has measurable threshold, requirement is obligation
+
+5.STATEMENT_OF_WORK:
+Semantic equivalence: SOW (prescriptive HOW) = PWS (performance-based WHAT) = SOO (objective-based WHY)
+Signals: Task descriptions,performance objectives,deliverables lists,contractor shall perform,Task numbering (1.0,1.1,1.1.1),SOW/PWS/SOO labels,work scope,outcomes
+Structure: Hierarchical task breakdown
+Location: Section C primary, Attachment J-#### PWS, embedded in Section C subsection
+Content-based: Work scope/tasks/objectives/deliverables, not labels alone
+
+6.DELIVERABLE:
+Signals: CDRL patterns (A###,B###,####), DD Form 1423,Contract Data Requirements List,submission schedules,report frequencies,deliverable formats,shall submit/deliver/provide
+Examples: CDRL A001 Monthly Status Report,Quarterly Review,System Design Document,Technical Manual,Deployed Application,Training Materials
+Context: Near submission schedules (due 5th business day), listed in deliverables sections, referenced in SOW tasks, DD Form 1423 mentions
+Location: Section J attachments (CDRL lists), Section C SOW (embedded in tasks), requirements text
+Attributes: CDRL identifiers,due dates preserved in natural language description
+
+7.CLAUSE:
+Patterns (26+ agency supplements):
+FAR: FAR 52.###-## (Federal Acquisition Regulation base)
+DFARS: DFARS 252.###-#### (Defense supplement)
+AFFARS: AFFARS 5352.###-## (Air Force supplement)
+NMCARS: NMCARS 5252.###-#### (Navy/Marine Corps supplement)
+Others: HSAR,DOSAR,GSAM,VAAR,DEAR,NFS,AIDAR,CAR,DIAR,DOLAR,EDAR,EPAAR,FEHBAR,HHSAR,HUDAR,IAAR,JAR,LIFAR,NRCAR,SOFARS,TAR (22+ additional)
+Signals: Agency patterns above,incorporated by reference,clause title,full text
+Attribution: FAR 52.### -> Section I (Contract Clauses), 52.2##-# (Reps/Certs) -> Section K
+Attributes: clause_number (extract from pattern), regulation (FAR/DFARS/AFFARS/etc from prefix)
+
+8.STRATEGIC_THEME:
+Types:
+CUSTOMER_HOT_BUTTON: Agency priorities,pain points,mission pressures (Readiness is Navy's top priority,Cybersecurity critical concern)
+DISCRIMINATOR: Competitive advantages,unique capabilities (Only offeror with on-site repair,Proprietary predictive maintenance AI)
+PROOF_POINT: Evidence supporting claims (99.8% uptime on similar Navy contract,CPARS Exceptional rating,CMMI Level 3 certified)
+WIN_THEME: THEME + DISCRIMINATOR + PROOF + BENEFIT (Mission Readiness Through Predictive Maintenance = Proprietary AI + 40% downtime reduction + ensures aircraft availability)
+Attributes: theme_type (4 types above)
+
+9.DOCUMENT:
+Signals: Attachment references (Attachment 1,J-0200000-18,Annex A,Exhibit B), referenced documents (See Section X,incorporated by reference), standards (MIL-STD-882E,ISO 9001,NIST SP 800-53), forms (SF 1449,DD Form 254), prior contracts
+Patterns: J-####,Attachment #,Annex ##,MIL-STD-###,ISO ####,NIST SP ###-##,SF ###,DD ###
+Context: See Attachment X,incorporated by reference,listed in Section J,reference documents include
+Location: Section J primary, throughout RFP (referenced docs), requirements citing standards
+Attribution: J-#### -> Section J, Attachment # -> Section J, Annex -> Section J or standalone, prefix letter -> corresponding section (A-#### -> Section A)
+
+10.SECTION:
+Extract structural label AND semantic type:
+A(Solicitation/Contract Form): SOLICITATION_FORM
+B(Supplies/Services): SUPPLIES_SERVICES
+C(Statement of Work): DESCRIPTION_SPECS
+H(Special Requirements): SPECIAL_REQUIREMENTS
+I(Contract Clauses): CONTRACT_CLAUSES
+J(Attachments): ATTACHMENTS
+K(Representations): REPRESENTATIONS
+L(Instructions to Offerors): SUBMISSION_INSTRUCTIONS
+M(Evaluation Factors): EVALUATION_CRITERIA
+
+Non-standard mapping: Selection Criteria -> Section M, Technical Requirements -> Section C, Proposal Instructions -> Section L, Request for Quote -> Section A, Statement of Work -> Section C
+Mixed content: Some sections contain multiple types (Section M with embedded submission instructions)
+
+11.PROGRAM:
+Purpose: Top-level organizational container for major acquisition/initiative/system
+Signals: Program names in title,major acquisition titles,portfolio-level initiatives,system names
+Examples: Marine Corps Prepositioning Program II (MCPP II), Navy Mobile Bay Organic Support (Navy MBOS), F-35 Lightning II Program
+Position: Top-level container CONTAINS requirements,deliverables,technologies,SOW,sections
+Context: Appears in document title,Section C header,SOW introduction,emphasized as primary subject,referenced throughout as umbrella
+
+12.ORGANIZATION:
+Signals: Companies (General Dynamics IT,Lockheed Martin,small business names), agencies (DoD,GSA,DLA), military units (Marine Corps,NAVAIR,SPAWAR,I MEF), commands (Naval Air Systems Command), departments (Contracting Office,PMO)
+Patterns: Acronyms (NAVAIR,SPAWAR,GSA), Inc/LLC/Corp suffixes, military designations (I MEF,3rd Battalion)
+Context: Near organizational roles,past performance,teaming arrangements,POC affiliations
+
+13.CONCEPT:
+Signals: Budget/pricing (CLIN 0001,Base Year Services,Option Period 2), technical concepts (Agile Development,DevSecOps,Zero Trust), business concepts (Small Business Set-Aside,Joint Venture), processes (Change Control,Risk Management), abstract ideas (Readiness,Sustainability), definitions (terms being defined)
+Patterns: CLIN/SLIN numbering (CLIN 0001,SLIN 0001AA), abstract nouns (no physical form), process names ending in -ing or Process
+Context: Near definitions (means,defined as,refers to), glossary sections, pricing tables, conceptual discussions
+Differentiation: NOT concept if physical item with model# (equipment), scheduled activity (event), named military unit (organization), software with version (technology). IS concept if abstract idea/process, business term/methodology, CLIN/budget item, term being defined
+
+14.EQUIPMENT:
+Signals: Model numbers (M1A1 Tank,Concorde RG-24,6200 Tennant Floor Scrubber), military equipment (TAMCN numbers,NSN), physical assets (Generator Set,HVAC System,Forklift), vehicles (HMMWV,MRAP,Aircraft), hardware (Servers,Workstations,Network Equipment)
+Patterns: Model# with alphanumerics (M1A1,RG-24,6200), TAMCN (5-char codes), NSN (####-##-###-####), Make/Model format
+Context: Near maintenance language,equipment lists,quantities (100 each,12 units),physical descriptions (weight,dimensions)
+Differentiation: EQUIPMENT = physical item you can touch (M1A1 Tank,Generator Set,Server Hardware), TECHNOLOGY = software/system/platform (Windows Server 2022,ServiceNow Platform,SINCGARS Radio System)
+
+15.TECHNOLOGY:
+Signals: Software (Windows Server 2022,Oracle Database 19c,Python 3.11), platforms (AWS GovCloud,Azure Government,ServiceNow), systems (SINCGARS Radio System,GCSS-MC,TBMCS), protocols (TLS 1.3,HTTPS,SFTP), standards (IPv6,802.11ac,Ethernet)
+Patterns: Version numbers (Windows 10,Python 3.11,TLS 1.3), acronyms for systems (GCSS-MC,TBMCS,DEERS), platform names (AWS,Azure,ServiceNow)
+Context: Near technical requirements,system architecture,software stack,IT infrastructure
+Differentiation: TECHNOLOGY = software/logical system/protocol (AWS GovCloud,SINCGARS System,Windows Server), EQUIPMENT = physical hardware (Dell Server,SINCGARS Radio Unit,Network Switch)
+
+16.EVENT:
+Signals: Milestones (Kickoff Meeting,Final Delivery,Contract Award), scheduled activities (Monthly Review,Quarterly Assessment,Annual Update), deadlines (Q&A Deadline: March 15 2025,Proposal Due Date), periods (Base Period,Option Year 2,Ship Availability), processes with timing (CAL Signing,Annual Inspection)
+Patterns: Dates (March 15 2025,30 days after award), recurring patterns (Monthly,Quarterly,Annual), event + timing (Review 15 days,Meeting 30 days after award)
+Context: Calendar dates,time-bound language (within X days,by date),scheduling sections,milestone charts
+Differentiation: EVENT = scheduled time-bound activity (Monthly Review,Kickoff Meeting,Annual Update), CONCEPT = process without schedule (Review Process,Meeting Protocol,Update Procedure)
+
+17.PERSON:
+Signals: Names (Jane Smith,John Doe,CDR Michael Johnson), titles (Contracting Officer,Program Manager,COR,Technical POC), roles (Key Personnel,Project Lead,Security Officer), contact info (near email,phone,office)
+Context: Contact: Name, POC: Title/Name, signature blocks, key personnel sections
+
+18.LOCATION:
+Signals: Bases (Naval Air Station Pensacola,Camp Lejeune,Fort Bragg), cities/states (Arlington VA,San Diego CA), facilities (Building 123,Warehouse 5,Depot Maintenance), geographic areas (CONUS,OCONUS,PACOM AOR), countries (Host Nation,Japan,Germany)
+Context: Near performance location,delivery addresses,site visit info,geographic scoping
+
+RELATIONSHIP TYPES (directed, explicitly stated or strongly implied):
+EVALUATED_BY: submission_instruction -> evaluation_factor (proposal section maps to criterion)
+GUIDES: submission_instruction -> entity (instruction governs format/content)
+CHILD_OF: entity -> parent (hierarchical: Subfactor 1.1 -> Factor 1)
+ATTACHMENT_OF: document -> section (annex belongs to section)
+CONTAINS: document -> statement_of_work (attachment contains SOW)
+REFERENCES: section -> document (section cites external doc)
+PRODUCES: requirement -> deliverable (task generates deliverable)
+REQUIRES: requirement -> deliverable (task needs deliverable)
+SPECIFIES: clause -> requirement (regulation mandates requirement)
+APPLIES_TO: clause -> section (regulation governs section)
+MEASURED_BY: requirement -> performance_metric (requirement has quality threshold)
+SUPPORTS: strategic_theme -> evaluation_factor (win theme aligns with criterion)
+
+QUALITY VALIDATION (before finalizing extraction):
+✅ No orphan entities (every entity links to at least one other)
+✅ Consistent naming (canonicalization: ISS and Installation Support Services (ISS) -> use Installation Support Services (ISS) for BOTH, NOT two entities)
+✅ Metadata completeness (critical fields populated: subfactors,criticality,modal_verb,labor_drivers,etc)
+✅ Subject validation (Government shall != MANDATORY, it's INFORMATIONAL)
+✅ Content over labels (verify Section M actually contains evaluation criteria, not just trusting label)
+✅ Required fields: entity_name (descriptive not generic), entity_type (valid from 18-type ontology), description (natural language min 20 chars)
+✅ Cross-reference integrity: EVALUATION_FACTOR.factor_id -> SUBMISSION_INSTRUCTION.guides_factor, REQUIREMENT -> EVALUATION_FACTOR relationship, ANNEX prefix -> parent SECTION linkage, CLAUSE -> SECTION attribution
+✅ Modal verb matches criticality (shall=MANDATORY, should=IMPORTANT, may=OPTIONAL)
