@@ -173,8 +173,47 @@ Return ONLY the JSON array. If no relationships found, return []."""
         try:
             response = await _call_llm_async(prompt, model=model, temperature=temperature)
             
-            # Parse JSON response
-            relationships = json.loads(response)
+            # Parse JSON response with repair/retry logic
+            relationships = None
+            parse_attempts = 0
+            max_attempts = 3
+            
+            while parse_attempts < max_attempts and relationships is None:
+                try:
+                    # Attempt 1: Standard JSON parse
+                    relationships = json.loads(response.strip())
+                except json.JSONDecodeError as json_err:
+                    parse_attempts += 1
+                    
+                    if parse_attempts < max_attempts:
+                        # Attempt 2-3: Try to extract JSON array from response
+                        import re
+                        json_match = re.search(r'\[.*\]', response, re.DOTALL)
+                        if json_match:
+                            try:
+                                relationships = json.loads(json_match.group(0))
+                                logger.info(f"    🔧 JSON repaired via regex extraction (batch {batch_num})")
+                            except json.JSONDecodeError:
+                                if parse_attempts == max_attempts - 1:
+                                    # Final attempt: Request clean JSON from LLM
+                                    logger.warning(f"    ⚠️  JSON parse failed, requesting clean response (batch {batch_num})")
+                                    retry_prompt = f"""The previous response had invalid JSON. Please return ONLY a valid JSON array of relationships.
+
+Original prompt:
+{prompt}
+
+Return ONLY the JSON array, no markdown, no explanation:"""
+                                    response = await _call_llm_async(retry_prompt, model=model, temperature=temperature)
+                                else:
+                                    continue
+                        else:
+                            logger.error(f"    ❌ JSON parse error batch {batch_num} attempt {parse_attempts}: {json_err}")
+                    else:
+                        logger.error(f"    ❌ JSON parse failed after {max_attempts} attempts (batch {batch_num})")
+                        relationships = []  # Empty array to avoid crash
+            
+            if relationships is None:
+                relationships = []
             
             # Validate entity IDs and build relationships
             for rel in relationships:
@@ -197,15 +236,14 @@ Return ONLY the JSON array. If no relationships found, return []."""
                         'reasoning': rel.get('reasoning', '')
                     })
                 else:
+                    # Enhanced logging with batch context and available IDs for debugging
                     if source_id not in id_to_entity:
-                        logger.warning(f"  Invalid source entity ID: {source_id}")
+                        logger.warning(f"  ⚠️  Invalid source entity ID in batch {batch_num}: {source_id} (not in current batch of {len(id_to_entity)} entities)")
                     if target_id not in id_to_entity:
-                        logger.warning(f"  Invalid target entity ID: {target_id}")
+                        logger.warning(f"  ⚠️  Invalid target entity ID in batch {batch_num}: {target_id} (not in current batch of {len(id_to_entity)} entities)")
             
             logger.info(f"    → Found {len(relationships)} relationships in batch {batch_num}")
             
-        except json.JSONDecodeError as e:
-            logger.error(f"  JSON parse error in batch {batch_num}: {e}")
         except Exception as e:
             logger.error(f"  Error inferring relationships in batch {batch_num}: {e}", exc_info=True)
         
@@ -529,6 +567,14 @@ Return ONLY valid JSON array:
             logger.info(f"    → Found {len(valid_rels)} instruction-evaluation relationships")
         except Exception as e:
             logger.error(f"    ❌ Algorithm 1 failed: {e}")
+    else:
+        # Log why algorithm was skipped for user transparency
+        skip_reasons = []
+        if not all_instruction_entities:
+            skip_reasons.append("no instruction/submission entities found")
+        if not eval_factors:
+            skip_reasons.append("no evaluation_factor entities found")
+        logger.info(f"\n  ⏭️  Algorithm 1 skipped: {', '.join(skip_reasons)} (typical for PWS-only documents)")
     
     # ALGORITHM 2: Evaluation Hierarchy & Metrics (Structure evaluation framework)
     if eval_factors:
@@ -564,6 +610,8 @@ Return ONLY valid JSON array:
             logger.info(f"    → Found {len(valid_rels)} evaluation hierarchy relationships")
         except Exception as e:
             logger.error(f"    ❌ Algorithm 2 failed: {e}")
+    else:
+        logger.info(f"\n  ⏭️  Algorithm 2 skipped: no evaluation_factor entities found (typical for PWS-only documents)")
     
     # ALGORITHM 3: Requirement-Evaluation Mapping (Requirements → Main Evaluation Factors ONLY)
     requirements = entities_by_type.get('requirement', [])
@@ -695,6 +743,14 @@ Return ONLY valid JSON array:
             logger.info(f"    → Found {len(valid_rels)} requirement→main-factor relationships")
         except Exception as e:
             logger.error(f"    ❌ Algorithm 3 failed: {e}")
+    else:
+        # Log why algorithm was skipped for user transparency
+        skip_reasons = []
+        if not requirements:
+            skip_reasons.append("no requirement entities found")
+        if not main_eval_factors:
+            skip_reasons.append(f"no main evaluation factors found (0 main out of {len(eval_factors)} total factors)")
+        logger.info(f"\n  ⏭️  Algorithm 3 skipped: {', '.join(skip_reasons)} (typical for PWS-only documents)")
     
     # ALGORITHM 4: Deliverable Traceability (Dual-Pattern: Requirements + Work Statements)
     requirements = entities_by_type.get('requirement', [])
@@ -873,6 +929,14 @@ Return ONLY valid JSON array:
             logger.info(f"    → Found {len(valid_rels)} semantic concept relationships")
         except Exception as e:
             logger.error(f"    ❌ Algorithm 6 failed: {e}")
+    else:
+        # Log why algorithm was skipped for user transparency
+        skip_reasons = []
+        if not (concepts or strategic_themes):
+            skip_reasons.append("no concept/theme entities found")
+        if not eval_factors:
+            skip_reasons.append("no evaluation_factor entities found")
+        logger.info(f"\n  ⏭️  Algorithm 6 skipped: {', '.join(skip_reasons)} (typical for PWS-only documents)")
     
     # ALGORITHM 7: Heuristic Pattern Matching (CDRL cross-refs)
     logger.info(f"\n  [Algorithm 7/8] Heuristic CDRL Pattern Matching")

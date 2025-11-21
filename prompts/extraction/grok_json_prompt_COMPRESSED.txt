@@ -53,7 +53,8 @@ JSON SCHEMA:
     {"entity_name":"Technical Volume","entity_type":"submission_instruction","description":"Must address Factor 1...","page_limit":"25 pages","format_reqs":"12pt Times New Roman","volume":"Volume I"},
     {"entity_name":"Factor 1 Technical","entity_type":"evaluation_factor","description":"Evaluates technical approach...","weight":"40%","importance":"Most Important","subfactors":["Subfactor 1.1","Subfactor 1.2"]},
     {"entity_name":"System Admin Support","entity_type":"requirement","description":"Provide 24/7 support for 500 users...","criticality":"MANDATORY","modal_verb":"shall","req_type":"TECHNICAL","labor_drivers":["24/7 coverage","500 users","4-hour response time"],"material_needs":[]},
-    {"entity_name":"FAR 52.212-1","entity_type":"clause","description":"Instructions to Offerors - Commercial Items","source_text":"FAR 52.212-1 Instructions to Offerors...","clause_number":"52.212-1","regulation":"FAR"}
+    {"entity_name":"FAR 52.212-1","entity_type":"clause","description":"Instructions to Offerors - Commercial Items","source_text":"FAR 52.212-1 Instructions to Offerors...","clause_number":"52.212-1","regulation":"FAR"},
+    {"entity_name":"95% Accuracy Standard","entity_type":"performance_metric","description":"QASP requirement: All deliverables must meet 95% accuracy threshold.","threshold":"95%","measurement_method":"Monthly quality audits"}
   ],
   "relationships": [
     {"source_entity":{"entity_name":"Technical Volume","entity_type":"submission_instruction","description":"Must address Factor 1..."},"target_entity":{"entity_name":"Factor 1 Technical","entity_type":"evaluation_factor","description":"Evaluates technical approach..."},"relationship_type":"GUIDES","description":"Submission instruction explicitly addresses evaluation factor."}

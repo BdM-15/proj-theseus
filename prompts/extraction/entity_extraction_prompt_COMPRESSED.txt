@@ -257,6 +257,18 @@ DEFINES: one entity defines/explains another
 MEASURED_BY: requirement measured by performance_metric
 TRACKED_BY: deliverable tracked by CDRL
 
+JSON SCHEMA TEMPLATES (REQUIRED FIELDS):
+
+EVALUATION_FACTOR: {"entity_name":"Factor 1 Technical","entity_type":"evaluation_factor","description":"Full description...","weight":"40%","importance":"Most Important","subfactors":["Subfactor 1.1","Subfactor 1.2"]}
+
+SUBMISSION_INSTRUCTION: {"entity_name":"Technical Volume Instructions","entity_type":"submission_instruction","description":"Full description...","page_limit":"25 pages","format_reqs":"12pt Times New Roman","volume":"Volume I"}
+
+REQUIREMENT: {"entity_name":"ISO 9001 Certification","entity_type":"requirement","description":"Full requirement text...","criticality":"MANDATORY","modal_verb":"shall","req_type":"QUALITY","labor_drivers":[],"material_needs":[]}
+
+CLAUSE: {"entity_name":"FAR 52.212-1","entity_type":"clause","description":"Instructions to Offerors...","clause_number":"52.212-1","regulation":"FAR"}
+
+PERFORMANCE_METRIC: {"entity_name":"99.9% Uptime","entity_type":"performance_metric","description":"System availability requirement with monthly monitoring","threshold":"99.9%","measurement_method":"Monthly system logs"}
+
 Output Format: {"entities":[...],"relationships":[...]}
 Metadata Requirements:
 EVALUATION_FACTOR: weight, importance, subfactors
