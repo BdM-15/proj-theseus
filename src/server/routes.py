@@ -104,10 +104,20 @@ async def process_document_with_semantic_inference(
         # Extract text from content_list for ontology processing
         # MinerU provides: {'type': 'text'/'table'/'image', 'text': '...', 'page_idx': N}
         from src.extraction.json_extractor import JsonExtractor
+        from src.extraction.govcon_table_processor import GovconTableProcessor
         
-        # Combine all text content for chunking
-        # CRITICAL: Only process type='text' blocks (not tables/images)
-        # This matches Perfect Run behavior (421 text blocks → 339 entities)
+        # Initialize extractors
+        json_extractor = JsonExtractor()
+        # Note: llm_func is passed as parameter to this function
+        
+        # Check if table processing is enabled
+        enable_table_processing = os.getenv("ENABLE_TABLE_ONTOLOGY", "true").lower() == "true"
+        
+        # Collect all entities and relationships from ALL content types
+        all_entities = []
+        all_relationships = []
+        
+        # PHASE 1: TEXT PROCESSING (UNCHANGED - Preserve Perfect Run)
         text_chunks = []
         for item in filtered_content:
             # Filter ONLY text blocks (exclude tables and images)
@@ -121,7 +131,57 @@ async def process_document_with_semantic_inference(
             return {"error": "No text content"}
         
         full_text = "\n\n".join(text_chunks)
-        logger.info(f"📝 Extracted {len(text_chunks)} content blocks ({len(full_text)} chars total)")
+        logger.info(f"📝 TEXT: Extracted {len(text_chunks)} text blocks ({len(full_text)} chars total)")
+        
+        # PHASE 2: TABLE PROCESSING (NEW - Apply ontology to tables)
+        if enable_table_processing:
+            logger.info("📊 TABLE PROCESSING ENABLED - Processing tables with govcon ontology")
+            table_processor = GovconTableProcessor(json_extractor, llm_func)
+            
+            table_count = 0
+            for idx, item in enumerate(filtered_content):
+                if item.get('type') == 'table':
+                    table_count += 1
+                    try:
+                        item_info = {
+                            "page_idx": item.get("page_idx", 0),
+                            "index": idx,
+                            "type": "table"
+                        }
+                        
+                        extraction_result, description = await table_processor.process_table(
+                            modal_content=item,
+                            file_path=file_path,
+                            item_info=item_info,
+                            content_list=filtered_content
+                        )
+                        
+                        # Collect entities and relationships
+                        all_entities.extend(extraction_result.entities)
+                        all_relationships.extend(extraction_result.relationships)
+                        
+                        logger.info(
+                            f"✅ Table {table_count} processed: "
+                            f"{len(extraction_result.entities)} entities, "
+                            f"{len(extraction_result.relationships)} relationships"
+                        )
+                        
+                    except Exception as e:
+                        logger.error(f"❌ Table {table_count} processing failed: {e}")
+                        # Continue processing other tables (graceful degradation)
+                        continue
+            
+            logger.info(
+                f"📊 TABLE SUMMARY: Processed {table_count} tables → "
+                f"{len(all_entities)} entities, {len(all_relationships)} relationships"
+            )
+        else:
+            logger.info("⏭️  TABLE PROCESSING DISABLED - Skipping tables")
+        
+        # Continue with text processing (unchanged)...
+        
+        full_text = "\n\n".join(text_chunks)
+        logger.info(f"📝 TEXT: Extracted {len(text_chunks)} text blocks ({len(full_text)} chars total)")
         
         # Use LightRAG's chunking strategy for consistent extraction
         import tiktoken
@@ -144,20 +204,16 @@ async def process_document_with_semantic_inference(
         logger.info(f"🔪 Chunked text into {len(chunked_texts)} chunks ({chunk_size} tokens, {chunk_overlap} overlap)")
         
         # Run custom ontology extraction on each chunk
-        logger.info("🚀 Running custom ontology extraction with Pydantic schema...")
-        extractor = JsonExtractor()
-        
-        all_entities = []
-        all_relationships = []
+        logger.info("🚀 Running custom ontology extraction with Pydantic schema (TEXT)...")
         
         try:
             for i, chunk_text in enumerate(chunked_texts):
-                logger.info(f"   Processing chunk {i+1}/{len(chunked_texts)}...")
-                extraction_result = await extractor.extract(chunk_text)
+                logger.info(f"   Processing text chunk {i+1}/{len(chunked_texts)}...")
+                extraction_result = await json_extractor.extract(chunk_text)
                 all_entities.extend(extraction_result.entities)
                 all_relationships.extend(extraction_result.relationships)
             
-            # Merge results (de-duplicate entities by name)
+            # Merge results (de-duplicate entities by name across text AND tables)
             unique_entities = {}
             for entity in all_entities:
                 if entity.entity_name not in unique_entities:
@@ -165,7 +221,12 @@ async def process_document_with_semantic_inference(
             
             all_entities = list(unique_entities.values())
             
-            logger.info(f"✅ Extracted {len(all_entities)} unique entities, {len(all_relationships)} relationships from {len(chunked_texts)} chunks")
+            logger.info(
+                f"✅ COMBINED EXTRACTION: "
+                f"{len(all_entities)} unique entities (text+tables), "
+                f"{len(all_relationships)} relationships "
+                f"from {len(chunked_texts)} text chunks + {table_count if enable_table_processing else 0} tables"
+            )
             
             # Convert Pydantic extraction to LightRAG custom_kg format
             custom_kg = {

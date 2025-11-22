@@ -259,3 +259,102 @@ Output the result strictly as a JSON object matching the schema defined in the f
         except Exception as e:
             logger.error(f"Extraction failed: {str(e)}")
             raise
+    
+    async def extract_from_text(self, text: str, chunk_id: str) -> ExtractionResult:
+        """
+        Extract entities from arbitrary text using govcon ontology.
+        
+        Used by modal processors (tables, images) to analyze converted descriptions.
+        This method applies the SAME ontology extraction as text processing,
+        ensuring consistent entity types and relationships.
+        
+        Args:
+            text: Text to extract entities from (e.g., table description)
+            chunk_id: Identifier for provenance tracking (e.g., "table-page42-idx15")
+        
+        Returns:
+            ExtractionResult with entities and relationships
+        """
+        user_prompt = f"""Extract entities and relationships from this government contracting content.
+
+SOURCE: {chunk_id}
+
+CONTENT:
+{text}
+
+Extract all relevant entities following the government contracting ontology:
+- Requirements (with criticality: MANDATORY/IMPORTANT/OPTIONAL)
+- Performance metrics (with thresholds and measurement methods)
+- Evaluation factors (with weights and subfactors)
+- Deliverables (with formats and due dates)
+- Strategic themes (customer hot buttons, discriminators, proof points)
+- Other entity types as appropriate
+
+Return structured JSON using the ExtractionResult schema."""
+
+        try:
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": self.system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.1
+            )
+            
+            content = response.choices[0].message.content
+            
+            # Parse JSON (with markdown extraction if needed)
+            if "```json" in content:
+                import re
+                json_match = re.search(r'```json\s*(.*?)\s*```', content, re.DOTALL)
+                if json_match:
+                    content = json_match.group(1)
+            
+            data = json.loads(content)
+            
+            # Clean relationships (same as extract_entities_and_relationships)
+            if "relationships" in data:
+                cleaned_relationships = []
+                for i, rel in enumerate(data["relationships"]):
+                    source = rel.get("source_entity") if isinstance(rel, dict) else None
+                    target = rel.get("target_entity") if isinstance(rel, dict) else None
+                    
+                    if not isinstance(rel, dict):
+                        continue
+                    
+                    # Convert string format to dict format if needed
+                    if isinstance(source, str):
+                        source = {"entity_name": source, "entity_type": "unknown"}
+                        rel["source_entity"] = source
+                    if isinstance(target, str):
+                        target = {"entity_name": target, "entity_type": "unknown"}
+                        rel["target_entity"] = target
+                    
+                    # Validate
+                    if not isinstance(source, dict) or not source.get("entity_name"):
+                        continue
+                    if not isinstance(target, dict) or not target.get("entity_name"):
+                        continue
+                    if not rel.get("relationship_type"):
+                        continue
+                    
+                    cleaned_relationships.append(rel)
+                
+                data["relationships"] = cleaned_relationships
+            
+            # Validate against Pydantic schema
+            result = ExtractionResult(**data)
+            
+            logger.info(
+                f"📝 Extracted from text ({chunk_id}): "
+                f"{len(result.entities)} entities, {len(result.relationships)} relationships"
+            )
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"❌ extract_from_text failed ({chunk_id}): {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return ExtractionResult(entities=[], relationships=[])
