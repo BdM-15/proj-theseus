@@ -104,23 +104,16 @@ async def process_document_with_semantic_inference(
         # Extract text from content_list for ontology processing
         # MinerU provides: {'type': 'text'/'table'/'image', 'text': '...', 'page_idx': N}
         from src.extraction.json_extractor import JsonExtractor
-        from src.extraction.govcon_table_processor import GovconTableProcessor
+        from src.processors import GovconMultimodalProcessor
         
         # Initialize extractors
         json_extractor = JsonExtractor()
         # Note: llm_func is passed as parameter to this function
         
-        # Check if table processing is enabled
-        enable_table_processing = os.getenv("ENABLE_TABLE_ONTOLOGY", "true").lower() == "true"
-        
-        # Collect all entities and relationships from ALL content types
-        all_entities = []
-        all_relationships = []
-        
-        # PHASE 1: TEXT PROCESSING (UNCHANGED - Preserve Perfect Run)
+        # PHASE 1: TEXT EXTRACTION (for custom ontology extraction)
         text_chunks = []
         for item in filtered_content:
-            # Filter ONLY text blocks (exclude tables and images)
+            # Filter ONLY text blocks (tables/images handled by RAG-Anything processors)
             if item.get('type') == 'text':
                 content_text = item.get('text', '')  # MinerU uses 'text' field, not 'content'
                 if content_text and content_text.strip():
@@ -129,56 +122,6 @@ async def process_document_with_semantic_inference(
         if not text_chunks:
             logger.error("❌ No text content found in MinerU output")
             return {"error": "No text content"}
-        
-        full_text = "\n\n".join(text_chunks)
-        logger.info(f"📝 TEXT: Extracted {len(text_chunks)} text blocks ({len(full_text)} chars total)")
-        
-        # PHASE 2: TABLE PROCESSING (NEW - Apply ontology to tables)
-        if enable_table_processing:
-            logger.info("📊 TABLE PROCESSING ENABLED - Processing tables with govcon ontology")
-            table_processor = GovconTableProcessor(json_extractor, llm_func)
-            
-            table_count = 0
-            for idx, item in enumerate(filtered_content):
-                if item.get('type') == 'table':
-                    table_count += 1
-                    try:
-                        item_info = {
-                            "page_idx": item.get("page_idx", 0),
-                            "index": idx,
-                            "type": "table"
-                        }
-                        
-                        extraction_result, description = await table_processor.process_table(
-                            modal_content=item,
-                            file_path=file_path,
-                            item_info=item_info,
-                            content_list=filtered_content
-                        )
-                        
-                        # Collect entities and relationships
-                        all_entities.extend(extraction_result.entities)
-                        all_relationships.extend(extraction_result.relationships)
-                        
-                        logger.info(
-                            f"✅ Table {table_count} processed: "
-                            f"{len(extraction_result.entities)} entities, "
-                            f"{len(extraction_result.relationships)} relationships"
-                        )
-                        
-                    except Exception as e:
-                        logger.error(f"❌ Table {table_count} processing failed: {e}")
-                        # Continue processing other tables (graceful degradation)
-                        continue
-            
-            logger.info(
-                f"📊 TABLE SUMMARY: Processed {table_count} tables → "
-                f"{len(all_entities)} entities, {len(all_relationships)} relationships"
-            )
-        else:
-            logger.info("⏭️  TABLE PROCESSING DISABLED - Skipping tables")
-        
-        # Continue with text processing (unchanged)...
         
         full_text = "\n\n".join(text_chunks)
         logger.info(f"📝 TEXT: Extracted {len(text_chunks)} text blocks ({len(full_text)} chars total)")
@@ -203,8 +146,11 @@ async def process_document_with_semantic_inference(
         
         logger.info(f"🔪 Chunked text into {len(chunked_texts)} chunks ({chunk_size} tokens, {chunk_overlap} overlap)")
         
-        # Run custom ontology extraction on each chunk
+        # PHASE 2: CUSTOM ONTOLOGY EXTRACTION (text only - tables handled by processor)
         logger.info("🚀 Running custom ontology extraction with Pydantic schema (TEXT)...")
+        
+        all_entities = []
+        all_relationships = []
         
         try:
             for i, chunk_text in enumerate(chunked_texts):
@@ -213,7 +159,7 @@ async def process_document_with_semantic_inference(
                 all_entities.extend(extraction_result.entities)
                 all_relationships.extend(extraction_result.relationships)
             
-            # Merge results (de-duplicate entities by name across text AND tables)
+            # De-duplicate entities by name
             unique_entities = {}
             for entity in all_entities:
                 if entity.entity_name not in unique_entities:
@@ -222,10 +168,10 @@ async def process_document_with_semantic_inference(
             all_entities = list(unique_entities.values())
             
             logger.info(
-                f"✅ COMBINED EXTRACTION: "
-                f"{len(all_entities)} unique entities (text+tables), "
+                f"✅ TEXT EXTRACTION: "
+                f"{len(all_entities)} unique entities, "
                 f"{len(all_relationships)} relationships "
-                f"from {len(chunked_texts)} text chunks + {table_count if enable_table_processing else 0} tables"
+                f"from {len(chunked_texts)} text chunks"
             )
             
             # Convert Pydantic extraction to LightRAG custom_kg format
@@ -235,7 +181,7 @@ async def process_document_with_semantic_inference(
                 "relationships": []
             }
             
-            # Convert chunks (text chunks)
+            # Convert text chunks only (tables handled by RAG-Anything's modal processors)
             for i, chunk_text in enumerate(chunked_texts):
                 custom_kg["chunks"].append({
                     "content": chunk_text,
@@ -244,41 +190,13 @@ async def process_document_with_semantic_inference(
                     "chunk_order_index": i
                 })
             
-            # Create synthetic chunks for table entities (one chunk per entity for unique provenance)
-            table_chunk_index = len(chunked_texts)
-            table_source_ids = {}  # Maps entity_name -> unique_table_source_id
-            
-            for entity in all_entities:
-                # Check if entity came from table (has [TABLE-P] tag in source_text)
-                if entity.source_text and "[TABLE-P" in entity.source_text:
-                    # Extract table page from tag: "[TABLE-P3] ..." -> "TABLE-P3"
-                    table_tag = entity.source_text.split("]")[0].replace("[", "")
-                    
-                    # Create UNIQUE source_id per entity: doc_id_TABLE-P3_EntityName
-                    # This ensures each table entity gets its own chunk_id in Neo4j
-                    table_source_id = f"{doc_id}_{table_tag}_{entity.entity_name}"
-                    
-                    # Create synthetic chunk with DETERMINISTIC content (entity name only)
-                    # This ensures consistent chunk_id across re-processing
-                    # LightRAG computes: chunk_id = md5(content) -> always same for same entity
-                    custom_kg["chunks"].append({
-                        "content": f"{table_tag}:{entity.entity_name}",  # Deterministic: no LLM-generated content
-                        "source_id": table_source_id,
-                        "file_path": file_path,
-                        "chunk_order_index": table_chunk_index
-                    })
-                    table_chunk_index += 1
-                    
-                    # Map entity to its unique table source
-                    table_source_ids[entity.entity_name] = table_source_id
-            
-            # Convert entities (use table source_id if available, else doc_id)
+            # Convert entities from text extraction
             for entity in all_entities:
                 custom_kg["entities"].append({
                     "entity_name": entity.entity_name,
                     "entity_type": entity.entity_type,
                     "description": entity.description,
-                    "source_id": table_source_ids.get(entity.entity_name, doc_id),
+                    "source_id": doc_id,
                     "file_path": file_path
                 })
             
@@ -293,10 +211,40 @@ async def process_document_with_semantic_inference(
                     "source_id": doc_id
                 })
             
-            # Insert custom KG into LightRAG (bypasses its extraction)
-            logger.info("💾 Inserting custom ontology into LightRAG...")
+            # PHASE 3: PROCESS MULTIMODAL CONTENT (tables, images) with custom processor
+            logger.info("📊 Registering GovconMultimodalProcessor for tables/images/equations...")
+            
+            # Create custom processor instance
+            govcon_processor = GovconMultimodalProcessor(
+                lightrag=rag_instance.lightrag,
+                modal_caption_func=llm_func,
+                context_extractor=rag_instance.context_extractor
+            )
+            
+            # Override RAG-Anything's default processors with our ontology-aware processor
+            rag_instance.modal_processors["table"] = govcon_processor
+            rag_instance.modal_processors["image"] = govcon_processor
+            rag_instance.modal_processors["equation"] = govcon_processor
+            
+            logger.info("✅ Custom processors registered")
+            
+            # Insert text entities + process multimodal content
+            logger.info("💾 Inserting custom text ontology and processing multimodal content...")
             await rag_instance.lightrag.ainsert_custom_kg(custom_kg, full_doc_id=doc_id)
-            logger.info("✅ Custom ontology inserted into knowledge graph")
+            
+            # Process multimodal content (tables, images) through RAG-Anything pipeline
+            # This will use our GovconMultimodalProcessor for entity extraction
+            multimodal_items = [item for item in filtered_content if item.get('type') in ['table', 'image', 'equation']]
+            if multimodal_items:
+                logger.info(f"📊 Processing {len(multimodal_items)} multimodal items with govcon ontology...")
+                await rag_instance.insert_content_list(
+                    content_list=multimodal_items,
+                    file_path=file_path,
+                    doc_id=doc_id
+                )
+                logger.info("✅ Multimodal content processed")
+            
+            logger.info("✅ Complete knowledge graph inserted")
             
             # Run semantic post-processing
             logger.info("🤖 Running semantic enhancement...")
