@@ -235,7 +235,7 @@ async def process_document_with_semantic_inference(
                 "relationships": []
             }
             
-            # Add chunks
+            # Convert chunks (text chunks)
             for i, chunk_text in enumerate(chunked_texts):
                 custom_kg["chunks"].append({
                     "content": chunk_text,
@@ -244,13 +244,41 @@ async def process_document_with_semantic_inference(
                     "chunk_order_index": i
                 })
             
-            # Convert entities
+            # Create synthetic chunks for table entities (one chunk per entity for unique provenance)
+            table_chunk_index = len(chunked_texts)
+            table_source_ids = {}  # Maps entity_name -> unique_table_source_id
+            
+            for entity in all_entities:
+                # Check if entity came from table (has [TABLE-P] tag in source_text)
+                if entity.source_text and "[TABLE-P" in entity.source_text:
+                    # Extract table page from tag: "[TABLE-P3] ..." -> "TABLE-P3"
+                    table_tag = entity.source_text.split("]")[0].replace("[", "")
+                    
+                    # Create UNIQUE source_id per entity: doc_id_TABLE-P3_EntityName
+                    # This ensures each table entity gets its own chunk_id in Neo4j
+                    table_source_id = f"{doc_id}_{table_tag}_{entity.entity_name}"
+                    
+                    # Create synthetic chunk with DETERMINISTIC content (entity name only)
+                    # This ensures consistent chunk_id across re-processing
+                    # LightRAG computes: chunk_id = md5(content) -> always same for same entity
+                    custom_kg["chunks"].append({
+                        "content": f"{table_tag}:{entity.entity_name}",  # Deterministic: no LLM-generated content
+                        "source_id": table_source_id,
+                        "file_path": file_path,
+                        "chunk_order_index": table_chunk_index
+                    })
+                    table_chunk_index += 1
+                    
+                    # Map entity to its unique table source
+                    table_source_ids[entity.entity_name] = table_source_id
+            
+            # Convert entities (use table source_id if available, else doc_id)
             for entity in all_entities:
                 custom_kg["entities"].append({
                     "entity_name": entity.entity_name,
                     "entity_type": entity.entity_type,
                     "description": entity.description,
-                    "source_id": doc_id,
+                    "source_id": table_source_ids.get(entity.entity_name, doc_id),
                     "file_path": file_path
                 })
             
@@ -643,7 +671,8 @@ def create_documents_upload_endpoint(app, rag_instance):
             )
             
             logger.info(f"✅ Processing complete for {file.filename}")
-            logger.info(f"   Relationships inferred: {processing_result['relationships_inferred']}")
+            if 'relationships_inferred' in processing_result:
+                logger.info(f"   Relationships inferred: {processing_result['relationships_inferred']}")
             
             # Clean up temp file
             os.unlink(file_path)
@@ -651,7 +680,7 @@ def create_documents_upload_endpoint(app, rag_instance):
             return JSONResponse({
                 "status": "success",
                 "message": f"Document {file.filename} processed successfully",
-                "relationships_inferred": processing_result["relationships_inferred"],
+                "relationships_inferred": processing_result.get("relationships_inferred", 0),
                 "method": "RAG-Anything + LLM semantic inference (format-agnostic)"
             })
             

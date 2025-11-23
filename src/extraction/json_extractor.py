@@ -4,6 +4,7 @@ import logging
 from typing import Optional, Dict, Any
 from openai import AsyncOpenAI
 from src.ontology.schema import ExtractionResult
+from src.utils.logging_config import log_graceful_failure
 
 logger = logging.getLogger(__name__)
 
@@ -354,7 +355,5 @@ Return structured JSON using the ExtractionResult schema."""
             return result
             
         except Exception as e:
-            logger.error(f"❌ extract_from_text failed ({chunk_id}): {e}")
-            import traceback
-            logger.error(traceback.format_exc())
+            log_graceful_failure(logger, "Entity extraction", e, chunk_id)
             return ExtractionResult(entities=[], relationships=[])

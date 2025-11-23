@@ -13,6 +13,7 @@ import logging
 import os
 from typing import Dict, Any, Tuple, List, Optional
 from src.ontology.schema import ExtractionResult
+from src.utils.logging_config import log_graceful_failure
 
 logger = logging.getLogger(__name__)
 
@@ -245,7 +246,7 @@ TABLE FOOTNOTES: {', '.join(table_footnote) if table_footnote else 'None'}
                 chunk_id=chunk_id
             )
             
-            # Tag all entities with table provenance
+            # Tag all entities with table provenance in source_text for identification
             for entity in extraction_result.entities:
                 entity.source_text = f"[TABLE-P{page_idx}] {entity.source_text or description[:100]}"
             
@@ -257,9 +258,6 @@ TABLE FOOTNOTES: {', '.join(table_footnote) if table_footnote else 'None'}
             return extraction_result, description
             
         except Exception as e:
-            logger.error(f"❌ Table entity extraction failed: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
-            
+            log_graceful_failure(logger, "Table extraction", e, chunk_id)
             # Return empty result on failure (graceful degradation)
             return ExtractionResult(entities=[], relationships=[]), description

@@ -19,6 +19,7 @@ import json
 import logging
 from typing import List, Dict, Tuple, Callable, Awaitable
 from pathlib import Path
+from src.utils.logging_config import log_graceful_failure
 
 from src.inference.batch_processor import BatchProcessor
 from src.inference.graph_io import group_entities_by_type
@@ -250,9 +251,7 @@ async def infer_relationships_batch(
         return new_relationships
     
     except Exception as e:
-        logger.error(f"  ❌ Error in relationship inference: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
+        log_graceful_failure(logger, "Relationship inference", e)
         return []
 
 
