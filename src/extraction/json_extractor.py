@@ -13,7 +13,7 @@ class JsonExtractor:
         self.api_key = os.getenv("LLM_BINDING_API_KEY")
         self.base_url = os.getenv("LLM_BINDING_HOST", "https://api.x.ai/v1")
         self.model = os.getenv("EXTRACTION_LLM_NAME", "grok-4-fast-reasoning")
-        self.max_output_tokens = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "32000"))
+        self.max_output_tokens = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "524288"))
         
         if not self.api_key:
             # Fallback for development/testing if env var not set, though it should be
@@ -38,20 +38,14 @@ class JsonExtractor:
         2. Entity Detection Rules (entity_detection_rules.md)
         3. Entity Extraction Prompt (entity_extraction_prompt.md)
         4. Relationship inference rules (prompts/relationship_inference/*.md)
-        
-        Supports compressed prompts via USE_COMPRESSED_PROMPTS env var for 89% token reduction.
         """
         base_path = os.getcwd()
         prompts_dir = os.path.join(base_path, "prompts")
         
-        # Check if compressed prompts should be used (default: False for safety)
-        use_compressed = os.getenv("USE_COMPRESSED_PROMPTS", "false").lower() == "true"
-        suffix = "_COMPRESSED.txt" if use_compressed else ".md"
-        logger.info(f"Loading {'COMPRESSED' if use_compressed else 'ORIGINAL'} prompts (89% token reduction enabled={use_compressed})")
+        logger.info(f"Loading original prompts from {prompts_dir}")
         
         # 1. Base JSON Instructions
-        json_prompt_filename = "grok_json_prompt_COMPRESSED.txt" if use_compressed else "grok_json_prompt.md"
-        json_prompt_path = os.path.join(prompts_dir, "extraction", json_prompt_filename)
+        json_prompt_path = os.path.join(prompts_dir, "extraction", "grok_json_prompt.md")
         try:
             with open(json_prompt_path, "r", encoding="utf-8") as f:
                 json_instructions = f.read()
@@ -60,8 +54,7 @@ class JsonExtractor:
             raise
 
         # 2. Entity Detection Rules (The "Rules")
-        detection_rules_filename = "entity_detection_rules_COMPRESSED.txt" if use_compressed else "entity_detection_rules.md"
-        detection_rules_path = os.path.join(prompts_dir, "extraction", detection_rules_filename)
+        detection_rules_path = os.path.join(prompts_dir, "extraction", "entity_detection_rules.md")
         detection_rules = ""
         if os.path.exists(detection_rules_path):
             with open(detection_rules_path, "r", encoding="utf-8") as f:
@@ -70,14 +63,13 @@ class JsonExtractor:
             logger.warning(f"Detection rules not found at {detection_rules_path}")
 
         # 3. Entity Extraction Prompt (The "Prompt" with examples)
-        extraction_prompt_filename = "entity_extraction_prompt_COMPRESSED.txt" if use_compressed else "entity_extraction_prompt.md"
-        extraction_prompt_path = os.path.join(prompts_dir, "extraction", extraction_prompt_filename)
+        extraction_prompt_path = os.path.join(prompts_dir, "extraction", "entity_extraction_prompt.md")
         extraction_prompt = ""
         if os.path.exists(extraction_prompt_path):
             with open(extraction_prompt_path, "r", encoding="utf-8") as f:
                 extraction_prompt = f.read()
-                # Strip the "Real Data" section if it exists at the end (only in original .md files)
-                if not use_compressed and "---Real Data---" in extraction_prompt:
+                # Strip the "Real Data" section if it exists at the end
+                if "---Real Data---" in extraction_prompt:
                     extraction_prompt = extraction_prompt.split("---Real Data---")[0]
         else:
             logger.warning(f"Extraction prompt not found at {extraction_prompt_path}")

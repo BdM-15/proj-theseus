@@ -31,9 +31,7 @@ from lightrag.api.config import global_args
 
 from src.inference import (
     parse_graphml,
-    infer_all_relationships,
     save_relationships_to_graphml,
-    save_relationships_to_kv_store
 )
 logger = logging.getLogger(__name__)
 
