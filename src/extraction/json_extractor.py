@@ -23,10 +23,14 @@ class JsonExtractor:
         if not self.api_key:
              raise ValueError("LLM_BINDING_API_KEY not found in environment variables")
 
+        # Large PWS documents (70+ pages) can generate 100KB+ JSON responses
+        # Default 120s timeout was causing truncation on complex extractions
+        self.timeout = float(os.getenv("LLM_TIMEOUT_SECONDS", "300"))  # 5 minutes default
+        
         self.client = AsyncOpenAI(
             api_key=self.api_key,
             base_url=self.base_url,
-            timeout=120.0
+            timeout=self.timeout
         )
         
         self.system_prompt = self._load_full_system_prompt()
@@ -122,6 +126,9 @@ Output the result strictly as a JSON object matching the schema defined in the f
             token_count = len(tokenizer.encode(text))
             logger.info(f"Sending extraction request to {self.model} (Length: {len(text)} chars, ~{token_count} tokens)")
             
+            # CRITICAL: stream=False prevents xAI API streaming buffer truncation
+            # Issue #6: Streaming responses truncate at ~60-70KB causing JSON parse errors
+            # With stream=False, API returns complete response in single payload
             response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=[
@@ -130,7 +137,8 @@ Output the result strictly as a JSON object matching the schema defined in the f
                 ],
                 response_format={"type": "json_object"},
                 temperature=0.1,
-                max_tokens=self.max_output_tokens
+                max_tokens=self.max_output_tokens,
+                stream=False  # Prevents truncation on large JSON responses
             )
             
             content = response.choices[0].message.content
@@ -206,34 +214,25 @@ Output the result strictly as a JSON object matching the schema defined in the f
             
             # CRITICAL: Rescue entities with partial data instead of dropping them
             # We want to capture ALL potential intelligence, even if imperfect.
+            # source_text is the ONLY content field - no description field exists anymore
             valid_entities = []
             for e in result.entities:
-                # Case 1: Both missing -> Try to rescue from source_text
-                if (not e.entity_name or not e.entity_name.strip()) and \
-                   (not e.description or not e.description.strip()):
-                    
-                    if e.source_text and e.source_text.strip():
-                        # Rescue using source_text
-                        snippet = e.source_text[:50].strip() + "..." if len(e.source_text) > 50 else e.source_text
-                        e.entity_name = f"[{e.entity_type.upper()}] {snippet}"
-                        e.description = e.source_text
-                        logger.info(f"🔧 Rescued entity using source_text: '{e.entity_name}'")
+                # Case 1: Missing source_text (REQUIRED field) -> Try to rescue from entity_name
+                if not e.source_text or not e.source_text.strip():
+                    if e.entity_name and e.entity_name.strip():
+                        # Use entity name as source_text (last resort)
+                        e.source_text = e.entity_name
+                        logger.info(f"🔧 Rescued entity using entity_name as source_text: '{e.entity_name}'")
                     else:
-                        # Truly empty (no name, desc, or source_text) -> Garbage
-                        logger.warning(f"⚠️ Dropping empty entity (no name, desc, or source_text): {e}")
+                        # Truly empty -> Garbage
+                        logger.warning(f"⚠️ Dropping empty entity (no source_text or name): {e}")
                         continue
 
-                # Case 2: Missing Name -> Rescue using Description
+                # Case 2: Missing Name -> Generate from source_text
                 if not e.entity_name or not e.entity_name.strip():
-                    # Create a descriptive name from the description
-                    desc_snippet = e.description[:50].strip() + "..." if len(e.description) > 50 else e.description
-                    e.entity_name = f"[{e.entity_type.upper()}] {desc_snippet}"
-                    logger.info(f"🔧 Rescued entity with missing name: Set to '{e.entity_name}'")
-
-                # Case 3: Missing Description -> Rescue using Name
-                if not e.description or not e.description.strip():
-                    e.description = e.entity_name
-                    logger.info(f"🔧 Rescued entity with missing description: Set to '{e.description}'")
+                    snippet = e.source_text[:50].strip() + "..." if len(e.source_text) > 50 else e.source_text
+                    e.entity_name = f"[{e.entity_type.upper()}] {snippet}"
+                    logger.info(f"🔧 Rescued entity with missing name from source_text: '{e.entity_name}'")
 
                 valid_entities.append(e)
             
@@ -288,13 +287,15 @@ Extract all relevant entities following the government contracting ontology:
 Return structured JSON using the ExtractionResult schema."""
 
         try:
+            # stream=False prevents xAI API streaming buffer truncation
             response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": self.system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                temperature=0.1
+                temperature=0.1,
+                stream=False
             )
             
             content = response.choices[0].message.content
