@@ -2,7 +2,8 @@ import os
 import json
 import logging
 from typing import Optional, Dict, Any
-from openai import AsyncOpenAI
+from xai_sdk import AsyncClient
+from xai_sdk.chat import system, user
 from src.ontology.schema import ExtractionResult
 from src.utils.logging_config import log_graceful_failure
 
@@ -11,27 +12,20 @@ logger = logging.getLogger(__name__)
 class JsonExtractor:
     def __init__(self):
         self.api_key = os.getenv("LLM_BINDING_API_KEY")
-        self.base_url = os.getenv("LLM_BINDING_HOST", "https://api.x.ai/v1")
         self.model = os.getenv("EXTRACTION_LLM_NAME", "grok-4-fast-reasoning")
         self.max_output_tokens = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "524288"))
         
         if not self.api_key:
             # Fallback for development/testing if env var not set, though it should be
-            logger.warning("LLM_BINDING_API_KEY not found, checking xai-api-key")
-            self.api_key = os.getenv("xai-api-key")
+            logger.warning("LLM_BINDING_API_KEY not found, checking XAI_API_KEY")
+            self.api_key = os.getenv("XAI_API_KEY")
             
         if not self.api_key:
-             raise ValueError("LLM_BINDING_API_KEY not found in environment variables")
+             raise ValueError("LLM_BINDING_API_KEY or XAI_API_KEY not found in environment variables")
 
-        # Large PWS documents (70+ pages) can generate 100KB+ JSON responses
-        # Default 120s timeout was causing truncation on complex extractions
-        self.timeout = float(os.getenv("LLM_TIMEOUT_SECONDS", "300"))  # 5 minutes default
-        
-        self.client = AsyncOpenAI(
-            api_key=self.api_key,
-            base_url=self.base_url,
-            timeout=self.timeout
-        )
+        # Initialize native xAI SDK client (gRPC-based, more reliable than OpenAI HTTP wrapper)
+        # The xAI SDK uses XAI_API_KEY env var by default, but we pass explicitly for clarity
+        self.client = AsyncClient(api_key=self.api_key)
         
         self.system_prompt = self._load_full_system_prompt()
 
@@ -124,24 +118,20 @@ Output the result strictly as a JSON object matching the schema defined in the f
             import tiktoken
             tokenizer = tiktoken.get_encoding("cl100k_base")
             token_count = len(tokenizer.encode(text))
-            logger.info(f"Sending extraction request to {self.model} (Length: {len(text)} chars, ~{token_count} tokens)")
+            logger.info(f"Sending extraction request to {self.model} via xAI SDK (Length: {len(text)} chars, ~{token_count} tokens)")
             
-            # CRITICAL: stream=False prevents xAI API streaming buffer truncation
-            # Issue #6: Streaming responses truncate at ~60-70KB causing JSON parse errors
-            # With stream=False, API returns complete response in single payload
-            response = await self.client.chat.completions.create(
+            # Use native xAI SDK (gRPC-based) instead of OpenAI HTTP wrapper
+            # This should be more reliable for large JSON responses
+            chat = self.client.chat.create(
                 model=self.model,
-                messages=[
-                    {"role": "system", "content": self.system_prompt},
-                    {"role": "user", "content": text}
-                ],
-                response_format={"type": "json_object"},
-                temperature=0.1,
-                max_tokens=self.max_output_tokens,
-                stream=False  # Prevents truncation on large JSON responses
+                messages=[system(self.system_prompt)]
             )
+            chat.append(user(text))
             
-            content = response.choices[0].message.content
+            # Sample the response (non-streaming, complete response)
+            response = await chat.sample()
+            content = response.content
+            
             if not content:
                 raise ValueError("Empty response from LLM")
 
@@ -287,18 +277,15 @@ Extract all relevant entities following the government contracting ontology:
 Return structured JSON using the ExtractionResult schema."""
 
         try:
-            # stream=False prevents xAI API streaming buffer truncation
-            response = await self.client.chat.completions.create(
+            # Use native xAI SDK (gRPC-based) for table/image extraction
+            chat = self.client.chat.create(
                 model=self.model,
-                messages=[
-                    {"role": "system", "content": self.system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                temperature=0.1,
-                stream=False
+                messages=[system(self.system_prompt)]
             )
+            chat.append(user(user_prompt))
             
-            content = response.choices[0].message.content
+            response = await chat.sample()
+            content = response.content
             
             # Parse JSON (with markdown extraction if needed)
             if "```json" in content:
