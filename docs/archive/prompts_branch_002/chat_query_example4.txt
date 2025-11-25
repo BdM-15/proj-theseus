@@ -1,1 +1,0 @@
-(Strategic, Shipley-grounded): "Based on extracted reqs, suggest win themes for Technical Approach (per Shipley Proposal Guide p.50). Include RFP citations."

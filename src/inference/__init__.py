@@ -2,28 +2,24 @@
 Relationship Inference Module
 
 LLM-powered semantic relationship inference for knowledge graphs.
-Implements 5 core algorithms for government contracting RFPs:
+Implements 8 core algorithms for government contracting RFPs:
 
-1. Document Hierarchy: DOCUMENT/CLAUSE → SECTION (CHILD_OF)
-2. Section L↔M Mapping: SUBMISSION_INSTRUCTION → EVALUATION_FACTOR (GUIDES)
-3. Document Section Linking: DOCUMENT → SECTION (ATTACHMENT_OF)
-4. Clause Clustering: CLAUSE → SECTION (CHILD_OF)
-5. Requirement Evaluation: REQUIREMENT → EVALUATION_FACTOR (EVALUATED_BY)
+1. Instruction-Evaluation Linking: SUBMISSION_INSTRUCTION → EVALUATION_FACTOR (GUIDES)
+2. Evaluation Hierarchy: EVALUATION_FACTOR → EVALUATION_FACTOR (CHILD_OF)
+3. Deliverable Traceability: DELIVERABLE → REQUIREMENT/EVALUATION_FACTOR (FULFILLS/EVALUATED_BY)
+4. Requirement Clustering: REQUIREMENT → REQUIREMENT (RELATED_TO)
+5. Annex/Attachment Linking: DOCUMENT → REQUIREMENT/CLAUSE (DEFINES/PROVIDES_CONTEXT)
+6. Orphan Resolution: Unconnected entities → related entities
+7. PWS Workload Enrichment: BOE metadata extraction for requirements
+8. Entity Type Correction: Fix misclassified entities
 
 Usage:
-    from src.inference import infer_all_relationships
+    from src.inference.semantic_post_processor import SemanticPostProcessor
     from src.inference.graph_io import parse_graphml, save_relationships_to_graphml
     
-    nodes, edges = parse_graphml(Path("./rag_storage/graph_chunk_entity_relation.graphml"))
-    new_rels = await infer_all_relationships(nodes, edges, llm_func)
-    save_relationships_to_graphml(graphml_path, new_rels, nodes)
+    processor = SemanticPostProcessor(neo4j_io, workspace)
+    await processor.process_batch()
 """
-
-from src.inference.engine import (
-    infer_all_relationships,
-    infer_relationships_batch,
-    create_relationship_inference_prompt,
-)
 
 from src.inference.graph_io import (
     parse_graphml,
@@ -33,10 +29,6 @@ from src.inference.graph_io import (
 )
 
 __all__ = [
-    # Engine exports
-    "infer_all_relationships",
-    "infer_relationships_batch",
-    "create_relationship_inference_prompt",
     # Graph I/O exports
     "parse_graphml",
     "save_relationships_to_graphml",

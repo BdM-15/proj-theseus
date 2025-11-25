@@ -24,6 +24,46 @@ python test_neo4j_quick.py
 
 ## Test Scripts
 
+### 0. `test_compressed_prompts.py` 🎯 A/B VALIDATION
+
+**Purpose**: Validate compressed prompts (89% token reduction) maintain extraction quality
+
+**What it tests**:
+
+- ✅ Entity count matches perfect run baseline ±5% (339 entities)
+- ✅ Relationship count matches baseline ±5% (154 relationships)
+- ✅ Workload driver completeness ≥95%
+- ✅ Schema compliance (rejected relationships ≤5)
+- ✅ Processing time comparison
+
+**Runtime**: ~3-5 minutes (2 extractions from Appendix F)
+
+**Use when**: Before enabling `USE_COMPRESSED_PROMPTS=true` in production
+
+**Example output**:
+
+```
+🔵 PHASE 1: Extract with ORIGINAL prompts (baseline)
+  ✓ Entities: 341
+  ✓ Relationships: 156
+  ✓ Processing time: 12.4s
+
+🟢 PHASE 2: Extract with COMPRESSED prompts (test)
+  ✓ Entities: 339
+  ✓ Relationships: 154
+  ✓ Processing time: 11.8s
+
+VALIDATION RESULTS
+═══════════════════════════════════════════════════════════
+✅ PASS Entity Count: 339 (baseline: 339, range: 322-356)
+✅ PASS Relationship Count: 154 (baseline: 154, range: 147-162)
+✅ PASS Workload Completeness: 96.9% (threshold: ≥95%)
+📊 Performance: 11.8s vs 12.4s (speedup: 1.05x)
+✅ ALL VALIDATION GATES PASSED
+```
+
+---
+
 ### 1. `test_event_loop.py` ⚡ FASTEST
 
 **Purpose**: Verify the async/event loop fix works correctly

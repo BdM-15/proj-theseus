@@ -95,17 +95,25 @@ Extract specific labor details when BOE category includes "Labor":
 - **Administrative**: Clerks, Coordinators, Support Staff
 - **Specialized**: Security Personnel, Medical Staff, QA Inspectors
 
-### Effort Indicators:
+### ❌ EXCLUSION RULE:
 
-- **Explicit**: "3 FTE", "24/7 coverage", "8-hour shifts", "40 hours/week"
+- Do NOT include Performance Metrics (e.g., "95% uptime", "100% compliance") in Labor Drivers.
+- These belong in the Performance Requirements section, not Workload.
+
+### Effort Indicators (CRITICAL: EXTRACT EXACT NUMBERS, FREQUENCIES, HOURS):
+
+- **Explicit**: "3 FTE", "24/7 coverage", "8-hour shifts", "40 hours/week", "5000 personnel"
+- **Frequencies**: "Daily", "Weekly", "Monthly", "Quarterly", "Annually", "3x per week"
+- **Hours**: "Operating hours 0800-1700", "Response time 2 hours", "2000 annual hours"
 - **Implicit**: "continuous operations" → 24/7 staffing, "daily cleaning" → recurring labor
+- **Quantitative**: If the text says "5000 personnel" or "Frequency: Daily", you MUST include it in the driver description.
 
 ### Example Labor Extraction:
 
 ```
-Requirement: "Contractor shall provide 24/7 janitorial services with minimum 3 FTE coverage"
-Labor Drivers: ["Janitorial Staff (3 FTE)", "24/7 Coverage (shift rotation)", "Cleaning Operations"]
-Effort Estimate: "Continuous (3-shift rotation, ~9 FTE total for 24/7 coverage)"
+Requirement: "Contractor shall provide 24/7 janitorial services with minimum 3 FTE coverage for 5000 personnel. Restrooms cleaned 4x daily."
+Labor Drivers: ["Janitorial Staff (3 FTE)", "24/7 Coverage (shift rotation)", "Cleaning Operations for 5000 personnel", "Frequency: 4x Daily Restroom Cleaning"]
+Effort Quantifiers: "Explicit: 3 FTE minimum, 24/7 coverage, 4x daily frequency"
 ```
 
 ---
@@ -121,17 +129,18 @@ Extract specific material details when BOE category includes "Materials":
 - **Technology**: Computers, software, communications gear
 - **Infrastructure**: Facilities, buildings, utilities
 
-### Quantity Indicators:
+### Quantity Indicators (CRITICAL: EXTRACT EXACT NUMBERS):
 
-- **Explicit**: "50 laptops", "3 vehicles", "200 meals/day"
+- **Explicit**: "50 laptops", "3 vehicles", "200 meals/day", "50,000 sq ft"
 - **Implicit**: "dining facility for 500" → kitchen equipment, tables, chairs, utensils
+- **Quantitative**: If the text says "50,000 sq ft", you MUST include "50,000 sq ft" in the material need.
 
 ### Example Material Extraction:
 
 ```
-Requirement: "Contractor shall operate dining facility serving 500 meals per day"
-Material Needs: ["Commercial kitchen equipment", "Dining tables/chairs (100 seats)", "Food service supplies", "Refrigeration units"]
-Quantity Estimate: "DFAC equipment for 500 PAX capacity"
+Requirement: "Contractor shall operate dining facility serving 500 meals per day in 10,000 sq ft facility"
+Material Needs: ["Commercial kitchen equipment", "Dining tables/chairs (100 seats)", "Food service supplies", "Refrigeration units", "Facility maintenance for 10,000 sq ft"]
+Quantity Metrics: "Explicit: 500 meals/day, 10,000 sq ft facility"
 ```
 
 ---
@@ -225,7 +234,7 @@ For each requirement entity, return:
 - **material_needs**: Array of material-related details (empty if no Materials category)
 - **complexity_score**: Integer 1-10 (difficulty rating)
 - **complexity_rationale**: String explaining complexity assessment
-- **effort_estimate**: String with high-level effort description
+- **effort_estimate**: String with EXPLICIT effort metrics found in text (e.g., "3 FTE", "24/7"). Do NOT estimate/guess FTEs if not stated.
 - **enriched_by**: String identifier for enrichment version (use "workload_analysis_v1")
 
 ---
@@ -315,7 +324,7 @@ Most requirements span multiple categories. Examples:
     ],
     "complexity_score": 9,
     "complexity_rationale": "High complexity due to 24/7 operations, large population (5000+), multiple service areas (dining, janitorial, grounds), and critical mission support role requiring continuous staffing and supply chain management",
-    "effort_estimate": "High - Estimated 100-150 FTE total across all services (dining: 60-80, janitorial: 30-40, grounds: 20-30) with shift rotations and management overhead",
+    "effort_estimate": "Explicit: 24/7 operations, 5000+ personnel, 3 service areas",
     "enriched_by": "workload_analysis_v1"
   },
   {
@@ -333,7 +342,7 @@ Most requirements span multiple categories. Examples:
     "material_needs": [],
     "complexity_score": 3,
     "complexity_rationale": "Low complexity - standard reporting requirement with defined format and deadline, minimal coordination required",
-    "effort_estimate": "Low - Estimated 20-40 hours per month (data collection + report writing + review)",
+    "effort_estimate": "Explicit: Monthly frequency (by 5th business day)",
     "enriched_by": "workload_analysis_v1"
   },
   {
@@ -353,7 +362,7 @@ Most requirements span multiple categories. Examples:
     "material_needs": [],
     "complexity_score": 7,
     "complexity_rationale": "Moderate-high complexity - requires quality management expertise, documentation development, inspection protocol design, and continuous improvement processes",
-    "effort_estimate": "Moderate - Initial development: 200-300 hours; Ongoing maintenance: 40-60 hours/month for updates and oversight",
+    "effort_estimate": "Implicit: Continuous improvement implies ongoing effort",
     "enriched_by": "workload_analysis_v1"
   }
 ]
@@ -369,7 +378,7 @@ Most requirements span multiple categories. Examples:
 4. **Extract labor drivers** if Labor category identified
 5. **Extract material needs** if Materials category identified
 6. **Assess complexity** (1-10) with rationale
-7. **Estimate effort** (qualitative description)
+7. **Extract effort metrics** (explicit numbers/frequencies only - NO ESTIMATION)
 8. **Output JSON array** with one object per requirement entity
 
 ---

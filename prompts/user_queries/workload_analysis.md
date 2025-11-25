@@ -26,7 +26,8 @@ Confidence Scores: [boe_relevance showing top 3 categories with confidence]
 
 OPERATIONAL METRICS (What needs to happen):
 - [labor_drivers - volumes, frequencies, hours, locations, surges]
-- Focus on OPERATIONAL PARAMETERS, not staffing solutions
+- Focus on OPERATIONAL PARAMETERS (quantities, counts, schedules)
+- ❌ EXCLUDE Performance Metrics (e.g., "95% uptime", "100% compliance", "zero defects") - these belong in the Performance Requirements section
 - Examples: "500 meals/day", "24/7 operations", "3 locations", "150-foot proximity"
 
 MATERIAL NEEDS (For BOM buildout):

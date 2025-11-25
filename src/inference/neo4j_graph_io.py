@@ -46,7 +46,8 @@ class Neo4jGraphIO:
         RETURN elementId(n) as id,
                n.entity_id as entity_name,
                n.entity_type as entity_type,
-               n.description as description
+               n.description as description,
+               n.source_id as source_id
         """
         
         with self.driver.session(database=self.database) as session:
@@ -57,7 +58,8 @@ class Neo4jGraphIO:
                     'id': record['id'],
                     'entity_name': record['entity_name'],
                     'entity_type': record['entity_type'],
-                    'description': record['description']
+                    'description': record['description'],
+                    'source_id': record['source_id']
                 })
             
             logger.info(f"  📊 Fetched {len(entities)} entities from Neo4j")
@@ -189,6 +191,41 @@ class Neo4jGraphIO:
         Returns:
             Number of relationships created
         """
+        # Filter out relationships with missing/null/empty relationship_type
+        # (prevents Neo4j ClientError: cannot merge relationship with null type)
+        valid_relationships = []
+        rejected_relationships = []
+        
+        for rel in new_relationships:
+            rel_type = rel.get('relationship_type')
+            if not rel_type or (isinstance(rel_type, str) and not rel_type.strip()):
+                rejected_relationships.append(rel)
+                continue
+            valid_relationships.append(rel)
+        
+        # CRITICAL: Log rejected relationships for data loss visibility
+        if rejected_relationships:
+            logger.error("=" * 80)
+            logger.error("❌ CRITICAL: REJECTED MALFORMED RELATIONSHIPS (DATA LOSS)")
+            logger.error("=" * 80)
+            logger.error(f"Rejected {len(rejected_relationships)} of {len(new_relationships)} relationships due to null/empty 'relationship_type'")
+            logger.error("")
+            logger.error("REJECTED RELATIONSHIPS:")
+            for i, rel in enumerate(rejected_relationships, 1):
+                logger.error(f"  [{i}] Source: {rel.get('source_id', 'MISSING')}")
+                logger.error(f"      Target: {rel.get('target_id', 'MISSING')}")
+                logger.error(f"      Type:   {repr(rel.get('relationship_type', 'MISSING'))}")
+                logger.error(f"      Reason: {rel.get('reasoning', 'N/A')[:100]}")
+                logger.error(f"      Full:   {rel}")
+                logger.error("")
+            logger.error("=" * 80)
+            logger.error("⚠️  INVESTIGATE: Check inference algorithms for null type generation")
+            logger.error("=" * 80)
+        
+        if not valid_relationships:
+            logger.info("  💾 No valid relationships to create")
+            return 0
+        
         # Neo4j doesn't allow dynamic relationship types in pure Cypher
         # We need to use APOC or create with a property
         # Only include confidence if present (trust LLM quality like LightRAG)
@@ -209,7 +246,7 @@ class Neo4jGraphIO:
         """
         
         with self.driver.session(database=self.database) as session:
-            result = session.run(query, relationships=new_relationships)
+            result = session.run(query, relationships=valid_relationships)
             record = result.single()
             count = record['created_count'] if record else 0
             
@@ -286,6 +323,107 @@ class Neo4jGraphIO:
                 type_counts[record['type']] = record['count']
             
             return type_counts
+    
+    def create_entities(self, entities: List[Dict]) -> int:
+        """
+        Create new entities in Neo4j.
+        
+        Args:
+            entities: List of entity dicts (from JsonExtractor)
+        
+        Returns:
+            Number of entities created
+        """
+        # Filter out any entities that might have slipped through with None names
+        # Note: JsonExtractor should have rescued these, but this is a final safety net.
+        valid_entities = []
+        for e in entities:
+            if e.get('entity_name'):
+                valid_entities.append(e)
+            else:
+                # This should theoretically never happen if JsonExtractor is working
+                logger.error(f"❌ Critical Error: Entity reached Neo4j without a name! Dropping to prevent DB corruption. Entity: {e}")
+        
+        if len(valid_entities) < len(entities):
+            logger.warning(f"⚠️ Skipped {len(entities) - len(valid_entities)} entities with missing names in Neo4j creation")
+        
+        # Note: We use MERGE on entity_name to avoid duplicates
+        query = f"""
+        UNWIND $entities AS entity
+        MERGE (n:`{self.workspace}` {{entity_name: entity.entity_name}})
+        SET n.entity_type = entity.entity_type,
+            n.description = entity.description,
+            n.source_text = entity.source_text,
+            n.created_by = 'json_extractor',
+            n.created_at = datetime()
+        
+        // Set specific properties based on type
+        FOREACH (_ IN CASE WHEN entity.entity_type = 'requirement' THEN [1] ELSE [] END |
+            SET n.criticality = entity.criticality,
+                n.modal_verb = entity.modal_verb,
+                n.req_type = entity.req_type,
+                n.labor_drivers = entity.labor_drivers,
+                n.material_needs = entity.material_needs
+        )
+        FOREACH (_ IN CASE WHEN entity.entity_type = 'evaluation_factor' THEN [1] ELSE [] END |
+            SET n.weight = entity.weight,
+                n.importance = entity.importance,
+                n.subfactors = entity.subfactors
+        )
+        FOREACH (_ IN CASE WHEN entity.entity_type = 'submission_instruction' THEN [1] ELSE [] END |
+            SET n.page_limit = entity.page_limit,
+                n.format_reqs = entity.format_reqs,
+                n.volume = entity.volume
+        )
+        FOREACH (_ IN CASE WHEN entity.entity_type = 'clause' THEN [1] ELSE [] END |
+            SET n.clause_number = entity.clause_number,
+                n.regulation = entity.regulation
+        )
+        FOREACH (_ IN CASE WHEN entity.entity_type = 'performance_metric' THEN [1] ELSE [] END |
+            SET n.threshold = entity.threshold,
+                n.measurement_method = entity.measurement_method
+        )
+        FOREACH (_ IN CASE WHEN entity.entity_type = 'strategic_theme' THEN [1] ELSE [] END |
+            SET n.theme_type = entity.theme_type
+        )
+        
+        RETURN count(n) as created_count
+        """
+        
+        with self.driver.session(database=self.database) as session:
+            result = session.run(query, entities=entities)
+            record = result.single()
+            count = record['created_count'] if record else 0
+            
+            logger.info(f"  💾 Created/Merged {count} entities in Neo4j")
+            return count
+
+    def create_typed_relationships(self, relationships: List[Dict]) -> int:
+        """
+        Create typed relationships in Neo4j using APOC for dynamic types.
+        
+        Args:
+            relationships: List of dicts with source_entity, target_entity, relationship_type, description
+        """
+        query = f"""
+        UNWIND $relationships AS rel
+        MATCH (source:`{self.workspace}` {{entity_name: rel.source_entity}})
+        MATCH (target:`{self.workspace}` {{entity_name: rel.target_entity}})
+        CALL apoc.create.relationship(source, rel.relationship_type, {{
+            description: rel.description,
+            source: 'json_extractor',
+            created_at: datetime()
+        }}, target) YIELD rel as r
+        RETURN count(r) as created_count
+        """
+        
+        with self.driver.session(database=self.database) as session:
+            result = session.run(query, relationships=relationships)
+            record = result.single()
+            count = record['created_count'] if record else 0
+            
+            logger.info(f"  💾 Created {count} typed relationships in Neo4j")
+            return count
 
 
 def group_entities_by_type(entities: List[Dict]) -> Dict[str, List[Dict]]:
