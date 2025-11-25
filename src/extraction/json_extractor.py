@@ -13,6 +13,7 @@ class JsonExtractor:
         self.api_key = os.getenv("LLM_BINDING_API_KEY")
         self.base_url = os.getenv("LLM_BINDING_HOST", "https://api.x.ai/v1")
         self.model = os.getenv("EXTRACTION_LLM_NAME", "grok-4-fast-reasoning")
+        self.max_output_tokens = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "32000"))
         
         if not self.api_key:
             # Fallback for development/testing if env var not set, though it should be
@@ -24,7 +25,8 @@ class JsonExtractor:
 
         self.client = AsyncOpenAI(
             api_key=self.api_key,
-            base_url=self.base_url
+            base_url=self.base_url,
+            timeout=120.0
         )
         
         self.system_prompt = self._load_full_system_prompt()
@@ -136,7 +138,7 @@ Output the result strictly as a JSON object matching the schema defined in the f
                 ],
                 response_format={"type": "json_object"},
                 temperature=0.1,
-                max_tokens=32000 # Maximize output token limit for large extractions
+                max_tokens=self.max_output_tokens
             )
             
             content = response.choices[0].message.content

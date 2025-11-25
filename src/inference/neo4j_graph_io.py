@@ -191,6 +191,41 @@ class Neo4jGraphIO:
         Returns:
             Number of relationships created
         """
+        # Filter out relationships with missing/null/empty relationship_type
+        # (prevents Neo4j ClientError: cannot merge relationship with null type)
+        valid_relationships = []
+        rejected_relationships = []
+        
+        for rel in new_relationships:
+            rel_type = rel.get('relationship_type')
+            if not rel_type or (isinstance(rel_type, str) and not rel_type.strip()):
+                rejected_relationships.append(rel)
+                continue
+            valid_relationships.append(rel)
+        
+        # CRITICAL: Log rejected relationships for data loss visibility
+        if rejected_relationships:
+            logger.error("=" * 80)
+            logger.error("❌ CRITICAL: REJECTED MALFORMED RELATIONSHIPS (DATA LOSS)")
+            logger.error("=" * 80)
+            logger.error(f"Rejected {len(rejected_relationships)} of {len(new_relationships)} relationships due to null/empty 'relationship_type'")
+            logger.error("")
+            logger.error("REJECTED RELATIONSHIPS:")
+            for i, rel in enumerate(rejected_relationships, 1):
+                logger.error(f"  [{i}] Source: {rel.get('source_id', 'MISSING')}")
+                logger.error(f"      Target: {rel.get('target_id', 'MISSING')}")
+                logger.error(f"      Type:   {repr(rel.get('relationship_type', 'MISSING'))}")
+                logger.error(f"      Reason: {rel.get('reasoning', 'N/A')[:100]}")
+                logger.error(f"      Full:   {rel}")
+                logger.error("")
+            logger.error("=" * 80)
+            logger.error("⚠️  INVESTIGATE: Check inference algorithms for null type generation")
+            logger.error("=" * 80)
+        
+        if not valid_relationships:
+            logger.info("  💾 No valid relationships to create")
+            return 0
+        
         # Neo4j doesn't allow dynamic relationship types in pure Cypher
         # We need to use APOC or create with a property
         # Only include confidence if present (trust LLM quality like LightRAG)
@@ -211,7 +246,7 @@ class Neo4jGraphIO:
         """
         
         with self.driver.session(database=self.database) as session:
-            result = session.run(query, relationships=new_relationships)
+            result = session.run(query, relationships=valid_relationships)
             record = result.single()
             count = record['created_count'] if record else 0
             
