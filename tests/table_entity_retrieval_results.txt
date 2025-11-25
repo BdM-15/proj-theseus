@@ -1,0 +1,41 @@
+TABLE ENTITY RETRIEVAL TEST RESULTS
+================================================================================
+
+Workspace: afcapv_adab_iss_2025_pwstst
+Test date: 2025-11-22
+
+
+1. Equipment Inventories
+--------------------------------------------------------------------------------
+Query: What equipment types and quantities are specified in the RFP?
+Expected: Should retrieve equipment lists from tables (if present)
+
+ERROR: argument of type 'NoneType' is not iterable
+
+2. Service Frequencies
+--------------------------------------------------------------------------------
+Query: What service frequencies or operational schedules are defined in the requirements?
+Expected: Should retrieve frequency data from tables and text
+
+ERROR: argument of type 'NoneType' is not iterable
+
+3. Staffing Levels
+--------------------------------------------------------------------------------
+Query: What staffing matrices, labor categories, or manning requirements are specified?
+Expected: Should retrieve staffing tables and personnel requirements
+
+ERROR: argument of type 'NoneType' is not iterable
+
+4. Workload Metrics
+--------------------------------------------------------------------------------
+Query: What metrics, quantities, or volumes drive the workload requirements for this contract?
+Expected: Should retrieve both table data (quantities) and text (narrative drivers)
+
+ERROR: argument of type 'NoneType' is not iterable
+
+5. Table-Specific Search
+--------------------------------------------------------------------------------
+Query: What information is presented in tables throughout the Performance Work Statement?
+Expected: Direct query for table content
+
+ERROR: argument of type 'NoneType' is not iterable

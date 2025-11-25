@@ -242,6 +242,35 @@ def setup_logging(
     }
 
 
+def log_graceful_failure(logger: logging.Logger, operation: str, error: Exception, context: str = "") -> None:
+    """
+    Log a graceful failure with truncated error message (non-critical, processing continues).
+    
+    Use this for expected failures that should not crash the system:
+    - Table extraction failures (3-5% tolerance)
+    - Relationship inference failures
+    - Individual chunk processing failures
+    
+    Args:
+        logger: Logger instance to use
+        operation: Brief description of what failed (e.g., "Table extraction", "Relationship inference")
+        error: The exception that was caught
+        context: Optional context (e.g., chunk_id, table_id) to include in log
+    
+    Example:
+        try:
+            result = process_table(...)
+        except Exception as e:
+            log_graceful_failure(logger, "Table extraction", e, chunk_id)
+            return empty_result()
+    """
+    error_msg = str(error)[:100]  # Truncate to 100 chars
+    if context:
+        logger.warning(f"⚠️ {operation} failed ({context}): {error_msg} - continuing with degraded result")
+    else:
+        logger.warning(f"⚠️ {operation} failed: {error_msg} - continuing with degraded result")
+
+
 def get_log_summary(log_dir: str = "logs") -> dict:
     """Get summary of current log files with sizes and timestamps"""
     log_path = Path(log_dir)
