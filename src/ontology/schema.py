@@ -11,6 +11,15 @@ logger = logging.getLogger(__name__)
 CriticalityLevel = Literal["MANDATORY", "IMPORTANT", "OPTIONAL", "INFORMATIONAL"]
 RequirementType = Literal["FUNCTIONAL", "PERFORMANCE", "SECURITY", "TECHNICAL", "INTERFACE", "MANAGEMENT", "DESIGN", "QUALITY", "OTHER"]
 ThemeType = Literal["CUSTOMER_HOT_BUTTON", "DISCRIMINATOR", "PROOF_POINT", "WIN_THEME"]
+
+# 18 allowed entity types - this is the single source of truth
+VALID_ENTITY_TYPES = {
+    "organization", "concept", "event", "technology", "person", "location",
+    "requirement", "clause", "section", "document", "deliverable",
+    "evaluation_factor", "submission_instruction", "program", "equipment",
+    "strategic_theme", "statement_of_work", "performance_metric"
+}
+
 EntityType = Literal[
     "organization", "concept", "event", "technology", "person", "location",
     "requirement", "clause", "section", "document", "deliverable",
@@ -25,6 +34,23 @@ EntityType = Literal[
 class BaseEntity(BaseModel):
     entity_name: str = Field(..., description="The canonical name of the entity (Title Case).")
     entity_type: EntityType = Field(..., description="The strict entity type from the government contracting ontology.")
+
+    @model_validator(mode='before')
+    @classmethod
+    def validate_entity_type(cls, values):
+        """
+        Validate entity_type BEFORE Pydantic parsing to catch invalid types early.
+        Coerces invalid types to 'concept' instead of silently accepting them.
+        """
+        if isinstance(values, dict):
+            entity_type = values.get('entity_type', '')
+            if entity_type and entity_type not in VALID_ENTITY_TYPES:
+                entity_name = values.get('entity_name', 'unknown')
+                logger.warning(
+                    f"⚠️ Invalid entity_type '{entity_type}' for '{entity_name}' - coercing to 'concept'"
+                )
+                values['entity_type'] = 'concept'
+        return values
 
     @model_validator(mode='after')
     def clean_entity_name(self):
