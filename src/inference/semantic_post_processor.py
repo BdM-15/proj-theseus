@@ -1015,8 +1015,8 @@ async def _semantic_post_processor_neo4j(
         
         # Get updated counts
         type_counts = neo4j_io.get_entity_count_by_type()
-        logger.info("\n📊 Entity Type Distribution:")
-        for entity_type, count in sorted(type_counts.items(), key=lambda x: x[1], reverse=True)[:10]:
+        logger.info("\n📊 Entity Type Distribution (all types):")
+        for entity_type, count in sorted(type_counts.items(), key=lambda x: x[1], reverse=True):
             logger.info(f"  {entity_type:30s}: {count:4d}")
         
         return {

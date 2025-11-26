@@ -1,5 +1,6 @@
-from typing import List, Optional, Literal
-from pydantic import BaseModel, Field, model_validator
+from typing import List, Optional, Literal, Dict
+from pydantic import BaseModel, Field, model_validator, field_validator
+from enum import Enum
 import logging
 
 logger = logging.getLogger(__name__)
@@ -11,6 +12,65 @@ logger = logging.getLogger(__name__)
 CriticalityLevel = Literal["MANDATORY", "IMPORTANT", "OPTIONAL", "INFORMATIONAL"]
 RequirementType = Literal["FUNCTIONAL", "PERFORMANCE", "SECURITY", "TECHNICAL", "INTERFACE", "MANAGEMENT", "DESIGN", "QUALITY", "OTHER"]
 ThemeType = Literal["CUSTOMER_HOT_BUTTON", "DISCRIMINATOR", "PROOF_POINT", "WIN_THEME"]
+
+
+class BOECategory(str, Enum):
+    """
+    Standard Basis of Estimate (BOE) categories for workload enrichment.
+    These are the ONLY valid values for workload_categories.
+    """
+    LABOR = "Labor"
+    MATERIALS = "Materials"
+    ODCS = "ODCs"
+    QA = "QA"
+    LOGISTICS = "Logistics"
+    LIFECYCLE = "Lifecycle"
+    COMPLIANCE = "Compliance"
+
+
+# Mapping of common LLM-generated invalid categories to valid BOE categories
+# NOTE: Keep this MINIMAL - prefer improving the prompt over adding mappings.
+# Warnings for unmapped categories guide prompt engineering efforts.
+BOE_CATEGORY_MAPPING: Dict[str, BOECategory] = {
+    # These are observed production issues from initial runs (Nov 2025)
+    # Future iterations should fix these at the prompt level, not here
+    
+    # Security-related → Compliance (common LLM mistake)
+    "security": BOECategory.COMPLIANCE,
+    "base access": BOECategory.COMPLIANCE,
+}
+
+
+def normalize_boe_category(category: str, fallback: BOECategory = BOECategory.LABOR) -> BOECategory:
+    """
+    Normalize a category string to a valid BOECategory.
+    
+    GRACEFUL HANDLING: Never returns None - always maps to a valid category.
+    Unknown categories are mapped to fallback (default: Labor) and logged as WARNING
+    so they can be added to BOE_CATEGORY_MAPPING in future iterations.
+    
+    Args:
+        category: Raw category string from LLM
+        fallback: Default BOE category for unmapped values (default: Labor)
+    
+    Returns:
+        BOECategory: Always returns a valid category (never None)
+    """
+    # First try exact match (case-insensitive)
+    category_lower = category.lower().strip()
+    
+    # Check if it's already a valid category
+    for boe_cat in BOECategory:
+        if boe_cat.value.lower() == category_lower:
+            return boe_cat
+    
+    # Try mapping from common invalid values
+    if category_lower in BOE_CATEGORY_MAPPING:
+        return BOE_CATEGORY_MAPPING[category_lower]
+    
+    # GRACEFUL FALLBACK: Log warning and use fallback category
+    logger.warning(f"Unmapped BOE category '{category}' → defaulting to '{fallback.value}'. Consider adding to BOE_CATEGORY_MAPPING.")
+    return fallback
 
 # 18 allowed entity types - this is the single source of truth
 VALID_ENTITY_TYPES = {
@@ -102,6 +162,70 @@ class PerformanceMetric(BaseEntity):
     entity_type: Literal["performance_metric"] = "performance_metric"
     threshold: str = Field(..., description="The specific value/limit (e.g., '99.9%', '< 2 errors').")
     measurement_method: Optional[str] = Field(None, description="How the metric is calculated or inspected.")
+
+
+# ==========================================
+# Workload Enrichment Model (for LLM response parsing)
+# ==========================================
+
+class WorkloadEnrichmentItem(BaseModel):
+    """
+    Pydantic model for validating workload enrichment LLM responses.
+    Enforces BOE category constraints at parse time.
+    """
+    entity_index: int = Field(..., description="Index of the entity in the batch.")
+    has_workload_metric: bool = Field(True, description="Whether this requirement has workload implications.")
+    workload_categories: List[str] = Field(default_factory=list, description="Raw categories from LLM (validated in validator).")
+    validated_categories: List[BOECategory] = Field(default_factory=list, description="Validated BOE categories after normalization.")
+    boe_relevance: Dict[str, float] = Field(default_factory=dict, description="Confidence scores per BOE category (0.0-1.0).")
+    estimated_volume: Optional[str] = Field(None, description="Volume descriptor (e.g., 'daily', 'monthly').")
+    complexity: Optional[str] = Field(None, description="Complexity level (High/Medium/Low).")
+    
+    @field_validator('workload_categories', mode='before')
+    @classmethod
+    def normalize_categories(cls, v):
+        """Accept any input format for workload_categories."""
+        if v is None:
+            return []
+        if isinstance(v, str):
+            return [v]
+        return list(v)
+    
+    @model_validator(mode='after')
+    def validate_and_map_categories(self):
+        """
+        Normalize raw workload_categories to validated BOE categories.
+        Uses graceful fallback - ALL categories are mapped (no data loss).
+        Invalid categories default to Labor and generate a WARNING log.
+        """
+        validated = []
+        for cat in self.workload_categories:
+            normalized = normalize_boe_category(cat)  # Always returns valid category
+            if normalized not in validated:
+                validated.append(normalized)
+        
+        self.validated_categories = validated
+        return self
+    
+    def get_category_values(self) -> List[str]:
+        """Return validated categories as string values for Neo4j storage."""
+        return [cat.value for cat in self.validated_categories]
+
+
+class WorkloadEnrichmentResponse(BaseModel):
+    """Container for batch workload enrichment LLM response."""
+    requirements: List[WorkloadEnrichmentItem] = Field(default_factory=list)
+    
+    @model_validator(mode='before')
+    @classmethod
+    def handle_response_formats(cls, values):
+        """Handle various LLM response formats."""
+        if isinstance(values, dict):
+            # Handle case where requirements is nested
+            if 'requirements' not in values and 'entities' in values:
+                values['requirements'] = values.pop('entities')
+        return values
+
 
 # ==========================================
 # Relationship Model

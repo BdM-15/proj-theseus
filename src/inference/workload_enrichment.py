@@ -34,16 +34,20 @@ import logging
 import json
 from typing import Dict, List, Callable, Awaitable
 from pathlib import Path
+from pydantic import ValidationError
 
 from src.inference.neo4j_graph_io import Neo4jGraphIO
+from src.ontology.schema import (
+    BOECategory, 
+    WorkloadEnrichmentItem, 
+    WorkloadEnrichmentResponse,
+    normalize_boe_category
+)
 
 logger = logging.getLogger(__name__)
 
-# Standard BOE categories (validation enforces these exact names)
-BOE_CATEGORIES = [
-    "Labor", "Materials", "ODCs", "QA",
-    "Logistics", "Lifecycle", "Compliance"
-]
+# Standard BOE categories (now imported from schema, kept here for reference)
+BOE_CATEGORIES = [cat.value for cat in BOECategory]
 
 
 async def enrich_workload_metadata(
@@ -214,18 +218,31 @@ Return JSON array with {len(batch)} objects (one per requirement above):
                 response_clean = response_clean[:-3]
             response_clean = response_clean.strip()
             
-            enrichments = json.loads(response_clean)
+            raw_data = json.loads(response_clean)
             
-            if not isinstance(enrichments, list):
-                logger.error(f"  LLM returned non-array response: {type(enrichments)}")
-                continue
-            
-            # Update Neo4j with enrichment data
-            for enrichment in enrichments:
-                entity_index = enrichment.get('entity_index')
-                if entity_index is None:
-                    logger.warning("  Enrichment missing entity_index, skipping")
+            # Normalize to list format
+            if not isinstance(raw_data, list):
+                if isinstance(raw_data, dict) and 'requirements' in raw_data:
+                    raw_data = raw_data['requirements']
+                else:
+                    logger.error(f"  LLM returned non-array response: {type(raw_data)}")
                     continue
+            
+            # Update Neo4j with enrichment data using Pydantic validation
+            for raw_enrichment in raw_data:
+                # Validate with Pydantic model
+                try:
+                    enrichment = WorkloadEnrichmentItem.model_validate(raw_enrichment)
+                except ValidationError as ve:
+                    logger.warning(f"  Pydantic validation error: {ve}")
+                    # Try to salvage what we can
+                    enrichment = WorkloadEnrichmentItem(
+                        entity_index=raw_enrichment.get('entity_index', 0),
+                        has_workload_metric=raw_enrichment.get('has_workload_metric', True),
+                        workload_categories=raw_enrichment.get('workload_categories', [])
+                    )
+                
+                entity_index = enrichment.entity_index
                 
                 # Validate entity_index exists in our batch
                 if entity_index not in index_to_entity:
@@ -236,12 +253,8 @@ Return JSON array with {len(batch)} objects (one per requirement above):
                 entity = index_to_entity[entity_index]
                 entity_id = entity['id']  # The real Neo4j element ID
                 
-                # Validate BOE categories
-                categories = enrichment.get('workload_categories', [])
-                invalid_cats = [cat for cat in categories if cat not in BOE_CATEGORIES]
-                if invalid_cats:
-                    logger.warning(f"  Invalid BOE categories for {entity_id}: {invalid_cats}")
-                    categories = [cat for cat in categories if cat in BOE_CATEGORIES]
+                # Get validated categories (Pydantic already normalized them)
+                categories = enrichment.get_category_values()
                 
                 # Update category distribution
                 for cat in categories:
@@ -251,12 +264,12 @@ Return JSON array with {len(batch)} objects (one per requirement above):
                 properties = {
                     'has_workload_metric': True,
                     'workload_categories': json.dumps(categories),  # Store as JSON string
-                    'boe_relevance': json.dumps(enrichment.get('boe_relevance', {})),
-                    'labor_drivers': json.dumps(enrichment.get('labor_drivers', [])),
-                    'material_needs': json.dumps(enrichment.get('material_needs', [])),
-                    'complexity_score': enrichment.get('complexity_score', 5),
-                    'complexity_rationale': enrichment.get('complexity_rationale', ''),
-                    'effort_estimate': enrichment.get('effort_estimate', ''),
+                    'boe_relevance': json.dumps(raw_enrichment.get('boe_relevance', {})),
+                    'labor_drivers': json.dumps(raw_enrichment.get('labor_drivers', [])),
+                    'material_needs': json.dumps(raw_enrichment.get('material_needs', [])),
+                    'complexity_score': raw_enrichment.get('complexity_score', 5),
+                    'complexity_rationale': raw_enrichment.get('complexity_rationale', ''),
+                    'effort_estimate': raw_enrichment.get('effort_estimate', ''),
                     'enriched_by': 'workload_analysis_v1'
                 }
                 
@@ -271,7 +284,7 @@ Return JSON array with {len(batch)} objects (one per requirement above):
             if property_updates:
                 neo4j_io.update_entity_properties(property_updates)
             
-            logger.info(f"    ✓ Enriched {len(enrichments)} requirements")
+            logger.info(f"    ✓ Enriched {len(raw_data)} requirements")
         
         except json.JSONDecodeError as e:
             logger.error(f"  Failed to parse LLM response as JSON: {e}")
