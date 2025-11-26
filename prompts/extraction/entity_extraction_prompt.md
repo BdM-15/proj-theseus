@@ -9,8 +9,9 @@
 - Domain knowledge patterns (FAR/DFARS, UCF, Shipley, CDRL)
 - 5 annotated RFP examples (Section L↔M, requirements, attachments, clauses, deliverables)
 - 8 decision rules for ambiguous cases (edge case handling)
-- Location-agnostic extraction (content over location)  
-  **Last Updated**: October 11, 2025 (Branch 005 - Examples + Decision Tree)
+- Location-agnostic extraction (content over location)
+- **Efficient extraction** (entity_name + type-specific metadata - no text duplication)
+  **Last Updated**: November 25, 2025 (Branch 023a - Schema Cleanup)
 
 ---
 
@@ -82,7 +83,7 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
             {
               "entity_name": "Section C.4 Supply",
               "entity_type": "section",
-              "description": "Supply section defining materiel requirements per Section C subsection 4"
+              "description": "SECTION C.4 - SUPPLY. This section defines materiel requirements and supply chain specifications for the contract."
             }
           ],
           "relationships": []
@@ -107,7 +108,9 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
             {
               "entity_name": "FAR 52.212-1",
               "entity_type": "clause",
-              "description": "Instructions to Offerors—Commercial Products and Commercial Services"
+              "description": "FAR 52.212-1 Instructions to Offerors—Commercial Products and Commercial Services (SEP 2023)",
+              "clause_number": "52.212-1",
+              "regulation": "FAR"
             }
           ],
           "relationships": []
@@ -435,21 +438,21 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
         {
           "entity_name": "Technical Volume",
           "entity_type": "submission_instruction",
-          "description": "Must address Factors 1 and 2 (Technical Approach and Maintenance Approach), include system architecture diagrams and integration plans",
+          "description": "The Technical Volume shall address Evaluation Factors 1 and 2 (Technical Approach and Maintenance Approach) and shall not exceed 25 pages, 12-point font, Times New Roman. Include system architecture diagrams and integration plans.",
           "page_limit": "25 pages",
-          "format_reqs": "12pt Times New Roman, 1-inch margins"
+          "format_reqs": "12pt Times New Roman"
         },
         {
           "entity_name": "Factor 1 Technical Approach",
           "entity_type": "evaluation_factor",
-          "description": "Evaluating technical understanding, system architecture, and integration methodology",
+          "description": "Factor 1: Technical Approach (Most Important, 40%) The Government will evaluate the offeror's understanding of technical requirements, including system architecture and integration methodology.",
           "weight": "40%",
           "importance": "Most Important"
         },
         {
           "entity_name": "Factor 2 Maintenance Approach",
           "entity_type": "evaluation_factor",
-          "description": "Evaluating maintenance strategy and sustainment plans",
+          "description": "Factor 2: Maintenance Approach (Significantly More Important, 30%) The Government will evaluate the offeror's maintenance strategy and sustainment plans.",
           "weight": "30%",
           "importance": "Significantly More Important"
         }
@@ -461,34 +464,45 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
       ```json
       [
         {
-          "source_entity": "Technical Volume",
-          "target_entity": "Factor 1 Technical Approach",
-          "relationship_type": "GUIDES",
-          "description": "Submission instruction explicitly addresses this evaluation factor"
+          "source_entity": {
+            "entity_name": "Technical Volume",
+            "entity_type": "submission_instruction"
+          },
+          "target_entity": {
+            "entity_name": "Factor 1 Technical Approach",
+            "entity_type": "evaluation_factor"
+          },
+          "relationship_type": "GUIDES"
         },
         {
-          "source_entity": "Technical Volume",
-          "target_entity": "Factor 2 Maintenance Approach",
-          "relationship_type": "GUIDES",
-          "description": "Submission instruction explicitly addresses this evaluation factor"
+          "source_entity": {
+            "entity_name": "Technical Volume",
+            "entity_type": "submission_instruction"
+          },
+          "target_entity": {
+            "entity_name": "Factor 2 Maintenance Approach",
+            "entity_type": "evaluation_factor"
+          },
+          "relationship_type": "GUIDES"
         }
       ]
       ```
 
-      **Example 2: Requirements with Criticality (Section C)**
+      **Example 2: Requirements with Criticality and Workload Drivers (Real PWS)**
 
       Input Text:
 
       ```
-      3.2 System Requirements
+      F.2. COMMUNITY RECREATIONAL PROGRAM (CRP): The Contractor shall implement
+      and maintain the CRP to support all morale welfare and recreation events
+      and activities described in this section of the PWS. Approximately 1,600
+      customers visit all CRP locations on a daily basis. The Contractor shall
+      ensure all personnel supporting the CRP are trained and all locations'
+      customer service desks are always covered with no more than two (2) customer
+      service desks coverage discrepancies allowed per month. Unless otherwise
+      stated, the Contractor shall support the CRP 24 hours a day / 7 days a week.
 
-      The Contractor shall provide 24/7 help desk support with average response
-      time under 4 hours for Priority 1 incidents. The Contractor should implement
-      automated monitoring tools to detect system anomalies. The Contractor may
-      use commercial off-the-shelf (COTS) solutions where appropriate.
-
-      The Government shall provide access to existing system documentation within
-      10 business days of contract award.
+      The Government shall provide facilities for CRP operations.
       ```
 
       Extracted Entities:
@@ -496,55 +510,79 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
       ```json
       [
         {
-          "entity_name": "24/7 Help Desk Support",
+          "entity_name": "Community Recreational Program Implementation",
           "entity_type": "requirement",
-          "description": "Contractor shall provide round-the-clock help desk support with 4-hour average response time for Priority 1 incidents - Critical operational requirement",
+          "description": "The Contractor shall implement and maintain the CRP to support all morale welfare and recreation events and activities described in this section of the PWS. Approximately 1,600 customers visit all CRP locations on a daily basis.",
           "criticality": "MANDATORY",
-          "modal_verb": "shall"
+          "modal_verb": "shall",
+          "req_type": "FUNCTIONAL",
+          "labor_drivers": [
+            "1,600 customers daily",
+            "24 hours a day / 7 days a week"
+          ],
+          "material_needs": []
         },
         {
-          "entity_name": "Automated Monitoring Tools",
+          "entity_name": "CRP Customer Service Desk Coverage",
           "entity_type": "requirement",
-          "description": "Contractor should implement automated monitoring tools to detect system anomalies - Best practice for proactive system management",
-          "criticality": "IMPORTANT",
-          "modal_verb": "should"
+          "description": "The Contractor shall ensure all personnel supporting the CRP are trained and all locations' customer service desks are always covered with no more than two (2) customer service desks coverage discrepancies allowed per month.",
+          "criticality": "MANDATORY",
+          "modal_verb": "shall",
+          "req_type": "PERFORMANCE",
+          "labor_drivers": [
+            "customer service desks always covered",
+            "no more than 2 discrepancies per month"
+          ],
+          "material_needs": []
         },
         {
-          "entity_name": "COTS Solutions Usage",
+          "entity_name": "CRP 24/7 Support",
           "entity_type": "requirement",
-          "description": "Contractor may use commercial off-the-shelf solutions where appropriate - Flexibility in technical approach and tool selection",
-          "criticality": "OPTIONAL",
-          "modal_verb": "may"
+          "description": "Unless otherwise stated, the Contractor shall support the CRP 24 hours a day / 7 days a week.",
+          "criticality": "MANDATORY",
+          "modal_verb": "shall",
+          "req_type": "FUNCTIONAL",
+          "labor_drivers": ["24 hours a day", "7 days a week"],
+          "material_needs": []
         },
         {
-          "entity_name": "System Documentation Access",
+          "entity_name": "Customer Service Desk Coverage Threshold",
+          "entity_type": "performance_metric",
+          "description": "no more than two (2) customer service desks coverage discrepancies allowed per month",
+          "threshold": "no more than 2 discrepancies per month",
+          "measurement_method": "Periodic Inspection (Monthly)"
+        },
+        {
+          "entity_name": "Government Furnished Facilities",
           "entity_type": "concept",
-          "description": "Government shall provide access to existing system documentation within 10 business days of contract award - Government-furnished information for contractor use"
+          "description": "The Government shall provide facilities for CRP operations."
         }
       ]
       ```
 
       Note:
 
-      - "Contractor shall" → REQUIREMENT with MANDATORY criticality, modal_verb "shall"
-      - "Contractor should" → REQUIREMENT with IMPORTANT criticality
-      - "Contractor may" → REQUIREMENT with OPTIONAL criticality (still a requirement, just optional)
+      - "Contractor shall" → REQUIREMENT with MANDATORY criticality
+      - Workload drivers captured: "1,600 customers daily", "24/7"
+      - Performance metric separated from requirement
       - "Government shall" → CONCEPT (not a contractor requirement)
 
-      **Example 3: Attachment Structure (Section J)**
+      **Example 3: PWS Appendix Structure (Real PWS)**
 
       Input Text:
 
       ```
-      Section J: List of Attachments
+      1.1. SCOPE. The Contractor shall provide support as specified in this PWS
+      for an average base population of 1,600 personnel of various categories,
+      to include transient, permanent party, and rotational personnel during
+      the year. During rotational periods, the base population can increase up
+      to 4,000 personnel. This Performance Work Statement (PWS) addresses the
+      following requirements:
 
-      The following documents are incorporated into this solicitation:
-
-      1. J-02000000 Performance Work Statement (PWS)
-      2. J-03000000 Quality Assurance Surveillance Plan (QASP)
-      3. J-04000000 Contract Data Requirements List (CDRL)
-         3.1 CDRL A001 - Monthly Status Report
-         3.2 CDRL A002 - Quarterly Technical Review
+      1.1.1. Appendix F – Recreational Services
+      1.1.2. Appendix G – Lodging Logistics Operations and Linen Support
+      1.1.3. Appendix H - Equipment and Appliance Maintenance
+      1.1.4. Appendix I – Water Delivery
       ```
 
       Extracted Entities:
@@ -552,39 +590,194 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
       ```json
       [
         {
-          "entity_name": "Section J",
-          "entity_type": "section",
-          "description": "List of attachments and referenced documents for the solicitation"
-        },
-        {
-          "entity_name": "J-02000000 Performance Work Statement",
-          "entity_type": "document",
-          "description": "Attachment containing detailed task descriptions and performance objectives"
-        },
-        {
-          "entity_name": "Performance Work Statement",
+          "entity_name": "PWS Scope",
           "entity_type": "statement_of_work",
-          "description": "Detailed task descriptions and performance objectives for contract execution"
+          "description": "The Contractor shall provide support as specified in this PWS for an average base population of 1,600 personnel of various categories, to include transient, permanent party, and rotational personnel during the year. During rotational periods, the base population can increase up to 4,000 personnel."
         },
         {
-          "entity_name": "J-03000000 Quality Assurance Surveillance Plan",
+          "entity_name": "Appendix F Recreational Services",
           "entity_type": "document",
-          "description": "Quality assurance surveillance plan and inspection procedures"
+          "description": "Appendix F – Recreational Services"
         },
         {
-          "entity_name": "J-04000000 Contract Data Requirements List",
+          "entity_name": "Appendix G Lodging Logistics",
           "entity_type": "document",
-          "description": "List of required contract deliverables with submission schedules"
+          "description": "Appendix G – Lodging Logistics Operations and Linen Support"
+        },
+        {
+          "entity_name": "Appendix H Equipment Maintenance",
+          "entity_type": "document",
+          "description": "Appendix H - Equipment and Appliance Maintenance"
+        },
+        {
+          "entity_name": "Appendix I Water Delivery",
+          "entity_type": "document",
+          "description": "Appendix I – Water Delivery"
+        },
+        {
+          "entity_name": "Base Population Workload",
+          "entity_type": "concept",
+          "description": "average base population of 1,600 personnel of various categories, to include transient, permanent party, and rotational personnel during the year. During rotational periods, the base population can increase up to 4,000 personnel."
+        }
+      ]
+      ```
+
+      Extracted Relationships:
+
+      ```json
+      [
+        {
+          "source_entity": {
+            "entity_name": "Appendix F Recreational Services",
+            "entity_type": "document"
+          },
+          "target_entity": {
+            "entity_name": "PWS Scope",
+            "entity_type": "statement_of_work"
+          },
+          "relationship_type": "CHILD_OF"
+        },
+        {
+          "source_entity": {
+            "entity_name": "Appendix H Equipment Maintenance",
+            "entity_type": "document"
+          },
+          "target_entity": {
+            "entity_name": "PWS Scope",
+            "entity_type": "statement_of_work"
+          },
+          "relationship_type": "CHILD_OF"
+        }
+      ]
+      ```
+
+      Note: PWS extracted with appendix hierarchy. Workload drivers (1,600-4,000 personnel) captured as concept.
+
+      **Example 4: FAR and DFARS Clauses (from Section I)**
+
+      Input Text:
+
+      ```
+      SECTION I - CONTRACT CLAUSES
+
+      52.203-3 GRATUITIES (APR 1984)
+      52.203-5 COVENANT AGAINST CONTINGENT FEES (MAY 2014)
+      52.204-7 System for Award Management (OCT 2018)
+      52.212-4 CONTRACT TERMS AND CONDITIONS—COMMERCIAL ITEMS (FEB 2024)
+      252.204-7012 SAFEGUARDING COVERED DEFENSE INFORMATION AND CYBER INCIDENT REPORTING (JAN 2023)
+      252.225-7001 BUY AMERICAN AND BALANCE OF PAYMENTS PROGRAM (DEC 2017)
+      ```
+
+      Extracted Entities:
+
+      ```json
+      [
+        {
+          "entity_name": "Section I Contract Clauses",
+          "entity_type": "section",
+          "description": "SECTION I - CONTRACT CLAUSES"
+        },
+        {
+          "entity_name": "FAR 52.203-3 Gratuities",
+          "entity_type": "clause",
+          "description": "52.203-3 GRATUITIES (APR 1984)"
+        },
+        {
+          "entity_name": "FAR 52.204-7 System for Award Management",
+          "entity_type": "clause",
+          "description": "52.204-7 System for Award Management (OCT 2018)"
+        },
+        {
+          "entity_name": "FAR 52.212-4 Contract Terms Commercial Items",
+          "entity_type": "clause",
+          "description": "52.212-4 CONTRACT TERMS AND CONDITIONS—COMMERCIAL ITEMS (FEB 2024)"
+        },
+        {
+          "entity_name": "DFARS 252.204-7012 Cybersecurity",
+          "entity_type": "clause",
+          "description": "252.204-7012 SAFEGUARDING COVERED DEFENSE INFORMATION AND CYBER INCIDENT REPORTING (JAN 2023)"
+        },
+        {
+          "entity_name": "DFARS 252.225-7001 Buy American",
+          "entity_type": "clause",
+          "description": "252.225-7001 BUY AMERICAN AND BALANCE OF PAYMENTS PROGRAM (DEC 2017)"
+        }
+      ]
+      ```
+
+      Extracted Relationships:
+
+      ```json
+      [
+        {
+          "source_entity": {
+            "entity_name": "FAR 52.203-3 Gratuities",
+            "entity_type": "clause"
+          },
+          "target_entity": {
+            "entity_name": "Section I Contract Clauses",
+            "entity_type": "section"
+          },
+          "relationship_type": "CHILD_OF"
+        },
+        {
+          "source_entity": {
+            "entity_name": "DFARS 252.204-7012 Cybersecurity",
+            "entity_type": "clause"
+          },
+          "target_entity": {
+            "entity_name": "Section I Contract Clauses",
+            "entity_type": "section"
+          },
+          "relationship_type": "CHILD_OF"
+        }
+      ]
+      ```
+
+      Note: Clause citations extracted verbatim with date references preserved.
+
+      **Example 5: Deliverables and CDRL Linkage (from real PWS)**
+
+      Input Text:
+
+      ```
+      PWS Section 3.4: Reporting Requirements
+
+      The Contractor shall provide monthly status reports to the Contracting Officer
+      Representative (COR) no later than the 10th calendar day following each month.
+      Reports shall include program metrics, performance issues, and corrective actions.
+
+      The Contractor shall maintain all documentation in the Government-provided
+      electronic management system IAW CDRL A001 through CDRL A005.
+      ```
+
+      Extracted Entities:
+
+      ```json
+      [
+        {
+          "entity_name": "Monthly Status Reports",
+          "entity_type": "deliverable",
+          "description": "The Contractor shall provide monthly status reports to the Contracting Officer Representative (COR) no later than the 10th calendar day following each month.",
+          "criticality": "MANDATORY",
+          "modal_verb": "shall"
+        },
+        {
+          "entity_name": "Program Metrics Documentation",
+          "entity_type": "deliverable",
+          "description": "Reports shall include program metrics, performance issues, and corrective actions.",
+          "criticality": "MANDATORY",
+          "modal_verb": "shall"
         },
         {
           "entity_name": "CDRL A001",
           "entity_type": "deliverable",
-          "description": "Monthly status report due to government"
+          "description": "The Contractor shall maintain all documentation in the Government-provided electronic management system IAW CDRL A001 through CDRL A005."
         },
         {
-          "entity_name": "CDRL A002",
-          "entity_type": "deliverable",
-          "description": "Quarterly technical review deliverable"
+          "entity_name": "Contracting Officer Representative",
+          "entity_type": "organization",
+          "description": "The Contractor shall provide monthly status reports to the Contracting Officer Representative (COR)"
         }
       ]
       ```
@@ -594,53 +787,49 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
       ```json
       [
         {
-          "source_entity": "J-02000000 Performance Work Statement",
-          "target_entity": "Section J",
-          "relationship_type": "ATTACHMENT_OF",
-          "description": "Top-level attachment listed under Section J"
+          "source_entity": {
+            "entity_name": "Monthly Status Reports",
+            "entity_type": "deliverable"
+          },
+          "target_entity": {
+            "entity_name": "CDRL A001",
+            "entity_type": "deliverable"
+          },
+          "relationship_type": "TRACKED_BY"
         },
         {
-          "source_entity": "J-03000000 Quality Assurance Surveillance Plan",
-          "target_entity": "Section J",
-          "relationship_type": "ATTACHMENT_OF",
-          "description": "Top-level attachment listed under Section J"
-        },
-        {
-          "source_entity": "J-04000000 Contract Data Requirements List",
-          "target_entity": "Section J",
-          "relationship_type": "ATTACHMENT_OF",
-          "description": "Top-level attachment listed under Section J"
-        },
-        {
-          "source_entity": "CDRL A001",
-          "target_entity": "J-04000000 Contract Data Requirements List",
-          "relationship_type": "CHILD_OF",
-          "description": "Deliverable item listed within CDRL attachment"
-        },
-        {
-          "source_entity": "CDRL A002",
-          "target_entity": "J-04000000 Contract Data Requirements List",
-          "relationship_type": "CHILD_OF",
-          "description": "Deliverable item listed within CDRL attachment"
+          "source_entity": {
+            "entity_name": "Monthly Status Reports",
+            "entity_type": "deliverable"
+          },
+          "target_entity": {
+            "entity_name": "Contracting Officer Representative",
+            "entity_type": "organization"
+          },
+          "relationship_type": "SUBMITTED_TO"
         }
       ]
       ```
 
-      Note: PWS extracted as BOTH DOCUMENT (structure) and STATEMENT_OF_WORK (semantics)
+      Note: Deliverables extracted with verbatim PWS language including due dates and CDRL references.
 
-      **Example 4: FAR Clauses (Section I)**
+      **Example 6: Section L ↔ M Relationship (Evaluation Factors)**
 
       Input Text:
 
       ```
-      Section I: Contract Clauses
+      Section L.4.2: Technical Capability Volume
 
-      The following Federal Acquisition Regulation (FAR) clauses are incorporated
-      by reference:
+      The Technical Capability Volume shall not exceed 30 pages and must address
+      all technical requirements in the PWS. Offerors shall demonstrate their
+      approach to meeting performance standards and quality requirements.
 
-      FAR 52.212-1 Instructions to Offerors—Commercial Products and Commercial Services
-      FAR 52.212-4 Contract Terms and Conditions—Commercial Products and Commercial Services
-      DFARS 252.204-7012 Safeguarding Covered Defense Information and Cyber Incident Reporting
+      Section M.2: Evaluation Factor 2 - Technical Capability (40%)
+
+      The Government will evaluate the offeror's technical approach, including:
+      (a) Understanding of requirements
+      (b) Approach to performance standards
+      (c) Quality management methodology
       ```
 
       Extracted Entities:
@@ -648,540 +837,30 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
       ```json
       [
         {
-          "entity_name": "Section I",
-          "entity_type": "section",
-          "description": "Contract clauses incorporated by reference from FAR and DFARS"
-        },
-        {
-          "entity_name": "FAR 52.212-1",
-          "entity_type": "clause",
-          "description": "Instructions to Offerors for commercial products and commercial services acquisitions"
-        },
-        {
-          "entity_name": "FAR 52.212-4",
-          "entity_type": "clause",
-          "description": "Standard contract terms and conditions for commercial products and services"
-        },
-        {
-          "entity_name": "DFARS 252.204-7012",
-          "entity_type": "clause",
-          "description": "DoD cybersecurity requirements for safeguarding covered defense information with NIST SP 800-171 compliance"
-        }
-      ]
-      ```
-
-      Extracted Relationships:
-
-      ```json
-      [
-        {
-          "source_entity": "FAR 52.212-1",
-          "target_entity": "Section I",
-          "relationship_type": "CHILD_OF",
-          "description": "Clause incorporated in Section I contract clauses"
-        },
-        {
-          "source_entity": "FAR 52.212-4",
-          "target_entity": "Section I",
-          "relationship_type": "CHILD_OF",
-          "description": "Clause incorporated in Section I contract clauses"
-        },
-        {
-          "source_entity": "DFARS 252.204-7012",
-          "target_entity": "Section I",
-          "relationship_type": "CHILD_OF",
-          "description": "Clause incorporated in Section I contract clauses"
-        }
-      ]
-      ```
-
-      **Example 5: Deliverables from SOW (Content-Location Flexibility)**
-
-      Input Text:
-
-      ```
-      Attachment 0001: Performance Work Statement
-
-      Task 3.4: Reporting Requirements
-
-      The Contractor shall submit the following deliverables:
-      - Monthly Progress Reports (due 5th business day of following month)
-      - Quarterly Risk Assessments (due 15 days after quarter end)
-      - Final Project Report (due at contract completion)
-
-      All deliverables shall comply with CDRL A001, A002, and A003 respectively.
-      ```
-
-      Extracted Entities:
-
-      ```json
-      [
-        {
-          "entity_name": "Attachment 0001 Performance Work Statement",
-          "entity_type": "document",
-          "description": "Attachment containing detailed task descriptions and performance objectives"
-        },
-        {
-          "entity_name": "Performance Work Statement",
-          "entity_type": "statement_of_work",
-          "description": "Detailed task descriptions and performance objectives for contract execution"
-        },
-        {
-          "entity_name": "Monthly Progress Reports",
-          "entity_type": "deliverable",
-          "description": "Monthly progress reports due 5th business day of following month per CDRL A001"
-        },
-        {
-          "entity_name": "Quarterly Risk Assessments",
-          "entity_type": "deliverable",
-          "description": "Quarterly risk assessment deliverables due 15 days after quarter end per CDRL A002"
-        },
-        {
-          "entity_name": "Final Project Report",
-          "entity_type": "deliverable",
-          "description": "Final project report deliverable due at contract completion per CDRL A003"
-        },
-        {
-          "entity_name": "CDRL A001",
-          "entity_type": "deliverable",
-          "description": "Contract data requirement for monthly progress reporting"
-        },
-        {
-          "entity_name": "CDRL A002",
-          "entity_type": "deliverable",
-          "description": "Contract data requirement for quarterly risk assessments"
-        },
-        {
-          "entity_name": "CDRL A003",
-          "entity_type": "deliverable",
-          "description": "Contract data requirement for final project report"
-        }
-      ]
-      ```
-
-      Extracted Relationships:
-
-      ```json
-      [
-        {
-          "source_entity": "Performance Work Statement",
-          "target_entity": "Monthly Progress Reports",
-          "relationship_type": "PRODUCES",
-          "description": "SOW task defines this deliverable requirement"
-        },
-        {
-          "source_entity": "Performance Work Statement",
-          "target_entity": "Quarterly Risk Assessments",
-          "relationship_type": "PRODUCES",
-          "description": "SOW task defines this deliverable requirement"
-        },
-        {
-          "source_entity": "Performance Work Statement",
-          "target_entity": "Final Project Report",
-          "relationship_type": "PRODUCES",
-          "description": "SOW task defines this deliverable requirement"
-        }
-      ]
-      ```
-
-      Note: SOW in attachment (not Section C) - extracted based on CONTENT, not LOCATION
-
-      **Example 6: Implicit Section L ↔ M Relationship (Topic Matching)**
-
-      Input Text:
-
-      ```
-      Section L.2.1: Technical Volume
-
-      The Technical Volume shall not exceed 20 pages and must include detailed
-      system architecture diagrams, cybersecurity controls mapping to NIST SP
-      800-171, and integration methodology with existing government systems.
-
-      Section M.1: Factor 1 - Technical Approach (Most Important, 45%)
-
-      The Government will evaluate the offeror's technical solution, including
-      system design, security architecture, and integration strategy. Subfactors:
-        1.1 System Architecture and Design (20%)
-        1.2 Cybersecurity Approach (15%)
-        1.3 Integration Methodology (10%)
-      ```
-
-      Extracted Entities (WITH ENHANCED METADATA):
-
-      ```json
-      [
-        {
-          "entity_name": "Technical Volume",
+          "entity_name": "Technical Capability Volume",
           "entity_type": "submission_instruction",
-          "description": "Must address Factor 1 Technical Approach, include system architecture diagrams, cybersecurity controls mapping to NIST SP 800-171, and integration methodology with government systems",
-          "page_limit": "20 pages",
-          "format_reqs": "12pt Times New Roman, 1-inch margins"
-        },
-        {
-          "entity_name": "Factor 1 Technical Approach",
-          "entity_type": "evaluation_factor",
-          "description": "Evaluating technical solution including system design, security architecture, and integration strategy",
-          "weight": "45%",
-          "importance": "Most Important",
-          "subfactors": [
-            "Subfactor 1.1 System Architecture",
-            "Subfactor 1.2 Cybersecurity Approach",
-            "Subfactor 1.3 Integration Methodology"
-          ]
-        },
-        {
-          "entity_name": "Subfactor 1.1 System Architecture",
-          "entity_type": "evaluation_factor",
-          "description": "Evaluating system design and architecture approach (20% of Factor 1's 45%)",
-          "weight": "20%",
-          "importance": "subfactor"
-        },
-        {
-          "entity_name": "Subfactor 1.2 Cybersecurity Approach",
-          "entity_type": "evaluation_factor",
-          "description": "Evaluating security architecture and NIST SP 800-171 compliance (15% of Factor 1's 45%)",
-          "weight": "15%",
-          "importance": "subfactor"
-        },
-        {
-          "entity_name": "Subfactor 1.3 Integration Methodology",
-          "entity_type": "evaluation_factor",
-          "description": "Evaluating integration strategy with government systems (10% of Factor 1's 45%)",
-          "weight": "10%",
-          "importance": "subfactor"
-        }
-      ]
-      ```
-
-      Extracted Relationships (IMPLICIT - based on topic matching):
-
-      ```json
-      [
-        {
-          "source_entity": "Technical Volume",
-          "target_entity": "Factor 1 Technical Approach",
-          "relationship_type": "GUIDES",
-          "description": "Instruction explicitly addresses evaluation factor topics (architecture, security, integration)"
-        },
-        {
-          "source_entity": "Technical Volume",
-          "target_entity": "Subfactor 1.1 System Architecture",
-          "relationship_type": "GUIDES",
-          "description": "Volume requires architecture diagrams matching subfactor evaluation criteria"
-        },
-        {
-          "source_entity": "Technical Volume",
-          "target_entity": "Subfactor 1.2 Cybersecurity Approach",
-          "relationship_type": "GUIDES",
-          "description": "Volume requires NIST 800-171 mapping matching security subfactor"
-        },
-        {
-          "source_entity": "Technical Volume",
-          "target_entity": "Subfactor 1.3 Integration Methodology",
-          "relationship_type": "GUIDES",
-          "description": "Volume requires integration methodology matching subfactor criteria"
-        },
-        {
-          "source_entity": "Subfactor 1.1 System Architecture",
-          "target_entity": "Factor 1 Technical Approach",
-          "relationship_type": "CHILD_OF",
-          "description": "Subfactor component of parent evaluation factor"
-        },
-        {
-          "source_entity": "Subfactor 1.2 Cybersecurity Approach",
-          "target_entity": "Factor 1 Technical Approach",
-          "relationship_type": "CHILD_OF",
-          "description": "Subfactor component of parent evaluation factor"
-        },
-        {
-          "source_entity": "Subfactor 1.3 Integration Methodology",
-          "target_entity": "Factor 1 Technical Approach",
-          "relationship_type": "CHILD_OF",
-          "description": "Subfactor component of parent evaluation factor"
-        }
-      ]
-      ```
-
-      **Example 7: Requirement → Evaluation Factor (Semantic Matching)**
-
-      Input Text:
-
-      ```
-      Section C.3.4: Quality Assurance Requirements
-
-      The Contractor shall maintain ISO 9001:2015 certification throughout the
-      contract period. The Contractor shall implement a quality management system
-      with documented procedures for defect tracking, root cause analysis, and
-      corrective action. The Contractor should achieve 98% on-time delivery rate.
-
-      Section M.3: Factor 3 - Quality Assurance (Significantly Important, 25%)
-
-      The Government will evaluate the contractor's quality management capabilities,
-      including ISO certification, quality processes, and performance metrics. Past
-      performance on quality will be heavily weighted.
-      ```
-
-      Extracted Entities (WITH ENHANCED METADATA):
-
-      ```json
-      [
-        {
-          "entity_name": "ISO 9001:2015 Certification Requirement",
-          "entity_type": "requirement",
-          "description": "Contractor shall maintain ISO 9001:2015 certification throughout contract period - Quality assurance requirement evaluated in Factor 3",
+          "description": "The Technical Capability Volume shall not exceed 30 pages and must address all technical requirements in the PWS.",
+          "page_limit": "30 pages",
           "criticality": "MANDATORY",
           "modal_verb": "shall"
         },
         {
-          "entity_name": "Quality Management System",
-          "entity_type": "requirement",
-          "description": "Contractor shall implement quality management system with documented procedures for defect tracking, root cause analysis, and corrective action - QMS implementation requirement supporting quality assurance evaluation",
-          "criticality": "MANDATORY",
-          "modal_verb": "shall"
-        },
-        {
-          "entity_name": "On-Time Delivery Rate Target",
-          "entity_type": "requirement",
-          "description": "Contractor should achieve 98% on-time delivery rate - Performance metric target demonstrating quality execution",
-          "criticality": "IMPORTANT",
-          "modal_verb": "should"
-        },
-        {
-          "entity_name": "Factor 3 Quality Assurance",
+          "entity_name": "Evaluation Factor 2 Technical Capability",
           "entity_type": "evaluation_factor",
-          "description": "Evaluating quality management capabilities, ISO certification, quality processes, and performance metrics - Past performance on quality heavily weighted",
-          "weight": "25%",
-          "importance": "Significantly Important"
-        }
-      ]
-      ```
-
-      Extracted Relationships (IMPLICIT - semantic keyword matching):
-
-      ```json
-      [
-        {
-          "source_entity": "ISO 9001:2015 Certification Requirement",
-          "target_entity": "Factor 3 Quality Assurance",
-          "relationship_type": "EVALUATED_BY",
-          "description": "Quality certification requirement directly evaluated in quality assurance factor"
+          "description": "Section M.2: Evaluation Factor 2 - Technical Capability (40%)",
+          "weight": "40%"
         },
         {
-          "source_entity": "Quality Management System",
-          "target_entity": "Factor 3 Quality Assurance",
-          "relationship_type": "EVALUATED_BY",
-          "description": "QMS implementation requirement evaluated in quality management capabilities factor"
+          "entity_name": "Understanding of Requirements",
+          "entity_type": "evaluation_factor",
+          "description": "(a) Understanding of requirements",
+          "importance": "subfactor"
         },
         {
-          "source_entity": "On-Time Delivery Rate",
-          "target_entity": "Factor 3 Quality Assurance",
-          "relationship_type": "EVALUATED_BY",
-          "description": "Performance metric requirement evaluated in quality assurance factor"
-        }
-      ]
-      ```
-
-      Note: All three requirements semantically match Factor 3 (keywords: quality, ISO, processes, metrics)
-
-      **Example 8: Multi-Agency Attachment Patterns (Implicit Hierarchy)**
-
-      Input Text:
-
-      ```
-      Section J: List of Documents
-
-      The following attachments are incorporated:
-      - Attachment 001: Base Performance Work Statement
-      - Attachment 002: Quality Assurance Surveillance Plan
-      - Enclosure (1): Security Requirements Addendum
-      - Exhibit A: Pricing Template and Instructions
-      - Schedule B: Contract Line Item Numbers (CLINs)
-
-      Attachment 001.1: Task Area 1 - Technical Support
-      Attachment 001.2: Task Area 2 - Training Services
-      ```
-
-      Extracted Entities:
-
-      ```json
-      [
-        {
-          "entity_name": "Section J",
-          "entity_type": "section",
-          "description": "List of incorporated documents and attachments for the solicitation"
-        },
-        {
-          "entity_name": "Attachment 001 Base Performance Work Statement",
-          "entity_type": "document",
-          "description": "Primary attachment containing base contract work requirements"
-        },
-        {
-          "entity_name": "Base Performance Work Statement",
-          "entity_type": "statement_of_work",
-          "description": "Detailed base contract work requirements and performance objectives"
-        },
-        {
-          "entity_name": "Attachment 002 Quality Assurance Surveillance Plan",
-          "entity_type": "document",
-          "description": "Quality assurance surveillance and inspection procedures"
-        },
-        {
-          "entity_name": "Enclosure (1) Security Requirements",
-          "entity_type": "document",
-          "description": "Security requirements addendum with classified handling procedures"
-        },
-        {
-          "entity_name": "Exhibit A Pricing Template",
-          "entity_type": "document",
-          "description": "Pricing template and instructions for cost proposal submission"
-        },
-        {
-          "entity_name": "Schedule B Contract Line Items",
-          "entity_type": "document",
-          "description": "CLIN structure and pricing schedule for contract items"
-        },
-        {
-          "entity_name": "Attachment 001.1 Task Area 1",
-          "entity_type": "document",
-          "description": "Sub-attachment defining Technical Support task area requirements"
-        },
-        {
-          "entity_name": "Attachment 001.2 Task Area 2",
-          "entity_type": "document",
-          "description": "Sub-attachment defining Training Services task area requirements"
-        }
-      ]
-      ```
-
-      Extracted Relationships (IMPLICIT - pattern recognition):
-
-      ```json
-      [
-        {
-          "source_entity": "Attachment 001 Base Performance Work Statement",
-          "target_entity": "Section J",
-          "relationship_type": "ATTACHMENT_OF",
-          "description": "Primary attachment listed under Section J"
-        },
-        {
-          "source_entity": "Attachment 002 Quality Assurance Surveillance Plan",
-          "target_entity": "Section J",
-          "relationship_type": "ATTACHMENT_OF",
-          "description": "Quality plan attachment listed under Section J"
-        },
-        {
-          "source_entity": "Enclosure (1) Security Requirements",
-          "target_entity": "Section J",
-          "relationship_type": "ATTACHMENT_OF",
-          "description": "Security addendum listed under Section J (Marine Corps naming pattern)"
-        },
-        {
-          "source_entity": "Exhibit A Pricing Template",
-          "target_entity": "Section J",
-          "relationship_type": "ATTACHMENT_OF",
-          "description": "Pricing exhibit listed under Section J (letter-based naming)"
-        },
-        {
-          "source_entity": "Schedule B Contract Line Items",
-          "target_entity": "Section J",
-          "relationship_type": "ATTACHMENT_OF",
-          "description": "CLIN schedule listed under Section J (schedule naming pattern)"
-        },
-        {
-          "source_entity": "Attachment 001.1 Task Area 1",
-          "target_entity": "Attachment 001 Base Performance Work Statement",
-          "relationship_type": "CHILD_OF",
-          "description": "Sub-attachment decomposition of base PWS (decimal numbering pattern)"
-        },
-        {
-          "source_entity": "Attachment 001.2 Task Area 2",
-          "target_entity": "Attachment 001 Base Performance Work Statement",
-          "relationship_type": "CHILD_OF",
-          "description": "Sub-attachment decomposition of base PWS (decimal numbering pattern)"
-        }
-      ]
-      ```
-
-      Note: Demonstrates Navy (Attachment ###), Marines (Enclosure (#)), and civilian (Exhibit/Schedule) patterns
-
-      **Example 9: SOW → Deliverable Production (Semantic + CDRL Linking)**
-
-      Input Text:
-
-      ```
-      Attachment J-04: Performance Work Statement
-
-      Task 4.3: Program Management and Reporting
-
-      The Contractor shall provide comprehensive program management including:
-      - Monthly Program Status Reports analyzing schedule, cost, and technical progress
-      - Quarterly Executive Briefings to government leadership
-      - Annual Performance Assessment Reports with metrics analysis
-      - Incident Reports within 24 hours of any security or safety event
-
-      All reports shall comply with formats specified in CDRL A001-A004.
-
-      Section J.5: Contract Data Requirements List
-
-      CDRL A001: Monthly Status Report (Due 5th business day)
-      CDRL A002: Quarterly Executive Briefing (Due 10 days after quarter)
-      CDRL A003: Annual Performance Assessment (Due January 31)
-      CDRL A004: Incident Report (Due 24 hours after event)
-      ```
-
-      Extracted Entities:
-
-      ```json
-      [
-        {
-          "entity_name": "Attachment J-04 Performance Work Statement",
-          "entity_type": "document",
-          "description": "Performance work statement attachment with task requirements"
-        },
-        {
-          "entity_name": "Performance Work Statement",
-          "entity_type": "statement_of_work",
-          "description": "Detailed task descriptions and performance objectives including program management"
-        },
-        {
-          "entity_name": "Monthly Program Status Reports",
-          "entity_type": "deliverable",
-          "description": "Monthly status reports analyzing schedule, cost, and technical progress per CDRL A001"
-        },
-        {
-          "entity_name": "Quarterly Executive Briefings",
-          "entity_type": "deliverable",
-          "description": "Quarterly executive briefings to government leadership per CDRL A002"
-        },
-        {
-          "entity_name": "Annual Performance Assessment Reports",
-          "entity_type": "deliverable",
-          "description": "Annual performance assessment with metrics analysis per CDRL A003"
-        },
-        {
-          "entity_name": "Incident Reports",
-          "entity_type": "deliverable",
-          "description": "Security or safety incident reports due within 24 hours per CDRL A004"
-        },
-        {
-          "entity_name": "CDRL A001",
-          "entity_type": "deliverable",
-          "description": "Monthly status report deliverable due 5th business day of following month"
-        },
-        {
-          "entity_name": "CDRL A002",
-          "entity_type": "deliverable",
-          "description": "Quarterly executive briefing deliverable due 10 days after quarter end"
-        },
-        {
-          "entity_name": "CDRL A003",
-          "entity_type": "deliverable",
-          "description": "Annual performance assessment deliverable due January 31 annually"
-        },
-        {
-          "entity_name": "CDRL A004",
-          "entity_type": "deliverable",
-          "description": "Incident report deliverable due 24 hours after qualifying event"
+          "entity_name": "Approach to Performance Standards",
+          "entity_type": "evaluation_factor",
+          "description": "(b) Approach to performance standards",
+          "importance": "subfactor"
         }
       ]
       ```
@@ -1191,69 +870,47 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
       ```json
       [
         {
-          "source_entity": "Performance Work Statement",
-          "target_entity": "Monthly Program Status Reports",
-          "relationship_type": "PRODUCES",
-          "description": "PWS task defines monthly reporting deliverable requirement"
+          "source_entity": {
+            "entity_name": "Technical Capability Volume",
+            "entity_type": "submission_instruction"
+          },
+          "target_entity": {
+            "entity_name": "Evaluation Factor 2 Technical Capability",
+            "entity_type": "evaluation_factor"
+          },
+          "relationship_type": "GUIDES"
         },
         {
-          "source_entity": "Performance Work Statement",
-          "target_entity": "Quarterly Executive Briefings",
-          "relationship_type": "PRODUCES",
-          "description": "PWS task defines quarterly briefing deliverable requirement"
-        },
-        {
-          "source_entity": "Performance Work Statement",
-          "target_entity": "Annual Performance Assessment Reports",
-          "relationship_type": "PRODUCES",
-          "description": "PWS task defines annual assessment deliverable requirement"
-        },
-        {
-          "source_entity": "Performance Work Statement",
-          "target_entity": "Incident Reports",
-          "relationship_type": "PRODUCES",
-          "description": "PWS task defines incident reporting deliverable requirement"
-        },
-        {
-          "source_entity": "Monthly Program Status Reports",
-          "target_entity": "CDRL A001",
-          "relationship_type": "TRACKED_BY",
-          "description": "Deliverable tracked and formatted per CDRL specification"
-        },
-        {
-          "source_entity": "Quarterly Executive Briefings",
-          "target_entity": "CDRL A002",
-          "relationship_type": "TRACKED_BY",
-          "description": "Deliverable tracked and formatted per CDRL specification"
-        },
-        {
-          "source_entity": "Annual Performance Assessment Reports",
-          "target_entity": "CDRL A003",
-          "relationship_type": "TRACKED_BY",
-          "description": "Deliverable tracked and formatted per CDRL specification"
-        },
-        {
-          "source_entity": "Incident Reports",
-          "target_entity": "CDRL A004",
-          "relationship_type": "TRACKED_BY",
-          "description": "Deliverable tracked and formatted per CDRL specification"
+          "source_entity": {
+            "entity_name": "Understanding of Requirements",
+            "entity_type": "evaluation_factor"
+          },
+          "target_entity": {
+            "entity_name": "Evaluation Factor 2 Technical Capability",
+            "entity_type": "evaluation_factor"
+          },
+          "relationship_type": "CHILD_OF"
         }
       ]
       ```
 
-      **Example 10: Strategic Themes and Win Themes (Concept Clustering)**
+      Note: Section L submission instructions GUIDE Section M evaluation factors - critical for proposal development.
+
+      **Example 7: Quality Requirements with Performance Standards**
 
       Input Text:
 
       ```
-      Section C.1: Background and Objectives
+      PWS Section 4.2: Quality Control Requirements
 
-      The Navy seeks a contractor to provide innovative sustainment solutions
-      leveraging predictive maintenance technology and data analytics to reduce
-      operational downtime and total cost of ownership. The program emphasizes
-      green energy initiatives and environmental sustainability aligned with Navy
-      climate action goals. Veterans hiring and small business partnerships are
-      critical program priorities.
+      The Contractor shall maintain a Quality Control Program (QCP) that ensures
+      all services meet the performance standards specified herein. The QCP shall
+      include deficiency identification, corrective action procedures, and root
+      cause analysis methodology.
+
+      The Contractor shall achieve a minimum 95% customer satisfaction rating
+      as measured by quarterly surveys. Response time for emergency work orders
+      shall not exceed 4 hours.
       ```
 
       Extracted Entities:
@@ -1261,79 +918,408 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
       ```json
       [
         {
-          "entity_name": "Innovative Sustainment Solutions",
-          "entity_type": "strategic_theme",
-          "description": "Win theme emphasizing innovation in maintenance and sustainment approaches"
+          "entity_name": "Quality Control Program",
+          "entity_type": "requirement",
+          "description": "The Contractor shall maintain a Quality Control Program (QCP) that ensures all services meet the performance standards specified herein.",
+          "criticality": "MANDATORY",
+          "modal_verb": "shall"
         },
         {
-          "entity_name": "Predictive Maintenance Technology",
-          "entity_type": "strategic_theme",
-          "description": "Technology-focused win theme highlighting data-driven preventive maintenance"
+          "entity_name": "Deficiency Identification Procedures",
+          "entity_type": "requirement",
+          "description": "The QCP shall include deficiency identification, corrective action procedures, and root cause analysis methodology.",
+          "criticality": "MANDATORY",
+          "modal_verb": "shall"
         },
         {
-          "entity_name": "Reduced Operational Downtime",
-          "entity_type": "strategic_theme",
-          "description": "Performance-focused win theme targeting availability and uptime improvements"
+          "entity_name": "Customer Satisfaction Rating Standard",
+          "entity_type": "requirement",
+          "description": "The Contractor shall achieve a minimum 95% customer satisfaction rating as measured by quarterly surveys.",
+          "criticality": "MANDATORY",
+          "modal_verb": "shall",
+          "performance_standard": "95% minimum"
         },
         {
-          "entity_name": "Total Cost of Ownership Reduction",
-          "entity_type": "strategic_theme",
-          "description": "Cost-focused win theme emphasizing lifecycle cost savings"
-        },
-        {
-          "entity_name": "Green Energy Initiatives",
-          "entity_type": "strategic_theme",
-          "description": "Environmental win theme aligned with Navy climate action and sustainability goals"
-        },
-        {
-          "entity_name": "Veterans Hiring Priority",
-          "entity_type": "strategic_theme",
-          "description": "Socioeconomic win theme supporting veteran employment objectives"
-        },
-        {
-          "entity_name": "Small Business Partnerships",
-          "entity_type": "strategic_theme",
-          "description": "Small business win theme emphasizing teaming and subcontracting commitments"
+          "entity_name": "Emergency Response Time Standard",
+          "entity_type": "requirement",
+          "description": "Response time for emergency work orders shall not exceed 4 hours.",
+          "criticality": "MANDATORY",
+          "modal_verb": "shall",
+          "performance_standard": "4 hours maximum"
         }
       ]
       ```
 
-      Extracted Relationships (semantic clustering):
+      Extracted Relationships:
 
       ```json
       [
         {
-          "source_entity": "Predictive Maintenance Technology",
-          "target_entity": "Innovative Sustainment Solutions",
-          "relationship_type": "SUPPORTS",
-          "description": "Technology enabler supporting innovation theme"
+          "source_entity": {
+            "entity_name": "Customer Satisfaction Rating Standard",
+            "entity_type": "requirement"
+          },
+          "target_entity": {
+            "entity_name": "Quality Control Program",
+            "entity_type": "requirement"
+          },
+          "relationship_type": "SUPPORTS"
         },
         {
-          "source_entity": "Predictive Maintenance Technology",
-          "target_entity": "Reduced Operational Downtime",
-          "relationship_type": "SUPPORTS",
-          "description": "Technology approach reduces downtime through prediction"
-        },
-        {
-          "source_entity": "Reduced Operational Downtime",
-          "target_entity": "Total Cost of Ownership Reduction",
-          "relationship_type": "SUPPORTS",
-          "description": "Uptime improvements drive cost savings"
-        },
-        {
-          "source_entity": "Green Energy Initiatives",
-          "target_entity": "Environmental Sustainability",
-          "relationship_type": "RELATED_TO",
-          "description": "Environmental themes aligned with climate action"
-        },
-        {
-          "source_entity": "Veterans Hiring Priority",
-          "target_entity": "Small Business Partnerships",
-          "relationship_type": "RELATED_TO",
-          "description": "Socioeconomic themes supporting diverse teaming"
+          "source_entity": {
+            "entity_name": "Deficiency Identification Procedures",
+            "entity_type": "requirement"
+          },
+          "target_entity": {
+            "entity_name": "Quality Control Program",
+            "entity_type": "requirement"
+          },
+          "relationship_type": "CHILD_OF"
         }
       ]
       ```
+
+      Note: Requirements extracted with verbatim performance standards. Modal verbs (shall/should) indicate criticality.
+
+      **Example 8: Operational Requirements with Workload Metrics (from real PWS)**
+
+      Input Text:
+
+      ```
+      F.2.3.1. C.A.C Customer Service Counter and Indoor Bar: The Contractor shall handle resale
+      requirements to include alcohol sales. The Contractor shall service:
+      1) One (1) inside bar with two (2) registers located in the C.A.C.
+      2) One (1) additional outside bar with two (2) registers during special events.
+      3) One (1) additional bar with one (1) register located in Phantom Auditorium during special
+      events and reserved activities.
+
+      Cash registers require USN staff personnel only. The Contractor shall verify all resale supplies
+      necessary to ensure items are properly stocked at all times. The Contractor shall notify the
+      Government when resale supply levels are low, and items need to be ordered. The Government
+      will procure the resale supplies. Contractor personnel shall provide retail services at minimum
+      rates of one (1) customer per minute during normal operations and three (3) customers per
+      minute during peak times (0500-0700, 1100-1300, 1900-2100, 2300-0100) or during special
+      events (e.g., concerts, 4-drink nights, community events, all calls, promotions, wing ceremonies,
+      etc.). The Contractor shall open the outside bar for special events as requested by the COR. The
+      Government will send requests to open the outside bar for special events in writing a minimum
+      of seven (7) calendar days prior to the event. This is estimated to occur 100 times per year.
+      ```
+
+      Extracted Entities:
+
+      ```json
+      [
+        {
+          "entity_name": "C.A.C. Customer Service Counter and Indoor Bar",
+          "entity_type": "requirement",
+          "description": "F.2.3.1. C.A.C Customer Service Counter and Indoor Bar: The Contractor shall handle resale requirements to include alcohol sales.",
+          "criticality": "MANDATORY",
+          "modal_verb": "shall"
+        },
+        {
+          "entity_name": "Bar Service Configuration",
+          "entity_type": "requirement",
+          "description": "The Contractor shall service: 1) One (1) inside bar with two (2) registers located in the C.A.C. 2) One (1) additional outside bar with two (2) registers during special events. 3) One (1) additional bar with one (1) register located in Phantom Auditorium during special events and reserved activities.",
+          "criticality": "MANDATORY",
+          "modal_verb": "shall"
+        },
+        {
+          "entity_name": "Resale Supply Verification",
+          "entity_type": "requirement",
+          "description": "The Contractor shall verify all resale supplies necessary to ensure items are properly stocked at all times. The Contractor shall notify the Government when resale supply levels are low, and items need to be ordered.",
+          "criticality": "MANDATORY",
+          "modal_verb": "shall"
+        },
+        {
+          "entity_name": "Retail Service Rate Standard",
+          "entity_type": "requirement",
+          "description": "Contractor personnel shall provide retail services at minimum rates of one (1) customer per minute during normal operations and three (3) customers per minute during peak times (0500-0700, 1100-1300, 1900-2100, 2300-0100) or during special events",
+          "criticality": "MANDATORY",
+          "modal_verb": "shall",
+          "performance_standard": "1 customer/min normal, 3 customers/min peak"
+        },
+        {
+          "entity_name": "Outside Bar Special Events Support",
+          "entity_type": "requirement",
+          "description": "The Contractor shall open the outside bar for special events as requested by the COR. The Government will send requests to open the outside bar for special events in writing a minimum of seven (7) calendar days prior to the event. This is estimated to occur 100 times per year.",
+          "criticality": "MANDATORY",
+          "modal_verb": "shall"
+        },
+        {
+          "entity_name": "Peak Service Hours",
+          "entity_type": "concept",
+          "description": "peak times (0500-0700, 1100-1300, 1900-2100, 2300-0100) or during special events (e.g., concerts, 4-drink nights, community events, all calls, promotions, wing ceremonies, etc.)"
+        },
+        {
+          "entity_name": "Special Events Frequency",
+          "entity_type": "concept",
+          "description": "This is estimated to occur 100 times per year."
+        }
+      ]
+      ```
+
+      Extracted Relationships:
+
+      ```json
+      [
+        {
+          "source_entity": {
+            "entity_name": "Retail Service Rate Standard",
+            "entity_type": "requirement"
+          },
+          "target_entity": {
+            "entity_name": "Peak Service Hours",
+            "entity_type": "concept"
+          },
+          "relationship_type": "REFERENCES"
+        },
+        {
+          "source_entity": {
+            "entity_name": "Outside Bar Special Events Support",
+            "entity_type": "requirement"
+          },
+          "target_entity": {
+            "entity_name": "Special Events Frequency",
+            "entity_type": "concept"
+          },
+          "relationship_type": "REFERENCES"
+        },
+        {
+          "source_entity": {
+            "entity_name": "Bar Service Configuration",
+            "entity_type": "requirement"
+          },
+          "target_entity": {
+            "entity_name": "C.A.C. Customer Service Counter and Indoor Bar",
+            "entity_type": "requirement"
+          },
+          "relationship_type": "CHILD_OF"
+        }
+      ]
+      ```
+
+      Note: Verbatim extraction preserves performance standards (1 customer/min, 3 customers/min), time windows, and workload estimates (100 times/year). Modal verb "shall" indicates mandatory requirements.
+
+      **Example 9: Government Furnished Property and CDRL Requirements (from real PWS)**
+
+      Input Text:
+
+      ```
+      Government Furnished Property Reporting – The Contractor shall report GFP to the
+      Contracting Officer within the task order specific time limits and using the current
+      version of Government-furnished forms. [CDRL A016]. The Contractor shall report GFP:
+      within 30 calendar days after the start of the period of performance, not later than
+      30 calendar days prior to the end of the period of performance, and at a minimum annually.
+      The Contractor shall base reports on physical inventories.
+
+      Date of First Submission: Thirty (30) calendar days after the start of the Period of
+      Performance (POP)
+      Frequency: As required
+      ```
+
+      Extracted Entities:
+
+      ```json
+      [
+        {
+          "entity_name": "Government Furnished Property Reporting",
+          "entity_type": "requirement",
+          "description": "Government Furnished Property Reporting – The Contractor shall report GFP to the Contracting Officer within the task order specific time limits and using the current version of Government-furnished forms. [CDRL A016].",
+          "criticality": "MANDATORY",
+          "modal_verb": "shall"
+        },
+        {
+          "entity_name": "GFP Report Initial Submission",
+          "entity_type": "deliverable",
+          "description": "The Contractor shall report GFP: within 30 calendar days after the start of the period of performance",
+          "criticality": "MANDATORY",
+          "modal_verb": "shall"
+        },
+        {
+          "entity_name": "GFP Report Final Submission",
+          "entity_type": "deliverable",
+          "description": "not later than 30 calendar days prior to the end of the period of performance",
+          "criticality": "MANDATORY"
+        },
+        {
+          "entity_name": "GFP Physical Inventory Requirement",
+          "entity_type": "requirement",
+          "description": "The Contractor shall base reports on physical inventories.",
+          "criticality": "MANDATORY",
+          "modal_verb": "shall"
+        },
+        {
+          "entity_name": "CDRL A016",
+          "entity_type": "deliverable",
+          "description": "[CDRL A016]"
+        },
+        {
+          "entity_name": "Contracting Officer",
+          "entity_type": "organization",
+          "description": "The Contractor shall report GFP to the Contracting Officer"
+        }
+      ]
+      ```
+
+      Extracted Relationships:
+
+      ```json
+      [
+        {
+          "source_entity": {
+            "entity_name": "Government Furnished Property Reporting",
+            "entity_type": "requirement"
+          },
+          "target_entity": {
+            "entity_name": "CDRL A016",
+            "entity_type": "deliverable"
+          },
+          "relationship_type": "TRACKED_BY"
+        },
+        {
+          "source_entity": {
+            "entity_name": "GFP Report Initial Submission",
+            "entity_type": "deliverable"
+          },
+          "target_entity": {
+            "entity_name": "Government Furnished Property Reporting",
+            "entity_type": "requirement"
+          },
+          "relationship_type": "CHILD_OF"
+        },
+        {
+          "source_entity": {
+            "entity_name": "Government Furnished Property Reporting",
+            "entity_type": "requirement"
+          },
+          "target_entity": {
+            "entity_name": "Contracting Officer",
+            "entity_type": "organization"
+          },
+          "relationship_type": "SUBMITTED_TO"
+        }
+      ]
+      ```
+
+      Note: CDRL references extracted verbatim. Due dates and frequency preserved exactly as stated in source.
+
+      **Example 10: Special Events and Training Requirements (from real PWS)**
+
+      Input Text:
+
+      ```
+      F.2.4. Special Events: The Contractor shall arrange special events including live bands,
+      shows, Armed Forces Entertainment, game shows, theme nights, and other similar events.
+      Special events may require coordination through the 380 AEW. The COR must be notified
+      of special events at least two (2) weeks prior to each planned event to ensure proper
+      coordination.
+
+      F.2.3.2. Alcohol Management: All Contractor personnel must complete DRAM shop training
+      prior to serving/selling alcohol and have proper training documentation on file with the
+      Community Services Flight Chief. The Contractor shall use the approved Alcohol Management
+      System provided by the Government. The Contractor shall track alcohol sales and strictly
+      enforce alcohol limitations IAW AFCENT and 380 AEW alcohol policies with no violations allowed.
+      ```
+
+      Extracted Entities:
+
+      ```json
+      [
+        {
+          "entity_name": "Special Events Arrangement",
+          "entity_type": "requirement",
+          "description": "F.2.4. Special Events: The Contractor shall arrange special events including live bands, shows, Armed Forces Entertainment, game shows, theme nights, and other similar events.",
+          "criticality": "MANDATORY",
+          "modal_verb": "shall"
+        },
+        {
+          "entity_name": "Special Events Notification",
+          "entity_type": "requirement",
+          "description": "The COR must be notified of special events at least two (2) weeks prior to each planned event to ensure proper coordination.",
+          "criticality": "MANDATORY",
+          "modal_verb": "must"
+        },
+        {
+          "entity_name": "DRAM Shop Training Requirement",
+          "entity_type": "requirement",
+          "description": "All Contractor personnel must complete DRAM shop training prior to serving/selling alcohol and have proper training documentation on file with the Community Services Flight Chief.",
+          "criticality": "MANDATORY",
+          "modal_verb": "must"
+        },
+        {
+          "entity_name": "Alcohol Management System Usage",
+          "entity_type": "requirement",
+          "description": "The Contractor shall use the approved Alcohol Management System provided by the Government.",
+          "criticality": "MANDATORY",
+          "modal_verb": "shall"
+        },
+        {
+          "entity_name": "Alcohol Policy Compliance",
+          "entity_type": "requirement",
+          "description": "The Contractor shall track alcohol sales and strictly enforce alcohol limitations IAW AFCENT and 380 AEW alcohol policies with no violations allowed.",
+          "criticality": "MANDATORY",
+          "modal_verb": "shall",
+          "performance_standard": "zero violations"
+        },
+        {
+          "entity_name": "380 AEW",
+          "entity_type": "organization",
+          "description": "Special events may require coordination through the 380 AEW."
+        },
+        {
+          "entity_name": "Community Services Flight Chief",
+          "entity_type": "organization",
+          "description": "have proper training documentation on file with the Community Services Flight Chief"
+        },
+        {
+          "entity_name": "AFCENT Alcohol Policy",
+          "entity_type": "document",
+          "description": "IAW AFCENT and 380 AEW alcohol policies"
+        }
+      ]
+      ```
+
+      Extracted Relationships:
+
+      ```json
+      [
+        {
+          "source_entity": {
+            "entity_name": "Special Events Arrangement",
+            "entity_type": "requirement"
+          },
+          "target_entity": {
+            "entity_name": "380 AEW",
+            "entity_type": "organization"
+          },
+          "relationship_type": "COORDINATED_WITH"
+        },
+        {
+          "source_entity": {
+            "entity_name": "DRAM Shop Training Requirement",
+            "entity_type": "requirement"
+          },
+          "target_entity": {
+            "entity_name": "Community Services Flight Chief",
+            "entity_type": "organization"
+          },
+          "relationship_type": "REPORTED_TO"
+        },
+        {
+          "source_entity": {
+            "entity_name": "Alcohol Policy Compliance",
+            "entity_type": "requirement"
+          },
+          "target_entity": {
+            "entity_name": "AFCENT Alcohol Policy",
+            "entity_type": "document"
+          },
+          "relationship_type": "GOVERNED_BY"
+        }
+      ]
+      ```
+
+      Note: Training requirements and compliance standards extracted verbatim. Zero-tolerance policy ("no violations allowed") captured as performance_standard.
 
     - **Relationship Patterns to Recognize:**
 
@@ -1879,6 +1865,301 @@ Action:
 Confidence: 0.75
 
 ````
+
+**Example 11: Equipment Inventory Tables with Building-Level Data (from real PWS)**
+
+Input Text (TABLE + Narrative):
+
+```
+H.1.4.6. Preventive Maintenance: The Contractor shall ensure machines are maintained
+according to the manufacturer's recommendations by performing preventive maintenance
+tasks. The Contractor shall perform weekly operational/electrical checks to ensure
+all machines operate safely, are clean, and are free of corrosion.
+
+TABLE H.2. APPLIANCE LISTING, LOCATION, AND REPAIR SCHEDULE:
+
+WEEKLY:
+| Building | Make   | Quantity (Washers) | Quantity (Dryers) |
+|----------|--------|-------------------|------------------|
+| 2959     | Washer | 69                |                  |
+|          | Dryers |                   | 69               |
+| 3880     | Washer | 44                |                  |
+|          | Dryers |                   | 50               |
+| 4505     | Washer | 49                |                  |
+|          | Dryers |                   | 61               |
+| Machine Accountability Totals | | 370 | 399 |
+| Total Units | | 769 |  |
+
+MONTHLY:
+| Building    | Make   | Quantity (Washers) | Quantity (Dryers) |
+|-------------|--------|-------------------|------------------|
+| 4863 A/B    | Washer | 1                 |                  |
+|             | Dryers |                   | 1                |
+| 4864 C/D    | Washer | 1                 |                  |
+|             | Dryers |                   | 1                |
+| Monthly Machine Totals | | 4 | 4 |
+| Total Units | | 8 |  |
+
+ON-CALL:
+| Building    | Make   | Quantity (Washers) | Quantity (Dryers) |
+|-------------|--------|-------------------|------------------|
+| 4860 A/B    | Washer | 1                 |                  |
+|             | Dryers |                   | 1                |
+| 4861 C/D    | Washer | 1                 |                  |
+|             | Dryers |                   | 1                |
+| On-Call Machine Totals | | 11 | 11 |
+| Total Units | | 22 |  |
+```
+
+**CRITICAL: TABLE EXTRACTION RULES**
+
+When processing equipment inventory tables:
+
+1. **Extract EACH building as a LOCATION entity** with equipment counts
+2. **Extract equipment aggregates as EQUIPMENT entities** by maintenance schedule
+3. **Create LOCATION→EQUIPMENT relationships** using HAS_EQUIPMENT
+4. **Preserve maintenance schedule context** (Weekly, Monthly, On-Call)
+5. **Extract ALL rows, not just summaries** - building-level data is critical for workload estimation
+
+Extracted Entities:
+
+```json
+[
+  {
+    "entity_name": "Table H.2 Appliance Listing",
+    "entity_type": "document",
+    "description": "TABLE H.2. APPLIANCE LISTING, LOCATION, AND REPAIR SCHEDULE"
+  },
+  {
+    "entity_name": "Preventive Maintenance Requirement",
+    "entity_type": "requirement",
+    "description": "The Contractor shall ensure machines are maintained according to the manufacturer's recommendations by performing preventive maintenance tasks. The Contractor shall perform weekly operational/electrical checks to ensure all machines operate safely, are clean, and are free of corrosion.",
+    "criticality": "MANDATORY",
+    "modal_verb": "shall",
+    "labor_drivers": ["weekly operational/electrical checks", "769 total units weekly", "8 units monthly", "22 units on-call"]
+  },
+  {
+    "entity_name": "Building 2959 Laundry Facility",
+    "entity_type": "location",
+    "equipment_counts": "69 washers, 69 dryers (138 total units, weekly maintenance schedule)"
+  },
+  {
+    "entity_name": "Building 3880 Laundry Facility",
+    "entity_type": "location",
+    "equipment_counts": "44 washers, 50 dryers (94 total units, weekly maintenance schedule)"
+  },
+  {
+    "entity_name": "Building 4505 Laundry Facility",
+    "entity_type": "location",
+    "equipment_counts": "49 washers, 61 dryers (110 total units, weekly maintenance schedule)"
+  },
+  {
+    "entity_name": "Weekly Maintenance Equipment Inventory",
+    "entity_type": "equipment",
+    "equipment_counts": "370 washers, 399 dryers (769 total units across multiple buildings)"
+  },
+  {
+    "entity_name": "Monthly Maintenance Equipment Inventory",
+    "entity_type": "equipment",
+    "equipment_counts": "4 washers, 4 dryers (8 total units in Buildings 4863-4866)"
+  },
+  {
+    "entity_name": "On-Call Maintenance Equipment Inventory",
+    "entity_type": "equipment",
+    "equipment_counts": "11 washers, 11 dryers (22 total units in Buildings 4860-4866)"
+  },
+  {
+    "entity_name": "Weekly Maintenance Schedule",
+    "entity_type": "concept",
+    "description": "Weekly operational/electrical checks for 769 laundry units across primary buildings"
+  },
+  {
+    "entity_name": "Monthly Maintenance Schedule",
+    "entity_type": "concept",
+    "description": "Monthly maintenance for 8 laundry units in auxiliary facilities (Buildings 4863-4866)"
+  },
+  {
+    "entity_name": "On-Call Maintenance Schedule",
+    "entity_type": "concept",
+    "description": "On-call service for 22 laundry units in remote facilities (Buildings 4860-4866)"
+  }
+]
+```
+
+Extracted Relationships:
+
+```json
+[
+  {
+    "source_entity": {
+      "entity_name": "Building 2959 Laundry Facility",
+      "entity_type": "location"
+    },
+    "target_entity": {
+      "entity_name": "Weekly Maintenance Equipment Inventory",
+      "entity_type": "equipment"
+    },
+    "relationship_type": "HAS_EQUIPMENT"
+  },
+  {
+    "source_entity": {
+      "entity_name": "Preventive Maintenance Requirement",
+      "entity_type": "requirement"
+    },
+    "target_entity": {
+      "entity_name": "Weekly Maintenance Schedule",
+      "entity_type": "concept"
+    },
+    "relationship_type": "DEFINES"
+  },
+  {
+    "source_entity": {
+      "entity_name": "Table H.2 Appliance Listing",
+      "entity_type": "document"
+    },
+    "target_entity": {
+      "entity_name": "Appendix H Equipment Maintenance",
+      "entity_type": "document"
+    },
+    "relationship_type": "CHILD_OF"
+  }
+]
+```
+
+Note:
+- **Building-level extraction**: Each building extracted as LOCATION with equipment counts
+- **Schedule categorization**: Weekly (769 units), Monthly (8 units), On-Call (22 units) separated
+- **Workload drivers captured**: Total unit counts enable FTE estimation (769 weekly checks = X labor hours)
+- **Tables ≠ Concepts**: Equipment inventory tables should produce LOCATION + EQUIPMENT entities, NOT generic "concept" entities
+
+**Example 12: Fitness Equipment Preventive Maintenance Tables (from real PWS)**
+
+Input Text (TABLE + Narrative):
+
+```
+TABLE H.1 PREVENTIVE MAINTENANCE AND REPAIRS SCHEDULES OF FITNESS EQUIPMENT:
+
+GENERAL:
+| Task Requirements                           | Weekly | Monthly | Quarterly | Yearly |
+|---------------------------------------------|--------|---------|-----------|--------|
+| Visually inspect all machines               | X      |         |           |        |
+| Clean machine housing                       | X      |         |           |        |
+| Inspect mechanical parts                    | X      |         |           |        |
+| Lubricate all moving parts semiannually     |        |         |           | 2x Year|
+| Evaluate repairs/replacement annually       |        |         | X         |        |
+
+TREADMILLS:
+| Task Requirements                           | Weekly | Monthly | Quarterly | Yearly |
+|---------------------------------------------|--------|---------|-----------|--------|
+| Clean bed and frame with damp cloth         | X      |         |           |        |
+| Inspect belt alignment                      | X      |         |           |        |
+| Inspect belt brushings                      |        | X       |           |        |
+| Lubricate bed                               |        |         | X         |        |
+
+STATIONARY CYCLES:
+| Task Requirements                           | Weekly | Monthly | Quarterly | Yearly |
+|---------------------------------------------|--------|---------|-----------|--------|
+| Clean housing with mild cleanser            | X      |         |           |        |
+| Clean & lubricate pedals/shaft with 30W oil |        | X       |           |        |
+| Clean and lubricate seat post               |        | X       |           |        |
+| Inspect crank bearings                      | X      |         |           |        |
+```
+
+Extracted Entities:
+
+```json
+[
+  {
+    "entity_name": "Table H.1 Fitness Equipment Maintenance Schedule",
+    "entity_type": "document",
+    "description": "TABLE H.1 PREVENTIVE MAINTENANCE AND REPAIRS SCHEDULES OF FITNESS EQUIPMENT"
+  },
+  {
+    "entity_name": "General Equipment Weekly Inspection",
+    "entity_type": "requirement",
+    "description": "Weekly: Visually inspect all machines, Clean machine housing, Inspect mechanical parts",
+    "criticality": "MANDATORY",
+    "labor_drivers": ["weekly visual inspection", "weekly housing cleaning", "weekly mechanical inspection"]
+  },
+  {
+    "entity_name": "Treadmill Preventive Maintenance",
+    "entity_type": "requirement",
+    "description": "Treadmills: Weekly - clean bed/frame, inspect belt alignment; Monthly - inspect belt brushings; Quarterly - lubricate bed",
+    "criticality": "MANDATORY",
+    "labor_drivers": ["weekly bed cleaning", "weekly belt alignment check", "monthly belt brushing inspection", "quarterly bed lubrication"]
+  },
+  {
+    "entity_name": "Stationary Cycle Preventive Maintenance",
+    "entity_type": "requirement",
+    "description": "Stationary Cycles: Weekly - clean housing, inspect crank bearings; Monthly - lubricate pedals/shaft with 30W oil, lubricate seat post",
+    "criticality": "MANDATORY",
+    "labor_drivers": ["weekly housing cleaning", "weekly crank bearing inspection", "monthly pedal lubrication", "monthly seat post lubrication"]
+  },
+  {
+    "entity_name": "Treadmills",
+    "entity_type": "equipment",
+    "description": "Treadmills requiring weekly cleaning, monthly belt inspection, quarterly lubrication"
+  },
+  {
+    "entity_name": "Stationary Cycles",
+    "entity_type": "equipment",
+    "description": "Stationary Cycles requiring weekly cleaning, monthly lubrication per manufacturer specifications"
+  },
+  {
+    "entity_name": "Equipment Lubrication Schedule",
+    "entity_type": "concept",
+    "description": "Lubricate all moving parts semiannually (2x per year) per manufacturer recommendations"
+  }
+]
+```
+
+Extracted Relationships:
+
+```json
+[
+  {
+    "source_entity": {
+      "entity_name": "Treadmill Preventive Maintenance",
+      "entity_type": "requirement"
+    },
+    "target_entity": {
+      "entity_name": "Treadmills",
+      "entity_type": "equipment"
+    },
+    "relationship_type": "APPLIES_TO"
+  },
+  {
+    "source_entity": {
+      "entity_name": "Stationary Cycle Preventive Maintenance",
+      "entity_type": "requirement"
+    },
+    "target_entity": {
+      "entity_name": "Stationary Cycles",
+      "entity_type": "equipment"
+    },
+    "relationship_type": "APPLIES_TO"
+  },
+  {
+    "source_entity": {
+      "entity_name": "Table H.1 Fitness Equipment Maintenance Schedule",
+      "entity_type": "document"
+    },
+    "target_entity": {
+      "entity_name": "Appendix H Equipment Maintenance",
+      "entity_type": "document"
+    },
+    "relationship_type": "CHILD_OF"
+  }
+]
+```
+
+Note:
+- **Maintenance frequency extraction**: Weekly/Monthly/Quarterly/Yearly schedules extracted as labor_drivers
+- **Equipment-specific requirements**: Each equipment type (Treadmills, Cycles) gets its own requirement entity
+- **Task-level detail**: Individual maintenance tasks preserved for workload estimation
+- **Cross-reference to equipment**: APPLIES_TO relationships link requirements to equipment types
+
+---
 
 **Pattern 7-20: Semantic Similarity Mapping**
 

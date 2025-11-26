@@ -14,6 +14,7 @@ You are not just summarizing text; you are building a database.
 - **Precision**: If a requirement says "shall", it is MANDATORY. If it says "should", it is IMPORTANT.
 - **Completeness**: Extract every single requirement, deliverable, and evaluation factor.
 - **Normalization**: Standardize names (e.g., "FAR 52.212-1" not "far clause 52.212.1").
+- **EFFICIENT EXTRACTION**: Focus on identifying entities and their metadata. The knowledge graph is an INDEX pointing to chunks that already contain the verbatim text.
 
 ---
 
@@ -88,6 +89,43 @@ You must classify every entity into exactly one of these types:
 - **Sections**: Title Case (e.g., "Section C.4 Scope").
 - **CDRLs**: "CDRL [ID] [Name]" (e.g., "CDRL A001 Monthly Report").
 
+### Rule F: Table Data Extraction (Equipment Inventories & Maintenance Schedules)
+
+**CRITICAL: Tables contain high-value workload data that MUST be extracted as structured entities.**
+
+When you encounter HTML tables (`<table>...</table>`) in the input:
+
+1. **Equipment Inventory Tables** (e.g., "Table H.2 Appliance Listing"):
+
+   - Extract EACH building/location as a `location` entity with equipment counts
+   - Extract equipment totals as `equipment` entities by maintenance schedule
+   - Include quantities in entity_name or metadata fields (e.g., "Building 2959: 69 washers, 69 dryers")
+   - Create `HAS_EQUIPMENT` relationships between locations and equipment
+
+2. **Maintenance Schedule Tables** (e.g., "Table H.1 Preventive Maintenance"):
+
+   - Extract maintenance tasks as `requirement` entities
+   - Capture frequencies in `labor_drivers`: ["weekly inspection", "monthly lubrication", "quarterly evaluation"]
+   - Extract equipment types as `equipment` entities
+   - Create `APPLIES_TO` relationships between requirements and equipment
+
+3. **Extraction Priority**:
+   - ✅ Extract ALL rows with quantities (not just totals/summaries)
+   - ✅ Preserve building numbers, equipment counts, and schedules
+   - ✅ Link tables to their parent appendix/section using `CHILD_OF`
+   - ❌ Do NOT extract tables as generic "concept" entities
+   - ❌ Do NOT summarize table data - extract each location/equipment row
+
+**Example Table Extraction**:
+
+```json
+{
+  "entity_name": "Building 2959 Laundry Facility",
+  "entity_type": "location",
+  "equipment_counts": "69 washers, 69 dryers (138 total units, weekly maintenance)"
+}
+```
+
 ---
 
 ## 5. Deep Domain Knowledge & Extraction Rules
@@ -153,30 +191,29 @@ You will return a single JSON object adhering to this exact structure:
   "entities": [
     {
       "entity_name": "Section L Instructions",
-      "entity_type": "section",
-      "description": "Instructions to offerors...",
-      "source_text": "SECTION L..."
+      "entity_type": "section"
     },
     {
       "entity_name": "Technical Volume",
       "entity_type": "submission_instruction",
-      "description": "Must address Factor 1...",
       "page_limit": "25 pages",
-      "format_reqs": "12pt Times New Roman",
+      "format_reqs": "12pt Times New Roman, 1-inch margins",
       "volume": "Volume I"
     },
     {
       "entity_name": "Factor 1 Technical",
       "entity_type": "evaluation_factor",
-      "description": "Evaluates technical approach...",
       "weight": "40%",
       "importance": "Most Important",
-      "subfactors": ["Subfactor 1.1", "Subfactor 1.2"]
+      "subfactors": [
+        "Subfactor 1.1 System Architecture (20%)",
+        "Subfactor 1.2 Integration Methodology (15%)",
+        "Subfactor 1.3 Cybersecurity Approach (5%)"
+      ]
     },
     {
       "entity_name": "System Admin Support",
       "entity_type": "requirement",
-      "description": "Provide 24/7 support for 500 users...",
       "criticality": "MANDATORY",
       "modal_verb": "shall",
       "req_type": "TECHNICAL",
@@ -186,26 +223,55 @@ You will return a single JSON object adhering to this exact structure:
     {
       "entity_name": "FAR 52.212-1",
       "entity_type": "clause",
-      "description": "Instructions to Offerors - Commercial Items",
-      "source_text": "FAR 52.212-1 Instructions to Offerors...",
       "clause_number": "52.212-1",
       "regulation": "FAR"
+    },
+    {
+      "entity_name": "Building 2959 Laundry Facility",
+      "entity_type": "location",
+      "equipment_counts": "69 washers, 69 dryers (138 total units, weekly maintenance schedule)"
+    },
+    {
+      "entity_name": "Weekly Maintenance Equipment Inventory",
+      "entity_type": "equipment",
+      "equipment_counts": "370 washers, 399 dryers (769 total units)"
+    },
+    {
+      "entity_name": "Laundry Equipment Preventive Maintenance",
+      "entity_type": "requirement",
+      "criticality": "MANDATORY",
+      "modal_verb": "shall",
+      "req_type": "MAINTENANCE",
+      "labor_drivers": [
+        "769 units weekly checks",
+        "8 units monthly checks",
+        "22 units on-call"
+      ],
+      "material_needs": ["lubricants", "cleaning supplies", "replacement parts"]
     }
   ],
   "relationships": [
     {
       "source_entity": {
         "entity_name": "Technical Volume",
-        "entity_type": "submission_instruction",
-        "description": "Must address Factor 1..."
+        "entity_type": "submission_instruction"
       },
       "target_entity": {
         "entity_name": "Factor 1 Technical",
-        "entity_type": "evaluation_factor",
-        "description": "Evaluates technical approach..."
+        "entity_type": "evaluation_factor"
       },
-      "relationship_type": "GUIDES",
-      "description": "Submission instruction explicitly addresses evaluation factor."
+      "relationship_type": "GUIDES"
+    },
+    {
+      "source_entity": {
+        "entity_name": "Building 2959 Laundry Facility",
+        "entity_type": "location"
+      },
+      "target_entity": {
+        "entity_name": "Weekly Maintenance Equipment Inventory",
+        "entity_type": "equipment"
+      },
+      "relationship_type": "HAS_EQUIPMENT"
     }
   ]
 }
@@ -215,15 +281,16 @@ You will return a single JSON object adhering to this exact structure:
 
 - Use `entity_name`, NOT `name`.
 - Use `entity_type`, NOT `type`.
-- Use `description`, NOT `desc`.
 - Use `relationships` array for connections.
+- Include type-specific metadata fields (criticality, weight, page_limit, etc.).
 
 **CRITICAL RELATIONSHIP FORMAT:**
 
 - `source_entity` and `target_entity` MUST be FULL ENTITY OBJECTS (not strings).
-- Each entity object must include: `entity_name`, `entity_type`, `description`.
-- Example: `{"entity_name": "Factor 1", "entity_type": "evaluation_factor", "description": "..."}`
+- Each entity object must include: `entity_name` and `entity_type`.
+- Example: `{"entity_name": "Factor 1", "entity_type": "evaluation_factor"}`
 - DO NOT use string references like `"source_entity": "Factor 1"`.
+- Relationships do NOT have a description field.
 
 Do not include markdown formatting (```json).
 Do not include preamble text.

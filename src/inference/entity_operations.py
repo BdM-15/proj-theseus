@@ -153,9 +153,10 @@ ENTITIES TO RETYPE:
     
     for i, entity in enumerate(entities_batch, 1):
         name = entity.get("entity_name", "Unknown")
-        desc = entity.get("description", "No description")[:150]  # Truncate long descriptions
+        # Use entity_name as the primary content identifier
+        source = name[:150]  # Truncate long content
         current_type = entity.get("entity_type", "UNKNOWN")
-        prompt += f"\n{i}. Name: {name}\n   Description: {desc}\n   Current type: {current_type}\n"
+        prompt += f"\n{i}. Name: {name}\n   Current type: {current_type}\n"
     
     prompt += f"""
 OUTPUT FORMAT (one line per entity, NO explanations):

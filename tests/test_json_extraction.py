@@ -70,13 +70,14 @@ async def test_extraction():
                 print(f"   Importance: {entity.importance}")
             elif entity.entity_type == "submission_instruction" and hasattr(entity, 'page_limit'):
                 print(f"   Page Limit: {entity.page_limit}")
-            print(f"   Desc: {entity.description[:100]}...")
+            # source_text is the verbatim extraction (no description field)
+            if entity.source_text:
+                print(f"   Source Text: {entity.source_text[:100]}...")
             print("")
             
         print("\n--- Relationships ---")
         for rel in result.relationships:
-            print(f"[{rel.relationship_type}] {rel.source_entity} -> {rel.target_entity}")
-            print(f"   Desc: {rel.description}")
+            print(f"[{rel.relationship_type}] {rel.source_entity.entity_name} -> {rel.target_entity.entity_name}")
             print("")
             
     except Exception as e:

@@ -25,8 +25,6 @@ EntityType = Literal[
 class BaseEntity(BaseModel):
     entity_name: str = Field(..., description="The canonical name of the entity (Title Case).")
     entity_type: EntityType = Field(..., description="The strict entity type from the government contracting ontology.")
-    description: str = Field(..., description="Comprehensive description including context, values, and relationships.")
-    source_text: Optional[str] = Field(None, description="The exact snippet from the source text that generated this entity.")
 
     @model_validator(mode='after')
     def clean_entity_name(self):
@@ -84,10 +82,9 @@ class PerformanceMetric(BaseEntity):
 # ==========================================
 
 class Relationship(BaseModel):
-    source_entity: BaseEntity = Field(..., description="Full source entity object with entity_name, entity_type, and description.")
-    target_entity: BaseEntity = Field(..., description="Full target entity object with entity_name, entity_type, and description.")
+    source_entity: BaseEntity = Field(..., description="Full source entity object with entity_name and entity_type.")
+    target_entity: BaseEntity = Field(..., description="Full target entity object with entity_name and entity_type.")
     relationship_type: str = Field(..., description="Type of relationship (e.g., EVALUATED_BY, GUIDES, CHILD_OF, ATTACHMENT_OF, PRODUCES).")
-    description: str = Field(..., description="Explanation of the relationship.")
 
 # ==========================================
 # Container for LLM Output
