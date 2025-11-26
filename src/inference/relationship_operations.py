@@ -22,7 +22,7 @@ from pathlib import Path
 from src.utils.logging_config import log_graceful_failure
 
 from src.inference.batch_processor import BatchProcessor
-from src.inference.graph_io import group_entities_by_type
+from src.inference.neo4j_graph_io import group_entities_by_type
 from src.core.prompt_loader import load_prompt
 
 logger = logging.getLogger(__name__)
