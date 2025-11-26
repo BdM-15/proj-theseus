@@ -25,6 +25,20 @@ For each requirement, identify:
 
 ## BOE Categories (7 Standard Categories)
 
+**CRITICAL: You MUST use ONLY these 7 exact category names. Map domain-specific concepts to these standard categories:**
+
+| Invalid (Do NOT Use)                 | Map To (Use This)                             |
+| ------------------------------------ | --------------------------------------------- |
+| Security, Base Access, DBIDS         | → **Compliance**                              |
+| Training, Personnel Qualifications   | → **ODCs** (training) or **Labor** (staffing) |
+| Business Performance, Work Orders    | → **Labor** (operations)                      |
+| Fitness for Duty, Hazardous Material | → **Compliance** (regulatory)                 |
+| Food and Beverage, Alcohol           | → **Materials** (consumables)                 |
+| Holidays, Host Nation                | → **Compliance** (policy)                     |
+| CAC, Recreational, Special Events    | → **Labor** or **Compliance**                 |
+| Interior/Exterior, Resale            | → **Materials** or **Labor**                  |
+| Funds, CRP                           | → **ODCs** or **Compliance**                  |
+
 Classify each requirement into one or more of these categories:
 
 ### 1. **Labor**
@@ -228,7 +242,7 @@ For each requirement entity, return:
 ### Field Definitions:
 
 - **has_workload_metric**: Boolean - Always `true` after enrichment
-- **workload_categories**: Array of BOE category names (max 7, must match standard categories)
+- **workload_categories**: Array containing ONLY these 7 exact strings: `["Labor", "Materials", "ODCs", "QA", "Logistics", "Lifecycle", "Compliance"]`. **NEVER use domain-specific terms like "Security", "Training", "Business Performance", etc. - MAP them to these 7 categories.**
 - **boe_relevance**: Object with confidence scores (0.0-1.0) for each identified category
 - **labor_drivers**: Array of labor-related details (empty if no Labor category)
 - **material_needs**: Array of material-related details (empty if no Materials category)
@@ -387,7 +401,9 @@ Most requirements span multiple categories. Examples:
 
 Before returning results, verify:
 
-- ✅ All `workload_categories` values match standard 7 BOE categories exactly
+- ✅ All `workload_categories` values are EXACTLY one of: `Labor`, `Materials`, `ODCs`, `QA`, `Logistics`, `Lifecycle`, `Compliance`
+  - ❌ INVALID examples: "Security", "Training", "Business Performance", "Base Access", "Hazardous Material"
+  - ✅ Map "Security" → "Compliance", "Training" → "ODCs", etc.
 - ✅ All `boe_relevance` scores are between 0.0 and 1.0
 - ✅ `complexity_score` is integer 1-10
 - ✅ `has_workload_metric` is always `true`

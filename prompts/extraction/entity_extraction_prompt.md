@@ -3,7 +3,7 @@
 **Purpose**: Extract government contracting entities and relationships from RFP documents  
 **Model**: xAI Grok-4-fast-reasoning (2M context window)  
 **Prompt Size**: ~5,593 tokens (0.28% of context window)  
-**Entity Types**: 17 specialized government contracting types  
+**Entity Types**: 18 specialized government contracting types  
 **Enhancements**:
 
 - Domain knowledge patterns (FAR/DFARS, UCF, Shipley, CDRL)
@@ -11,7 +11,182 @@
 - 8 decision rules for ambiguous cases (edge case handling)
 - Location-agnostic extraction (content over location)
 - **Efficient extraction** (entity_name + type-specific metadata - no text duplication)
-  **Last Updated**: November 25, 2025 (Branch 023a - Schema Cleanup)
+  **Last Updated**: November 26, 2025 (Branch 026 - Extraction Enhancements)
+
+---
+
+## ⚠️ CRITICAL: PERFORMANCE_METRIC vs REQUIREMENT DISTINCTION
+
+**This is the #1 extraction error. Read carefully before extracting!**
+
+### PERFORMANCE_METRIC = Measurable Standard (How performance is judged)
+
+**Trigger Phrases** - Extract as `performance_metric` when you see:
+
+- "Performance Objective (PO-X)" or "PO-1", "PO-2", etc.
+- "Performance Threshold:" or "Threshold:"
+- "Acceptable Quality Level (AQL)"
+- "Quality Assurance Surveillance Plan (QASP)"
+- "Method of Surveillance:"
+- Numerical standards: "99.9%", "Zero (0)", "No more than X", "At least Y%"
+- "per month", "per week", "per quarter" with a metric value
+
+**Structure Pattern**: Performance metrics often appear in tables with columns:
+
+- Requirement | Standard | Surveillance Method
+- Performance Objective | Threshold | Method of Surveillance
+
+### REQUIREMENT = Action/Obligation (What contractor must DO)
+
+**Trigger Phrases** - Extract as `requirement` when you see:
+
+- "Contractor shall...", "Contractor must...", "Contractor will..."
+- "The offeror shall...", "Personnel shall..."
+- Action verbs: provide, maintain, perform, deliver, ensure, implement
+
+### ⚡ SPLIT RULE: One Sentence → Two Entities
+
+**When a sentence contains BOTH an action AND a metric, extract TWO entities!**
+
+**Example Text:**
+
+> "The Contractor shall clean equipment daily with no more than 2 defects per month."
+
+**Extract as TWO entities:**
+
+```json
+{
+  "entities": [
+    {
+      "entity_name": "Daily Equipment Cleaning",
+      "entity_type": "requirement",
+      "description": "The Contractor shall clean equipment daily.",
+      "criticality": "MANDATORY",
+      "modal_verb": "shall"
+    },
+    {
+      "entity_name": "Equipment Cleaning Defect Threshold",
+      "entity_type": "performance_metric",
+      "description": "No more than 2 defects per month for equipment cleaning.",
+      "threshold": "No more than 2 defects per month",
+      "measurement_method": "Periodic Inspection (Monthly)"
+    }
+  ],
+  "relationships": [
+    {
+      "source_entity": "Daily Equipment Cleaning",
+      "target_entity": "Equipment Cleaning Defect Threshold",
+      "relationship_type": "MEASURED_BY",
+      "description": "Cleaning requirement performance is measured by defect threshold"
+    }
+  ]
+}
+```
+
+### Real QASP Table Example
+
+**Input Table:**
+| Performance Objective | Performance Threshold | Surveillance Method |
+|-----------------------|----------------------|---------------------|
+| PO-1: Escort Monitoring | Zero (0) discrepancies per month | Periodic Inspection (Monthly) |
+| PO-2: Equipment Availability | 95% operational per month | 100% Inspection |
+
+**Extract as `performance_metric` entities (NOT requirements):**
+
+```json
+{
+  "entities": [
+    {
+      "entity_name": "PO-1 Escort Monitoring Compliance",
+      "entity_type": "performance_metric",
+      "description": "PO-1: Escort Monitoring - Performance threshold for zero discrepancies in escort monitoring activities.",
+      "threshold": "Zero (0) discrepancies per month",
+      "measurement_method": "Periodic Inspection (Monthly)"
+    },
+    {
+      "entity_name": "PO-2 Equipment Availability Standard",
+      "entity_type": "performance_metric",
+      "description": "PO-2: Equipment Availability - Performance threshold requiring 95% equipment operational status.",
+      "threshold": "95% operational per month",
+      "measurement_method": "100% Inspection"
+    }
+  ]
+}
+```
+
+---
+
+## ⚠️ STRATEGIC_THEME Detection (Shipley Capture Intelligence)
+
+**Strategic themes are competitive intelligence extracted from RFP language. They reveal customer priorities and proposal positioning opportunities.**
+
+### Theme Types (ThemeType enum)
+
+1. **CUSTOMER_HOT_BUTTON**: Government's explicit emphasis or priority concern
+2. **DISCRIMINATOR**: Key differentiator between competitors
+3. **PROOF_POINT**: Evidence/past performance that validates capability
+4. **WIN_THEME**: Overarching proposal messaging/positioning
+
+### Detection Patterns
+
+**CUSTOMER_HOT_BUTTON Detection:**
+
+- "The Government places emphasis on..."
+- "Critical to mission success is..."
+- "Of paramount importance..."
+- Evaluation factor weighted >30% (signals priority)
+- "Key to success is..."
+- "Offerors must demonstrate..."
+- "Past performance demonstrating [X] is essential"
+- Repeated emphasis on specific capability areas
+
+**WIN_THEME / DISCRIMINATOR Detection:**
+
+- Unique capability requirements that favor specific approaches
+- Technology or methodology preferences stated in RFP
+- Emphasis on innovation, cost savings, or efficiency
+- References to lessons learned from previous contracts
+
+**Example Extractions:**
+
+**From Evaluation Criteria:**
+
+> "Past performance demonstrating successful base operations support in austere environments is critical to source selection."
+
+```json
+{
+  "entity_name": "Austere Environment Operations Experience",
+  "entity_type": "strategic_theme",
+  "description": "Past performance demonstrating successful base operations support in austere environments is critical to source selection.",
+  "theme_type": "CUSTOMER_HOT_BUTTON"
+}
+```
+
+**From PWS Emphasis:**
+
+> "The Government emphasizes the importance of cultural sensitivity when managing OCN/LN workforce in host nation environments."
+
+```json
+{
+  "entity_name": "Cultural Sensitivity in OCN/LN Management",
+  "entity_type": "strategic_theme",
+  "description": "Government emphasis on cultural sensitivity when managing OCN/LN workforce in host nation environments.",
+  "theme_type": "CUSTOMER_HOT_BUTTON"
+}
+```
+
+**From Weighted Factors:**
+
+> "Factor 1: Mission Support Capability (45%) - Most Important"
+
+```json
+{
+  "entity_name": "Mission Support Capability Priority",
+  "entity_type": "strategic_theme",
+  "description": "Mission Support Capability is weighted 45% and rated Most Important, indicating Government's top priority area.",
+  "theme_type": "CUSTOMER_HOT_BUTTON"
+}
+```
 
 ---
 

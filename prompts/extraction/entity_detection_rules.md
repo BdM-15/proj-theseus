@@ -2,7 +2,116 @@
 
 **Purpose**: Semantic-first entity extraction rules for federal RFPs  
 **Philosophy**: Content determines entity type, NOT section labels  
-**Usage**: Guide LLM during entity extraction in RAG-Anything processing
+**Usage**: Guide LLM during entity extraction in RAG-Anything processing  
+**Last Updated**: November 26, 2025 (Branch 026 - Extraction Enhancements)
+
+---
+
+## ⚠️ PRIORITY DETECTION: Performance Metrics (QASP/PO-X Patterns)
+
+**CRITICAL**: Performance Objectives and QASP metrics are commonly misclassified as requirements. Use these patterns to correctly identify `performance_metric` entities.
+
+### Trigger Phrases (Extract as `performance_metric`)
+
+| Pattern                                      | Example                             | Entity Type        |
+| -------------------------------------------- | ----------------------------------- | ------------------ |
+| Performance Objective (PO-X)                 | "PO-1: Escort Monitoring"           | performance_metric |
+| Performance Threshold:                       | "Threshold: Zero (0) discrepancies" | performance_metric |
+| Method of Surveillance:                      | "Surveillance: Periodic Inspection" | performance_metric |
+| Acceptable Quality Level (AQL)               | "AQL: 98% accuracy"                 | performance_metric |
+| QASP table entries                           | Any row from QASP table             | performance_metric |
+| Numerical standards with timeframe           | "99.9% uptime per month"            | performance_metric |
+| "No more than X per [timeframe]"             | "No more than 2 errors per week"    | performance_metric |
+| "At least X% [metric]"                       | "At least 95% operational"          | performance_metric |
+| "Zero (0) [violations/errors/discrepancies]" | "Zero security violations"          | performance_metric |
+
+### NOT Performance Metrics (Extract as `requirement`)
+
+| Pattern                      | Example                                 | Entity Type |
+| ---------------------------- | --------------------------------------- | ----------- |
+| Contractor shall [action]    | "Contractor shall clean daily"          | requirement |
+| Contractor must [action]     | "Contractor must provide reports"       | requirement |
+| Personnel shall [action]     | "Personnel shall complete training"     | requirement |
+| Action verbs without metrics | "Maintain equipment", "Provide support" | requirement |
+
+### Split Rule: Combined Sentences
+
+When a sentence contains BOTH action AND metric:
+
+**Input:** "Contractor shall provide 24/7 support with 99.9% uptime."
+
+**Output:**
+
+1. `requirement`: "24/7 Support Provision" (the action)
+2. `performance_metric`: "99.9% Uptime Standard" (the measurement)
+3. Relationship: requirement --MEASURED_BY--> performance_metric
+
+---
+
+## ⚠️ PRIORITY DETECTION: Strategic Themes (Shipley Capture Intelligence)
+
+**Purpose**: Extract competitive intelligence from RFP language that reveals customer priorities and proposal positioning opportunities.
+
+### Theme Type Classification
+
+| ThemeType           | Definition                                | Detection Signals                                                      |
+| ------------------- | ----------------------------------------- | ---------------------------------------------------------------------- |
+| CUSTOMER_HOT_BUTTON | Government's explicit priority or concern | "emphasizes", "critical to", "paramount", "essential", heavy weighting |
+| DISCRIMINATOR       | Key differentiator between competitors    | Unique requirements, specialized capabilities, innovation emphasis     |
+| PROOF_POINT         | Evidence validating capability            | Past performance references, certifications, demonstrated experience   |
+| WIN_THEME           | Overarching proposal positioning          | Alignment language, value proposition signals                          |
+
+### Customer Hot Button Detection Patterns
+
+**Explicit Emphasis Language:**
+
+- "The Government places emphasis on..."
+- "Critical to mission success..."
+- "Of paramount importance..."
+- "The Government's primary concern is..."
+- "Essential to successful performance..."
+- "Key to award decision..."
+
+**Weighting Signals (>30% = hot button):**
+
+- "Factor A (45%) - Most Important"
+- "Technical Approach weighted twice as important as price"
+- "Past Performance is significantly more important than cost"
+
+**Repeated Themes:**
+
+- Same capability mentioned 3+ times across different sections
+- Capability appears in both PWS and evaluation factors
+- Special emphasis sections (Section H) highlighting specific concerns
+
+### Strategic Theme Examples
+
+**From Evaluation Weighting:**
+
+```
+"Factor 1: Mission Readiness (50%) - Most Important"
+```
+
+→ Extract as: `strategic_theme` with `theme_type: "CUSTOMER_HOT_BUTTON"`
+→ Name: "Mission Readiness Priority"
+
+**From PWS Emphasis:**
+
+```
+"Cultural sensitivity in host nation operations is essential to contract success."
+```
+
+→ Extract as: `strategic_theme` with `theme_type: "CUSTOMER_HOT_BUTTON"`
+→ Name: "Host Nation Cultural Sensitivity"
+
+**From Past Performance Requirements:**
+
+```
+"Offerors must demonstrate relevant experience in austere environment operations."
+```
+
+→ Extract as: `strategic_theme` with `theme_type: "CUSTOMER_HOT_BUTTON"`  
+→ Name: "Austere Environment Experience Requirement"
 
 ---
 
@@ -31,16 +140,16 @@ section_origin = detect_section(context)  # Could be L, M, or custom
 
 Federal solicitations use standard lettered sections A-M. **Note**: Extract entities based on CONTENT, not just section labels.
 
-| Section       | Purpose                    | Common Entity Types                                  | Content Signals                                                                          |
-| ------------- | -------------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| **Section A** | Solicitation/Contract Form | section, organization, person, event                 | SF 1449, cover page, solicitation number, POCs, Q&A deadline                             |
-| **Section B** | Supplies/Services & Prices | section, concept, program                            | CLIN/SLIN structure, pricing tables, line items, unit prices                             |
-| **Section C** | Statement of Work          | section, statement_of_work, requirement, deliverable | "contractor shall", task descriptions, performance objectives, work scope                |
-| **Section H** | Special Requirements       | section, requirement, person, location               | Security clearances, key personnel, organizational conflicts, facility requirements      |
-| **Section I** | Contract Clauses           | section, clause                                      | FAR/DFARS citations, "52.###-##" patterns, "incorporated by reference"                   |
-| **Section J** | Attachments                | section, document, statement_of_work                 | "Attachment", "Annex", "Exhibit", "J-####", referenced documents                         |
-| **Section L** | Instructions to Offerors   | section, submission_instruction                      | Page limits, font requirements, "proposal shall", volume structure, submission deadlines |
-| **Section M** | Evaluation Factors         | section, evaluation_factor                           | "will be evaluated", factor hierarchy, relative importance, adjectival ratings           |
+| Section       | Purpose                    | Common Entity Types                                                      | Content Signals                                                                          |
+| ------------- | -------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| **Section A** | Solicitation/Contract Form | section, organization, person, event                                     | SF 1449, cover page, solicitation number, POCs, Q&A deadline                             |
+| **Section B** | Supplies/Services & Prices | section, concept, program                                                | CLIN/SLIN structure, pricing tables, line items, unit prices                             |
+| **Section C** | Statement of Work          | section, statement_of_work, requirement, deliverable, performance_metric | "contractor shall", task descriptions, performance objectives, QASP tables               |
+| **Section H** | Special Requirements       | section, requirement, person, location                                   | Security clearances, key personnel, organizational conflicts, facility requirements      |
+| **Section I** | Contract Clauses           | section, clause                                                          | FAR/DFARS citations, "52.###-##" patterns, "incorporated by reference"                   |
+| **Section J** | Attachments                | section, document, statement_of_work                                     | "Attachment", "Annex", "Exhibit", "J-####", referenced documents                         |
+| **Section L** | Instructions to Offerors   | section, submission_instruction                                          | Page limits, font requirements, "proposal shall", volume structure, submission deadlines |
+| **Section M** | Evaluation Factors         | section, evaluation_factor, strategic_theme                              | "will be evaluated", factor hierarchy, relative importance, adjectival ratings           |
 
 ### Non-Standard Label Mapping
 
@@ -981,53 +1090,89 @@ Capture entity_name, entity_type, and type-specific metadata (structural_label, 
 
 ## Entity Type 9: STRATEGIC_THEME
 
+**Purpose**: Extract competitive intelligence from RFP language that reveals customer priorities, evaluation emphasis, and proposal positioning opportunities. Based on Shipley Capture Management methodology.
+
 ### Type Classification
 
 #### CUSTOMER_HOT_BUTTON
 
-Agency priorities, pain points, mission pressures
+**Definition**: Agency priorities, pain points, or mission pressures explicitly or implicitly emphasized in the RFP.
 
-**Signals**:
+**Detection Signals**:
 
-- "critical", "essential", "priority"
-- "emphasize", "significant concern"
-- "mission-critical", "high-priority"
+- "critical", "essential", "priority", "paramount"
+- "emphasize", "significant concern", "of utmost importance"
+- "mission-critical", "high-priority", "key to success"
+- "The Government places emphasis on..."
+- Evaluation factors weighted >30%
+- Repeated mention across multiple sections
 
-**Examples**:
+**Real-World Examples**:
 
-- "Readiness is the Navy's top priority"
-- "Cybersecurity is a critical concern"
-- "Mission availability must be maintained"
+- "Readiness is the Navy's top priority" → Hot button: operational readiness
+- "Cybersecurity is a critical concern for this acquisition" → Hot button: security posture
+- "Mission availability must be maintained at all times" → Hot button: uptime/reliability
+- "Past performance demonstrating success in austere environments is essential" → Hot button: relevant experience
+- "Cultural sensitivity in host nation operations is paramount" → Hot button: cultural competence
+
+**Extraction Pattern**:
+
+```json
+{
+  "entity_name": "Austere Environment Operations Experience",
+  "entity_type": "strategic_theme",
+  "description": "Past performance demonstrating successful operations in austere/expeditionary environments is emphasized as essential to source selection.",
+  "theme_type": "CUSTOMER_HOT_BUTTON"
+}
+```
 
 #### DISCRIMINATOR
 
-Competitive advantages, unique capabilities
+**Definition**: Competitive advantages, unique capabilities, or differentiators that could set one offeror apart.
 
-**Examples**:
+**Detection Signals**:
+
+- Specialized requirements (unique certifications, rare capabilities)
+- Technology or methodology preferences in RFP
+- References to innovation or modernization
+- Incumbent-specific knowledge requirements
+- OEM partnerships or exclusive access requirements
+
+**Real-World Examples**:
 
 - "Only offeror with on-site repair facility"
-- "Proprietary predictive maintenance AI"
-- "Incumbent knowledge of legacy systems"
-- "Exclusive partnership with OEM"
+- "Proprietary predictive maintenance capability"
+- "Incumbent knowledge of legacy systems required"
+- "Exclusive OEM partnership for parts supply"
+- "Contractor must have existing FedRAMP High authorization"
 
 #### PROOF_POINT
 
-Evidence supporting competitive claims
+**Definition**: Evidence that validates capability claims or demonstrates past performance.
 
-**Examples**:
+**Detection Signals**:
 
-- "99.8% uptime on similar Navy contract"
-- "CPARS rating: Exceptional (all categories)"
-- "CMMI Level 3 certified organization"
-- "150 certified technicians on staff"
+- Specific past performance requirements
+- CPARS rating references
+- Certification requirements (CMMI, ISO, etc.)
+- Quantified experience (years, contract values, staff size)
+- Similar contract references
+
+**Real-World Examples**:
+
+- "99.8% uptime demonstrated on similar Navy contracts"
+- "CPARS rating: Exceptional in all categories required"
+- "CMMI Level 3 certification required"
+- "Minimum 5 years experience in base operations support"
+- "Three similar contracts valued at $50M+ in last 5 years"
 
 #### WIN_THEME
 
-Strategic messaging combining discriminator + proof + customer benefit
+**Definition**: Overarching strategic messaging combining discriminator + proof + customer benefit. Typically synthesized during capture, but RFP language may reveal positioning opportunities.
 
-**Structure**: THEME + DISCRIMINATOR + PROOF POINT + CUSTOMER BENEFIT
+**Structure**: THEME = DISCRIMINATOR + PROOF POINT → CUSTOMER BENEFIT
 
-**Example**:
+**Example Synthesis**:
 
 ```
 THEME: "Mission Readiness Through Predictive Maintenance"
@@ -1036,9 +1181,40 @@ PROOF POINT: "Reduced unscheduled downtime 40% on similar contract"
 CUSTOMER BENEFIT: "Ensures aircraft availability for critical missions"
 ```
 
+### Strategic Theme from Evaluation Factor Weighting
+
+**When evaluation factors reveal priorities, extract as strategic_theme:**
+
+**RFP Text:**
+
+> "Factor 1: Mission Support Capability (45%) - Most Important. The Government will evaluate the offeror's ability to provide uninterrupted mission support..."
+
+**Extract BOTH entities:**
+
+```json
+[
+  {
+    "entity_name": "Factor 1 Mission Support Capability",
+    "entity_type": "evaluation_factor",
+    "description": "Factor 1: Mission Support Capability (45%) - Most Important.",
+    "weight": "45%",
+    "importance": "Most Important"
+  },
+  {
+    "entity_name": "Mission Support Capability as Top Priority",
+    "entity_type": "strategic_theme",
+    "description": "Mission Support Capability is weighted 45% and rated Most Important, indicating this is the Government's primary concern for this acquisition.",
+    "theme_type": "CUSTOMER_HOT_BUTTON"
+  }
+]
+```
+
 ### Basic Attributes
 
-Capture entity_name, entity_type, and type-specific metadata (theme_type, customer_benefit). Theme classification (hot button/discriminator/proof point) and competitive context are advanced analysis best performed during query-time.
+- `entity_name`: Descriptive name of the theme
+- `entity_type`: strategic_theme
+- `description`: Full context from RFP showing the emphasis
+- `theme_type`: CUSTOMER_HOT_BUTTON, DISCRIMINATOR, PROOF_POINT, or WIN_THEME
 
 ---
 

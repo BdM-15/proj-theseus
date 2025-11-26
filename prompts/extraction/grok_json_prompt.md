@@ -4,6 +4,67 @@
 **Goal**: Extract structured intelligence from the provided RFP text into a strict JSON format.
 **Model**: xAI Grok-4-fast-reasoning
 **Output**: A single JSON object adhering to the `ExtractionResult` schema.
+**Last Updated**: November 26, 2025 (Branch 026 - Extraction Enhancements)
+
+---
+
+## ⚠️ CRITICAL: PERFORMANCE_METRIC vs REQUIREMENT (Priority #1)
+
+**This is the #1 extraction error. Read carefully before extracting!**
+
+### PERFORMANCE_METRIC = Measurable Standard (How performance is judged)
+
+**Trigger Phrases** - Extract as `performance_metric` when you see:
+
+- "Performance Objective (PO-X)" or "PO-1", "PO-2", etc.
+- "Performance Threshold:" or "Threshold:"
+- "Acceptable Quality Level (AQL)"
+- "Quality Assurance Surveillance Plan (QASP)"
+- "Method of Surveillance:"
+- Numerical standards: "99.9%", "Zero (0)", "No more than X", "At least Y%"
+- "per month", "per week", "per quarter" with a metric value
+
+### REQUIREMENT = Action/Obligation (What contractor must DO)
+
+**Trigger Phrases** - Extract as `requirement` when you see:
+
+- "Contractor shall...", "Contractor must...", "Contractor will..."
+- Action verbs: provide, maintain, perform, deliver, ensure, implement
+
+### ⚡ SPLIT RULE: One Sentence → Two Entities
+
+When a sentence contains BOTH an action AND a metric, extract TWO entities!
+
+**Example**: "Contractor shall clean equipment daily with no more than 2 defects per month."
+
+- Entity 1 (`requirement`): "Daily Equipment Cleaning"
+- Entity 2 (`performance_metric`): "Equipment Cleaning Defect Threshold" with threshold "No more than 2 defects per month"
+- Relationship: requirement --MEASURED_BY--> performance_metric
+
+---
+
+## ⚠️ STRATEGIC_THEME Detection (Shipley Capture Intelligence)
+
+Extract strategic themes when you see customer priorities or emphasis:
+
+**CUSTOMER_HOT_BUTTON Detection:**
+
+- "The Government places emphasis on..."
+- "Critical to mission success..."
+- "Of paramount importance..."
+- Evaluation factors weighted >30%
+- Repeated emphasis across sections
+
+**Example**:
+
+```json
+{
+  "entity_name": "Mission Readiness Priority",
+  "entity_type": "strategic_theme",
+  "description": "Mission Support Capability is weighted 45% and rated Most Important.",
+  "theme_type": "CUSTOMER_HOT_BUTTON"
+}
+```
 
 ---
 
@@ -148,13 +209,31 @@ You must apply these advanced government contracting rules to your extraction lo
 - **OPTIONAL**: "Contractor may" -> `criticality: "OPTIONAL"`.
 - **INFORMATIONAL**: "Government shall" -> Extract as `concept` (not a requirement).
 
-### C. QASP Separation (Requirement vs Metric)
+### Rule C: QASP Separation (Requirement vs Metric) - CRITICAL
+
+**This is the most common extraction error!**
 
 - If text says: "Contractor shall clean daily with 95% accuracy."
 - Extract TWO entities:
-  1. `requirement`: "Daily cleaning" (The Work).
-  2. `performance_metric`: "95% accuracy" (The Standard).
+  1. `requirement`: "Daily cleaning" (The Work/Action).
+  2. `performance_metric`: "95% accuracy" (The Standard/Threshold).
 - Link them with a `MEASURED_BY` relationship.
+
+**QASP Table Detection** - When you see tables with columns like:
+
+- "Performance Objective | Performance Threshold | Surveillance Method"
+- "PO-1 | Zero (0) discrepancies | Periodic Inspection"
+
+Extract EACH ROW as a `performance_metric` entity (NOT as requirements):
+
+```json
+{
+  "entity_name": "PO-1 Escort Monitoring Compliance",
+  "entity_type": "performance_metric",
+  "threshold": "Zero (0) discrepancies per month",
+  "measurement_method": "Periodic Inspection (Monthly)"
+}
+```
 
 ### D. Section L <-> M Mapping (The "Golden Thread")
 
