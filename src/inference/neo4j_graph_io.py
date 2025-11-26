@@ -352,8 +352,6 @@ class Neo4jGraphIO:
         UNWIND $entities AS entity
         MERGE (n:`{self.workspace}` {{entity_name: entity.entity_name}})
         SET n.entity_type = entity.entity_type,
-            n.description = entity.description,
-            n.source_text = entity.source_text,
             n.created_by = 'json_extractor',
             n.created_at = datetime()
         
@@ -410,7 +408,7 @@ class Neo4jGraphIO:
         MATCH (source:`{self.workspace}` {{entity_name: rel.source_entity}})
         MATCH (target:`{self.workspace}` {{entity_name: rel.target_entity}})
         CALL apoc.create.relationship(source, rel.relationship_type, {{
-            description: rel.description,
+            description: rel.relationship_type,
             source: 'json_extractor',
             created_at: datetime()
         }}, target) YIELD rel as r

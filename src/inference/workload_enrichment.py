@@ -123,12 +123,13 @@ async def enrich_workload_metadata(
         # Initialize batch update list
         property_updates = []
         
-        # Build entity lookup by elementId (same pattern as other algorithms)
-        id_to_entity = {req['id']: req for req in batch}
+        # Build entity lookup by INDEX (LLM returns results in order)
+        # Using index is more reliable than asking LLM to echo complex Neo4j element IDs
+        index_to_entity = {idx: req for idx, req in enumerate(batch)}
         
         # Build entity JSON with RAW TEXT from chunks
         batch_data = []
-        for req in batch:
+        for idx, req in enumerate(batch):
             # Resolve raw text from chunks
             raw_text = ""
             source_ids = req.get('source_id', '')
@@ -153,7 +154,7 @@ async def enrich_workload_metadata(
             display_text = raw_text[:100000] + "..." if len(raw_text) > 100000 else raw_text
 
             batch_data.append({
-                'id': req['id'],
+                'index': idx,  # Use simple index instead of complex Neo4j element ID
                 'name': req.get('entity_name', 'Unnamed'),
                 'type': 'requirement',
                 'text_content': display_text 
@@ -178,13 +179,13 @@ Analyze all {len(batch)} requirements above and return a JSON array with workloa
 
 **CRITICAL INSTRUCTIONS:**
 1. Return ONLY the JSON array - no markdown code blocks, no explanations, no additional text
-2. Use the EXACT 'id' field from the JSON above for each "entity_id" field in your response
-3. The 'id' field contains the Neo4j element ID - copy it exactly as shown
+2. Use the EXACT 'index' field from the JSON above for each "entity_index" field in your response
+3. Return results in the SAME ORDER as the input (index 0, 1, 2, ...)
 
 Return JSON array with {len(batch)} objects (one per requirement above):
 [
   {{
-    "entity_id": "COPY_EXACT_ID_FROM_JSON_ABOVE",
+    "entity_index": 0,
     "has_workload_metric": true,
     "workload_categories": ["Labor", "Materials"],
     "boe_relevance": {{"Labor": 0.95, "Materials": 0.80}},
@@ -221,15 +222,19 @@ Return JSON array with {len(batch)} objects (one per requirement above):
             
             # Update Neo4j with enrichment data
             for enrichment in enrichments:
-                entity_id = enrichment.get('entity_id')
-                if not entity_id:
-                    logger.warning("  Enrichment missing entity_id, skipping")
+                entity_index = enrichment.get('entity_index')
+                if entity_index is None:
+                    logger.warning("  Enrichment missing entity_index, skipping")
                     continue
                 
-                # Validate entity_id exists in our batch (using id_to_entity lookup)
-                if entity_id not in id_to_entity:
-                    logger.warning(f"  Invalid entity_id '{entity_id}' not in batch, skipping")
+                # Validate entity_index exists in our batch
+                if entity_index not in index_to_entity:
+                    logger.warning(f"  Invalid entity_index '{entity_index}' not in batch (0-{len(batch)-1}), skipping")
                     continue
+                
+                # Get the actual entity and its Neo4j element ID
+                entity = index_to_entity[entity_index]
+                entity_id = entity['id']  # The real Neo4j element ID
                 
                 # Validate BOE categories
                 categories = enrichment.get('workload_categories', [])
@@ -257,7 +262,7 @@ Return JSON array with {len(batch)} objects (one per requirement above):
                 
                 # Add to batch update list
                 property_updates.append({
-                    'id': entity_id,  # entity_id IS the elementId (from LLM response)
+                    'id': entity_id,  # Neo4j element ID from our index_to_entity lookup
                     'properties': properties
                 })
                 enriched_count += 1
