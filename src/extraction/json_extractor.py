@@ -1,31 +1,64 @@
+"""
+Entity extraction using Instructor library with xAI Grok.
+
+Issue #6: Migrated from OpenAI SDK to Instructor for:
+- Native Pydantic validation (no manual JSON parsing)
+- Automatic retry with exponential backoff
+- Better error recovery on truncated responses
+
+DESIGN PRINCIPLE: GRACEFUL TOLERANCE (2-3% error rate acceptable)
+- Retry aggressively (up to 5 attempts with backoffs)
+- Log failures clearly but continue processing (like table extraction tolerance)
+- Track failed chunks for visibility and potential batch retry
+- Return empty result on failure to allow pipeline to continue
+- The orchestrator can check failed_chunks at end of processing
+"""
+
 import os
 import json
 import logging
-from typing import Optional, Dict, Any
-from xai_sdk import AsyncClient
-from xai_sdk.chat import system, user
+import asyncio
+from typing import Optional, Dict, Any, List
+
+import instructor
+from tenacity import retry, stop_after_attempt, wait_exponential, before_log, after_log
+from pydantic import ValidationError
+
 from src.ontology.schema import ExtractionResult
 from src.utils.logging_config import log_graceful_failure
 
 logger = logging.getLogger(__name__)
 
+
 class JsonExtractor:
     def __init__(self):
         self.api_key = os.getenv("LLM_BINDING_API_KEY")
         self.model = os.getenv("EXTRACTION_LLM_NAME", "grok-4-fast-reasoning")
-        self.max_output_tokens = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "524288"))
+        # More aggressive retry count - data preservation is critical
+        self.max_retries = int(os.getenv("LLM_MAX_RETRIES", "5"))
         
         if not self.api_key:
-            # Fallback for development/testing if env var not set, though it should be
             logger.warning("LLM_BINDING_API_KEY not found, checking XAI_API_KEY")
             self.api_key = os.getenv("XAI_API_KEY")
             
         if not self.api_key:
-             raise ValueError("LLM_BINDING_API_KEY or XAI_API_KEY not found in environment variables")
+            raise ValueError("LLM_BINDING_API_KEY or XAI_API_KEY not found in environment variables")
 
-        # Initialize native xAI SDK client (gRPC-based, more reliable than OpenAI HTTP wrapper)
-        # The xAI SDK uses XAI_API_KEY env var by default, but we pass explicitly for clarity
-        self.client = AsyncClient(api_key=self.api_key)
+        # Set XAI_API_KEY for instructor's from_provider
+        os.environ["XAI_API_KEY"] = self.api_key
+        
+        # Initialize instructor with xAI provider (handles retries, validation, etc.)
+        # async_client=True for async support
+        self.client = instructor.from_provider(
+            f"xai/{self.model}",
+            async_client=True
+        )
+        
+        # Track failed chunks for potential later recovery
+        self.failed_chunks: List[dict] = []
+        self._successful_extractions: int = 0  # For failure rate calculation
+        
+        logger.info(f"Initialized Instructor client with xAI model: {self.model}, max_retries: {self.max_retries}")
         
         self.system_prompt = self._load_full_system_prompt()
 
@@ -108,149 +141,181 @@ Output the result strictly as a JSON object matching the schema defined in the f
         logger.info(f"Constructed system prompt with {len(full_prompt)} characters (~{len(full_prompt)//4} tokens)")
         return full_prompt
 
-    async def extract(self, text: str) -> ExtractionResult:
+    async def extract(self, text: str, chunk_id: str = "unknown") -> ExtractionResult:
         """
-        Extracts entities from the given text using Grok 4 in JSON mode.
-        Returns empty result on malformed JSON to allow graceful continuation.
+        Extracts entities from the given text using Instructor + xAI Grok.
+        
+        Uses automatic retry with exponential backoff for resilience against
+        API truncation/instability issues.
+        
+        GRACEFUL TOLERANCE: On failure after retries, logs warning and returns
+        empty result. Failed chunks are tracked in self.failed_chunks for
+        visibility and potential batch retry. This allows 2-3% error tolerance
+        like our table extraction pipeline.
+        
+        Args:
+            text: The text chunk to extract entities from
+            chunk_id: Identifier for logging/tracking (e.g., "chunk-0", "page-5")
+        
+        Returns:
+            ExtractionResult with entities/relationships, or empty result on failure
         """
+        token_count = 0
         try:
             # Log chunk size for debugging
             import tiktoken
             tokenizer = tiktoken.get_encoding("cl100k_base")
             token_count = len(tokenizer.encode(text))
-            logger.info(f"Sending extraction request to {self.model} via xAI SDK (Length: {len(text)} chars, ~{token_count} tokens)")
+            logger.info(f"📤 [{chunk_id}] Extraction request to {self.model} ({len(text)} chars, ~{token_count} tokens)")
             
-            # Use native xAI SDK (gRPC-based) instead of OpenAI HTTP wrapper
-            # This should be more reliable for large JSON responses
-            chat = self.client.chat.create(
-                model=self.model,
-                messages=[system(self.system_prompt)]
-            )
-            chat.append(user(text))
+            # Use instructor with built-in retry mechanism
+            result = await self._extract_with_retry(text, chunk_id)
             
-            # Sample the response (non-streaming, complete response)
-            response = await chat.sample()
-            content = response.content
+            # Post-process: rescue entities with partial data
+            result = self._rescue_partial_entities(result, chunk_id)
             
-            if not content:
-                raise ValueError("Empty response from LLM")
-
-            # Parse JSON with error handling for malformed responses
-            try:
-                data = json.loads(content)
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse JSON response: {e}")
-                logger.error(f"Response preview (first 500 chars): {content[:500]}")
-                
-                # Try to extract JSON from markdown code blocks if present
-                if "```json" in content:
-                    logger.info("Attempting to extract JSON from markdown code block...")
-                    import re
-                    json_match = re.search(r'```json\s*(.*?)\s*```', content, re.DOTALL)
-                    if json_match:
-                        content = json_match.group(1)
-                        data = json.loads(content)
-                    else:
-                        logger.warning(f"⚠️ Malformed JSON - skipping chunk and continuing")
-                        return ExtractionResult(entities=[], relationships=[])
-                else:
-                    logger.warning(f"⚠️ Malformed JSON - skipping chunk and continuing")
-                    return ExtractionResult(entities=[], relationships=[])
-            
-            # Pre-validate and clean relationships before Pydantic validation
-            # Handle both old format (strings) and new format (entity objects)
-            if "relationships" in data:
-                cleaned_relationships = []
-                for i, rel in enumerate(data["relationships"]):
-                    # Handle both string and dict formats for backwards compatibility
-                    source = rel.get("source_entity") if isinstance(rel, dict) else None
-                    target = rel.get("target_entity") if isinstance(rel, dict) else None
-                    
-                    # Skip if not a dict at all
-                    if not isinstance(rel, dict):
-                        logger.warning(f"⚠️ Relationship #{i} is not a dict, skipping: {rel}")
-                        continue
-                    
-                    # Convert string format to dict format if needed
-                    if isinstance(source, str):
-                        source = {"entity_name": source, "entity_type": "unknown"}
-                        rel["source_entity"] = source
-                    if isinstance(target, str):
-                        target = {"entity_name": target, "entity_type": "unknown"}
-                        rel["target_entity"] = target
-                    
-                    # Validate we have entity objects now
-                    if not isinstance(source, dict) or not source.get("entity_name"):
-                        logger.warning(f"⚠️ Relationship #{i} missing valid 'source_entity', skipping: {rel}")
-                        continue
-                    if not isinstance(target, dict) or not target.get("entity_name"):
-                        logger.warning(f"⚠️ Relationship #{i} missing valid 'target_entity', skipping: {rel}")
-                        continue
-                    if not rel.get("relationship_type"):
-                        logger.warning(f"⚠️ Relationship #{i} missing 'relationship_type', skipping: {rel}")
-                        continue
-                    
-                    cleaned_relationships.append(rel)
-                
-                skipped_count = len(data["relationships"]) - len(cleaned_relationships)
-                if skipped_count > 0:
-                    logger.warning(f"⚠️ Skipped {skipped_count} malformed relationships (total: {len(data['relationships'])})")
-                
-                data["relationships"] = cleaned_relationships
-            
-            # Validate against Pydantic Schema
-            # This ensures the output strictly adheres to our ontology
-            result = ExtractionResult(**data)
-            
-            # CRITICAL: Rescue entities with partial data instead of dropping them
-            # We want to capture ALL potential intelligence, even if imperfect.
-            # source_text is the ONLY content field - no description field exists anymore
-            valid_entities = []
-            for e in result.entities:
-                # Case 1: Missing source_text (REQUIRED field) -> Try to rescue from entity_name
-                if not e.source_text or not e.source_text.strip():
-                    if e.entity_name and e.entity_name.strip():
-                        # Use entity name as source_text (last resort)
-                        e.source_text = e.entity_name
-                        logger.info(f"🔧 Rescued entity using entity_name as source_text: '{e.entity_name}'")
-                    else:
-                        # Truly empty -> Garbage
-                        logger.warning(f"⚠️ Dropping empty entity (no source_text or name): {e}")
-                        continue
-
-                # Case 2: Missing Name -> Generate from source_text
-                if not e.entity_name or not e.entity_name.strip():
-                    snippet = e.source_text[:50].strip() + "..." if len(e.source_text) > 50 else e.source_text
-                    e.entity_name = f"[{e.entity_type.upper()}] {snippet}"
-                    logger.info(f"🔧 Rescued entity with missing name from source_text: '{e.entity_name}'")
-
-                valid_entities.append(e)
-            
-            result.entities = valid_entities
-            
-            logger.info(f"Successfully extracted {len(result.entities)} entities")
+            logger.info(f"✅ [{chunk_id}] Extracted {len(result.entities)} entities, {len(result.relationships)} relationships")
             return result
             
         except Exception as e:
-            logger.error(f"❌ Unexpected error during extraction: {e}")
-            logger.error(f"Returning empty result to allow processing to continue")
+            # GRACEFUL FAILURE: Log, track, and continue (like table extraction tolerance)
+            self.failed_chunks.append({
+                "chunk_id": chunk_id,
+                "text": text,
+                "text_length": len(text),
+                "token_count": token_count,
+                "error": str(e),
+                "error_type": type(e).__name__
+            })
+            
+            # Calculate failure rate for visibility
+            total_attempts = len(self.failed_chunks) + self._successful_extractions
+            failure_rate = len(self.failed_chunks) / max(total_attempts, 1) * 100
+            
+            log_graceful_failure(
+                logger, 
+                "Entity extraction", 
+                e, 
+                f"{chunk_id}, {len(text)} chars, failure rate: {failure_rate:.1f}%"
+            )
+            
+            # Return empty result - pipeline continues (2-3% tolerance acceptable)
             return ExtractionResult(entities=[], relationships=[])
 
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse JSON response: {e}")
-            logger.debug(f"Raw content: {content}")
-            raise
-        except Exception as e:
-            logger.error(f"Extraction failed: {str(e)}")
-            raise
-    
+    async def _extract_with_retry(self, text: str, chunk_id: str = "unknown") -> ExtractionResult:
+        """
+        Internal extraction method with manual retry logic.
+        
+        Retries up to max_retries times with exponential backoff (5s, 15s, 45s, 135s delays)
+        on any exception (API errors, truncation, validation failures).
+        """
+        max_attempts = self.max_retries
+        last_error = None
+        
+        for attempt in range(1, max_attempts + 1):
+            try:
+                logger.info(f"🔄 [{chunk_id}] Extraction attempt {attempt}/{max_attempts}")
+                
+                result = await self.client.chat.completions.create(
+                    model=self.model,
+                    response_model=ExtractionResult,
+                    max_retries=2,  # Instructor's internal retry for validation errors
+                    messages=[
+                        {"role": "system", "content": self.system_prompt},
+                        {"role": "user", "content": text}
+                    ],
+                    temperature=0.1,
+                )
+                
+                # Success! Track it for failure rate calculation
+                self._successful_extractions += 1
+                return result
+                
+            except Exception as e:
+                last_error = e
+                logger.warning(f"⚠️ [{chunk_id}] Attempt {attempt}/{max_attempts} failed: {type(e).__name__}: {str(e)[:200]}")
+                
+                if attempt < max_attempts:
+                    # Exponential backoff: 5s, 15s, 45s, 135s
+                    delay = 5 * (3 ** (attempt - 1))
+                    logger.info(f"⏳ [{chunk_id}] Retrying in {delay} seconds...")
+                    await asyncio.sleep(delay)
+        
+        # All attempts failed - raise to let extract() handle gracefully
+        logger.error(f"❌ [{chunk_id}] All {max_attempts} attempts exhausted")
+        raise last_error
+
+    def _rescue_partial_entities(self, result: ExtractionResult, chunk_id: str = "unknown") -> ExtractionResult:
+        """
+        Rescue entities with partial data instead of dropping them.
+        We want to capture ALL potential intelligence, even if imperfect.
+        """
+        valid_entities = []
+        rescued_count = 0
+        dropped_count = 0
+        
+        for e in result.entities:
+            # Validate entity has required fields (entity_name and entity_type)
+            if not e.entity_name or not e.entity_name.strip():
+                dropped_count += 1
+                logger.debug(f"⚠️ [{chunk_id}] Dropping entity with missing name")
+                continue
+
+            if not e.entity_type or not e.entity_type.strip():
+                dropped_count += 1
+                logger.debug(f"⚠️ [{chunk_id}] Dropping entity with missing type: {e.entity_name}")
+                continue
+
+            valid_entities.append(e)
+        
+        if rescued_count > 0 or dropped_count > 0:
+            logger.info(f"🔧 [{chunk_id}] Entity rescue: {rescued_count} rescued, {dropped_count} dropped (unrecoverable)")
+        
+        result.entities = valid_entities
+        return result
+
+    def get_extraction_stats(self) -> dict:
+        """
+        Get extraction statistics for monitoring and reporting.
+        
+        Returns:
+            dict with success count, failure count, failure rate, and failed chunk details
+        """
+        total = self._successful_extractions + len(self.failed_chunks)
+        failure_rate = len(self.failed_chunks) / max(total, 1) * 100
+        
+        return {
+            "successful_extractions": self._successful_extractions,
+            "failed_extractions": len(self.failed_chunks),
+            "total_attempts": total,
+            "failure_rate_percent": round(failure_rate, 2),
+            "acceptable": failure_rate <= 3.0,  # 3% tolerance threshold
+            "failed_chunks": [
+                {
+                    "chunk_id": fc["chunk_id"],
+                    "text_length": fc["text_length"],
+                    "token_count": fc["token_count"],
+                    "error_type": fc["error_type"],
+                    "error": fc["error"][:200]  # Truncate error message
+                }
+                for fc in self.failed_chunks
+            ]
+        }
+
+    def get_failed_chunks_for_retry(self) -> List[dict]:
+        """
+        Get full text of failed chunks for potential batch retry.
+        
+        Use this at end of processing to attempt re-extraction of failed chunks
+        (perhaps with a different model or after API stabilizes).
+        """
+        return self.failed_chunks.copy()
+
     async def extract_from_text(self, text: str, chunk_id: str) -> ExtractionResult:
         """
         Extract entities from arbitrary text using govcon ontology.
         
         Used by modal processors (tables, images) to analyze converted descriptions.
-        This method applies the SAME ontology extraction as text processing,
-        ensuring consistent entity types and relationships.
         
         Args:
             text: Text to extract entities from (e.g., table description)
@@ -277,57 +342,7 @@ Extract all relevant entities following the government contracting ontology:
 Return structured JSON using the ExtractionResult schema."""
 
         try:
-            # Use native xAI SDK (gRPC-based) for table/image extraction
-            chat = self.client.chat.create(
-                model=self.model,
-                messages=[system(self.system_prompt)]
-            )
-            chat.append(user(user_prompt))
-            
-            response = await chat.sample()
-            content = response.content
-            
-            # Parse JSON (with markdown extraction if needed)
-            if "```json" in content:
-                import re
-                json_match = re.search(r'```json\s*(.*?)\s*```', content, re.DOTALL)
-                if json_match:
-                    content = json_match.group(1)
-            
-            data = json.loads(content)
-            
-            # Clean relationships (same as extract_entities_and_relationships)
-            if "relationships" in data:
-                cleaned_relationships = []
-                for i, rel in enumerate(data["relationships"]):
-                    source = rel.get("source_entity") if isinstance(rel, dict) else None
-                    target = rel.get("target_entity") if isinstance(rel, dict) else None
-                    
-                    if not isinstance(rel, dict):
-                        continue
-                    
-                    # Convert string format to dict format if needed
-                    if isinstance(source, str):
-                        source = {"entity_name": source, "entity_type": "unknown"}
-                        rel["source_entity"] = source
-                    if isinstance(target, str):
-                        target = {"entity_name": target, "entity_type": "unknown"}
-                        rel["target_entity"] = target
-                    
-                    # Validate
-                    if not isinstance(source, dict) or not source.get("entity_name"):
-                        continue
-                    if not isinstance(target, dict) or not target.get("entity_name"):
-                        continue
-                    if not rel.get("relationship_type"):
-                        continue
-                    
-                    cleaned_relationships.append(rel)
-                
-                data["relationships"] = cleaned_relationships
-            
-            # Validate against Pydantic schema
-            result = ExtractionResult(**data)
+            result = await self._extract_with_retry(user_prompt)
             
             logger.info(
                 f"📝 Extracted from text ({chunk_id}): "

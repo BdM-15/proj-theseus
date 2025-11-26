@@ -190,13 +190,18 @@ Focus on workload drivers and basis of estimate elements.
         content_type: str,
         modal_content: Dict[str, Any]
     ) -> Tuple[str, Dict[str, Any]]:
-        """Format extraction results for RAG-Anything's pipeline."""
+        """Format extraction results for RAG-Anything's pipeline.
         
-        # Create description from extracted entities
+        Note: We only output entity_type and entity_name. The verbatim source
+        text is already preserved in the chunk - no need to duplicate it.
+        """
+        
+        # Create description from extracted entities (type: name format)
+        # This becomes the "Analysis:" section appended to the chunk
         entity_summaries = []
         for entity in extraction_result.entities:
             entity_summaries.append(
-                f"{entity.entity_type}: {entity.entity_name} - {entity.description}"
+                f"{entity.entity_type}: {entity.entity_name}"
             )
         
         description = "\n".join(entity_summaries) if entity_summaries else f"No govcon entities found in {content_type}"
@@ -208,19 +213,18 @@ Focus on workload drivers and basis of estimate elements.
             "entity_type": f"govcon_{content_type}",
             "summary": description,
             # Preserve our extraction results for downstream use
+            # source_text is empty - verbatim text is in the chunk
             "govcon_entities": [
                 {
                     "name": e.entity_name,
-                    "type": e.entity_type,
-                    "description": e.description
+                    "type": e.entity_type
                 } for e in extraction_result.entities
             ],
             "govcon_relationships": [
                 {
                     "source": r.source_entity.entity_name,
                     "target": r.target_entity.entity_name,
-                    "type": r.relationship_type,
-                    "description": r.description
+                    "type": r.relationship_type
                 } for r in extraction_result.relationships
             ]
         }

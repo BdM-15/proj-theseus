@@ -319,7 +319,7 @@ async def process_document_with_semantic_inference(
                 custom_kg["entities"].append({
                     "entity_name": entity.entity_name,
                     "entity_type": entity.entity_type,
-                    "description": entity.description,
+                    "description": entity.entity_name,  # Use entity_name for embedding - full text is in chunks
                     "source_id": doc_id,
                     "file_path": file_path
                 })
@@ -329,7 +329,7 @@ async def process_document_with_semantic_inference(
                 custom_kg["relationships"].append({
                     "src_id": rel.source_entity.entity_name,
                     "tgt_id": rel.target_entity.entity_name,
-                    "description": rel.description,
+                    "description": rel.relationship_type,  # Use relationship_type as description
                     "keywords": rel.relationship_type,
                     "weight": 1.0,
                     "source_id": doc_id

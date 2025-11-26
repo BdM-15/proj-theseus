@@ -185,7 +185,7 @@ See Attachment J-0200000-18 for Performance Work Statement.
 
 ### Basic Attributes
 
-Capture entity_name, entity_type, and description. Additional structured metadata (factor_id, relative_importance, subfactors) can be enriched during query-time operations.
+Capture entity_name, entity_type, and type-specific metadata (factor_id, relative_importance, subfactors). Additional structured metadata can be enriched during query-time operations.
 
 ### Examples from Real RFPs
 
@@ -209,7 +209,6 @@ subfactors:
 {
   "entity_name": "Factor 2: Maintenance Approach",
   "entity_type": "evaluation_factor",
-  "description": "Evaluation of offeror's maintenance approach including staffing, philosophy, and transition (Factor M2)",
   "importance": "Most Important",
   "subfactors": [
     "M2.1 Staffing Plan",
@@ -236,7 +235,6 @@ Technical Merit (100 points)
 {
   "entity_name": "Technical Merit",
   "entity_type": "evaluation_factor",
-  "description": "Point-scored evaluation of technical solution quality found in Selection Criteria",
   "weight": "100 points",
   "subfactors": [
     "Understanding (40pt)",
@@ -303,7 +301,7 @@ SUBMISSION_INSTRUCTION "Technical Volume Format" → GUIDES → EVALUATION_FACTO
 
 ### Basic Attributes
 
-Capture entity_name, entity_type, and description. Additional structured metadata (page_limits, format_requirements, deadlines) can be enriched during query-time operations.
+Capture entity_name, entity_type, and type-specific metadata (page_limits, format_requirements, deadlines). Additional structured metadata can be enriched during query-time operations.
 
 ### Examples from Real RFPs
 
@@ -324,7 +322,6 @@ Contracting.Officer@navy.mil by March 15, 2025, 2:00 PM EST.
 {
   "entity_name": "Technical Volume Submission Requirements",
   "entity_type": "submission_instruction",
-  "description": "Submission requirements for Technical Volume including page limits and format. Guides Factors M1-M3. Deadline: 2025-03-15.",
   "page_limit": "25 pages maximum",
   "format_reqs": "12pt Times New Roman, 1-inch margins, single-spaced, PDF format",
   "volume": "Technical Volume"
@@ -465,7 +462,7 @@ organizational chart, resumes for key personnel, and project schedule.
 
 ### Basic Attributes
 
-Capture entity_name, entity_type, and description. Requirement criticality (SHALL/SHOULD/MAY) and modal verb context can be enriched during query-time operations.
+Capture entity_name, entity_type, and type-specific metadata (criticality, modal_verb, labor_drivers). Requirement criticality (SHALL/SHOULD/MAY) and modal verb context can be enriched during query-time operations.
 
 ### Examples from Real RFPs
 
@@ -484,7 +481,6 @@ The Contractor shall provide Tier 1 and Tier 2 help desk support
 {
   "entity_name": "24/7 Help Desk Support Requirement",
   "entity_type": "requirement",
-  "description": "Contractor shall provide Tier 1 and Tier 2 help desk support 24 hours per day, 7 days per week. (Source: Section C.3.1.2)",
   "req_type": "FUNCTIONAL",
   "criticality": "MANDATORY",
   "modal_verb": "shall",
@@ -507,8 +503,7 @@ contractor personnel working on-site.
 ```json
 {
   "entity_name": "Government-Furnished Office Space",
-  "entity_type": "concept",
-  "description": "Government will provide office space and desktop computers for contractor personnel. (Source: Section C.3.2.1)"
+  "entity_type": "concept"
 }
 ```
 
@@ -527,7 +522,6 @@ The system should maintain 99.9% uptime during business hours
 {
   "entity_name": "99.9% Uptime SLA",
   "entity_type": "requirement",
-  "description": "The system should maintain 99.9% uptime during business hours (6 AM - 6 PM EST). (Source: Section C.3.3.1)",
   "req_type": "PERFORMANCE",
   "criticality": "IMPORTANT",
   "modal_verb": "should",
@@ -585,7 +579,7 @@ PROGRAM → CONTAINS → DELIVERABLE (program expects deliverables)
 
 ### Basic Attributes
 
-Capture entity_name, entity_type, and description. Program acronyms and scope details can be enriched during query-time operations.
+Capture entity_name, entity_type, and type-specific metadata (acronym, scope). Program acronyms and scope details can be enriched during query-time operations.
 
 ### Example from Navy MBOS RFP
 
@@ -605,8 +599,7 @@ maintenance for ground support equipment at Naval Air Station (NAS) locations...
 ```json
 {
   "entity_name": "Navy Mobile Bay Organic Support",
-  "entity_type": "program",
-  "description": "Navy Mobile Bay Organic Support (Navy MBOS) program provides organic maintenance for ground support equipment at Naval Air Station (NAS) locations. (Source: Section C.1.0)"
+  "entity_type": "program"
 }
 ```
 
@@ -676,7 +669,7 @@ The entity type `STATEMENT_OF_WORK` represents **ANY** of these three formats:
 
 ### Basic Attributes
 
-Capture entity_name, entity_type, and description. Work statement location and task structure can be enriched during query-time operations.
+Capture entity_name, entity_type, and type-specific metadata (work_type, location, performance_standards). Work statement location and task structure can be enriched during query-time operations.
 
 ### Examples from Real RFPs
 
@@ -703,7 +696,6 @@ Performance shall be measured monthly against these standards.
 {
   "entity_name": "Maintenance Services PWS",
   "entity_type": "statement_of_work",
-  "description": "Performance Work Statement for maintenance services including availability and fix rate standards. Located in Attachment J-0200000-18.",
   "work_type": "PWS",
   "location": "Attachment J-0200000-18",
   "performance_standards": true,
@@ -729,7 +721,6 @@ Task 1: Software Development
 {
   "entity_name": "Software Development SOW",
   "entity_type": "statement_of_work",
-  "description": "Statement of Work for software development tasks including Agile methodology and tool requirements. Located in Section C.",
   "work_type": "SOW",
   "location": "Section C",
   "hierarchical_structure": true,
@@ -771,7 +762,7 @@ An annex/attachment can contain:
 
 ### Basic Attributes
 
-Capture entity_name, entity_type, and description. Attachment numbering and parent section linkage can be inferred during relationship inference.
+Capture entity_name, entity_type, and type-specific metadata (prefix_pattern, content_type, parent_section). Attachment numbering and parent section linkage can be inferred during relationship inference.
 
 ### Examples from Real RFPs
 
@@ -794,7 +785,6 @@ J-0400000-05: Site Layout and Facility Maps
   {
     "entity_name": "J-0200000-18 Performance Work Statement",
     "entity_type": "document",
-    "description": "Performance Work Statement (PWS) attachment J-0200000-18.",
     "prefix_pattern": "J-",
     "content_type": "SOW",
     "parent_section": "Section J"
@@ -802,7 +792,6 @@ J-0400000-05: Site Layout and Facility Maps
   {
     "entity_name": "J-0300000-12 Equipment List",
     "entity_type": "document",
-    "description": "Equipment List and Specifications attachment J-0300000-12.",
     "prefix_pattern": "J-",
     "content_type": "Specifications",
     "parent_section": "Section J"
@@ -810,7 +799,6 @@ J-0400000-05: Site Layout and Facility Maps
   {
     "entity_name": "J-0400000-05 Site Layout Maps",
     "entity_type": "document",
-    "description": "Site Layout and Facility Maps attachment J-0400000-05.",
     "prefix_pattern": "J-",
     "content_type": "Maps",
     "parent_section": "Section J"
@@ -881,7 +869,7 @@ Even if not adjacent in document:
 
 ### Basic Attributes
 
-Capture entity_name, entity_type, and description. Clause supplements (FAR/DFARS/AFFARS) and parent section clustering are handled during relationship inference.
+Capture entity_name, entity_type, and type-specific metadata (clause_number, regulation, date). Clause supplements (FAR/DFARS/AFFARS) and parent section clustering are handled during relationship inference.
 
 ### Examples from Real RFPs
 
@@ -908,7 +896,6 @@ Cyber Incident Reporting (DEC 2019)
   {
     "entity_name": "FAR 52.212-4 Contract Terms and Conditions",
     "entity_type": "clause",
-    "description": "Contract Terms and Conditions—Commercial Products and Commercial Services (JAN 2024). Found in Section I.",
     "clause_number": "FAR 52.212-4",
     "regulation": "FAR",
     "section_attribution": "Section I",
@@ -918,7 +905,6 @@ Cyber Incident Reporting (DEC 2019)
   {
     "entity_name": "FAR 52.212-5 Required Statutes",
     "entity_type": "clause",
-    "description": "Contract Terms and Conditions Required To Implement Statutes or Executive Orders (JAN 2024). Found in Section I.",
     "clause_number": "FAR 52.212-5",
     "regulation": "FAR",
     "section_attribution": "Section I",
@@ -928,7 +914,6 @@ Cyber Incident Reporting (DEC 2019)
   {
     "entity_name": "DFARS 252.204-7012 Cybersecurity",
     "entity_type": "clause",
-    "description": "Safeguarding Covered Defense Information and Cyber Incident Reporting (DEC 2019). Found in Section I.",
     "clause_number": "DFARS 252.204-7012",
     "regulation": "DFARS",
     "section_attribution": "Section I",
@@ -990,7 +975,7 @@ Some sections contain multiple content types:
 
 ### Basic Attributes
 
-Capture entity_name, entity_type, and description. Section semantic types and subsection structures can be enriched during relationship inference.
+Capture entity_name, entity_type, and type-specific metadata (structural_label, semantic_type). Section semantic types and subsection structures can be enriched during relationship inference.
 
 ---
 
@@ -1053,7 +1038,7 @@ CUSTOMER BENEFIT: "Ensures aircraft availability for critical missions"
 
 ### Basic Attributes
 
-Capture entity_name, entity_type, and description. Theme classification (hot button/discriminator/proof point) and competitive context are advanced analysis best performed during query-time.
+Capture entity_name, entity_type, and type-specific metadata (theme_type, customer_benefit). Theme classification (hot button/discriminator/proof point) and competitive context are advanced analysis best performed during query-time.
 
 ---
 
@@ -1088,7 +1073,7 @@ Capture entity_name, entity_type, and description. Theme classification (hot but
 
 ### Basic Attributes
 
-Capture entity_name, entity_type, and description. CDRL identifiers and due dates preserved in natural language.
+Capture entity_name, entity_type, and type-specific metadata (cdrl_id, due_date, format). CDRL identifiers and due dates can be enriched during query-time operations.
 
 ---
 
@@ -1123,7 +1108,7 @@ Capture entity_name, entity_type, and description. CDRL identifiers and due date
 
 ### Basic Attributes
 
-Capture entity_name, entity_type, and description. Document numbers and reference locations preserved.
+Capture entity_name, entity_type, and type-specific metadata (document_number, reference_location). Document numbers and reference locations can be enriched during query-time operations.
 
 ---
 
@@ -1170,7 +1155,7 @@ Capture entity_name, entity_type, and description. Document numbers and referenc
 
 ### Basic Attributes
 
-Capture entity_name, entity_type, and description. Abstract nature preserved in description.
+Capture entity_name, entity_type, and type-specific metadata (concept_category, definition). Abstract nature can be described during query-time operations.
 
 ---
 
@@ -1214,7 +1199,7 @@ Capture entity_name, entity_type, and description. Abstract nature preserved in 
 
 ### Basic Attributes
 
-Capture entity_name, entity_type, and description. Model numbers and specifications preserved.
+Capture entity_name, entity_type, and type-specific metadata (model_number, manufacturer, specifications). Model numbers and specifications can be enriched during query-time operations.
 
 ---
 
@@ -1257,7 +1242,7 @@ Capture entity_name, entity_type, and description. Model numbers and specificati
 
 ### Basic Attributes
 
-Capture entity_name, entity_type, and description. Versions and platforms preserved.
+Capture entity_name, entity_type, and type-specific metadata (version, platform, vendor). Versions and platforms can be enriched during query-time operations.
 
 ---
 
@@ -1287,7 +1272,7 @@ Capture entity_name, entity_type, and description. Versions and platforms preser
 
 ### Basic Attributes
 
-Capture entity_name, entity_type, and description. Acronyms and full names preserved.
+Capture entity_name, entity_type, and type-specific metadata (acronym, full_name, org_type). Acronyms and full names can be enriched during query-time operations.
 
 ---
 
@@ -1330,7 +1315,7 @@ Capture entity_name, entity_type, and description. Acronyms and full names prese
 
 ### Basic Attributes
 
-Capture entity_name, entity_type, and description. Dates and frequencies preserved in description.
+Capture entity_name, entity_type, and type-specific metadata (event_date, frequency, milestone_type). Dates and frequencies can be enriched during query-time operations.
 
 ---
 
@@ -1367,7 +1352,7 @@ Capture entity_name, entity_type, and description. Dates and frequencies preserv
 
 ### Basic Attributes
 
-Capture entity_name, entity_type, and description. Contact details and addresses preserved in description.
+Capture entity_name, entity_type, and type-specific metadata (title, role, contact_info for PERSON; address, facility_type for LOCATION). Contact details and addresses can be enriched during query-time operations.
 
 ---
 
@@ -1413,8 +1398,8 @@ Before finalizing entity extraction for a document chunk:
 
 - ✅ `entity_name`: Present and descriptive (not generic)
 - ✅ `entity_type`: Valid type from 17-type ontology
-- ✅ `description`: Natural language context (min 20 chars)
-- ✅ `section_origin`: Traceable location reference
+- ✅ `section_origin`: Traceable location reference (optional)
+- ✅ Type-specific metadata: Appropriate fields for entity type (importance, criticality, etc.)
 
 ### 2. Format Validation
 

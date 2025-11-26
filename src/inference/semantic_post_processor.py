@@ -27,25 +27,45 @@ from pathlib import Path
 from src.inference.graph_io import parse_graphml, save_enhanced_graphml
 from src.inference.neo4j_graph_io import Neo4jGraphIO, group_entities_by_type
 from src.inference.entity_operations import ALLOWED_TYPES, FORBIDDEN_TYPES
-from lightrag.llm.openai import openai_complete_if_cache
 import os
+from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
 
 
 async def _call_llm_async(prompt: str, system_prompt: str = None, model: str = None, temperature: float = 0.1) -> str:
-    """Async wrapper for LLM calls"""
+    """Async wrapper for LLM calls using xAI endpoint directly
+    
+    Args:
+        prompt: The user prompt to send
+        system_prompt: Optional system prompt (if None, only sends user message)
+        model: LLM model name (defaults to LLM_MODEL env var)
+        temperature: Sampling temperature (default: 0.1)
+    
+    Returns:
+        LLM response text
+    """
     if model is None:
         model = os.getenv("LLM_MODEL", "grok-4-fast-reasoning")
-    return await openai_complete_if_cache(
-        model=model,
-        prompt=prompt,
-        system_prompt=system_prompt,
-        hashing_kv=None,  # No caching for post-processing
+    
+    # Create AsyncOpenAI client with xAI endpoint
+    client = AsyncOpenAI(
         api_key=os.getenv("LLM_BINDING_API_KEY"),
-        base_url=os.getenv("LLM_BINDING_HOST"),
+        base_url=os.getenv("LLM_BINDING_HOST", "https://api.x.ai/v1")
+    )
+    
+    messages = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": prompt})
+    
+    response = await client.chat.completions.create(
+        model=model,
+        messages=messages,
         temperature=temperature
     )
+    
+    return response.choices[0].message.content
 
 
 async def _infer_entity_type(entity_name: str, description: str, model: str, temperature: float) -> str:
