@@ -865,7 +865,7 @@ Return ONLY valid JSON array:
         try:
             response = await _call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
             rels = json.loads(response.strip())
-            valid_rels = _validate_relationships(rels, id_to_entity, "Algorithm 5")
+            valid_rels = _validate_relationships(rels, id_to_entity, "Algorithm 6")
             all_relationships.extend(valid_rels)
             logger.info(f"    → Found {len(valid_rels)} semantic concept relationships")
         except Exception as e:
