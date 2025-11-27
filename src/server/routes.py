@@ -302,11 +302,12 @@ async def process_document_with_semantic_inference(
             }
             
             # Convert text chunks only (tables handled by RAG-Anything's modal processors)
+            # NOTE: Use file_name (clean filename) not file_path (temp path) for citations
             for i, chunk_text in enumerate(chunked_texts):
                 custom_kg["chunks"].append({
                     "content": chunk_text,
                     "source_id": doc_id,
-                    "file_path": file_path,
+                    "file_path": file_name,
                     "chunk_order_index": i
                 })
             
@@ -317,7 +318,7 @@ async def process_document_with_semantic_inference(
                     "entity_type": entity.entity_type,
                     "description": entity.entity_name,  # Use entity_name for embedding - full text is in chunks
                     "source_id": doc_id,
-                    "file_path": file_path
+                    "file_path": file_name
                 })
             
             # Convert relationships
@@ -359,7 +360,7 @@ async def process_document_with_semantic_inference(
                 logger.info(f"📊 Processing {len(multimodal_items)} multimodal items with govcon ontology...")
                 await rag_instance.insert_content_list(
                     content_list=multimodal_items,
-                    file_path=file_path,
+                    file_path=file_name,  # Use clean filename for citations, not temp path
                     doc_id=doc_id
                 )
                 logger.info("✅ Multimodal content processed")
@@ -470,8 +471,10 @@ def create_insert_endpoint(app, rag_instance):
             logger.info(f"📄 Processing {file.filename} via /insert endpoint")
             
             # Integrated processing: Entity extraction + relationship inference in one pipeline
+            # NOTE: Pass safe_filename (not file_path) as the stored reference
+            # The temp path is only for reading the file - citations should use the clean filename
             processing_result = await process_document_with_semantic_inference(
-                file_path, file.filename, rag_instance, rag_instance.llm_model_func
+                file_path, safe_filename, rag_instance, rag_instance.llm_model_func
             )
             
             logger.info(f"✅ Processing complete for {file.filename}")
@@ -541,8 +544,10 @@ def create_documents_upload_endpoint(app, rag_instance):
             logger.info(f"📄 Processing {file.filename} via WebUI /documents/upload endpoint")
             
             # Integrated processing: Entity extraction + relationship inference in one pipeline
+            # NOTE: Pass safe_filename (not file_path) as the stored reference
+            # The temp path is only for reading the file - citations should use the clean filename
             processing_result = await process_document_with_semantic_inference(
-                file_path, file.filename, rag_instance, rag_instance.llm_model_func
+                file_path, safe_filename, rag_instance, rag_instance.llm_model_func
             )
             
             logger.info(f"✅ Processing complete for {file.filename}")
