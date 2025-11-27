@@ -214,7 +214,7 @@ For each requirement entity, return:
 
 ```json
 {
-  "entity_id": "entity_123",
+  "entity_index": 0,
   "has_workload_metric": true,
   "workload_categories": ["Labor", "Materials", "QA"],
   "boe_relevance": {
@@ -306,7 +306,7 @@ Most requirements span multiple categories. Examples:
 ```json
 [
   {
-    "entity_id": "entity_456",
+    "entity_index": 0,
     "has_workload_metric": true,
     "workload_categories": [
       "Labor",
@@ -342,7 +342,7 @@ Most requirements span multiple categories. Examples:
     "enriched_by": "workload_analysis_v1"
   },
   {
-    "entity_id": "entity_789",
+    "entity_index": 1,
     "has_workload_metric": true,
     "workload_categories": ["Labor", "Compliance"],
     "boe_relevance": {
@@ -360,7 +360,7 @@ Most requirements span multiple categories. Examples:
     "enriched_by": "workload_analysis_v1"
   },
   {
-    "entity_id": "entity_234",
+    "entity_index": 2,
     "has_workload_metric": true,
     "workload_categories": ["Labor", "QA", "Compliance"],
     "boe_relevance": {
