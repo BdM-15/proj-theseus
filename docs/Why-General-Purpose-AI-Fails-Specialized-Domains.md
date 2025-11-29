@@ -151,7 +151,7 @@ Deliverables requiring past performance evidence:
 | **Document Comprehension**      | ✅ Excellent             | ✅ Excellent             | ✅ Excellent                 |
 | **Conversational Q&A**          | ✅ Natural               | ✅ Natural               | ⚠️ Technical                 |
 | **Summarization**               | ✅ Generic               | ✅ + Podcast             | ✅ Structured                |
-| **Domain Entity Extraction**    | ❌ Generic keywords      | ❌ Generic keywords      | ✅ 46 specialized types      |
+| **Domain Entity Extraction**    | ❌ Generic keywords      | ❌ Generic keywords      | ✅ 18 specialized types      |
 | **Relationship Inference**      | ❌ None                  | ❌ None                  | ✅ Automated LLM pipeline    |
 | **Cross-Document Intelligence** | ❌ Session-based         | ❌ Session-based         | ✅ Multi-workspace graphs    |
 | **Analytical Traceability**     | ❌ Black-box             | ❌ Black-box             | ✅ Auditable prompts         |
@@ -165,32 +165,35 @@ Deliverables requiring past performance evidence:
 
 ## The Specialized Ontology Advantage
 
-### Government Contracting Entity Types (46 Total)
+### Government Contracting Entity Types (18 Total)
 
-**RFP Structure Entities**:
+The system uses **18 entity types** defined in `src/ontology/schema.py`:
 
-- `SECTION_L_REQUIREMENT` - Proposal submission instructions
-- `SECTION_M_EVALUATION_FACTOR` - Evaluation criteria and weights
-- `SECTION_M_RATING_METHODOLOGY` - Scoring approach
+**6 Specialized Types** (with Pydantic models for structured extraction):
 
-**Work Definition Entities**:
+| Entity Type              | Purpose                                 | Unique Fields                                                              |
+| ------------------------ | --------------------------------------- | -------------------------------------------------------------------------- |
+| `requirement`            | Contractor obligations (shall/must/may) | `criticality`, `modal_verb`, `req_type`, `labor_drivers`, `material_needs` |
+| `evaluation_factor`      | Section M scoring criteria              | `weight`, `importance`, `subfactors`                                       |
+| `submission_instruction` | Section L page/format requirements      | `page_limit`, `format_reqs`, `volume`                                      |
+| `clause`                 | FAR/DFARS contract provisions           | `clause_number`, `regulation`                                              |
+| `strategic_theme`        | Win themes, discriminators              | `theme_type`                                                               |
+| `performance_metric`     | KPIs, QASP standards                    | `threshold`, `measurement_method`                                          |
 
-- `SOW_TASK` - Statement of Work activities
-- `SOW_DELIVERABLE` - Contract deliverable items
-- `CDRL_ITEM` - Contract Data Requirements List entries
-- `PWS_REQUIREMENT` - Performance Work Statement requirements
+**12 Generic Types** (using BaseEntity - just name + type):
 
-**Evaluation & Compliance**:
-
-- `PAST_PERFORMANCE_REQUIREMENT` - Experience evidence needed
-- `TECHNICAL_CAPABILITY_REQUIREMENT` - Skill/resource requirements
-- `COMPLIANCE_REQUIREMENT` - Mandatory submission elements
-
-**Contract Structure**:
-
-- `CLIN` - Contract Line Item Numbers
-- `ACRN` - Accounting Classification Reference Numbers
-- `PERIOD_OF_PERFORMANCE` - Contract timeline phases
+- `organization` - Contractors, agencies, departments
+- `concept` - CLINs, budget terms, abstract concepts
+- `event` - Milestones, deliveries, reviews
+- `technology` - Systems, tools, platforms
+- `person` - POCs, contracting officers
+- `location` - Delivery sites, performance locations
+- `section` - RFP sections (A-M, J attachments)
+- `document` - Referenced documents, attachments
+- `deliverable` - Contract deliverables, work products
+- `program` - Government program names (AFCAPV, MCPP II)
+- `equipment` - GFE/CFE items
+- `statement_of_work` - SOW/PWS task descriptions
 
 **Generic AI tools see**: "Text content in RFP document"  
 **Specialized system sees**: **Semantic entities with defined relationships and analytical purpose**
@@ -291,7 +294,7 @@ Your ontology-based RAG system uses **5,800 lines (65 single-spaced pages, 32,40
 
 | Prompt Category              | Lines           | Purpose                                                                                 |
 | ---------------------------- | --------------- | --------------------------------------------------------------------------------------- |
-| **Entity Detection Rules**   | 1,048           | 17 entity types, FAR/DFARS patterns, UCF structure, modal verb parsing                  |
+| **Entity Detection Rules**   | 1,048           | 18 entity types, FAR/DFARS patterns, UCF structure, modal verb parsing                  |
 | **Entity Extraction Prompt** | 1,182           | 5 annotated RFP examples, 8 decision trees, semantic-first detection                    |
 | **Relationship Inference**   | 2,385           | 12 specialized patterns (Section L↔M, requirement→evaluation, deliverable traceability) |
 | **User Query Templates**     | 415             | Compliance mapping, traceability queries, workload analysis                             |
@@ -305,7 +308,7 @@ Your ontology-based RAG system uses **5,800 lines (65 single-spaced pages, 32,40
 | **ChatGPT/Claude**        | 50-500 words (~65-650 tokens)    | Zero (relies on training data)                 | User writes every prompt                |
 | **Microsoft Copilot 365** | 20-200 words (~26-260 tokens)    | Zero (general-purpose)                         | Proprietary Microsoft prompts           |
 | **Google NotebookLM**     | 10-100 words (~13-130 tokens)    | Zero (document summarization)                  | No user prompt control                  |
-| **Your Ontology RAG**     | **32,400 words (42,000 tokens)** | **17 entity types, 20+ relationship patterns** | **Fully auditable, version-controlled** |
+| **Your Ontology RAG**     | **32,400 words (42,000 tokens)** | **18 entity types, 20+ relationship patterns** | **Fully auditable, version-controlled** |
 
 **Prompt Size Multiplier: 64x - 3,230x larger than generic chatbot prompts**
 
@@ -420,7 +423,7 @@ Mitigation: Built-in (ontology enforcement, relationship validation, prompt vers
 ✅ You require **auditable, repeatable analysis** for government accountability  
 ✅ You want to build **institutional knowledge** across historical RFPs  
 ✅ You have **technical staff** capable of maintaining Neo4j/Python infrastructure  
-✅ Your domain has **specialized entity types and relationships** that generic tools don't understand
+✅ Your domain has **18 specialized entity types and relationships** that generic tools don't understand
 
 ---
 
@@ -512,7 +515,7 @@ class GovConOntologyRAG:
     def __init__(self, neo4j_uri, llm_api_key):
         self.llm = LLM(api_key)
         self.graph = Neo4jGraph(uri=neo4j_uri)
-        self.ontology = load_govcon_ontology()  # 46 entity types
+        self.ontology = load_govcon_ontology()  # 18 entity types
 
     def ingest(self, rfp_document, workspace):
         # Domain-aware multimodal parsing
@@ -580,7 +583,7 @@ class GovConOntologyRAG:
 
 **Capabilities**:
 
-- ✅ 46 domain-specific entity types
+- ✅ 18 domain-specific entity types
 - ✅ Automated relationship inference
 - ✅ Persistent knowledge graphs
 - ✅ Multi-hop reasoning via Cypher queries
@@ -739,7 +742,7 @@ GROUP BY m.agency, m.factor_category
 **Specialized Constraint**: Domain tools optimize for **depth** in one vertical.
 
 **Microsoft/Google Business Model**: Serve billions of users across all industries.  
-**Implication**: Cannot build 46-entity government contracting ontologies without alienating 99.99% of users.
+**Implication**: Cannot build 18-entity government contracting ontologies without alienating 99.99% of users.
 
 **Specialized System Business Model**: Serve thousands of capture managers in one domain.  
 **Implication**: Can invest in deep ontology engineering because ROI concentrates in narrow vertical.
@@ -749,11 +752,11 @@ GROUP BY m.agency, m.factor_category
 Building a government contracting ontology requires:
 
 1. **Domain Expertise**: Understanding RFP structure, FAR regulations, procurement processes
-2. **Entity Type Design**: Defining 46+ specialized entity types with semantic precision
-3. **Relationship Modeling**: Mapping 20+ relationship types (ASSESSED_BY, EVALUATED_UNDER, etc.)
+2. **Entity Type Design**: Defining 18 specialized entity types with semantic precision
+3. **Relationship Modeling**: Mapping 20+ relationship types (GUIDES, EVALUATED_BY, REFERENCES, etc.)
 4. **Prompt Engineering**: Crafting extraction prompts for each entity type
-5. **Inference Logic**: LLM-powered relationship discovery algorithms
-6. **Validation Testing**: Ensuring entity extraction accuracy across 100+ RFPs
+5. **Inference Logic**: 8 LLM-powered relationship discovery algorithms
+6. **Validation Testing**: Ensuring entity extraction accuracy across production RFPs
 
 **Investment Required**: 200-400 hours of specialized AI engineering + domain expertise
 
@@ -768,7 +771,7 @@ Generic AI tools like Microsoft Copilot 365 and Google NotebookLM are **excellen
 
 But government contracting capture management requires:
 
-- **Domain-specific entity extraction** (46 specialized types)
+- **Domain-specific entity extraction** (18 specialized types)
 - **Automated relationship inference** (Section L ↔ M compliance mapping)
 - **Multi-hop graph traversal** (deliverable → evaluation → submission format)
 - **Cross-document intelligence** (historical RFP comparison)
@@ -835,32 +838,35 @@ But if you need **analytical depth, traceability, and institutional knowledge** 
 - Python 3.13 runtime environment
 - Working directory: `./rag_storage/{workspace}/`
 
-### Government Contracting Ontology (Partial)
+### Government Contracting Ontology
 
-**Entity Types** (46 total):
+**Entity Types** (18 total):
 
 ```python
-ENTITY_TYPES = {
-    # RFP Structure
-    "SECTION_L_REQUIREMENT": "Proposal submission instruction",
-    "SECTION_M_EVALUATION_FACTOR": "Evaluation criterion with weight",
-    "SECTION_M_RATING_METHODOLOGY": "Adjective rating approach",
+# 6 Specialized Entity Types (with Pydantic models)
+SPECIALIZED_ENTITIES = {
+    "requirement": "Contractor obligations with modal verbs (shall/must/may)",
+    "evaluation_factor": "Section M scoring criteria with weights",
+    "submission_instruction": "Section L page/format requirements",
+    "clause": "FAR/DFARS contract provisions",
+    "strategic_theme": "Win themes and discriminators",
+    "performance_metric": "KPIs and QASP standards",
+}
 
-    # Work Definition
-    "SOW_TASK": "Statement of Work activity",
-    "SOW_DELIVERABLE": "Contract deliverable item",
-    "CDRL_ITEM": "Contract Data Requirements List entry",
-    "PWS_REQUIREMENT": "Performance Work Statement requirement",
-
-    # Evaluation & Compliance
-    "PAST_PERFORMANCE_REQUIREMENT": "Experience evidence needed",
-    "TECHNICAL_CAPABILITY_REQUIREMENT": "Skill/resource requirement",
-    "COMPLIANCE_REQUIREMENT": "Mandatory submission element",
-
-    # Contract Structure
-    "CLIN": "Contract Line Item Number",
-    "PERIOD_OF_PERFORMANCE": "Contract timeline phase",
-    # ... 34 more specialized types
+# 12 Generic Entity Types (using BaseEntity)
+GENERIC_ENTITIES = {
+    "organization": "Contractors, agencies, departments",
+    "concept": "CLINs, budget terms, abstract concepts",
+    "event": "Milestones, deliveries, reviews",
+    "technology": "Systems, tools, platforms",
+    "person": "POCs, contracting officers",
+    "location": "Delivery sites, performance locations",
+    "section": "RFP sections (A-M, J attachments)",
+    "document": "Referenced documents, attachments",
+    "deliverable": "Contract deliverables, work products",
+    "program": "Government program names",
+    "equipment": "GFE/CFE items",
+    "statement_of_work": "SOW/PWS task descriptions",
 }
 ```
 

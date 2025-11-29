@@ -1,10 +1,11 @@
 # Ontology Evolution: Government Contracting RAG System
 
-**Project**: GovCon-Capture-Vibe  
+**Project**: GovCon-Capture-Vibe (Project Theseus)  
 **Status**: Living Document  
-**Last Updated**: October 5, 2025
+**Version**: 0.3.0  
+**Last Updated**: November 28, 2025
 
-This document chronicles the evolution of the government contracting ontology from initial RAG storage analysis through Path A/B iterations to the current ontology-enhanced LightRAG implementation.
+This document chronicles the evolution of the government contracting ontology from initial RAG storage analysis through Path A/B iterations to the current production system with **18 entity types**, **8 semantic post-processing algorithms**, and **Neo4j enterprise storage**.
 
 ---
 
@@ -15,7 +16,9 @@ This document chronicles the evolution of the government contracting ontology fr
 3. [Phase 2: Path A Analysis & Problems (October 3, 2025)](#phase-2-path-a-analysis--problems-october-3-2025)
 4. [Phase 3: Ontology Development (October 3-4, 2025)](#phase-3-ontology-development-october-3-4-2025)
 5. [Phase 4: Cross-Reference Validation (October 3, 2025)](#phase-4-cross-reference-validation-october-3-2025)
-6. [Current State & Future Directions](#current-state--future-directions)
+6. [Phase 5: Cloud Acceleration & Entity Expansion (October-November 2025)](#phase-5-cloud-acceleration--entity-expansion-october-november-2025)
+7. [Phase 6: Semantic Post-Processing & Neo4j (November 2025)](#phase-6-semantic-post-processing--neo4j-november-2025)
+8. [Current State: Production System](#current-state-production-system)
 
 ---
 
@@ -43,10 +46,26 @@ October 4, 2025
 ├── Path B implementation planning
 └── Quality gates defined: Zero contamination, zero fictitious entities
 
-October 5, 2025 (Current)
+October 5, 2025
 ├── Branch 002 (local) and Branch 003 (cloud) strategy finalized
 ├── Documentation consolidation in progress
 └── Preparing for clean Path B extraction validation
+
+October-November 2025 (Phase 5: Cloud Acceleration)
+├── xAI Grok integration completed (significant speedup over local)
+├── RAG-Anything + LightRAG pip packages adopted (no forked libraries)
+├── Entity types expanded: 11 → 18 specialized types
+├── Instructor + Pydantic schema validation implemented
+├── MinerU multimodal parsing integrated
+└── Processing: 30-60 minutes per RFP (~$4 cost)
+
+November 2025 (Phase 6: Semantic Post-Processing) ✅ CURRENT
+├── 8 LLM-powered relationship inference algorithms
+├── Neo4j 5.25 enterprise storage (Docker)
+├── Section L↔M mapping automated
+├── Workload enrichment with BOE categories
+├── Full RFP processing: 30-60 minutes (~$4/RFP)
+└── Production-ready on main branch
 ```
 
 ---
@@ -62,24 +81,26 @@ First complete Navy MBOS RFP processing using **Path A** (custom regex chunking 
 **Document**: N6945025R0003.pdf (1,051 pages)  
 **Approach**: Custom section-aware chunking with requirement-based splitting
 
-| Metric | Value |
-|--------|-------|
-| Total Chunks | 157 |
-| Processing Success | 157/157 (100%) |
-| Entities Extracted | 772 |
-| Relationships Extracted | 697 |
-| Processing Time | ~3.5 hours |
-| Total Storage | ~20 MB |
+| Metric                  | Value          |
+| ----------------------- | -------------- |
+| Total Chunks            | 157            |
+| Processing Success      | 157/157 (100%) |
+| Entities Extracted      | 772            |
+| Relationships Extracted | 697            |
+| Processing Time         | ~3.5 hours     |
+| Total Storage           | ~20 MB         |
 
 ### What Worked ✅
 
 1. **LightRAG Framework Robustness**
+
    - Processed all 157 chunks without crashes
    - Semantic entity extraction captured domain-specific concepts
    - Knowledge graph automatically constructed
    - Embeddings generated for chunks, entities, relationships
 
 2. **Rich Metadata Preservation**
+
    ```json
    {
      "chunk_id": "chunk_0000",
@@ -93,6 +114,7 @@ First complete Navy MBOS RFP processing using **Path A** (custom regex chunking 
    ```
 
 3. **Diverse Entity Capture**
+
    - Organizations: NAVSTA Mayport, MCSF-BI, Jacobs Technology Inc.
    - Documents: RFP Section A, PWS, various attachments
    - Contract Elements: CLINs (0008, 0016, 0019, etc.), ELINs, Sub-ELINs
@@ -109,6 +131,7 @@ First complete Navy MBOS RFP processing using **Path A** (custom regex chunking 
 #### 1. Fictitious Entities from Regex Preprocessing
 
 **Evidence from Knowledge Graph**:
+
 ```xml
 <node id="RFP Section J-L">
   <!-- DOES NOT EXIST in Uniform Contract Format -->
@@ -125,6 +148,7 @@ First complete Navy MBOS RFP processing using **Path A** (custom regex chunking 
 ```
 
 **Root Cause**: `ShipleyRFPChunker` regex patterns created malformed section identifiers:
+
 ```python
 # Path A mistake (archived):
 section_pattern = r"Section ([A-M])"  # Brittle, deterministic
@@ -132,6 +156,7 @@ section_pattern = r"Section ([A-M])"  # Brittle, deterministic
 ```
 
 **Impact**:
+
 - Knowledge graph contained invalid entities
 - Queries for "Section J" or "Section L" failed (merged into fictitious "J-L")
 - Semantic search broken for proper Uniform Contract Format sections
@@ -140,6 +165,7 @@ section_pattern = r"Section ([A-M])"  # Brittle, deterministic
 #### 2. Contamination from External Knowledge
 
 **Sports-Related Entities** (not in RFP):
+
 - "100m Sprint Record"
 - "Carbon-Fiber Spikes"
 - "Noah Carter"
@@ -147,6 +173,7 @@ section_pattern = r"Section ([A-M])"  # Brittle, deterministic
 - "Tokyo"
 
 **Financial Markets Entities** (not in RFP):
+
 - "Market Selloff"
 - "Gold Futures"
 - "Crude Oil"
@@ -156,6 +183,7 @@ section_pattern = r"Section ([A-M])"  # Brittle, deterministic
 **Total Contamination**: 11 external entities in Path A extraction
 
 **Root Cause**: LLM introducing external knowledge during extraction with no validation:
+
 1. No type-safe structured outputs
 2. No document isolation verification
 3. No Pydantic validation
@@ -164,6 +192,7 @@ section_pattern = r"Section ([A-M])"  # Brittle, deterministic
 #### 3. Unconstrained Entity Extraction
 
 **Chunk 136 Problem**:
+
 - 113 entities + 111 relationships extracted
 - 24 minutes processing time
 - LLM extracted every table row as separate entity
@@ -171,6 +200,7 @@ section_pattern = r"Section ([A-M])"  # Brittle, deterministic
 - No entity type validation
 
 **Generic/Broken Entities**:
+
 - "nce assessment" (truncated)
 - "rounding" (too generic)
 - "17" (attachment number cleaned incorrectly)
@@ -178,6 +208,7 @@ section_pattern = r"Section ([A-M])"  # Brittle, deterministic
 #### 4. Invalid Entity Types
 
 **Examples**:
+
 ```
 WARNING | invalid entity type in:
   ['entity', 'Numbers H700 through H718', 'ELINs/Sub-ELINs', ...]
@@ -200,22 +231,24 @@ LightRAG faithfully extracted what we fed it. The problem wasn't LightRAG—it w
 
 ### Comparative Metrics
 
-| Metric | Plan A | Plan B | Analysis |
-|--------|--------|--------|----------|
-| **Entities** | 772 | 569 | Plan A +35.7% (but includes noise) |
-| **Relationships** | 697 | 426 | Plan A +63.6% |
-| **Rel/Entity Ratio** | 0.90 | 0.75 | Plan A +20% density |
-| **Contamination** | 11 entities | 6 entities | Both FAILED |
-| **Section Coverage** | 90% (A-M) | 60% (partial) | Plan A better coverage |
-| **Isolated Entities** | ~25% | 19% | Plan B slight edge |
+| Metric                | Plan A      | Plan B        | Analysis                           |
+| --------------------- | ----------- | ------------- | ---------------------------------- |
+| **Entities**          | 772         | 569           | Plan A +35.7% (but includes noise) |
+| **Relationships**     | 697         | 426           | Plan A +63.6%                      |
+| **Rel/Entity Ratio**  | 0.90        | 0.75          | Plan A +20% density                |
+| **Contamination**     | 11 entities | 6 entities    | Both FAILED                        |
+| **Section Coverage**  | 90% (A-M)   | 60% (partial) | Plan A better coverage             |
+| **Isolated Entities** | ~25%        | 19%           | Plan B slight edge                 |
 
 ### Path A Strengths
 
 1. **Section-Aware Chunking**
+
    - Sophisticated regex patterns identified all RFP sections (A-M) with subsections
    - Preserved "Section L.3.1" as context (vs random text fragments in Plan B)
 
 2. **Requirement-Based Splitting**
+
    - Split requirement-heavy sections into manageable chunks (3 requirements max)
    - Prevented LLM timeouts on Section C, Section L (400+ pages)
    - Each chunk processable within token limits
@@ -228,11 +261,13 @@ LightRAG faithfully extracted what we fed it. The problem wasn't LightRAG—it w
 ### Path A Critical Flaws
 
 1. **Fictitious Entities**
+
    - "RFP Section J-L" (should be J, K, L separately)
    - "RFP Section J-Line" (nonsensical)
    - "Attachment L" (doesn't exist)
 
 2. **Regex Brittleness**
+
    - Failed on real-world RFP variations
    - Cut content mid-paragraph when patterns matched
    - Over-extraction (772 entities) was quantity, not quality
@@ -245,10 +280,12 @@ LightRAG faithfully extracted what we fed it. The problem wasn't LightRAG—it w
 ### Path B Strengths
 
 1. **Lower Contamination**
+
    - 6 entities vs 11 (both still unacceptable)
    - Cleaner entities overall
 
 2. **No Fictitious Entities**
+
    - No regex artifacts like "Section J-L"
    - Semantic understanding prevented nonsensical combinations
 
@@ -259,11 +296,13 @@ LightRAG faithfully extracted what we fed it. The problem wasn't LightRAG—it w
 ### Path B Weaknesses
 
 1. **Generic Chunking Lost Structure**
+
    - Missed section boundaries
    - Lost subsection hierarchy
    - Lower relationship density (0.75 vs 0.90)
 
 2. **Surface Ontology Integration**
+
    - Insufficient domain knowledge injection
    - Generic entity types ("person", "location")
    - Didn't understand government contracting concepts
@@ -290,6 +329,7 @@ Path A had better metrics but created fictitious entities. Path B was cleaner bu
 **Core Principle**: Let LLMs understand semantically, guide with domain knowledge, validate outputs.
 
 **Three-Layer Architecture**:
+
 ```
 ┌─────────────────────────────────────────────┐
 │ ONTOLOGY (src/core/ontology.py)            │
@@ -316,6 +356,7 @@ Path A had better metrics but created fictitious entities. Path B was cleaner bu
 ### EntityType Enum Evolution
 
 **Initial Design** (11 types):
+
 ```python
 class EntityType(str, Enum):
     SECTION = "SECTION"              # RFP sections (A-M) + subsections
@@ -332,20 +373,49 @@ class EntityType(str, Enum):
 ```
 
 **Phase 3 Addition** (October 4, 2025 - Commit 7b59a94):
+
 ```python
 DELIVERABLE = "DELIVERABLE"  # Contract deliverables, work products
 ```
 
+**Phase 5 Expansion** (October-November 2025):
+Entity types expanded from 12 to **18** to capture government contracting nuances:
+
+```python
+# Current 18 entity types (src/ontology/schema.py)
+VALID_ENTITY_TYPES = {
+    # Generic types (6)
+    "organization", "concept", "event", "technology", "person", "location",
+    # Government contracting specialized types (12)
+    "requirement", "clause", "section", "document", "deliverable",
+    "evaluation_factor", "submission_instruction", "program", "equipment",
+    "strategic_theme", "statement_of_work", "performance_metric"
+}
+```
+
+**New Specialized Types Added**:
+
+- `evaluation_factor` - Section M scoring criteria with weights
+- `submission_instruction` - Section L page limits, format requirements
+- `strategic_theme` - Win themes, discriminators, hot buttons
+- `program` - Government program names (AFCAPV, MCPP II)
+- `equipment` - GFE/CFE items
+- `statement_of_work` - SOW/PWS task descriptions
+- `performance_metric` - KPIs, QASP standards with thresholds
+
 **Rationale**:
+
 1. Explicitly listed in `extract_requirements_prompt.txt`
 2. `RFPSection` model has `deliverables` field
 3. FAR 15.210 Section F is "Deliveries or Performance"
 4. Shipley methodology treats deliverables as key evaluation factors
 5. Korean AI RFP Simulator tracks `deliverables[]` separately from `requirements[]`
+6. Specialized types enable Section L↔M relationship inference
 
 ### Relationship Pattern Evolution
 
 **Valid Relationship Patterns**:
+
 ```python
 VALID_RELATIONSHIPS: Dict[Tuple[str, str], List[str]] = {
     # Section relationships
@@ -353,27 +423,27 @@ VALID_RELATIONSHIPS: Dict[Tuple[str, str], List[str]] = {
     ("SECTION", "CONTAINS"): ["REQUIREMENT", "DELIVERABLE", "CLAUSE"],
     ("SECTION", "APPLIES_TO"): ["ORGANIZATION", "LOCATION"],
     ("SECTION", "EVALUATES"): ["SECTION"],  # M evaluates L
-    
+
     # Requirement relationships
     ("REQUIREMENT", "PRODUCES"): ["DELIVERABLE"],  # ← Added Phase 3
     ("REQUIREMENT", "REQUIRES"): ["TECHNOLOGY", "ORGANIZATION"],
     ("REQUIREMENT", "REFERENCES"): ["CLAUSE", "DOCUMENT"],
     ("REQUIREMENT", "APPLIES_TO"): ["SECTION"],
-    
+
     # Deliverable relationships (Phase 3)
     ("DELIVERABLE", "REQUIRES"): ["TECHNOLOGY", "ORGANIZATION", "CONCEPT"],
     ("DELIVERABLE", "DELIVERED_BY"): ["ORGANIZATION"],
     ("DELIVERABLE", "SUPPORTS"): ["REQUIREMENT", "SECTION"],
     ("DELIVERABLE", "PERFORMED_AT"): ["LOCATION"],
     ("DELIVERABLE", "DUE_BY"): ["EVENT"],
-    
+
     # Concept relationships (CLINs)
     ("CONCEPT", "INCLUDES"): ["DELIVERABLE"],  # CLIN includes deliverables
     ("CONCEPT", "FUNDS"): ["REQUIREMENT"],
-    
+
     # Event relationships
     ("EVENT", "MILESTONE_FOR"): ["DELIVERABLE"],
-    
+
     # ... (full schema in src/core/ontology.py)
 }
 ```
@@ -385,13 +455,16 @@ VALID_RELATIONSHIPS: Dict[Tuple[str, str], List[str]] = {
 **Options Considered**:
 
 **Option A: Add FINANCIAL entity**
+
 ```python
 FINANCIAL = "FINANCIAL"  # Budget line items, pricing, cost data
 ```
+
 ✅ Pros: Explicit semantic representation, enables financial-specific relationships  
 ❌ Cons: Financial data is often an attribute, over-complicates graph
 
 **Option B: Keep as attributes (CHOSEN)**
+
 ```python
 # CLIN as CONCEPT with financial attributes
 {
@@ -403,10 +476,12 @@ FINANCIAL = "FINANCIAL"  # Budget line items, pricing, cost data
   }
 }
 ```
+
 ✅ Pros: Cleaner graph, budget is metadata not standalone concept  
 ❌ Cons: Can't query "all financial entities" directly
 
 **Decision Rationale**:
+
 - Budget appears in prompts but is typically metadata
 - CLINs already handle pricing as CONCEPT entities
 - "Budget: $500,000" doesn't need entity status
@@ -423,22 +498,22 @@ FINANCIAL = "FINANCIAL"  # Budget line items, pricing, cost data
 
 **Source**: `src/models/rfp_models.py`
 
-| Model Enum/Class | Ontology EntityType | Alignment | Notes |
-|------------------|---------------------|-----------|-------|
-| `RFPSectionType` (A-M) | ✅ `SECTION` | GOOD | FAR 15.210 sections |
-| `RequirementType` | ✅ `REQUIREMENT` | GOOD | Covered |
-| `ComplianceLevel` | ⚠️ N/A | APPROPRIATE | Analysis metadata |
-| `ComplianceStatus` | ⚠️ N/A | APPROPRIATE | Assessment outcome |
-| `RiskLevel` | ⚠️ N/A | APPROPRIATE | Risk assessment |
-| FAR clauses | ✅ `CLAUSE` | GOOD | Contract clauses |
-| **Deliverables** | ✅ `DELIVERABLE` | FIXED | Added Phase 3 |
-| CLINs | ✅ `CONCEPT` | ACCEPTABLE | Modeled as concepts |
-| Organizations | ✅ `ORGANIZATION` | GOOD | Covered |
-| Persons | ✅ `PERSON` | GOOD | POCs, officers |
-| Locations | ✅ `LOCATION` | GOOD | Performance sites |
-| Events | ✅ `EVENT` | GOOD | Milestones |
-| Documents | ✅ `DOCUMENT` | GOOD | Attachments |
-| Technical specs | ✅ `TECHNOLOGY` | GOOD | Systems, software |
+| Model Enum/Class       | Ontology EntityType | Alignment   | Notes               |
+| ---------------------- | ------------------- | ----------- | ------------------- |
+| `RFPSectionType` (A-M) | ✅ `SECTION`        | GOOD        | FAR 15.210 sections |
+| `RequirementType`      | ✅ `REQUIREMENT`    | GOOD        | Covered             |
+| `ComplianceLevel`      | ⚠️ N/A              | APPROPRIATE | Analysis metadata   |
+| `ComplianceStatus`     | ⚠️ N/A              | APPROPRIATE | Assessment outcome  |
+| `RiskLevel`            | ⚠️ N/A              | APPROPRIATE | Risk assessment     |
+| FAR clauses            | ✅ `CLAUSE`         | GOOD        | Contract clauses    |
+| **Deliverables**       | ✅ `DELIVERABLE`    | FIXED       | Added Phase 3       |
+| CLINs                  | ✅ `CONCEPT`        | ACCEPTABLE  | Modeled as concepts |
+| Organizations          | ✅ `ORGANIZATION`   | GOOD        | Covered             |
+| Persons                | ✅ `PERSON`         | GOOD        | POCs, officers      |
+| Locations              | ✅ `LOCATION`       | GOOD        | Performance sites   |
+| Events                 | ✅ `EVENT`          | GOOD        | Milestones          |
+| Documents              | ✅ `DOCUMENT`       | GOOD        | Attachments         |
+| Technical specs        | ✅ `TECHNOLOGY`     | GOOD        | Systems, software   |
 
 **Result**: 11/14 entities aligned (79% - up from 71% before DELIVERABLE addition)
 
@@ -448,16 +523,16 @@ FINANCIAL = "FINANCIAL"  # Budget line items, pricing, cost data
 
 **Source**: `src/agents/rfp_agents.py`
 
-| Agent Analysis Type | Ontology RelationshipType | Alignment | Notes |
-|---------------------|---------------------------|-----------|-------|
-| L↔M Section connections | ✅ `REFERENCES`, `EVALUATES` | GOOD | Critical relationships |
-| Requirements → Clauses | ✅ `REFERENCES`, `APPLIES_TO` | GOOD | Clause application |
-| Section I applications | ✅ `APPLIES_TO` | GOOD | Contract clauses |
-| Section C dependencies | ✅ `DEPENDS_ON`, `REQUIRES` | GOOD | SOW dependencies |
-| J attachment support | ✅ `SUPPORTS` | GOOD | Attachments |
-| Compliance evidence | ⚠️ N/A | APPROPRIATE | Analysis layer |
-| Win theme alignment | ⚠️ N/A | APPROPRIATE | Business logic |
-| Gap mitigation | ⚠️ N/A | APPROPRIATE | Analysis outcome |
+| Agent Analysis Type     | Ontology RelationshipType     | Alignment   | Notes                  |
+| ----------------------- | ----------------------------- | ----------- | ---------------------- |
+| L↔M Section connections | ✅ `REFERENCES`, `EVALUATES`  | GOOD        | Critical relationships |
+| Requirements → Clauses  | ✅ `REFERENCES`, `APPLIES_TO` | GOOD        | Clause application     |
+| Section I applications  | ✅ `APPLIES_TO`               | GOOD        | Contract clauses       |
+| Section C dependencies  | ✅ `DEPENDS_ON`, `REQUIRES`   | GOOD        | SOW dependencies       |
+| J attachment support    | ✅ `SUPPORTS`                 | GOOD        | Attachments            |
+| Compliance evidence     | ⚠️ N/A                        | APPROPRIATE | Analysis layer         |
+| Win theme alignment     | ⚠️ N/A                        | APPROPRIATE | Business logic         |
+| Gap mitigation          | ⚠️ N/A                        | APPROPRIATE | Analysis outcome       |
 
 **Result**: 5/8 relationship types covered (63%)
 
@@ -469,28 +544,28 @@ FINANCIAL = "FINANCIAL"  # Budget line items, pricing, cost data
 
 **Source**: `prompts/extract_requirements_prompt.txt`
 
-| Prompt Field | Ontology Coverage | Status | Notes |
-|--------------|-------------------|--------|-------|
-| `client_company` | ✅ `ORGANIZATION` | GOOD | Covered |
-| `department` | ✅ `ORGANIZATION` | GOOD | Covered |
-| `project_background` | ✅ `CONCEPT` | GOOD | High-level concept |
-| `objectives` | ✅ `REQUIREMENT` | GOOD | Project objectives |
-| `scope` | ✅ `SECTION` (Section C) | GOOD | SOW section |
-| `timeline` | ✅ `EVENT` | GOOD | Schedule events |
-| `budget` | ✅ `CONCEPT` (attribute) | FIXED | Decided: Keep as attribute |
-| `evaluation_criteria` | ✅ `REQUIREMENT` (Section M) | GOOD | Evaluation factors |
-| **`deliverables`** | ✅ `DELIVERABLE` | FIXED | Added Phase 3 |
-| `bidder_requirements` | ✅ `REQUIREMENT` | GOOD | Covered |
-| `compliance_items` | ✅ `CLAUSE` | GOOD | Contract clauses |
-| `risk_management` | ⚠️ N/A | APPROPRIATE | Analysis metadata |
-| `required_competencies` | ✅ `REQUIREMENT` | GOOD | Qualification requirements |
-| `schedule` | ✅ `EVENT` | GOOD | Timeline events |
-| `special_conditions` | ✅ `REQUIREMENT` | GOOD | Special requirements |
-| `packaging_marking` | ✅ `SECTION` (Section D) | GOOD | Covered |
-| `inspection_acceptance` | ✅ `SECTION` (Section E) | GOOD | Covered |
-| `contract_admin_data` | ✅ `SECTION` (Section G) | GOOD | Covered |
-| `contract_clauses` | ✅ `CLAUSE` (Section I) | GOOD | Covered |
-| `representations` | ✅ `SECTION` (Section K) | GOOD | Covered |
+| Prompt Field            | Ontology Coverage            | Status      | Notes                      |
+| ----------------------- | ---------------------------- | ----------- | -------------------------- |
+| `client_company`        | ✅ `ORGANIZATION`            | GOOD        | Covered                    |
+| `department`            | ✅ `ORGANIZATION`            | GOOD        | Covered                    |
+| `project_background`    | ✅ `CONCEPT`                 | GOOD        | High-level concept         |
+| `objectives`            | ✅ `REQUIREMENT`             | GOOD        | Project objectives         |
+| `scope`                 | ✅ `SECTION` (Section C)     | GOOD        | SOW section                |
+| `timeline`              | ✅ `EVENT`                   | GOOD        | Schedule events            |
+| `budget`                | ✅ `CONCEPT` (attribute)     | FIXED       | Decided: Keep as attribute |
+| `evaluation_criteria`   | ✅ `REQUIREMENT` (Section M) | GOOD        | Evaluation factors         |
+| **`deliverables`**      | ✅ `DELIVERABLE`             | FIXED       | Added Phase 3              |
+| `bidder_requirements`   | ✅ `REQUIREMENT`             | GOOD        | Covered                    |
+| `compliance_items`      | ✅ `CLAUSE`                  | GOOD        | Contract clauses           |
+| `risk_management`       | ⚠️ N/A                       | APPROPRIATE | Analysis metadata          |
+| `required_competencies` | ✅ `REQUIREMENT`             | GOOD        | Qualification requirements |
+| `schedule`              | ✅ `EVENT`                   | GOOD        | Timeline events            |
+| `special_conditions`    | ✅ `REQUIREMENT`             | GOOD        | Special requirements       |
+| `packaging_marking`     | ✅ `SECTION` (Section D)     | GOOD        | Covered                    |
+| `inspection_acceptance` | ✅ `SECTION` (Section E)     | GOOD        | Covered                    |
+| `contract_admin_data`   | ✅ `SECTION` (Section G)     | GOOD        | Covered                    |
+| `contract_clauses`      | ✅ `CLAUSE` (Section I)      | GOOD        | Covered                    |
+| `representations`       | ✅ `SECTION` (Section K)     | GOOD        | Covered                    |
 
 **Result**: 19/20 fields covered (95% - up from 85% before fixes)
 
@@ -502,21 +577,21 @@ FINANCIAL = "FINANCIAL"  # Budget line items, pricing, cost data
 
 ```typescript
 interface RfpAnalysisData {
-  projectTitle: string;        // ✅ Our: CONCEPT
-  organization: string;         // ✅ Our: ORGANIZATION
-  description: string;          // Text field, not entity
-  deadline: string;             // ✅ Our: EVENT
-  budget: string;               // ✅ Our: CONCEPT attribute
-  projectPeriod: string;        // ✅ Our: EVENT
-  requirements: string[];       // ✅ Our: REQUIREMENT
-  technicalSpecs: string[];     // ✅ Our: TECHNOLOGY
-  deliverables: string[];       // ✅ Our: DELIVERABLE (added Phase 3)
+  projectTitle: string; // ✅ Our: CONCEPT
+  organization: string; // ✅ Our: ORGANIZATION
+  description: string; // Text field, not entity
+  deadline: string; // ✅ Our: EVENT
+  budget: string; // ✅ Our: CONCEPT attribute
+  projectPeriod: string; // ✅ Our: EVENT
+  requirements: string[]; // ✅ Our: REQUIREMENT
+  technicalSpecs: string[]; // ✅ Our: TECHNOLOGY
+  deliverables: string[]; // ✅ Our: DELIVERABLE (added Phase 3)
   evaluationCriteria: string[]; // ✅ Our: REQUIREMENT (Section M)
-  submissionFormat: string;     // ✅ Our: REQUIREMENT (Section L)
-  contactInfo: string;          // ✅ Our: PERSON
-  industryType: string;         // Metadata
-  projectComplexity: string;    // Metadata
-  competitionLevel: string;     // Metadata (competitive analysis)
+  submissionFormat: string; // ✅ Our: REQUIREMENT (Section L)
+  contactInfo: string; // ✅ Our: PERSON
+  industryType: string; // Metadata
+  projectComplexity: string; // Metadata
+  competitionLevel: string; // Metadata (competitive analysis)
 }
 ```
 
@@ -526,183 +601,304 @@ interface RfpAnalysisData {
 
 ---
 
-## Current State & Future Directions
+## Phase 5: Cloud Acceleration & Entity Expansion (October-November 2025)
 
-### Phase 3 Status (October 4, 2025)
+### The Cloud Pivot
 
-**Completed** ✅:
-1. DELIVERABLE entity type added (commit 7b59a94)
-2. Budget handling decision documented (keep as CONCEPT attributes)
-3. DELIVERABLE relationships integrated into VALID_RELATIONSHIPS
-4. Cross-reference validation completed (95% alignment with prompts)
-5. Architecture validated: Ontology-Models-Agents separation is sound
+**Problem**: Local Ollama processing (Mistral-Nemo 12B) required 3-8 hours per RFP.
 
-**In Progress** ⏳:
-1. Clean Path B extraction validation (Navy MBOS RFP re-run)
-2. Quality comparison documentation
-3. Zero contamination validation testing
+**Solution**: xAI Grok cloud processing for public government documents.
 
-### Expected Outcomes (Clean Path B Extraction)
+| Metric       | Local (Branch 002) | Cloud (Branch 003+) | Improvement          |
+| ------------ | ------------------ | ------------------- | -------------------- |
+| 71-page RFP  | ~8 hours           | 30-40 minutes       | **~12x faster**      |
+| 425-page RFP | ~16 hours          | 45-60 minutes       | **~16x faster**      |
+| Cost per RFP | $0 (local)         | ~$4                 | Acceptable for speed |
 
-| Metric | Path A | Path B (Target) |
-|--------|--------|-----------------|
-| Entities | 772 (noisy) | 600-700 (validated) |
-| Relationships | 697 | 500-600 (domain-valid) |
-| Rel/Entity Ratio | 0.90 | 1.2+ (denser) |
-| **Contamination** | 11 | **0** (MUST ACHIEVE) |
-| **Fictitious Entities** | Yes ("J-L") | **0** (MUST ACHIEVE) |
-| Section Coverage | 90% | 100% (A-M all) |
-| Isolated Entities | ~25% | <10% |
-| Processing Time | ~76 min | <60 min |
+### Architecture Evolution
 
-### Quality Gates
+**Before (Branch 002)**:
 
-**Phase 3 Gate** (Current):
-- ✅ Zero fictitious entities (semantic understanding, no regex)
-- ✅ DELIVERABLE entity type operational
-- ⏳ Zero contamination (PydanticAI validation in progress)
-- ⏳ 100% entity type compliance
-- ⏳ Document isolation verified
+```
+PDF → Custom ShipleyRFPChunker → Ollama (local) → LightRAG (forked at src/lightrag/)
+```
 
-**Phase 4 Gate** (Testing):
-- All relationships match VALID_RELATIONSHIPS
-- Section hierarchy preserved (parent→child)
-- L↔M critical connections maintained
-- Navy MBOS RFP processed successfully
+**After (Branch 003+)**:
 
-**Production Gate** (Branch 002/003):
-- All metrics meet or exceed targets
-- No quality regressions vs Path A/B
-- Performance benchmarks met
-- Documentation complete
+```
+PDF → MinerU (via RAG-Anything) → xAI Grok → LightRAG (pip: lightrag-hku) → Neo4j
+```
 
-### Test Cases Planned
+### Key Changes
 
-**Test Case 1: Section L Extraction**
-- Input: Sample Section L (Instructions to Offerors)
-- Expected: SECTION, REQUIREMENT, DOCUMENT entities with L→M relationships
-- Validation: No fictitious entities like "Section J-L"
+1. **No More Forked Libraries**
 
-**Test Case 2: Section C + CLINs + Deliverables**
-- Input: Sample Section C (SOW) with CLINs
-- Expected: SECTION, REQUIREMENT, CONCEPT, DELIVERABLE, TECHNOLOGY entities
-- Validation: CLIN→DELIVERABLE relationships correct
+   - Removed: `src/lightrag/` forked directory
+   - Added: `lightrag-hku>=1.4.9.7` pip package
+   - Added: `raganything[all]>=1.2.8` pip package
 
-**Test Case 3: Section M Evaluation Factors**
-- Input: Sample Section M with evaluation criteria
-- Expected: SECTION, REQUIREMENT, CONCEPT entities with M→L relationships
-- Validation: Evaluation factors classified correctly
+2. **Instructor + Pydantic Schema Validation**
 
-**Test Case 4: End-to-End Compliance Matrix**
-- Input: Full RFP with Sections L, M, C
-- Process: LightRAG extraction → Ontology validation → PydanticAI agents → Shipley methodology
-- Validation: Clean pipeline, no data loss between layers
+   - All LLM outputs validated against `src/ontology/schema.py`
+   - Invalid entity types coerced to `concept` with warning
+   - Zero contamination from external knowledge
 
-### Architecture Lessons Learned
+3. **MinerU Multimodal Parsing**
 
-#### 1. Regex is Not the Answer
+   - Tables extracted with structure preserved
+   - Images processed (future: figure extraction)
+   - Equations handled (for technical RFPs)
+
+4. **Entity Type Expansion**: 12 → 18 types
+   - Added 6 specialized Pydantic models with unique fields
+   - 12 generic types use `BaseEntity` directly
+
+### 18 Entity Types Architecture
+
+**6 Specialized Models** (have unique fields for structured extraction):
+
+| Model                   | Unique Fields                                                              | Purpose                     |
+| ----------------------- | -------------------------------------------------------------------------- | --------------------------- |
+| `Requirement`           | `criticality`, `modal_verb`, `req_type`, `labor_drivers`, `material_needs` | SHALL/SHOULD/MAY + workload |
+| `EvaluationFactor`      | `weight`, `importance`, `subfactors`                                       | Section M scoring           |
+| `SubmissionInstruction` | `page_limit`, `format_reqs`, `volume`                                      | Section L constraints       |
+| `StrategicTheme`        | `theme_type`                                                               | Win themes classification   |
+| `Clause`                | `clause_number`, `regulation`                                              | FAR/DFARS citations         |
+| `PerformanceMetric`     | `threshold`, `measurement_method`                                          | KPIs with values            |
+
+**12 Generic Types** (use `BaseEntity` - just name + type):
+
+- `organization`, `concept`, `event`, `technology`, `person`, `location`
+- `section`, `document`, `deliverable`, `program`, `equipment`, `statement_of_work`
+
+**Design Philosophy**: Don't over-engineer. A `location` like "Joint Base Andrews" doesn't need special fields - relationships carry the semantic meaning.
+
+---
+
+## Phase 6: Semantic Post-Processing & Neo4j (November 2025)
+
+### The Relationship Gap
+
+**Problem**: LightRAG native extraction captures entities well but misses domain-specific relationships:
+
+- Section L instructions → Section M evaluation factors (critical!)
+- Requirements → Deliverables (traceability)
+- Annexes → Parent documents (hierarchy)
+
+**Solution**: 8 LLM-powered semantic post-processing algorithms.
+
+### 8 Semantic Algorithms
+
+| #   | Algorithm                      | Purpose                      | Relationships Created    |
+| --- | ------------------------------ | ---------------------------- | ------------------------ |
+| 1   | Instruction-Evaluation Linking | Section L → M mapping        | `GUIDES`, `EVALUATED_BY` |
+| 2   | Evaluation Hierarchy           | Factor → subfactor structure | `PARENT_OF`, `CHILD_OF`  |
+| 3   | Requirement-Evaluation Mapping | Requirements → factors       | `EVALUATED_BY`           |
+| 4   | Deliverable Traceability       | CDRLs → requirements         | `PRODUCES`, `REFERENCES` |
+| 5   | Document Hierarchy             | Section structure            | `PARENT_OF`, `CHILD_OF`  |
+| 6   | Semantic Concept Linking       | Topic-based connections      | `RELATED_TO`             |
+| 7   | Heuristic Pattern Matching     | CDRL cross-references        | `REFERENCES`             |
+| 8   | Orphan Pattern Resolution      | Unlinked entity cleanup      | Various                  |
+
+**Implementation**: `src/inference/semantic_post_processor.py` (1,086 lines)
+
+### Neo4j Enterprise Storage
+
+**Why Neo4j over NetworkX**:
+
+- Graph queries 10-100x faster for large RFPs
+- APOC procedures for complex traversals
+- Visual exploration via Neo4j Browser
+- Production-grade persistence
+
+**Docker Setup**:
+
+```yaml
+# docker-compose.neo4j.yml
+services:
+  neo4j:
+    image: neo4j:5.25-community
+    ports:
+      - "7474:7474" # Browser
+      - "7687:7687" # Bolt
+    environment:
+      NEO4J_PLUGINS: '["apoc"]'
+```
+
+### Workload Enrichment
+
+**New in Phase 6**: BOE (Basis of Estimate) category tagging for requirements.
+
+```python
+class BOECategory(str, Enum):
+    LABOR = "Labor"
+    MATERIALS = "Materials"
+    ODCS = "ODCs"
+    QA = "QA"
+    LOGISTICS = "Logistics"
+    LIFECYCLE = "Lifecycle"
+    COMPLIANCE = "Compliance"
+```
+
+**Purpose**: Enable downstream cost estimation and staffing analysis.
+
+### Production Metrics (November 2025)
+
+| Metric               | Value                   |
+| -------------------- | ----------------------- |
+| Entity Types         | 18                      |
+| Semantic Algorithms  | 8                       |
+| Navy MBOS (71 pages) | 594 entities, 30-40 min |
+| Large RFP (400+ pg)  | 45-60 minutes           |
+| Cost per RFP         | ~$4                     |
+| Graph Storage        | Neo4j 5.25              |
+| Zero Contamination   | ✅ Achieved             |
+
+---
+
+## Current State: Production System
+
+### System Architecture (November 2025)
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    6-Step Processing Pipeline                       │
+├─────────────────────────────────────────────────────────────────────┤
+│  1. DOCUMENT UPLOAD → PDF/DOCX to /documents/upload                │
+│  2. MINERU PARSING → Tables, images, text via RAG-Anything         │
+│  3. LIGHTRAG CHUNKING → 8,192 tokens/chunk, 15% overlap            │
+│  4. ENTITY EXTRACTION → 18 types via xAI Grok + Instructor         │
+│  5. RELATIONSHIP EXTRACTION → LightRAG native inference            │
+│  6. SEMANTIC POST-PROCESSING → 8 LLM algorithms                    │
+│                                                                     │
+│  OUTPUT: Neo4j Knowledge Graph + LightRAG WebUI                    │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Technology Stack
+
+| Component         | Technology                    | Version                        |
+| ----------------- | ----------------------------- | ------------------------------ |
+| RAG Orchestration | RAG-Anything                  | ≥1.2.8 (pip)                   |
+| Knowledge Graph   | LightRAG                      | ≥1.4.9.7 (pip: `lightrag-hku`) |
+| LLM               | xAI Grok-4-fast-reasoning     | Cloud API                      |
+| Embeddings        | OpenAI text-embedding-3-large | 3072-dim                       |
+| Graph Storage     | Neo4j Community               | 5.25                           |
+| Schema Validation | Instructor + Pydantic         | ≥1.13.0                        |
+| Document Parsing  | MinerU                        | via RAG-Anything               |
+
+### Quality Gates Achieved ✅
+
+| Gate                     | Status | Evidence                                      |
+| ------------------------ | ------ | --------------------------------------------- |
+| Zero fictitious entities | ✅     | No regex artifacts like "Section J-L"         |
+| Zero contamination       | ✅     | Pydantic validation blocks external knowledge |
+| 18 entity types          | ✅     | `src/ontology/schema.py`                      |
+| Section L↔M mapping      | ✅     | Algorithm 1: Instruction-Evaluation Linking   |
+| Production performance   | ✅     | 30-60 min per RFP (vs 8-16 hrs local)         |
+| Enterprise storage       | ✅     | Neo4j with APOC                               |
+
+### GitHub Issues & Roadmap
+
+**Active Optimization Issues**:
+
+- [#14](https://github.com/BdM-15/govcon-capture-vibe/issues/14): Prompt Compression (50% token reduction)
+- [#15](https://github.com/BdM-15/govcon-capture-vibe/issues/15): Remove Redundant Algorithms 1-3
+- [#17](https://github.com/BdM-15/govcon-capture-vibe/issues/17): Parallel Chunk Processing
+- [#19](https://github.com/BdM-15/govcon-capture-vibe/issues/19): Fine-Tuned SLM Strategy
+
+**Strategic Features**:
+
+- [#20](https://github.com/BdM-15/govcon-capture-vibe/issues/20): Cross-RFP Knowledge Accumulation
+- [#21](https://github.com/BdM-15/govcon-capture-vibe/issues/21): Strategic Intelligence
+- [#23](https://github.com/BdM-15/govcon-capture-vibe/issues/23): Core Capture Intelligence
+
+---
+
+## Architecture Lessons Learned
+
+### 1. Regex is Not the Answer
+
 - Regex preprocessing created fictitious entities ("Section J-L")
 - Brittle patterns failed on real-world variations
 - Over-extraction appeared better but was actually noise
 
 **Lesson**: Let LLMs understand semantically, not through pattern matching.
 
-#### 2. Preprocessing Can Enhance RAG (When Done Right)
-- Path A's requirement-based splitting prevented timeouts
-- Section context preservation improved extraction quality
+### 2. Preprocessing Can Enhance RAG (When Done Right)
+
+- MinerU structure preservation improved extraction quality
+- 8K token chunks with 15% overlap prevents context loss
 - Relationship hints guided LLM toward valid patterns
 
-**Lesson**: Preprocessing + RAG + Validation = Production Quality (not preprocessing alone).
+**Lesson**: Preprocessing + RAG + Validation = Production Quality.
 
-#### 3. Validation is Non-Negotiable
-- Both Path A and Path B had contamination
-- No type-safe outputs, no document isolation checks
-- No automated quality control
+### 3. Validation is Non-Negotiable
 
-**Lesson**: PydanticAI validation is ESSENTIAL for production.
+- Instructor + Pydantic enforces schema at extraction time
+- Invalid entity types coerced to `concept` with warning
+- Zero contamination from external knowledge achieved
 
-#### 4. Domain Knowledge Matters
+**Lesson**: Type-safe structured outputs are ESSENTIAL for production.
+
+### 4. Domain Knowledge Matters
+
 - Generic LightRAG doesn't understand government contracting
-- Never seen RFPs, CLINs, FAR clauses in training
-- Extracts generic entities ("person", "location") not domain concepts
+- 18 specialized entity types capture domain nuances
+- 8 semantic algorithms add domain-specific relationships
 
 **Lesson**: Ontology injection is CRITICAL for domain-specific RAG.
 
-#### 5. Entities vs Attributes vs Metadata
-- Entities: Things that exist independently (SECTION, REQUIREMENT, DELIVERABLE)
-- Attributes: Properties of entities (budget as CLIN attribute, $500,000)
-- Metadata: Analysis outcomes (ComplianceLevel, RiskLevel, win themes)
+### 5. Entities vs Attributes vs Specialized Models
 
-**Lesson**: Don't over-complicate knowledge graph. Keep analysis layer separate from semantic layer.
+- **18 Entity Types**: Things that exist in the knowledge graph
+- **6 Specialized Models**: Entity types needing structured fields (Requirement, EvaluationFactor, etc.)
+- **12 Generic Types**: Use BaseEntity directly (organization, location, etc.)
+- **Attributes**: Properties like budget stored as metadata, not separate entities
 
-### Branch Strategy Integration
-
-**Branch 002** (Local LLM Architecture):
-- Fully local Ollama processing
-- Uses ontology-enhanced LightRAG from `src/lightrag/`
-- Zero contamination via PydanticAI validation
-- 100% private, air-gapped capable
-
-**Branch 003** (Cloud-Enhanced Architecture):
-- Hybrid: xAI Grok for public RFPs (fast), local Ollama for proprietary (private)
-- Same ontology foundation as Branch 002
-- 20-30x faster processing for non-sensitive documents
-- Enterprise privacy boundaries maintained
-
-**Main Branch**:
-- Reserved for production-ready releases
-- Will merge from Branch 003 after validation
-- Full test suite passing
-- Documentation complete
-
-### Next Steps
-
-**Immediate** (Week 1):
-1. Complete clean Path B extraction (Navy MBOS RFP)
-2. Validate zero contamination with PydanticAI
-3. Document quality comparison vs Path A
-4. Update test cases with DELIVERABLE entity
-
-**Short-Term** (Weeks 2-3):
-1. Test all 4 comprehensive test cases
-2. Benchmark performance (<60 min target)
-3. Document architectural decisions
-4. Merge to Branch 002 parent
-
-**Medium-Term** (Week 4+):
-1. Fork Branch 003 for cloud enhancement
-2. Implement xAI Grok integration
-3. Test hybrid workflow (public→cloud, proprietary→local)
-4. Prepare for production release (merge to main)
+**Lesson**: Specialize only when structured extraction provides value.
 
 ---
 
 ## References
 
 ### Primary Documents
-- **Navy MBOS RFP**: N6945025R0003.pdf (1,051 pages) - Primary test document
-- **Shipley Guides**: `docs/Shipley Capture Guide.pdf`, `docs/Shipley Proposal Guide.pdf`
+
+- **Navy MBOS RFP**: N6945025R0003.pdf (71 pages) - Primary test document
+- **Marine Corps MCPP II DRFP**: 495 pages - Large-scale validation
+- **Shipley Guides**: Capture Guide, Proposal Guide - Methodology foundation
 - **FAR 15.210**: Uniform Contract Format (Sections A-M standard)
 
 ### Source Code
-- **Ontology**: `src/core/ontology.py` (EntityType enum, VALID_RELATIONSHIPS)
-- **Models**: `src/models/rfp_models.py` (Pydantic models with Shipley methodology)
-- **Agents**: `src/agents/rfp_agents.py` (PydanticAI agents for extraction/assessment)
-- **Prompts**: `prompts/extract_requirements_prompt.txt` (Shipley-based extraction)
+
+| File                                       | Purpose                                        |
+| ------------------------------------------ | ---------------------------------------------- |
+| `src/ontology/schema.py`                   | 18 entity types, 6 specialized Pydantic models |
+| `src/inference/semantic_post_processor.py` | 8 relationship inference algorithms            |
+| `src/extraction/json_extractor.py`         | Instructor + Pydantic extraction               |
+| `src/server/config.py`                     | LightRAG global_args configuration             |
+| `prompts/extraction/`                      | Entity extraction prompts (~170K tokens)       |
 
 ### External References
-- **LightRAG**: https://github.com/HKUDS/LightRAG (v1.4.9 forked to `src/lightrag/`)
-- **PydanticAI**: https://ai.pydantic.dev/ (type-safe LLM outputs)
-- **AI RFP Simulator**: https://github.com/felixlkw/ai-rfp-simulator (Korean RFP system validation)
+
+- **LightRAG**: https://github.com/HKUDS/LightRAG (pip: `lightrag-hku`)
+- **RAG-Anything**: https://github.com/HKUDS/RAG-Anything (pip: `raganything[all]`)
+- **Instructor**: https://github.com/jxnl/instructor (Pydantic LLM validation)
+- **xAI Grok**: https://x.ai/ (Cloud LLM API)
+- **Neo4j**: https://neo4j.com/ (Graph database)
 
 ### Related Documentation
-- **Architecture Decision Records**: `docs/ARCHITECTURE_DECISION_RECORDS.md`
-- **README**: Project overview with Branch 002/003 strategy
-- **Shipley Reference**: `docs/SHIPLEY_LLM_CURATED_REFERENCE.md`
+
+- **[README.md](../../README.md)**: Project overview
+- **[ARCHITECTURE.md](../ARCHITECTURE.md)**: System architecture
+- **[NEO4J_USER_GUIDE.md](../neo4j/NEO4J_USER_GUIDE.md)**: Graph database setup
+- **[FEATURE_ROADMAP.md](../capture-intelligence/FEATURE_ROADMAP.md)**: Development roadmap
 
 ---
 
-**Document Status**: Living document - updated as ontology evolves and new phases complete.
+**Document Status**: Living document - updated as ontology evolves.
 
 **Version History**:
-- v1.0.0 (October 5, 2025): Initial consolidation of RAG storage analysis and ontology alignment analysis into chronological evolution format
+
+- v2.0.0 (November 28, 2025): Updated for Phase 5-6, 18 entity types, 8 semantic algorithms, Neo4j
+- v1.0.0 (October 5, 2025): Initial consolidation of RAG storage analysis and ontology alignment
