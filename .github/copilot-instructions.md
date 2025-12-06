@@ -2,223 +2,223 @@
 
 ## Project Overview
 
-**Ontology-based RAG system** for federal RFP analysis that transforms generic document processing into specialized government contracting intelligence. Uses **RAG-Anything** (multimodal ingestion) + **LightRAG** (knowledge graph/queries) with **xAI Grok** cloud processing for 417x speedup over local processing.
+**Ontology-based RAG system** for federal RFP analysis. Uses **RAG-Anything** (multimodal PDF parsing via MinerU) + **LightRAG** (knowledge graph/queries) with **xAI Grok** cloud processing.
 
-**Core Innovation**: Government contracting entity types + LLM-powered relationship inference enables Section L↔M mapping, requirement traceability, and Shipley methodology compliance.
+**Core Innovation**: 18 government contracting entity types + 8 LLM-powered relationship inference algorithms enable Section L↔M mapping, requirement traceability, and Shipley methodology compliance.
 
----
+### Supporting Documentation
 
-## CRITICAL EXECUTION RULES
+- [System Architecture and Design](../docs/ARCHITECTURE.md) - Overall system architecture, technology stack, and performance metrics
+- [Feature Roadmap](../docs/capture-intelligence/FEATURE_ROADMAP.md) - Future features and agent-powered proposal development workflows
+- [Semantic Post-Processing](../docs/inference/SEMANTIC_POST_PROCESSING.md) - LLM relationship inference algorithms
+- [Neo4j Integration](../docs/neo4j/NEO4J_USER_GUIDE.md) - Graph database workspace management
 
-### Rule 1: Virtual Environment & Terminal Management
+**Note**: Suggest updates to these documents if you find incomplete or conflicting information.
 
-**CRITICAL**: Always use the SAME terminal for sequential commands. Never open a new terminal mid-workflow.
+### Root Folders
 
-**Before ANY Python execution**, activate `.venv` as a separate command in ONE terminal:
+- `src/` - Python source code organized by domain
+- `prompts/` - LLM prompt templates for extraction and inference
+- `tests/` - Validation scripts (test\_\*.py files, run directly with Python)
+- `tools/` - Neo4j workspace management and validation utilities
+- `docs/` - Architecture documentation and feature roadmaps
+- `inputs/` - RFP document staging (uploaded/ and **enqueued**/ subdirs)
+- `rag_storage/` - Per-workspace knowledge graph data (GraphML + embeddings)
 
-```powershell
-# Step 1: Activate venv (ONCE per terminal session)
-.venv\Scripts\Activate.ps1
+### Core Architecture (`src/` folder)
 
-# Step 2: Run subsequent commands in SAME terminal
-python app.py
-# or
-uv pip list
-# or
-python -m pytest
+- `src/server/` - FastAPI server configuration and routing
+  - `config.py` - LightRAG global_args setup (MUST load .env first)
+  - `routes.py` - Custom endpoints with batch completion detection
+  - `initialization.py` - RAGAnything wrapper initialization
+- `src/inference/` - Semantic post-processing algorithms
+  - `semantic_post_processor.py` - 8 LLM relationship inference algorithms
+  - `neo4j_graph_io.py` - Neo4j CRUD operations
+  - `batch_processor.py` - Auto-trigger logic after document batches
+- `src/ontology/` - Domain schema validation
+  - `schema.py` - Pydantic models for 18 entity types
+- `src/extraction/` - Custom entity extraction logic
+- `raganything_server.py` - Main entry point (orchestrates all components)
+
+**Dependencies**: Uses `raganything[all]` and `lightrag-hku` from pip. **NO forked libraries** - all customization via configuration and wrapper modules.
+
+### Processing Pipeline (6 Steps)
+
+```
+1. Document Upload → /insert or /documents/upload endpoints
+2. MinerU Parsing → Tables, images, text extraction (GPU-accelerated)
+3. LightRAG Chunking → 8,192 tokens/chunk, 15% overlap
+4. Entity Extraction → 18 govcon types via xAI Grok + Pydantic validation
+5. Relationship Extraction → LightRAG native inference
+6. Semantic Post-Processing → 8 LLM algorithms (auto-triggered after batch)
 ```
 
-**Common Mistakes to AVOID**:
+**Key Modules**:
 
-- ❌ Opening new terminal for each command (breaks venv activation)
-- ❌ Running Python in global environment (installs packages globally)
-- ❌ Combining activation with execution: `.venv\Scripts\Activate.ps1; python app.py`
-
-**Correct Workflow**:
-
-1. Activate `.venv` in one terminal
-2. Keep using that SAME terminal for all subsequent Python/uv/pytest commands
-3. Terminal prompt shows `(.venv)` when active
-
-### Rule 2: Use Workspace Tools for File Operations
-
-**NEVER use PowerShell/terminal for file operations.** Always use workspace tools:
-
-| Operation   | ✅ CORRECT TOOL                  | ❌ NEVER USE                             |
-| ----------- | -------------------------------- | ---------------------------------------- |
-| Read file   | `read_file`                      | `Get-Content`, `cat`, `type`             |
-| Create file | `create_file`                    | `New-Item`, `echo >`, `Out-File`         |
-| Edit file   | `replace_string_in_file`         | `(Get-Content).Replace()`, `Set-Content` |
-| Search      | `grep_search`, `semantic_search` | `Select-String`, `findstr`               |
-| List dir    | `list_dir`                       | `Get-ChildItem`, `ls`, `dir`             |
-| Copy file   | `read_file` + `create_file`      | `Copy-Item`, `cp`                        |
-
-**PowerShell ONLY for**:
-
-- Running Python: `python app.py`, `python -m pytest`
-- Package management: `uv sync`, `uv pip list`
-- Git operations: `git status`, `git commit -m "message"`
-- Process management: `Get-Process python`
-
-**Why This Matters**: PowerShell file operations bypass workspace tracking and can cause sync issues with the editor. Always use workspace tools for file I/O.
-
-### Rule 3: Application Management & Environment
-
-**NEVER start the application yourself** - only the user can run the app. The application server (`python app.py`) must be started by the user in their own terminal session.
-
-**ALWAYS ensure the virtual environment is active** before any Python operations. Check that the terminal prompt shows `(.venv)` before proceeding with Python commands.
-
-**STOP creating documents for everything** - focus on code changes and direct implementation. Only create documentation when explicitly requested or when it serves a critical architectural purpose.
-
-### Rule 4: Stay Grounded in Core Libraries
-
-**ALL actions must stay grounded in LightRAG and RAG-Anything repos and libraries**. Do not invent APIs, methods, or capabilities that don't exist in these core libraries. Reference the actual source code and documentation from:
-
-- [LightRAG GitHub](https://github.com/HKUDS/LightRAG)
-- [RAG-Anything GitHub](https://github.com/HKUDS/RAG-Anything)
-
-**Do not** propose solutions that require modifications to these external libraries unless they are already implemented in the forked versions within this project.
+| Path                        | Purpose                                                |
+| --------------------------- | ------------------------------------------------------ |
+| `app.py`                    | Entry point - starts Neo4j Docker + server             |
+| `src/raganything_server.py` | Server orchestration, imports modular components       |
+| `src/server/config.py`      | LightRAG global_args configuration                     |
+| `src/server/routes.py`      | Custom `/insert`, `/documents/upload` + batch tracking |
+| `src/inference/`            | Semantic post-processing algorithms                    |
+| `src/ontology/schema.py`    | Pydantic models for entity validation                  |
+| `prompts/extraction/`       | Entity extraction prompts (~3,000 lines)               |
 
 ---
 
-## Essential Architecture
+## Validating Changes
 
-**Two-Stage Processing Flow**:
+MANDATORY: Always activate virtual environment and check for errors BEFORE running scripts or declaring work complete.
 
-1. **INGESTION** (Cloud - xAI Grok): RFP → RAG-Anything multimodal parsing → entity extraction → GraphML storage
-2. **POST-PROCESSING** (Local - Phase 6): GraphML → LLM relationship inference → enhanced knowledge graph → LightRAG WebUI
+### Environment Setup
 
-**Key Components**:
+- **NEVER run Python commands without activating .venv first**
+- Monitor terminal prompt for `(.venv)` indicator
+- Use ONE terminal session for all sequential commands
 
-- `app.py` (40 lines): Entry point importing pip-installed libraries
-- `src/raganything_server.py` (790 lines): Main server wrapping RAG-Anything + LightRAG with government contracting ontology
-- Phase 6 pipeline: LLM-powered relationship inference for Section L↔M mapping and annex linkage
+### Validation Steps
 
-**Dependencies**: Uses `raganything[all]` and `lightrag-hku` from pip - NO forked libraries in codebase.
+`.env` MUST load BEFORE importing LightRAG (see `src/raganything_server.py` line 23):
+
+```python
+from dotenv import load_dotenv
+load_dotenv()  # BEFORE any LightRAG imports
+```
+
+LightRAG uses `os.getenv()` in dataclass defaults at import time.
+
+### Import Patterns
+
+```python
+# ✅ CORRECT: pip-installed packages
+from lightrag import LightRAG
+from raganything import RAGAnything
+from lightrag.api.config import global_args
+
+# ❌ WRONG: These don't exist locally
+from lightrag.lightrag import LightRAG  # ModuleNotFoundError
+```
+
+### Entity Type Handling
+
+Entity types are lowercase internally (see `src/server/config.py` line 76):
+
+```python
+global_args.entity_types = ["requirement", "clause", "section", ...]  # lowercase
+```
+
+Validation via Pydantic in `src/ontology/schema.py` - do NOT modify entity types post-extraction.
+
+### Finding Related Code
+
+1. **Semantic search first** - Use for general concepts like "batch processing" or "entity extraction"
+2. **Grep for exact strings** - Use for error messages, class names, or function names
+3. **Follow imports** - Check which files import problematic modules (especially circular dependencies)
+4. **Check test files** - Often reveal usage patterns and expected behavior (e.g., `tests/test_json_extraction.py` shows entity validation)
+5. **Trace prompts** - Entity extraction logic lives in `prompts/extraction/` (~3,000 lines), not Python code
 
 ---
 
 ## Development Workflows
 
-### Starting the Server
+### Adding New Entity Types
 
-**IMPORTANT**: Never start the application yourself. The user must run the app in their terminal.
+1. Add to `src/server/config.py` → `global_args.entity_types` (lowercase)
+2. Add Pydantic model to `src/ontology/schema.py`
+3. Update `prompts/extraction/entity_extraction_prompt.md` with examples
+4. Test with `tests/test_json_extraction.py`
 
-```powershell
-# User must activate venv and start server themselves
-.venv\Scripts\Activate.ps1
-python app.py
-# Server ready at http://localhost:9621
-```
-
-### Processing an RFP
+### Neo4j Workspace Management
 
 ```powershell
-# Upload via WebUI: http://localhost:9621/webui
-# OR use custom endpoint with auto Phase 6:
-curl -X POST http://localhost:9621/insert \
-  -F "file=@navy_rfp.pdf" \
-  -F "mode=auto"  # Triggers Phase 6 post-processing
-```
+# List all workspaces
+python tools/neo4j/clear_neo4j.py --list
 
-### Branch Strategy
+# Duplicate baseline workspace (interactive)
+python tools/neo4j/duplicate_workspace.py
 
+# Clear workspace for fresh testing
+python tools/neo4j/clear_neo4j.py --workspace NAME
 ```
-main                                   # Production releases only
-├── 002-lighRAG-govcon-ontology        # ARCHIVED: Fully local
-├── 003-ontology-lightrag-cloud        # STABLE: Cloud processing
-├── 004-code-optimization             # ARCHIVED: Performance refactoring
-├── 005-entity-type-expansion         # ARCHIVED: Added entity types
-├── 006-phase6-llm-inference          # ARCHIVED: LLM relationship inference
-├── 007-postgresql-integration        # ARCHIVED: Data warehouse foundation
-├── 008-knowledge-graph-enhancement  # ARCHIVED: Multi-workspace graphs
-├── 009-cross-rfp-intelligence        # ARCHIVED: Competitive analytics
-└── 010-pivot-enterprise-platform     # ACTIVE: Enterprise Neo4j evolution
-```
-
-**Never merge directly to main** - use feature branches, PR when stable.
 
 ---
 
 ## Configuration (.env)
 
 ```bash
-# xAI Grok LLM (OpenAI-compatible API)
-LLM_BINDING=openai
+# LLM - xAI Grok (OpenAI-compatible API)
 LLM_BINDING_HOST=https://api.x.ai/v1
 LLM_MODEL=grok-4-fast-reasoning
-LLM_BINDING_API_KEY=xai-your-key
+LLM_BINDING_API_KEY=xai-xxx
 
-# OpenAI Embeddings (CRITICAL: Use OpenAI endpoint, NOT xAI!)
-EMBEDDING_BINDING=openai
+# Embeddings - OpenAI (MUST use OpenAI endpoint, not xAI)
 EMBEDDING_BINDING_HOST=https://api.openai.com/v1
 EMBEDDING_MODEL=text-embedding-3-large
-EMBEDDING_BINDING_API_KEY=sk-proj-your-key
+EMBEDDING_BINDING_API_KEY=sk-proj-xxx
 
-# Processing optimization
-CHUNK_SIZE=4096
-MAX_ASYNC=32
-LLM_MODEL_TEMPERATURE=0.1
-```
+# Storage
+GRAPH_STORAGE=Neo4JStorage  # or NetworkXStorage
+WORKING_DIR=./rag_storage/workspace_name
 
-**Security**: Only use cloud processing for PUBLIC government RFPs. Proprietary queries stay 100% local.
-
----
-
-## Common Pitfalls
-
-### ❌ Importing from Non-Existent Local Packages
-
-```python
-# WRONG: No forked libraries in src/
-from lightrag.lightrag import LightRAG  # ModuleNotFoundError
-
-# CORRECT: Use pip-installed packages
-from lightrag import LightRAG           # From pip package
-from raganything import RAGAnything     # From pip package
-```
-
-### ❌ Processing Large RFPs Without Phase 6
-
-```python
-# WRONG: Using vanilla LightRAG for government RFPs
-rag.insert(file_path)  # Misses L↔M relationships, annex linkage
-
-# CORRECT: Use custom /insert endpoint with Phase 6
-POST /insert with mode=auto  # Triggers post-processing pipeline
-```
-
-### ❌ Starting Application Without User Permission
-
-```python
-# WRONG: Never start the app yourself
-python app.py  # Only user can do this
-
-# CORRECT: Guide user to start app in their terminal
-# Tell user: "Please run: .venv\Scripts\Activate.ps1; python app.py"
-```
-
-### ❌ Creating Documentation for Everything
-
-```python
-# WRONG: Creating docs for every minor change
-# Don't create README updates, architecture docs, etc. unless explicitly requested
-
-# CORRECT: Focus on code implementation
-# Only create docs when they serve critical architectural purpose
+# Batch processing
+BATCH_TIMEOUT_SECONDS=30  # Wait before triggering post-processing
 ```
 
 ---
 
-## Key Files
+## Common Patterns
 
-| File                                | Purpose                      |
-| ----------------------------------- | ---------------------------- |
-| `app.py`                            | Entry point                  |
-| `src/raganything_server.py`         | Main server with ontology    |
-| `src/llm_relationship_inference.py` | Phase 6 inference algorithms |
-| `.env`                              | Cloud configuration          |
+### Batch Document Upload
+
+The `DocumentQueueTracker` in `src/server/routes.py` auto-detects batch completion:
+
+- Uploads register via `register_request_start()`
+- Processing tracked via `document_started()` / `document_completed()`
+- Post-processing triggers after `BATCH_TIMEOUT_SECONDS` with no new uploads
+
+### Custom Endpoint Override
+
+Routes override LightRAG defaults in `src/raganything_server.py` (lines 86-93):
+
+```python
+# Remove original endpoints, add custom ones with multimodal + semantic inference
+create_insert_endpoint(app, rag_instance)
+create_documents_upload_endpoint(app, rag_instance)
+```
 
 ---
 
-**Last Updated**: October 2025 (Branch 010 - Enterprise Neo4j Evolution)
+## File Operations
+
+**Use workspace tools** (read_file, create_file, replace_string_in_file), NOT PowerShell for file I/O.
+
+**PowerShell only for**: `python`, `uv`, `git`, `docker` commands.
+
+---
+
+## GPU Warning
+
+After `uv sync`, PyTorch downgrades to CPU-only. Reinstall CUDA versions manually:
+
+```powershell
+uv pip install torch==2.9.0+cu128 torchvision==0.24.0+cu128 --index-url https://download.pytorch.org/whl/cu128
+```
+
+Verify: `python -c "import torch; print(torch.cuda.is_available())"` → should be `True`
+
+---
+
+## Context Engineering Notes
+
+This is a **living document** - refine based on observed AI mistakes or shortcomings. When implementing future features from `docs/future_features/`, consider creating:
+
+- **Custom agents** (`.github/agents/*.agent.md`) for specialized workflows (e.g., planning, implementation, validation)
+- **Prompt files** (`.github/prompts/*.prompt.md`) for reusable task workflows
+- **Agent handoffs** for multi-step processes (plan → implement → test)
+
+See [VS Code Context Engineering Guide](https://code.visualstudio.com/docs/copilot/guides/context-engineering-guide) for patterns.
+
+---
+
+**Last Updated**: December 2025
