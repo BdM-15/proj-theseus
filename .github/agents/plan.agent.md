@@ -1,7 +1,6 @@
 ---
 description: Generate implementation plans for new features
 name: plan
-tools: ["fetch", "githubRepo", "search", "usages", "read_file"]
 handoffs:
   - label: Start Implementation
     agent: implement

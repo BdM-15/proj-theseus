@@ -1,7 +1,6 @@
 ---
 description: Validate implementations and run tests
 name: validate
-tools: ["runTests", "get_errors", "read_file", "search"]
 ---
 
 # Validation Agent

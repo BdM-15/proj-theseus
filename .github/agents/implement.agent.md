@@ -1,7 +1,6 @@
 ---
 description: Implement features using TDD approach
 name: implement
-tools: ["all"]
 handoffs:
   - label: Start Validation
     agent: validate

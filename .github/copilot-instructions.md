@@ -22,10 +22,10 @@
 
 ### Supporting Documentation
 
-- [System Architecture and Design](../docs/ARCHITECTURE.md) - Overall system architecture, technology stack, and performance metrics
-- [Feature Roadmap](../docs/capture-intelligence/FEATURE_ROADMAP.md) - Future features and agent-powered proposal development workflows
-- [Semantic Post-Processing](../docs/inference/SEMANTIC_POST_PROCESSING.md) - LLM relationship inference algorithms
-- [Neo4j Integration](../docs/neo4j/NEO4J_USER_GUIDE.md) - Graph database workspace management
+- `docs/ARCHITECTURE.md` - Overall system architecture, technology stack, and performance metrics
+- `docs/capture-intelligence/FEATURE_ROADMAP.md` - Future features and agent-powered proposal development workflows
+- `docs/inference/SEMANTIC_POST_PROCESSING.md` - LLM relationship inference algorithms
+- `docs/neo4j/NEO4J_USER_GUIDE.md` - Graph database workspace management
 
 **Note**: Suggest updates to these documents if you find incomplete or conflicting information.
 
