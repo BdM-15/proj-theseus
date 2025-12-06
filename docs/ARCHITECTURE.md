@@ -2,8 +2,8 @@
 
 **Project**: Government Contracting RAG System  
 **Status**: Living Document  
-**Last Updated**: October 6, 2025  
-**Current Branch**: 003-cleanup-refactor (from 003-ontology-lightrag-cloud)
+**Last Updated**: December 6, 2025  
+**Current Branch**: main (production-ready)
 
 ---
 
@@ -11,12 +11,11 @@
 
 1. [Executive Summary](#executive-summary)
 2. [Architecture Overview](#architecture-overview)
-3. [Branch Strategy](#branch-strategy)
-4. [Architecture Decision Records](#architecture-decision-records)
-5. [Ontology Design](#ontology-design)
-6. [Implementation Status](#implementation-status)
-7. [Performance Metrics](#performance-metrics)
-8. [References](#references)
+3. [Architecture Decision Records](#architecture-decision-records)
+4. [Ontology Design](#ontology-design)
+5. [Implementation Status](#implementation-status)
+6. [Performance Metrics](#performance-metrics)
+7. [References](#references)
 
 ---
 
@@ -26,78 +25,98 @@
 
 GovCon Capture Vibe is an **ontology-modified RAG system** for federal RFP analysis that transforms generic document processing into specialized procurement intelligence through domain-specific entity extraction and relationship mapping.
 
-### **Core Innovation: Branch 003 Cloud-Optimized Architecture**
+### **Core Innovation: Production Architecture**
 
-**Breakthrough Performance** (October 5, 2025):
+**Current Performance** (December 2025):
 
-- **Navy MBOS RFP** (71 pages): **69 seconds** vs 8 hours local (417x speedup)
-- **Entity extraction**: 594 entities (3.5x more than local baseline)
-- **Cost**: $0.042 per RFP (4.2 cents)
-- **Architecture**: RAG-Anything (multimodal ingestion) + LightRAG (WebUI/queries) + xAI Grok (2M context cloud LLM)
+- **MCPP II RFP** (425 pages): **~60 minutes** end-to-end processing
+- **Entity extraction**: 1,522 entities across 18 specialized types
+- **Graph storage**: Neo4j (primary) with workspace isolation
+- **Architecture**: RAG-Anything (multimodal PDF parsing via MinerU) + LightRAG (knowledge graph + WebUI) + xAI Grok-4 (fast-reasoning)
 
 ### **Technology Stack**
 
-**Active Codebase** (Post-Phase 1 Cleanup):
+**Active Codebase** (December 2025):
 
-- **Total Lines**: ~320 lines (down from 50,000+)
-- **Core Files**:
-  - `app.py` (40 lines) - Entry point
-  - `src/raganything_server.py` (280 lines) - Main server
-  - Configuration: `.env`, `.env.example`, `pyproject.toml`
+- **Total Lines**: ~4,700 lines (22 Python files in src/)
+- **Core Modules**:
+  - `app.py` - Entry point with Neo4j Docker management
+  - `src/raganything_server.py` - Server orchestration
+  - `src/server/` - FastAPI routing, configuration, initialization
+  - `src/extraction/` - Custom entity extraction (Instructor + Pydantic)
+  - `src/inference/` - Semantic post-processing algorithms
+  - `src/ontology/` - Pydantic schema validation (18 entity types)
 
 **External Dependencies**:
 
-- **RAG-Anything** (`pip install raganything[all]`) - Multimodal document parsing (MinerU backend)
-- **LightRAG** (`pip install lightrag-hku`) - Knowledge graph + WebUI
-- **xAI Grok** - Cloud LLM (grok-beta: $5/M input, $15/M output)
-- **OpenAI Embeddings** - text-embedding-3-large (3072-dim, 8K token limit)
+- **RAG-Anything** (`raganything[all]`) - Multimodal PDF parsing via MinerU
+- **LightRAG** (`lightrag-hku`) - Knowledge graph construction + WebUI
+- **xAI Grok** - Cloud LLM (`grok-4-fast-reasoning`: 2M context, $5/M input)
+- **OpenAI Embeddings** - text-embedding-3-large (3072-dim)
+- **Neo4j 5.25** - Primary graph storage with workspace isolation
+- **Instructor** - Pydantic-enforced LLM outputs with retry logic
 
 ### **Strategic Value**
 
-| Capability             | Branch 002 (Local)  | Branch 003 (Cloud)                   | Improvement              |
-| ---------------------- | ------------------- | ------------------------------------ | ------------------------ |
-| **Processing Speed**   | 8 hours (Navy MBOS) | 69 seconds                           | 417x faster              |
-| **Entities Extracted** | 172 entities        | 594 entities                         | 3.5x more                |
-| **Cost per RFP**       | $0 (local Ollama)   | $0.042                               | Minimal                  |
-| **Privacy**            | 100% local          | Public RFPs → cloud, Queries → local | Hybrid security          |
-| **Chunk Size**         | 800 tokens          | 4,096 tokens                         | 5x larger (fewer chunks) |
-| **Concurrency**        | Sequential          | 32 parallel requests                 | Massive parallelization  |
+| Capability             | Current Production (Dec 2025) | Notes                                |
+| ---------------------- | ----------------------------- | ------------------------------------ |
+| **Entity Types**       | 18 specialized types          | Government contracting ontology      |
+| **Graph Storage**      | Neo4j (primary)               | Workspace isolation, Cypher queries  |
+| **Extraction Quality** | 1,522 entities (425-page RFP) | Pydantic validation, 5x retry        |
+| **Privacy**            | Public RFPs → cloud           | Queries → 100% local                 |
+| **Chunk Size**         | 8,192 tokens                  | Optimized for comprehensive coverage |
+| **LLM Model**          | grok-4-fast-reasoning         | 2M context, deterministic (temp=0.1) |
+| **Multimodal**         | Tables, images, text          | MinerU parsing with ontology mapping |
 
 ---
 
 ## Architecture Overview
 
-### **Branch 003: Cloud-Optimized Processing Flow**
+### **Production Processing Flow** (December 2025)
 
 ```
 Public RFP Upload (PDF)
     ↓
-Document Type Detection (user prompt)
-    ↓
-[PUBLIC] → RAG-Anything Multimodal Pipeline
+RAG-Anything Multimodal Pipeline
     ├─ MinerU Document Parsing
     │   ├─ Text extraction
-    │   ├─ Table extraction (Section M evaluation matrices)
+    │   ├─ Table extraction (Section M evaluation matrices, BOE tables)
     │   ├─ Image extraction (org charts, diagrams)
-    │   └─ Equation parsing (technical specs)
+    │   └─ Layout analysis (headers, footers, captions)
     ↓
-Cloud Processing (xAI Grok)
-    ├─ LLM: grok-beta (2M context window, $5/M input)
+Cloud Processing (xAI Grok-4)
+    ├─ LLM: grok-4-fast-reasoning (2M context, $5/M input)
     ├─ Embeddings: OpenAI text-embedding-3-large (3072-dim)
-    ├─ Chunk size: 4,096 tokens (5x larger vs Branch 002)
-    ├─ Concurrency: 32 parallel requests
+    ├─ Chunk size: 8,192 tokens with 1,200 token overlap (15%)
+    ├─ Concurrency: 16 workers (MAX_ASYNC, prevents rate limit errors)
     └─ Temperature: 0.1 (deterministic extraction)
          ↓
-Entity Extraction (12 govcon types)
-    ├─ ORGANIZATION, CONCEPT, REQUIREMENT, DELIVERABLE
-    ├─ EVALUATION_FACTOR, SECTION, CLAUSE, EVENT
-    ├─ TECHNOLOGY, PERSON, LOCATION, DOCUMENT
-    └─ Constrained relationships (prevents O(n²) explosion)
+Custom Ontology Extraction (18 entity types)
+    ├─ Core: organization, concept, technology, person, location, event
+    ├─ Requirements: requirement (with criticality_level, requirement_type)
+    ├─ Structural: clause, section, document, deliverable
+    ├─ Program: program, equipment
+    ├─ Evaluation: evaluation_factor, submission_instruction
+    ├─ Strategic: strategic_theme (win themes, hot buttons)
+    ├─ Performance: statement_of_work, performance_metric
+    └─ Pydantic validation: Instructor library with 5x retry
          ↓
-Knowledge Graph Construction (LightRAG)
-    ├─ Entities: 594 (Navy MBOS baseline)
-    ├─ Relationships: 584
-    ├─ Storage: ./rag_storage/ (local only)
+Semantic Post-Processing (8 LLM algorithms)
+    ├─ Entity type correction (forbidden types → valid types)
+    ├─ Document hierarchy (DOCUMENT → SECTION relationships)
+    ├─ Clause clustering (CLAUSE → parent SECTION)
+    ├─ Section L↔M mapping (SUBMISSION_INSTRUCTION ↔ EVALUATION_FACTOR)
+    ├─ Requirement evaluation (REQUIREMENT → EVALUATION_FACTOR)
+    ├─ SOW deliverables (STATEMENT_OF_WORK → DELIVERABLE)
+    ├─ Deliverable traceability (DELIVERABLE → REQUIREMENT/EVALUATION_FACTOR)
+    └─ Workload enrichment (extract BOE categories from requirements)
+         ↓
+Knowledge Graph Storage (Neo4j)
+    ├─ Workspace isolation: Each RFP gets unique label (e.g., mcpp_drfp_2025)
+    ├─ Entities: ~1,500 per large RFP (18 types)
+    ├─ Relationships: ~1,000 per RFP (5 types: CHILD_OF, EVALUATED_BY, GUIDES, REQUIRES, RELATED_TO)
+    ├─ Storage: Neo4j database (http://localhost:7474)
+    └─ Query: Cypher + LightRAG hybrid search
     └─ WebUI: http://localhost:9621/
          ↓
 Query Processing (100% Local)
@@ -124,78 +143,35 @@ Query Processing (100% Local)
 # LLM Settings
 LLM_BINDING_API_KEY=xai-your-key-here
 LLM_BINDING_HOST=https://api.x.ai/v1
-LLM_BINDING_MODEL=grok-beta
+LLM_MODEL=grok-4-fast-reasoning
+LLM_MODEL_TEMPERATURE=0.1
 
 # Embedding Settings
 EMBEDDING_BINDING_API_KEY=sk-proj-your-openai-key
 EMBEDDING_BINDING_HOST=https://api.openai.com/v1
-EMBEDDING_BINDING_MODEL=text-embedding-3-large
+EMBEDDING_MODEL=text-embedding-3-large
 
-# Cloud Optimization
-CHUNK_SIZE=4096                    # 5x larger chunks (limited by 8K embedding model)
-CHUNK_OVERLAP_SIZE=512             # 12.5% overlap for continuity
-MAX_ASYNC=32                       # 32 parallel LLM requests
-EMBEDDING_FUNC_MAX_ASYNC=32        # 32 parallel embedding requests
-LLM_MODEL_TEMPERATURE=0.1          # Deterministic extraction
+# Storage
+GRAPH_STORAGE=Neo4JStorage  # or NetworkXStorage
+WORKING_DIR=./rag_storage/workspace_name
+
+# Chunking (REQUIRED - no defaults)
+CHUNK_SIZE=8192                    # 8K tokens per chunk (optimized for quality)
+CHUNK_OVERLAP_SIZE=1200            # 15% overlap for continuity (1200/8192)
+
+# Concurrency
+MAX_ASYNC=16                       # 16 parallel LLM requests (prevents rate limit errors)
+EMBEDDING_FUNC_MAX_ASYNC=16        # 16 parallel embedding requests
+
+# Batch processing
+BATCH_TIMEOUT_SECONDS=30  # Wait before triggering post-processing
 ```
 
 **Performance Results**:
 
-- **Navy MBOS RFP** (71 pages, 15 chunks): 69 seconds, $0.042 cost
-- **Speedup**: 417x faster than Branch 002 (8 hours → 69 seconds)
-- **Entity density**: 39 entities/chunk average (excellent)
-- **Relationship density**: 39 relationships/chunk (strong linking)
-
----
-
-## Branch Strategy
-
-### **Branch Evolution**
-
-```
-main (production releases only)
- ├── 002-lighRAG-govcon-ontology ✅ STABLE BASELINE
- │    └── Fully local processing (Ollama + Mistral Nemo 12B)
- │        └── 8 hours/RFP, $0 cost, 100% private
- └── 003-ontology-lightrag-cloud 🚀 CURRENT
-      ├── fdde07f: Artifacts preserved (old fork, test files)
-      ├── b5a5796: Branch 003 cloud optimization complete
-      └── 003-cleanup-refactor (ACTIVE)
-           └── 42e8432: Phase 1 cleanup (254 files deleted, 58K lines removed)
-```
-
-### **Branch 003 Development Timeline**
-
-| Phase                            | Status         | Completion  | Key Achievements                         |
-| -------------------------------- | -------------- | ----------- | ---------------------------------------- |
-| **Setup & Testing**              | ✅ Complete    | Oct 5, 2025 | Navy MBOS: 69s, 594 entities, $0.042     |
-| **Security Remediation**         | ✅ Complete    | Oct 6, 2025 | .env removed from git, keys never pushed |
-| **Artifact Preservation**        | ✅ Complete    | Oct 6, 2025 | 238 files archived in git history        |
-| **Phase 1: Code Cleanup**        | ✅ Complete    | Oct 6, 2025 | 254 files deleted, ~320 lines active     |
-| **Phase 2: Documentation**       | 🚧 In Progress | Oct 6, 2025 | Consolidating into ARCHITECTURE.md       |
-| **Phase 3: Ontology Refinement** | 📋 Planned     | TBD         | Shipley methodology integration          |
-| **Phase 4: Golden Dataset**      | 📋 Planned     | TBD         | Process 5-10 RFPs for fine-tuning        |
-
-### **Why Two Branches?**
-
-**Branch 002 (Local Foundation)**:
-
-- ✅ Zero dependencies on cloud services
-- ✅ 100% privacy for proprietary content
-- ✅ Baseline architecture validation
-- ✅ Air-gapped deployment capable
-- ⚠️ Slower processing (6-8 hours for large RFPs)
-
-**Branch 003 (Cloud Acceleration)**:
-
-- ✅ 417x faster processing for public RFPs
-- ✅ 3.5x more entities extracted (594 vs 172)
-- ✅ Multimodal parsing (tables, images, equations)
-- ✅ Minimal cost ($0.042 per RFP)
-- ⚠️ Requires cloud API keys for public RFP processing
-- ✅ Queries remain 100% local (zero cloud exposure)
-
-**Configuration Management**: Both branches share same codebase, only `.env` differs (see `.env.example`).
+- **MCPP II DRAFT RFP** (425 pages): ~60 minutes, 1,522 entities, ~1,000 relationships
+- **Entity density**: ~3.6 entities/page (comprehensive coverage)
+- **Chunk size**: 8,192 tokens with 1,200 token overlap (15%)
 
 ---
 
@@ -204,9 +180,9 @@ main (production releases only)
 ### **ADR-001: LLM-Native Semantic Approach Over Regex Preprocessing**
 
 **Date**: October 4, 2025  
-**Status**: Accepted (then superseded by Branch 003 cloud optimization)
+**Status**: Accepted
 
-**Context**: Initial Branch 002 explored regex-based section identification (`ShipleyRFPChunker`) which showed superior metrics (772 entities vs 569 generic) but created fictitious entities like "RFP Section J-L" (doesn't exist in Uniform Contract Format).
+**Context**: Early exploration of regex-based section identification showed promise but created fictitious entities like "RFP Section J-L" (doesn't exist in Uniform Contract Format).
 
 **Decision**: Adopt LLM-native semantic understanding, eliminating regex preprocessing.
 
@@ -215,46 +191,122 @@ main (production releases only)
 - ❌ **Regex Issues**: Fictitious entities, false boundaries, pattern fragility
 - ✅ **LLM Benefits**: Semantic understanding, context awareness, handles variations
 
-**Outcome**: Branch 003 uses pure LLM semantic processing with cloud-optimized chunking (4,096 tokens) and massive parallelization (32 concurrent requests) for 417x speedup without regex preprocessing.
+**Outcome**: Production uses pure LLM semantic processing with 8,192-token chunking for comprehensive entity extraction without regex preprocessing.
 
 ---
 
-### **ADR-002: Branch 003 Cloud Optimization Strategy**
+### **ADR-002: Cloud Optimization with xAI Grok**
 
 **Date**: October 5, 2025  
 **Status**: Accepted
 
-**Context**: Branch 002 local processing took 8 hours for Navy MBOS RFP (71 pages). Fine-tuning would require 4-6 months development. Need immediate production speed.
+**Context**: Need production-ready speed for public RFP processing without 4-6 months of local model fine-tuning.
 
-**Decision**: Hybrid cloud architecture using xAI Grok for public RFP processing, local Ollama for proprietary queries.
+**Decision**: Hybrid cloud architecture using xAI Grok-4 for public RFP processing, maintaining 100% local query processing.
 
 **Rationale**:
 
 - ✅ **Immediate availability**: xAI Grok production-ready (vs 6-month fine-tuning)
-- ✅ **Superior speed**: 20-30x faster than local 12B, 417x achieved
-- ✅ **Larger model capability**: Grok-beta (2M context) vs fine-tuned 7B
+- ✅ **Large model capability**: grok-4-fast-reasoning with 2M context window
 - ✅ **Privacy maintained**: Proprietary queries stay 100% local
-- ✅ **Minimal cost**: $0.042/RFP vs 2-4 hours compute time
-
-**Alternatives Considered**:
-
-1. **Fine-tune local 7B model**: 4-6 months dev, 3-5x speedup (vs 417x cloud)
-2. **OpenAI GPT-4**: More expensive, similar quality
-3. **Anthropic Claude**: Different API structure, migration cost
-4. **Azure OpenAI**: Enterprise focus, higher cost
+- ✅ **Minimal cost**: ~$0.85 per large RFP
 
 **Consequences**:
 
-- **PRO**: 417x speedup validated on Navy MBOS RFP
-- **PRO**: 3.5x more entities extracted (594 vs 172)
+- **PRO**: 60-minute processing for 425-page RFPs
+- **PRO**: 1,522 entities extracted (comprehensive coverage)
 - **PRO**: Multimodal parsing included (tables, images)
 - **PRO**: Query processing stays 100% local
 - **CON**: Dependency on xAI API availability
-- **MITIGATION**: Branch 002 remains available as fallback
 
 ---
 
-### **ADR-003: RAG-Anything Non-Invasive Integration**
+### **ADR-003: Pydantic Schema Enforcement with Instructor**
+
+**Date**: November 2025  
+**Status**: Accepted (Issue #6 Complete)
+
+**Context**: Need type-safe entity extraction with validation and graceful failure handling. LLMs occasionally produce invalid entity types or malformed JSON.
+
+**Decision**: Use Instructor library to wrap xAI Grok API, enforcing Pydantic schema validation during extraction.
+
+**Implementation**:
+
+```python
+from instructor import from_openai
+from pydantic import BaseModel, Field, field_validator
+
+class Entity(BaseModel):
+    entity_name: str
+    entity_type: str  # Must match one of 18 types
+    description: str
+
+    @field_validator('entity_type')
+    def validate_entity_type(cls, v):
+        valid_types = ["organization", "concept", "requirement", ...]
+        if v.lower() not in valid_types:
+            raise ValueError(f"Invalid entity type: {v}")
+        return v.lower()
+
+client = from_openai(OpenAI(base_url="https://api.x.ai/v1"))
+result = client.chat.completions.create(
+    model="grok-4-fast-reasoning",
+    response_model=ExtractionResult,
+    max_retries=5,
+    messages=[...]
+)
+```
+
+**Rationale**:
+
+- ✅ **Type safety**: Invalid entity types rejected at extraction time
+- ✅ **Graceful degradation**: 5x retry with exponential backoff
+- ✅ **Failed chunk tracking**: Logs chunks that fail validation
+- ✅ **Schema evolution**: Easy to add new fields (e.g., `criticality_level`)
+
+**Consequences**:
+
+- **PRO**: Zero malformed entities in knowledge graph
+- **PRO**: Clear error messages for debugging extraction prompts
+- **PRO**: Production-ready with robust error handling
+- **CON**: Slightly higher latency (validation overhead)
+
+---
+
+### **ADR-004: Neo4j as Primary Graph Storage**
+
+**Date**: November 2025  
+**Status**: Accepted
+
+**Context**: NetworkXStorage limited for multi-workspace scenarios, complex queries, and production scale. Need workspace isolation, Cypher queries, and Docker-managed persistence.
+
+**Decision**: Use Neo4j 5.25 as primary graph storage with automatic Docker container management.
+
+**Implementation**:
+
+- **Workspace isolation**: Each RFP labeled (e.g., `mcpp_drfp_2025`)
+- **Docker auto-start**: `app.py` manages Neo4j container lifecycle
+- **Fallback**: NetworkXStorage remains available for air-gapped deployments
+- **Configuration**: `.env` setting `GRAPH_STORAGE=Neo4JStorage`
+
+**Rationale**:
+
+- ✅ **Multi-workspace support**: Isolate multiple RFPs in one database
+- ✅ **Cypher queries**: Complex graph traversals (Section L↔M mapping)
+- ✅ **WebUI integration**: Neo4j Browser (http://localhost:7474)
+- ✅ **Production-grade**: ACID transactions, backup/restore
+
+**Consequences**:
+
+- **PRO**: Workspace management tools (duplicate, clear, list)
+- **PRO**: Complex relationship queries (3-hop traversals)
+- **PRO**: Browser visualization for RFP structure
+- **CON**: Docker Desktop required (vs NetworkX pure Python)
+- **MITIGATION**: NetworkX fallback for edge cases
+
+---
+
+### **ADR-005: RAG-Anything Non-Invasive Integration**
 
 **Date**: October 5, 2025  
 **Status**: Accepted
@@ -351,29 +403,48 @@ multimodal_rag = RAGAnything(
 
 ## Ontology Design
 
-### **Government Contracting Entity Types (12 Types)**
+### **Government Contracting Entity Types (18 Types)**
+
+**Source**: `src/server/config.py` (lines 75-93)
 
 ```python
 class EntityType(str, Enum):
     # Core Business Entities
-    ORGANIZATION = "ORGANIZATION"      # Contractors, agencies, departments
-    PERSON = "PERSON"                  # POCs, contracting officers
-    LOCATION = "LOCATION"              # Delivery sites, performance locations
+    ORGANIZATION = "organization"      # Contractors, agencies, departments
+    PERSON = "person"                  # POCs, contracting officers
+    LOCATION = "location"              # Delivery sites, performance locations
 
     # Technical & Conceptual
-    CONCEPT = "CONCEPT"                # CLINs, technical concepts, budget/pricing
-    TECHNOLOGY = "TECHNOLOGY"          # Systems, tools, platforms
+    CONCEPT = "concept"                # CLINs, technical concepts, budget/pricing
+    TECHNOLOGY = "technology"          # Systems, tools, platforms
 
     # Temporal
-    EVENT = "EVENT"                    # Milestones, deliveries, reviews
+    EVENT = "event"                    # Milestones, deliveries, reviews
 
-    # RFP-Specific (Govcon Domain)
-    REQUIREMENT = "REQUIREMENT"        # Explicit must/should/may requirements
-    DELIVERABLE = "DELIVERABLE"        # Contract deliverables, work products
-    EVALUATION_FACTOR = "EVALUATION_FACTOR"  # Section M factors, Section L instructions
-    SECTION = "SECTION"                # RFP sections (A-M, J-attachments)
-    CLAUSE = "CLAUSE"                  # FAR clauses, contract provisions
-    DOCUMENT = "DOCUMENT"              # Referenced documents, attachments
+    # Requirements Domain
+    REQUIREMENT = "requirement"        # Explicit shall/must/should/may requirements
+                                       # Fields: requirement_type, criticality_level, compliance_method
+
+    # Document Structure
+    SECTION = "section"                # RFP sections (A-M, J-attachments)
+    CLAUSE = "clause"                  # FAR clauses, contract provisions
+    DOCUMENT = "document"              # Referenced documents, attachments
+
+    # Deliverables & Work Products
+    DELIVERABLE = "deliverable"        # Contract deliverables, CDRLs, reports
+    STATEMENT_OF_WORK = "statement_of_work"  # Section C statements of work
+
+    # Program Management
+    PROGRAM = "program"                # Programs, subprograms, initiatives
+    EQUIPMENT = "equipment"            # Physical equipment, assets, tools
+
+    # Evaluation Domain (Section L↔M mapping)
+    EVALUATION_FACTOR = "evaluation_factor"  # Section M factors with weights
+    SUBMISSION_INSTRUCTION = "submission_instruction"  # Section L instructions
+
+    # Strategic & Performance
+    STRATEGIC_THEME = "strategic_theme"      # Win themes, hot buttons, pain points
+    PERFORMANCE_METRIC = "performance_metric"  # KPIs, metrics, SLAs
 ```
 
 ### **Constrained Relationship Schema**
@@ -426,116 +497,126 @@ VALID_RELATIONSHIPS = {
 
 ## Implementation Status
 
-### **Branch 003 Cloud Optimization - COMPLETE ✅**
+### **Production System - COMPLETE ✅**
 
-**Performance Validated** (October 5, 2025):
-
-- **Navy MBOS RFP** (71 pages):
-  - Processing time: **69 seconds** (vs 8 hours local)
-  - Speedup: **417x faster**
-  - Entity extraction: **594 entities** (vs 172 local, 3.5x more)
-  - Relationship extraction: **584 relationships**
-  - Chunk count: **15 chunks** (vs 240 at 800 tokens, 93.75% reduction)
-  - Cost per RFP: **$0.042** (4.2 cents)
-
-**Architecture**:
+**December 2025 Architecture**:
 
 - ✅ RAG-Anything integration (multimodal parsing via MinerU)
 - ✅ LightRAG WebUI (http://localhost:9621/)
-- ✅ xAI Grok cloud LLM (grok-beta, 2M context)
+- ✅ xAI Grok cloud LLM (grok-4-fast-reasoning, 2M context)
 - ✅ OpenAI embeddings (text-embedding-3-large, 3072-dim)
-- ✅ Cloud optimization (4,096 token chunks, 32 parallel requests)
-- ✅ Local query processing (100% private)
+- ✅ Neo4j primary storage with workspace isolation
+- ✅ Pydantic schema enforcement (Instructor library)
+- ✅ 18 entity types with semantic detection
+- ✅ 8 semantic post-processing algorithms
+- ✅ Custom agents framework (.github/agents/)
 
-### **Phase 1: Code Cleanup - COMPLETE ✅**
+### **Recent Major Features**
 
-**Results** (October 6, 2025):
+**Issue #6: Pydantic Schema Enforcement** (✅ Complete):
 
-- ✅ **254 files deleted** (58,044 lines removed)
-- ✅ **320 lines active** (down from 50,000+)
-- ✅ **2 files in src/**: `raganything_server.py` + `__init__.py`
-- ✅ **Import test passed**: System fully functional
-- ✅ **Git commit**: 42e8432 (all changes committed)
+- Instructor library wraps xAI Grok API
+- 5x retry with exponential backoff
+- Failed chunk tracking and logging
+- Graceful degradation on validation failures
 
-### **Phase 2: Documentation Consolidation - IN PROGRESS 🚧**
+**Issue #13: Neo4j Primary Storage** (✅ Complete):
 
-**Goals**:
+- Docker auto-managed Neo4j 5.25 container
+- Workspace isolation via labels
+- Cypher query support
+- Neo4j Browser integration (http://localhost:7474)
 
-- 🚧 Create comprehensive `ARCHITECTURE.md` (this file)
-- 📋 Archive historical docs (keep PDFs, Shipley guides)
-- 📋 Clean prompts/ directory (identify active vs archived)
-- 📋 Update README.md with Branch 003 results
+**Semantic Post-Processing** (✅ Complete):
 
-### **Future Phases**
+- Entity type correction (forbidden → valid types)
+- Document hierarchy inference
+- Clause clustering
+- Section L↔M mapping (SUBMISSION_INSTRUCTION ↔ EVALUATION_FACTOR)
+- Requirement evaluation (REQUIREMENT → EVALUATION_FACTOR)
+- SOW deliverables (STATEMENT_OF_WORK → DELIVERABLE)
+- Deliverable traceability
+- Workload enrichment (BOE category extraction)
 
-**Phase 3: Ontology Refinement with Shipley** (Planned):
+**Multimodal Table Processing** (✅ Complete):
 
-- 📋 Add Shipley methodology entity types (WIN_THEME, DISCRIMINATOR, PINK_TEAM, RED_TEAM)
-- 📋 Enhance compliance level classification (Must/Should/May/Will)
-- 📋 Integrate Shipley capture best practices
-- 📋 Update extraction prompts with Shipley examples
+- 2-stage pipeline: MinerU → semantic entity mapping
+- Section M evaluation matrices
+- BOE workload tables
+- CLIN pricing tables
 
-**Phase 4: Golden Dataset Creation** (Planned):
+**Custom Agents Framework** (✅ Complete):
 
-- 📋 Process 5-10 diverse public RFPs
-- 📋 Validate entity extraction quality
-- 📋 Create training dataset for future fine-tuning
-- 📋 Document entity type patterns and relationships
+- VS Code 1.106+ custom agents (.agent.md files)
+- Plan agent (read-only, implementation planning)
+- Implement agent (TDD approach, full editing)
+- Validate agent (testing, Neo4j verification)
+- Prompt files (/plan-feature, /add-entity-type, etc.)
 
 ---
 
 ## Performance Metrics
 
-### **Branch 003 Performance Summary**
+### **Production Performance Summary**
 
-| Metric                  | Branch 002 (Local)      | Branch 003 (Cloud)       | Improvement                      |
-| ----------------------- | ----------------------- | ------------------------ | -------------------------------- |
-| **Processing Time**     | 8 hours (Navy MBOS)     | 69 seconds               | 417x faster                      |
-| **Entities Extracted**  | 172                     | 594                      | 3.5x more                        |
-| **Relationships Found** | ~63                     | 584                      | 9.3x more                        |
-| **Entity Density**      | ~7 per chunk            | 39 per chunk             | 5.6x denser                      |
-| **Chunk Count**         | 240 chunks (800 tokens) | 15 chunks (4,096 tokens) | 93.75% reduction                 |
-| **Cost per RFP**        | $0 (local)              | $0.042                   | Minimal incremental cost         |
-| **Query Latency**       | Fast (local)            | Fast (local)             | No change (queries always local) |
+| Metric                  | Current Production (Dec 2025) | Notes                                     |
+| ----------------------- | ----------------------------- | ----------------------------------------- |
+| **Processing Time**     | ~60 minutes (425-page RFP)    | MCPP II DRAFT RFP baseline                |
+| **Entities Extracted**  | 1,522 entities                | 18 specialized govcon types               |
+| **Relationships Found** | ~1,000 relationships          | 5 relationship types + semantic inference |
+| **Entity Density**      | ~3.6 entities/page            | Comprehensive coverage                    |
+| **Chunk Size**          | 8,192 tokens                  | Optimized for extraction quality          |
+| **Storage**             | Neo4j (primary)               | Workspace-isolated, Cypher queries        |
+| **LLM Model**           | grok-4-fast-reasoning         | 2M context, temp=0.1 (deterministic)      |
+| **Validation**          | Pydantic + 5x retry           | Zero malformed entities                   |
 
 ### **Quality Indicators**
 
 **Entity Extraction**:
 
-- ✅ Average 39 entities/chunk (excellent density)
-- ✅ 12 entity types properly classified
-- ✅ Only 3 minor entity type formatting warnings
-- ✅ Zero contamination (no fictitious entities)
+- ✅ 18 entity types properly classified
+- ✅ Pydantic validation enforced (Instructor library)
+- ✅ 5x retry with exponential backoff
+- ✅ Failed chunk tracking for post-mortem analysis
+- ✅ BOECategory enum for workload classification
 
 **Relationship Extraction**:
 
-- ✅ Average 39 relationships/chunk (strong linking)
-- ✅ Constrained by ontology (valid patterns only)
-- ✅ Section L↔M connections preserved
-- ✅ Requirement→Deliverable mappings accurate
+- ✅ 5 core relationship types (CHILD_OF, EVALUATED_BY, GUIDES, REQUIRES, RELATED_TO)
+- ✅ Section L↔M connections (SUBMISSION_INSTRUCTION ↔ EVALUATION_FACTOR)
+- ✅ Requirement→Deliverable mappings
+- ✅ Document hierarchy (DOCUMENT → SECTION → CLAUSE)
+
+**Semantic Post-Processing**:
+
+- ✅ 8 LLM-powered inference algorithms
+- ✅ Batch processing (50 items per LLM call)
+- ✅ Confidence scoring (0.0-1.0 per relationship)
+- ✅ Human-readable reasoning strings
 
 **Multimodal Parsing**:
 
-- ✅ Tables extracted from evaluation matrices
-- ✅ Organizational charts parsed
-- ✅ Technical diagrams classified
-- ✅ Multimodal entities properly typed
+- ✅ Tables extracted from evaluation matrices (Section M)
+- ✅ BOE workload tables parsed and classified
+- ✅ CLIN pricing tables extracted
+- ✅ 2-stage pipeline: MinerU → semantic mapping
 
 ### **Cost Analysis**
 
-**Navy MBOS RFP** (71 pages, 15 chunks):
+**MCPP II DRAFT RFP** (425 pages):
 
-- **LLM costs**: $0.038 (text extraction)
-- **Embedding costs**: $0.004 (vector generation)
-- **Total**: $0.042 per RFP
+- **Extraction**: ~$0.50 (text + table processing)
+- **Embeddings**: ~$0.05 (vector generation)
+- **Semantic post-processing**: ~$0.30 (8 algorithms)
+- **Total**: ~$0.85 per large RFP
 
 **Monthly Projections**:
 
-- 10 RFPs/month: $0.42
-- 50 RFPs/month: $2.10
-- 100 RFPs/month: $4.20
+- 10 RFPs/month: ~$8.50
+- 50 RFPs/month: ~$42.50
+- 100 RFPs/month: ~$85.00
 
-**ROI**: Cloud costs minimal vs 417x speedup benefit.
+**ROI**: Minimal costs vs 60-minute processing time per large RFP.
 
 ---
 
@@ -570,8 +651,7 @@ VALID_RELATIONSHIPS = {
 **Cloud Services**:
 
 - **xAI Grok**: https://docs.x.ai
-  - grok-beta: $5/M input, $15/M output tokens
-  - grok-vision-beta: $5/M tokens (vision model)
+  - grok-4-fast-reasoning: $5/M input, $15/M output tokens
   - API: OpenAI-compatible (https://api.x.ai/v1)
 - **OpenAI Embeddings**: https://platform.openai.com/docs/guides/embeddings
   - text-embedding-3-large: 3072-dim, 8K token limit
@@ -594,12 +674,11 @@ VALID_RELATIONSHIPS = {
 ### **Git Repository**
 
 - **Repository**: https://github.com/BdM-15/govcon-capture-vibe
-- **Current Branch**: `003-cleanup-refactor`
-- **Parent Branch**: `003-ontology-lightrag-cloud`
-- **Stable Baseline**: `002-lighRAG-govcon-ontology`
+- **Current Branch**: main
+- **Development Practice**: Always create feature branches, never commit directly to main
 
 ---
 
-**Last Updated**: October 6, 2025  
-**Document Version**: 1.0.0  
-**Status**: 🚧 Phase 2 Documentation Consolidation In Progress
+**Last Updated**: December 6, 2025  
+**Document Version**: 2.0.0  
+**Status**: ✅ Documentation Updated to Reflect Current Production State
