@@ -234,6 +234,7 @@ Extract government contracting entities from this {content_type}:
    - Resources ↔ Requirements (capability enablers)
 
 Focus on workload drivers and basis of estimate elements.
+"""
             
             result = await json_extractor.extract_from_text(
                 text=ontology_prompt,
