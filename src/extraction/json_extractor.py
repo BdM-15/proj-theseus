@@ -342,7 +342,7 @@ Extract all relevant entities following the government contracting ontology:
 Return structured JSON using the ExtractionResult schema."""
 
         try:
-            result = await self._extract_with_retry(user_prompt)
+            result = await self._extract_with_retry(user_prompt, chunk_id)
             
             logger.info(
                 f"📝 Extracted from text ({chunk_id}): "

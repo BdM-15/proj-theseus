@@ -1518,62 +1518,58 @@ async def _infer_relationships_multi_algorithm(
     semaphore = asyncio.Semaphore(MAX_CONCURRENT_LLM_CALLS)
     
     # =========================================================================
-    # PARALLEL EXECUTION ARCHITECTURE (Issue #30 Phase 1)
+    # PARALLEL EXECUTION ARCHITECTURE (Issue #30 Phase 3B)
     # =========================================================================
-    # Algorithms grouped into 3 independent waves for parallel execution:
-    # - Wave 1: Document structure (Algorithms 1, 2, 5) - no dependencies
-    # - Wave 2: Batched relationship inference (Algorithms 3, 4) - CRITICAL FIXES
-    # - Wave 3: Semantic linking (Algorithms 6, 8) - independent
-    # - Algorithm 7: Heuristic (instant, regex-based) - runs separately
+    # ALL algorithms execute in parallel (no wave-based sequencing):
+    # - Algorithms 1-6, 8: Run concurrently with shared semaphore (MAX_ASYNC=8)
+    # - Algorithm 7: Heuristic (instant, regex-based) - no LLM, runs separately
+    # 
+    # Phase 3B Optimization:
+    # - OLD (Phase 2): Sequential waves → 5.1 min total
+    #   * Wave 1 (Algos 1,2,5): 49s
+    #   * Wave 2 (Algos 3,4): 195s (sequential!)
+    #   * Wave 3 (Algos 6,8): 63s
+    # - NEW (Phase 3B): Full parallelization → ~2 min (longest algorithm)
+    #   * All algos run concurrently, limited only by semaphore (MAX_ASYNC=8)
+    #   * Total time = max(algo_times) ≈ 121s (Algorithm 3)
     #
-    # Expected Impact: 34+ min → ~3min (91% reduction via parallelization)
+    # Expected Impact: 5.1 min → 2 min (60% reduction, 186s savings)
     # =========================================================================
     
-    # WAVE 1: Document structure algorithms (independent)
-    logger.info("\n🌊 Wave 1: Document Structure Analysis")
-    wave_1_tasks = [
+    logger.info("\n⚡ Starting ALL algorithms in parallel (Phase 3B full parallelization)...")
+    
+    # Prepare all algorithm tasks
+    all_tasks = [
         _algorithm_1_instruction_eval(entities_by_type, id_to_entity, system_prompt, model, temperature),
         _algorithm_2_eval_hierarchy(entities_by_type, id_to_entity, system_prompt, model, temperature),
-        _algorithm_5_doc_hierarchy(entities, id_to_entity, system_prompt, model, temperature),
-    ]
-    
-    wave_1_results = await asyncio.gather(*wave_1_tasks, return_exceptions=True)
-    for i, result in enumerate(wave_1_results, 1):
-        if isinstance(result, Exception):
-            logger.error(f"  ❌ Wave 1 Algorithm {i} failed: {result}")
-        else:
-            all_relationships.extend(result)
-            logger.info(f"  ✅ Wave 1 Algorithm {i}: {len(result)} relationships")
-    
-    # WAVE 2: Batched relationship inference (critical fixes for Algorithms 3 & 4)
-    logger.info("\n🌊 Wave 2: Batched Relationship Inference (CRITICAL FIXES)")
-    wave_2_tasks = [
         _algorithm_3_req_eval_batched(entities_by_type, id_to_entity, system_prompt, model, temperature, semaphore),
         _algorithm_4_deliverable_trace_batched(entities_by_type, id_to_entity, system_prompt, model, temperature, semaphore),
-    ]
-    
-    wave_2_results = await asyncio.gather(*wave_2_tasks, return_exceptions=True)
-    for i, result in enumerate(wave_2_results, 1):
-        if isinstance(result, Exception):
-            logger.error(f"  ❌ Wave 2 Algorithm {i} failed: {result}")
-        else:
-            all_relationships.extend(result)
-            logger.info(f"  ✅ Wave 2 Algorithm {i}: {len(result)} relationships")
-    
-    # WAVE 3: Semantic linking algorithms (independent)
-    logger.info("\n🌊 Wave 3: Semantic Linking")
-    wave_3_tasks = [
+        _algorithm_5_doc_hierarchy(entities, id_to_entity, system_prompt, model, temperature),
         _algorithm_6_concept_linking(entities_by_type, id_to_entity, system_prompt, model, temperature),
         _algorithm_8_orphan_resolution(entities, id_to_entity, neo4j_io, model, temperature),
     ]
     
-    wave_3_results = await asyncio.gather(*wave_3_tasks, return_exceptions=True)
-    for i, result in enumerate(wave_3_results, 1):
+    # Execute all algorithms in parallel
+    logger.info(f"   Executing 7 LLM-powered algorithms concurrently (MAX_ASYNC={MAX_CONCURRENT_LLM_CALLS})...")
+    algorithm_results = await asyncio.gather(*all_tasks, return_exceptions=True)
+    
+    # Process results
+    algorithm_names = [
+        "Algorithm 1: Instruction-Evaluation",
+        "Algorithm 2: Evaluation Hierarchy",
+        "Algorithm 3: Requirement-Evaluation",
+        "Algorithm 4: Deliverable Traceability",
+        "Algorithm 5: Document Hierarchy",
+        "Algorithm 6: Concept Linking",
+        "Algorithm 8: Orphan Resolution"
+    ]
+    
+    for i, (name, result) in enumerate(zip(algorithm_names, algorithm_results), 1):
         if isinstance(result, Exception):
-            logger.error(f"  ❌ Wave 3 Algorithm {i} failed: {result}")
+            logger.error(f"  ❌ {name} failed: {result}")
         else:
             all_relationships.extend(result)
-            logger.info(f"  ✅ Wave 3 Algorithm {i}: {len(result)} relationships")
+            logger.info(f"  ✅ {name}: {len(result)} relationships")
     
     # ALGORITHM 7: Heuristic pattern matching (instant, no LLM)
     logger.info("\n⚡ Algorithm 7: Heuristic Pattern Matching (CDRL cross-refs)")
