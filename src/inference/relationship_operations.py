@@ -15,11 +15,11 @@ Architecture:
 Integration: Called from semantic_post_processor.enhance_knowledge_graph()
 """
 
-import json
 import logging
 from typing import List, Dict, Tuple, Callable, Awaitable
 from pathlib import Path
 from src.utils.logging_config import log_graceful_failure
+from src.utils.llm_parsing import extract_json_from_response
 
 from src.inference.batch_processor import BatchProcessor
 from src.inference.neo4j_graph_io import group_entities_by_type
@@ -128,7 +128,7 @@ Only include pairs that are TRUE duplicates. If no duplicates found, return: {"d
                 
                 try:
                     response = await llm_func(prompt, "You are an expert at identifying duplicate entities in government RFP documents.")
-                    result = json.loads(response)
+                    result = extract_json_from_response(response)
                     
                     for dup_group in result.get('duplicates', []):
                         canonical = dup_group.get('canonical_name')
@@ -234,7 +234,7 @@ async def infer_relationships_batch(
         response = await llm_func(prompt, system_prompt)
         
         # Parse JSON response
-        result = json.loads(response)
+        result = extract_json_from_response(response)
         relationships = result.get('relationships', [])
         
         # Convert to internal relationship format

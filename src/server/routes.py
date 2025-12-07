@@ -547,11 +547,151 @@ async def process_document_with_semantic_inference(
                             "source_id": doc_id
                         })
             
-            # PHASE 4: INSERT COMPLETE KNOWLEDGE GRAPH (text + multimodal)
-            logger.info("💾 Inserting complete knowledge graph (text + multimodal entities)...")
-            await rag_instance.lightrag.ainsert_custom_kg(custom_kg, full_doc_id=doc_id)
+            # PHASE 4: EXTRACT MULTIMODAL ENTITIES (tables, images) using custom processor
+            # Extract entities WITHOUT triggering LightRAG's chunking+extraction pipeline
+            multimodal_items = [item for item in filtered_content if item.get('type') in ['table', 'image', 'equation']]
+            if multimodal_items:
+                logger.info(f"📊 Extracting entities from {len(multimodal_items)} multimodal items (custom ontology)...")
+                
+                # Initialize JSON extractor for direct multimodal extraction
+                multimodal_entity_count = 0
+                multimodal_rel_count = 0
+                
+                for idx, item in enumerate(multimodal_items):
+                    content_type = item.get('type', 'table')
+                    page_idx = item.get('page_idx', idx)
+                    
+                    # Extract text content from multimodal item (MinerU already textualized it)
+                    text_content = item.get('text', '')
+                    if not text_content or not text_content.strip():
+                        continue
+                    
+                    # Extract entities using same JsonExtractor as text chunks
+                    chunk_id = f"multimodal_{content_type}_p{page_idx}"
+                    try:
+                        extraction_result = await json_extractor.extract_from_text(
+                            text=text_content,
+                            chunk_id=chunk_id
+                        )
+                        
+                        # Add extracted entities to custom_kg
+                        for entity in extraction_result.entities:
+                            custom_kg["entities"].append({
+                                "entity_name": entity.entity_name,
+                                "entity_type": entity.entity_type,
+                                "description": entity.description if hasattr(entity, 'description') else '',
+                                "source_id": doc_id
+                            })
+                            multimodal_entity_count += 1
+                        
+                        # Add extracted relationships
+                        for rel in extraction_result.relationships:
+                            if (rel.source_entity and rel.target_entity and
+                                rel.source_entity.entity_name and rel.target_entity.entity_name and
+                                rel.source_entity.entity_name.strip() and rel.target_entity.entity_name.strip()):
+                                custom_kg["relationships"].append({
+                                    "src_id": rel.source_entity.entity_name,
+                                    "tgt_id": rel.target_entity.entity_name,
+                                    "description": rel.relationship_type,
+                                    "keywords": rel.relationship_type,
+                                    "weight": 1.0,
+                                    "source_id": doc_id
+                                })
+                                multimodal_rel_count += 1
+                    
+                    except Exception as e:
+                        logger.warning(f"⚠️ Multimodal extraction failed for {content_type} page {page_idx}: {e}")
+                        continue
+                
+                logger.info(f"✅ MULTIMODAL EXTRACTION: {multimodal_entity_count} entities, {multimodal_rel_count} relationships")
             
-            logger.info("✅ Complete knowledge graph inserted")
+            # PHASE 5: INSERT COMPLETE CUSTOM KG (text + multimodal) ONCE
+            total_entities = len(custom_kg["entities"])
+            total_rels = len(custom_kg["relationships"])
+            logger.info(f"💾 Inserting complete custom ontology ({total_entities} entities, {total_rels} relationships)...")
+            
+            # Track entities before insertion for merge detection
+            entity_names_before = set()
+            try:
+                # Access Neo4j/NetworkX storage (not VDB - that's for embeddings)
+                kg_storage = rag_instance.lightrag.chunk_entity_relation_graph
+                if hasattr(kg_storage, 'graph') and hasattr(kg_storage.graph, 'nodes'):
+                    # NetworkX/Neo4j stores nodes with entity_name attribute
+                    entity_names_before = {
+                        data.get('entity_name') 
+                        for node, data in kg_storage.graph.nodes(data=True)
+                        if data.get('entity_name')
+                    }
+            except Exception as e:
+                logger.debug(f"Could not capture pre-insertion entities: {e}")
+            
+            await rag_instance.lightrag.ainsert_custom_kg(custom_kg, full_doc_id=doc_id)
+            logger.info("✅ Custom ontology inserted (text + multimodal)")
+            
+            # PHASE 6: TRIGGER MERGE PHASES ONLY (no chunking, no extraction)
+            logger.info("🔄 Triggering LightRAG merge phases (Entity Dedup, Relationship Dedup, Graph Indexing)...")
+            logger.info("   📊 Pre-merge stats:")
+            logger.info(f"      • Entities inserted: {total_entities}")
+            logger.info(f"      • Relationships inserted: {total_rels}")
+            
+            # Run merge phases (combines duplicate entities/relationships, updates embeddings)
+            await rag_instance.lightrag.finalize_storages()
+            
+            # Query final counts and show what got merged
+            try:
+                kg_storage = rag_instance.lightrag.chunk_entity_relation_graph
+                
+                if hasattr(kg_storage, 'graph') and hasattr(kg_storage.graph, 'nodes'):
+                    # Count final entities in graph
+                    final_entity_count = kg_storage.graph.number_of_nodes()
+                    entity_names_after = {
+                        data.get('entity_name')
+                        for node, data in kg_storage.graph.nodes(data=True)
+                        if data.get('entity_name')
+                    }
+                    
+                    # Calculate merge stats
+                    new_unique_entities = entity_names_after - entity_names_before
+                    entities_merged = total_entities - len(new_unique_entities)
+                    
+                    # Show itemized merge output
+                    if entities_merged > 0:
+                        logger.info(f"   🔀 Merged {entities_merged} duplicate entities:")
+                        # Count entity occurrences in custom_kg
+                        entity_count = {}
+                        for entity_dict in custom_kg["entities"]:
+                            name = entity_dict.get("entity_name")
+                            if name:
+                                entity_count[name] = entity_count.get(name, 0) + 1
+                        
+                        # Find duplicates (entities that appeared multiple times)
+                        duplicates_found = {name: count for name, count in entity_count.items() if count > 1}
+                        sample_size = min(10, len(duplicates_found))
+                        for i, (name, count) in enumerate(sorted(duplicates_found.items(), key=lambda x: -x[1])[:sample_size]):
+                            logger.info(f"      • `{name}` | {count-1}+1 (consolidated from {count} instances)")
+                        
+                        if len(duplicates_found) > sample_size:
+                            logger.info(f"      • ... and {len(duplicates_found) - sample_size} more duplicates merged")
+                else:
+                    final_entity_count = total_entities
+                    entities_merged = 0
+                
+                # Count final relationships
+                if hasattr(kg_storage, 'graph') and hasattr(kg_storage.graph, 'edges'):
+                    final_rel_count = kg_storage.graph.number_of_edges()
+                    rels_merged = total_rels - final_rel_count
+                else:
+                    final_rel_count = total_rels
+                    rels_merged = 0
+                
+                logger.info("   ✅ Post-merge stats:")
+                logger.info(f"      • Final entities: {final_entity_count} (from {total_entities} inserted, {entities_merged} duplicates merged)")
+                logger.info(f"      • Final relationships: {final_rel_count} (from {total_rels} inserted, {rels_merged} duplicates merged)")
+            except Exception as e:
+                logger.warning(f"   ⚠️ Could not retrieve detailed merge stats: {e}")
+            
+            logger.info("✅ Merge phases completed (Entity Dedup, Relationship Dedup, Graph Indexing)")
+            logger.info("✅ Complete knowledge graph inserted with deduplication")
             
             # Log queue status
             stats = await _queue_tracker.get_stats()

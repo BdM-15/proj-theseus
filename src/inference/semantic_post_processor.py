@@ -21,16 +21,16 @@ Usage:
 
 import logging
 import time
-import json
 import os
 import re
 import asyncio
+import json
 from typing import Dict, Callable, Awaitable, List
 
-from openai import AsyncOpenAI
-
 from src.inference.neo4j_graph_io import Neo4jGraphIO, group_entities_by_type
-from src.ontology.schema import VALID_ENTITY_TYPES
+from src.ontology.schema import VALID_ENTITY_TYPES, InferredRelationship, InferredRelationshipBatch
+from src.utils.llm_client import call_llm_async
+from src.utils.llm_parsing import extract_json_from_response, parse_with_pydantic
 
 logger = logging.getLogger(__name__)
 
@@ -42,41 +42,6 @@ MAX_CONCURRENT_LLM_CALLS = int(os.getenv("MAX_ASYNC", 4))
 BATCH_SIZE_ALGO3 = int(os.getenv("BATCH_SIZE_ALGORITHM_3", 100))
 BATCH_OVERLAP_ALGO3 = int(os.getenv("BATCH_OVERLAP_ALGORITHM_3", 20))
 BATCH_SIZE_ALGO4 = int(os.getenv("BATCH_SIZE_ALGORITHM_4", 50))
-
-
-async def _call_llm_async(prompt: str, system_prompt: str = None, model: str = None, temperature: float = 0.1) -> str:
-    """Async wrapper for LLM calls using xAI endpoint directly
-    
-    Args:
-        prompt: The user prompt to send
-        system_prompt: Optional system prompt (if None, only sends user message)
-        model: LLM model name (defaults to LLM_MODEL env var)
-        temperature: Sampling temperature (default: 0.1)
-    
-    Returns:
-        LLM response text
-    """
-    if model is None:
-        model = os.getenv("LLM_MODEL", "grok-4-fast-reasoning")
-    
-    # Create AsyncOpenAI client with xAI endpoint
-    client = AsyncOpenAI(
-        api_key=os.getenv("LLM_BINDING_API_KEY"),
-        base_url=os.getenv("LLM_BINDING_HOST", "https://api.x.ai/v1")
-    )
-    
-    messages = []
-    if system_prompt:
-        messages.append({"role": "system", "content": system_prompt})
-    messages.append({"role": "user", "content": prompt})
-    
-    response = await client.chat.completions.create(
-        model=model,
-        messages=messages,
-        temperature=temperature
-    )
-    
-    return response.choices[0].message.content
 
 
 async def _infer_relationships_batch(entities: List[Dict], existing_rels: List[Dict], model: str, temperature: float) -> List[Dict]:
@@ -100,7 +65,6 @@ async def _infer_relationships_batch(entities: List[Dict], existing_rels: List[D
     Returns:
         List of inferred relationships
     """
-    import json
     
     all_relationships = []
     batch_size = 500  # Increased from 50 to leverage 2M context window
@@ -175,10 +139,10 @@ Format your response as JSON array:
 Return ONLY the JSON array. If no relationships found, return []."""
         
         try:
-            response = await _call_llm_async(prompt, model=model, temperature=temperature)
+            response = await call_llm_async(prompt, model=model, temperature=temperature)
             
             # Parse JSON response
-            relationships = json.loads(response)
+            relationships = extract_json_from_response(response)
             
             # Validate entity IDs and build relationships
             for rel in relationships:
@@ -208,7 +172,7 @@ Return ONLY the JSON array. If no relationships found, return []."""
             
             logger.info(f"    → Found {len(relationships)} relationships in batch {batch_num}")
             
-        except json.JSONDecodeError as e:
+        except (ValueError, TypeError) as e:
             logger.error(f"  JSON parse error in batch {batch_num}: {e}")
         except Exception as e:
             logger.error(f"  Error inferring relationships in batch {batch_num}: {e}", exc_info=True)
@@ -233,9 +197,10 @@ async def _load_prompt_template(prompt_filename: str) -> str:
 
 def _validate_relationships(rels: List[Dict], id_to_entity: Dict, algorithm_name: str) -> List[Dict]:
     """
-    Validate and filter relationships to ensure required fields are present.
+    Validate and filter relationships using Pydantic models.
     
-    Trust LLM semantic quality like LightRAG does - no confidence required.
+    Pattern: Follows WorkloadEnrichmentItem proven approach (100% success rate).
+    Graceful degradation: Never drops relationships - marks validation warnings instead.
     
     Args:
         rels: List of relationship dicts from LLM
@@ -245,31 +210,61 @@ def _validate_relationships(rels: List[Dict], id_to_entity: Dict, algorithm_name
     Returns:
         List of valid relationships with required fields only
     """
-    valid_rels = []
-    for rel in rels:
-        if (rel.get('source_id') in id_to_entity and 
-            rel.get('target_id') in id_to_entity and 
-            rel.get('relationship_type')):
-            # Include only required fields - trust LLM inference quality
-            valid_rel = {
-                'source_id': rel['source_id'],
-                'target_id': rel['target_id'],
-                'relationship_type': rel['relationship_type'],
-                'reasoning': rel.get('reasoning', '')
-            }
-            valid_rels.append(valid_rel)
-        else:
-            missing = []
-            if not rel.get('source_id') or rel.get('source_id') not in id_to_entity:
-                missing.append('source_id')
-            if not rel.get('target_id') or rel.get('target_id') not in id_to_entity:
-                missing.append('target_id')
-            if not rel.get('relationship_type'):
-                missing.append('relationship_type')
-            logger.warning(f"    ⚠️ {algorithm_name}: Skipping malformed relationship (missing: {', '.join(missing)})")
+    from src.ontology.schema import InferredRelationship
+    from pydantic import ValidationError
     
-    if len(rels) > len(valid_rels):
-        logger.warning(f"    ⚠️ {algorithm_name}: Filtered out {len(rels) - len(valid_rels)} of {len(rels)} relationships")
+    valid_rels = []
+    validation_errors = 0
+    
+    for rel in rels:
+        try:
+            # Validate with Pydantic - catches self-loops, missing fields, etc.
+            validated = InferredRelationship.model_validate(rel)
+            
+            # Check entity IDs exist (Pydantic can't validate this without context)
+            if validated.source_id not in id_to_entity:
+                logger.warning(
+                    f"    ⚠️ {algorithm_name}: Unknown source_id '{validated.source_id}' "
+                    f"in relationship {validated.relationship_type}"
+                )
+                validation_errors += 1
+                continue
+            
+            if validated.target_id not in id_to_entity:
+                logger.warning(
+                    f"    ⚠️ {algorithm_name}: Unknown target_id '{validated.target_id}' "
+                    f"in relationship {validated.relationship_type}"
+                )
+                validation_errors += 1
+                continue
+            
+            # Convert back to dict for backward compatibility
+            valid_rels.append(validated.to_dict())
+            
+        except ValidationError as ve:
+            # Pydantic caught a validation error (self-loop, missing field, etc.)
+            validation_errors += 1
+            # Safe error detail extraction - handle empty loc tuples
+            error_details = '; '.join([
+                f"{err['loc'][0] if err.get('loc') else 'unknown'}: {err['msg']}" 
+                for err in ve.errors()
+            ])
+            logger.warning(
+                f"    ⚠️ {algorithm_name}: Pydantic validation failed - {error_details}. "
+                f"Relationship data: {rel}"
+            )
+            continue
+        except Exception as e:
+            # Unexpected error - log but don't crash
+            validation_errors += 1
+            logger.warning(f"    ⚠️ {algorithm_name}: Unexpected validation error: {e}")
+            continue
+    
+    if validation_errors > 0:
+        logger.warning(
+            f"    ⚠️ {algorithm_name}: Filtered out {validation_errors} of {len(rels)} relationships "
+            f"({len(valid_rels)} valid, {validation_errors} validation errors)"
+        )
     
     return valid_rels
 
@@ -341,6 +336,104 @@ def _is_main_evaluation_factor(entity: Dict) -> bool:
     return True
 
 
+async def _parse_and_validate_relationship_batch(
+    response: str,
+    id_to_entity: Dict,
+    context: str
+) -> List[Dict]:
+    """
+    Parse LLM response and validate relationships with Pydantic (ROBUST).
+    
+    Shared helper for all relationship inference algorithms.
+    Validates relationships ONE-BY-ONE to gracefully filter self-loops and bad data.
+    
+    Args:
+        response: Raw LLM response text
+        id_to_entity: Dict mapping entity IDs to entity objects
+        context: Context string for logging (e.g., "Algorithm 1 Batch 2")
+        
+    Returns:
+        List of validated relationship dicts (self-loops and hallucinations filtered)
+    """
+    try:
+        # Step 1: Extract JSON from response
+        response_json = extract_json_from_response(response, allow_array=True)
+        
+        # Step 2: Extract relationships array
+        if isinstance(response_json, dict):
+            # Unwrap common wrapper keys
+            relationships_data = (
+                response_json.get('relationships') or
+                response_json.get('results') or
+                response_json.get('data') or
+                response_json.get('items') or
+                []
+            )
+        elif isinstance(response_json, list):
+            relationships_data = response_json
+        else:
+            logger.warning(f"    ⚠️ {context}: Unexpected JSON type {type(response_json)}")
+            return []
+        
+        # Step 3: Validate relationships ONE-BY-ONE (graceful partial validation)
+        valid_rels = []
+        filtered_count = 0
+        self_loop_count = 0
+        hallucination_count = 0
+        
+        for idx, rel_data in enumerate(relationships_data):
+            try:
+                # Validate with Pydantic (catches self-loops, normalizes fields)
+                rel = InferredRelationship.model_validate(rel_data)
+                
+                # Verify entity IDs exist in graph
+                if rel.source_id not in id_to_entity:
+                    logger.warning(
+                        f"    ⚠️ {context}: Relationship {idx}: "
+                        f"LLM hallucinated source entity ID - {rel.source_id}. Skipping."
+                    )
+                    hallucination_count += 1
+                    continue
+                
+                if rel.target_id not in id_to_entity:
+                    logger.warning(
+                        f"    ⚠️ {context}: Relationship {idx}: "
+                        f"LLM hallucinated target entity ID - {rel.target_id}. Skipping."
+                    )
+                    hallucination_count += 1
+                    continue
+                
+                # Valid relationship - add to results
+                valid_rels.append(rel.to_dict())
+                
+            except ValidationError as e:
+                # Check if it's a self-loop (expected, filter silently)
+                if any('Self-loop detected' in str(err.get('msg', '')) for err in e.errors()):
+                    self_loop_count += 1
+                else:
+                    # Other validation error (missing field, bad type, etc.)
+                    logger.warning(
+                        f"    ⚠️ {context}: Relationship {idx} failed validation: "
+                        f"{e.errors()[0]['msg']} at {e.errors()[0]['loc']}"
+                    )
+                filtered_count += 1
+        
+        # Step 4: Log filtering summary
+        if filtered_count > 0:
+            logger.info(
+                f"    → {context}: Validated {len(valid_rels)}/{len(relationships_data)} relationships "
+                f"({filtered_count} filtered: {self_loop_count} self-loops, "
+                f"{hallucination_count} hallucinated IDs, "
+                f"{filtered_count - self_loop_count - hallucination_count} other errors)"
+            )
+        
+        return valid_rels
+        
+    except Exception as e:
+        logger.error(f"    ❌ {context}: Batch parsing failed: {e}")
+        return []
+
+
 async def _process_req_eval_batch(
     prompt: str,
     system_prompt: str,
@@ -351,14 +444,16 @@ async def _process_req_eval_batch(
     batch_num: int,
     total_batches: int
 ) -> List[Dict]:
-    """Process single batch for Algorithm 3 (Requirement→Evaluation Mapping)"""
+    """Process single batch for Algorithm 3 (Requirement→Evaluation Mapping) with Pydantic validation"""
     try:
         async with semaphore:
-            response = await _call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
+            response = await call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
         
-        rels = json.loads(response.strip())
-        valid_rels = _validate_relationships(rels, id_to_entity, f"Algorithm 3 Batch {batch_num}/{total_batches}")
-        return valid_rels
+        return await _parse_and_validate_relationship_batch(
+            response,
+            id_to_entity,
+            f"Algorithm 3 Batch {batch_num}/{total_batches}"
+        )
     except Exception as e:
         logger.error(f"    ❌ Batch {batch_num}/{total_batches} failed: {e}")
         return []
@@ -373,14 +468,16 @@ async def _process_deliverable_batch(
     id_to_entity: Dict,
     batch_label: str
 ) -> List[Dict]:
-    """Process single batch for Algorithm 4 (Deliverable Traceability)"""
+    """Process single batch for Algorithm 4 (Deliverable Traceability) with Pydantic validation"""
     try:
         async with semaphore:
-            response = await _call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
+            response = await call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
         
-        rels = json.loads(response.strip())
-        valid_rels = _validate_relationships(rels, id_to_entity, f"Algorithm 4 {batch_label}")
-        return valid_rels
+        return await _parse_and_validate_relationship_batch(
+            response,
+            id_to_entity,
+            f"Algorithm 4 {batch_label}"
+        )
     except Exception as e:
         logger.error(f"    ❌ {batch_label} failed: {e}")
         return []
@@ -421,17 +518,16 @@ async def _resolve_orphan_patterns(
     Returns:
         List of relationships for orphan patterns
     """
-    import json
     
-    # Get truly orphaned entity IDs from Neo4j (nodes with NO relationships)
-    orphan_ids = set(neo4j_io.get_orphaned_entity_ids())
+    # Get truly orphaned entity names from Neo4j (nodes with NO relationships)
+    orphan_names = set(neo4j_io.get_orphaned_entity_ids())
     
-    if not orphan_ids:
+    if not orphan_names:
         logger.info("    → No orphaned entities found")
         return []
     
     # Filter entities to only those that are actually orphaned
-    orphaned = [e for e in entities if e['id'] in orphan_ids]
+    orphaned = [e for e in entities if e['entity_name'] in orphan_names]
     
     if not orphaned:
         logger.info("    → No orphaned entities found")
@@ -504,22 +600,22 @@ async def _process_orphan_batch(
     temperature: float
 ) -> List[Dict]:
     """
-    Process a single batch of orphaned entities.
+    Process a single batch of orphaned entities with Pydantic validation.
     
     Helper function for conditional batching in _resolve_orphan_patterns.
     """
     import json
     
-    # Build JSON representations (truncate descriptions to save tokens)
+    # Build JSON representations using entity_name as ID (human-readable, easier for LLM)
     orphan_json = json.dumps([{
-        'id': o['id'],
+        'id': o['entity_name'],
         'name': o['entity_name'],
         'type': o.get('entity_type'),
         'description': o.get('description', '')[:5000]
     } for o in orphaned], indent=2)
     
     candidate_json = json.dumps([{
-        'id': c['id'],
+        'id': c['entity_name'],
         'name': c['entity_name'],
         'type': c.get('entity_type'),
         'description': c.get('description', '')[:5000]
@@ -556,19 +652,67 @@ SPECIAL PATTERNS:
 - Conditional requirements: "may substitute" → REQUIRES
 - Table/data references: "field in X" → FIELD_IN
 
-Use entity IDs from 'id' field. Return ONLY valid relationships.
+CRITICAL: Use EXACT entity IDs from the 'id' field above. Copy them character-for-character.
+DO NOT create new IDs. DO NOT simplify IDs. Use the exact strings provided.
+
 Return ONLY valid JSON array:
 [
-  {{"source_id": "entity_id", "target_id": "entity_id", "relationship_type": "TYPE", "reasoning": "brief evidence"}}
+  {{"source_id": "exact_id_from_above", "target_id": "exact_id_from_above", "relationship_type": "TYPE", "confidence": 0.7, "reasoning": "brief evidence"}}
 ]
 
 If no relationships found, return []."""
 
     try:
-        response = await _call_llm_async(prompt, model=model, temperature=temperature)
-        rels = json.loads(response.strip())
-        valid_rels = _validate_relationships(rels, id_to_entity, "Orphan Batch")
-        return valid_rels
+        response = await call_llm_async(prompt, model=model, temperature=temperature)
+        
+        # Build entity_name -> Neo4j element ID mapping for validation
+        # Handle both dict entities and potential string IDs
+        name_to_id = {}
+        for e in orphaned + candidates:
+            if isinstance(e, dict) and e.get('entity_name'):
+                # Extract ID safely - could be dict or already a string
+                entity_id = e.get('id') if isinstance(e.get('id'), str) else e.get('id', {}).get('elementId', str(e.get('id')))
+                name_to_id[e['entity_name']] = entity_id
+        
+        # Parse with Pydantic (using entity_name IDs as LLM uses those)
+        batch_result = parse_with_pydantic(
+            response,
+            InferredRelationshipBatch,
+            context="Orphan Batch",
+            allow_partial=False
+        )
+        
+        # Map entity_name IDs (from LLM) back to Neo4j element IDs (for validation/storage)
+        mapped_rels = []
+        for rel in batch_result.relationships:
+            source_name = rel.source_id
+            target_name = rel.target_id
+            
+            source_element_id = name_to_id.get(source_name)
+            target_element_id = name_to_id.get(target_name)
+            
+            if source_element_id and target_element_id:
+                # Verify IDs exist in id_to_entity (final validation)
+                if source_element_id in id_to_entity and target_element_id in id_to_entity:
+                    mapped_rels.append({
+                        'source_id': source_element_id,
+                        'target_id': target_element_id,
+                        'relationship_type': rel.relationship_type,
+                        'reasoning': rel.reasoning,
+                        'confidence': rel.confidence
+                    })
+                else:
+                    logger.warning(
+                        f"    ⚠️ Orphan Batch: LLM provided valid entity name but ID not in graph - "
+                        f"source: '{source_name}' ({source_element_id}), target: '{target_name}' ({target_element_id}). Skipping."
+                    )
+            else:
+                logger.warning(
+                    f"    ⚠️ Orphan Batch: LLM hallucinated entity name - "
+                    f"source: '{source_name}', target: '{target_name}'. Skipping."
+                )
+        
+        return mapped_rels
     except Exception as e:
         logger.error(f"    ❌ Orphan batch processing failed: {e}")
         return []
@@ -672,7 +816,7 @@ Return ONLY valid JSON array:
   {{"source_id": "instruction_id", "target_id": "factor_id", "relationship_type": "GUIDES", "confidence": 0.7-0.95, "reasoning": "pattern explanation"}}
 ]
 """
-            batch_tasks.append(_call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature))
+            batch_tasks.append(call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature))
         
         # Batch 2: Deliverable-based instructions
         if deliverables_with_instructions:
@@ -697,7 +841,7 @@ Return ONLY valid JSON array:
   {{"source_id": "instruction_id", "target_id": "factor_id", "relationship_type": "GUIDES", "confidence": 0.7-0.95, "reasoning": "pattern explanation"}}
 ]
 """
-            batch_tasks.append(_call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature))
+            batch_tasks.append(call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature))
         
         # Batch 3: Requirement-based instructions
         if requirements_with_instructions:
@@ -722,23 +866,23 @@ Return ONLY valid JSON array:
   {{"source_id": "instruction_id", "target_id": "factor_id", "relationship_type": "GUIDES", "confidence": 0.7-0.95, "reasoning": "pattern explanation"}}
 ]
 """
-            batch_tasks.append(_call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature))
+            batch_tasks.append(call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature))
         
         # Process all batches in parallel
         batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
         
-        # Combine and validate results
+        # Combine and validate results with Pydantic
         all_rels = []
         for i, result in enumerate(batch_results, 1):
             if isinstance(result, Exception):
                 logger.error(f"    ❌ Batch {i} failed: {result}")
             else:
-                try:
-                    rels = json.loads(result.strip())
-                    valid_rels = _validate_relationships(rels, id_to_entity, f"Algorithm 1 Batch {i}")
-                    all_rels.extend(valid_rels)
-                except Exception as e:
-                    logger.error(f"    ❌ Batch {i} parsing failed: {e}")
+                valid_rels = await _parse_and_validate_relationship_batch(
+                    result,
+                    id_to_entity,
+                    f"Algorithm 1 Batch {i}"
+                )
+                all_rels.extend(valid_rels)
         
         logger.info(f"    → Found {len(all_rels)} instruction-evaluation relationships ({len(batch_tasks)} parallel batches)")
         return all_rels
@@ -804,14 +948,15 @@ async def _algorithm_2_eval_hierarchy(
                 root_key = name.upper()
             # Pattern 3: "Technical Factor", "Management Factor", etc.
             elif any(keyword in name.lower() for keyword in ['technical', 'management', 'price', 'cost', 'past performance']):
-                root_key = name.split()[0].upper()  # Use first word as key
+                parts = name.split()
+                root_key = parts[0].upper() if parts else "UNKNOWN"  # Safe access with fallback
             # Pattern 4: Sub-factors (contains "Sub", digit suffix, or is very long)
             elif 'sub' in name.lower() or re.search(r'[A-Z]\.\d+', name) or len(name) > 50:
                 orphan_factors.append(factor)
                 continue
             else:
                 # Default: treat as independent root factor
-                root_key = name[:20]  # Truncate for grouping
+                root_key = name[:20] if name else "UNKNOWN"  # Truncate for grouping with fallback
             
             hierarchies.setdefault(root_key, []).append(factor)
         
@@ -843,23 +988,23 @@ Return ONLY valid JSON array:
   {{"source_id": "parent_id", "target_id": "child_id", "relationship_type": "HAS_SUBFACTOR|HAS_RATING_SCALE|MEASURED_BY|HAS_THRESHOLD|EVALUATED_USING|DEFINES_SCALE", "confidence": 0.75-0.95, "reasoning": "pattern explanation"}}
 ]
 """
-            batch_tasks.append(_call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature))
+            batch_tasks.append(call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature))
         
         # Process all hierarchies in parallel
         batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
         
-        # Combine and validate results
+        # Combine and validate results with Pydantic
         all_rels = []
         for i, result in enumerate(batch_results, 1):
             if isinstance(result, Exception):
                 logger.error(f"    ❌ Hierarchy batch {i} failed: {result}")
             else:
-                try:
-                    rels = json.loads(result.strip())
-                    valid_rels = _validate_relationships(rels, id_to_entity, f"Algorithm 2 Batch {i}")
-                    all_rels.extend(valid_rels)
-                except Exception as e:
-                    logger.error(f"    ❌ Hierarchy batch {i} parsing failed: {e}")
+                valid_rels = await _parse_and_validate_relationship_batch(
+                    result,
+                    id_to_entity,
+                    f"Algorithm 2 Batch {i}"
+                )
+                all_rels.extend(valid_rels)
         
         logger.info(f"    → Found {len(all_rels)} evaluation hierarchy relationships ({len(batch_tasks)} parallel hierarchies)")
         return all_rels
@@ -944,23 +1089,23 @@ Return ONLY valid JSON array:
   {{"source_id": "child_id", "target_id": "parent_id", "relationship_type": "CHILD_OF|ATTACHMENT_OF", "confidence": 0.7-1.0, "reasoning": "pattern explanation"}}
 ]
 """
-            batch_tasks.append(_call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature))
+            batch_tasks.append(call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature))
         
         # Process all document type groups in parallel
         batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
         
-        # Combine and validate results
+        # Combine and validate results with Pydantic
         all_rels = []
         for i, result in enumerate(batch_results, 1):
             if isinstance(result, Exception):
                 logger.error(f"    ❌ Document type batch {i} failed: {result}")
             else:
-                try:
-                    rels = json.loads(result.strip())
-                    valid_rels = _validate_relationships(rels, id_to_entity, f"Algorithm 5 Batch {i}")
-                    all_rels.extend(valid_rels)
-                except Exception as e:
-                    logger.error(f"    ❌ Document type batch {i} parsing failed: {e}")
+                valid_rels = await _parse_and_validate_relationship_batch(
+                    result,
+                    id_to_entity,
+                    f"Algorithm 5 Batch {i}"
+                )
+                all_rels.extend(valid_rels)
         
         logger.info(f"    → Found {len(all_rels)} document hierarchy relationships ({len(batch_tasks)} parallel type groups)")
         return all_rels
@@ -1071,23 +1216,23 @@ Return ONLY valid JSON array:
   {{"source_id": "concept_id", "target_id": "entity_id", "relationship_type": "INFORMS|IMPACTS|DETERMINES|GUIDES|ADDRESSED_BY|RELATED_TO", "confidence": 0.6-0.9, "reasoning": "semantic connection"}}
 ]
 """
-            batch_tasks.append(_call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature))
+            batch_tasks.append(call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature))
         
         # Process all batches in parallel
         batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
         
-        # Combine and validate results
+        # Combine and validate results with Pydantic
         all_rels = []
         for i, result in enumerate(batch_results, 1):
             if isinstance(result, Exception):
                 logger.error(f"    ❌ Concept batch {i} failed: {result}")
             else:
-                try:
-                    rels = json.loads(result.strip())
-                    valid_rels = _validate_relationships(rels, id_to_entity, f"Algorithm 6 Batch {i}")
-                    all_rels.extend(valid_rels)
-                except Exception as e:
-                    logger.error(f"    ❌ Concept batch {i} parsing failed: {e}")
+                valid_rels = await _parse_and_validate_relationship_batch(
+                    result,
+                    id_to_entity,
+                    f"Algorithm 6 Batch {i}"
+                )
+                all_rels.extend(valid_rels)
         
         logger.info(f"    → Found {len(all_rels)} semantic concept relationships ({len(batch_tasks)} dynamic batches)")
         return all_rels
@@ -1500,7 +1645,6 @@ async def _infer_relationships_multi_algorithm(
     Returns:
         List of inferred relationships
     """
-    import json
     
     all_relationships = []
     
@@ -1656,7 +1800,7 @@ async def _semantic_post_processor_neo4j(
         
         workload_stats = await enrich_workload_metadata(
             neo4j_io=neo4j_io,
-            llm_func=_call_llm_async,
+            llm_func=call_llm_async,
             batch_size=50,
             model=llm_model_name,
             temperature=temperature
@@ -1730,7 +1874,7 @@ async def enhance_knowledge_graph(
     
     Args:
         rag_storage_path: Path to rag_storage directory (unused - kept for API compatibility)
-        llm_func: Async LLM function (unused - we use internal _call_llm_async)
+        llm_func: Async LLM function (unused - we use centralized call_llm_async)
         batch_size: Batch size for LLM calls (default: 50)
     
     Returns:
