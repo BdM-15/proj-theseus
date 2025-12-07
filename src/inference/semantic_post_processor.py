@@ -394,9 +394,14 @@ async def _resolve_orphan_patterns(
     temperature: float
 ) -> List[Dict]:
     """
-    Resolve orphaned entities using LLM-powered relationship inference.
+    Resolve orphaned entities using LLM-powered relationship inference (PHASE 2 OPTIMIZED).
     
-    Strategy: Single batched LLM call with all orphans + connected entities
+    PHASE 2 OPTIMIZATION:
+    - Conditional batching: Single call if < 100 orphans, batch if >= 100
+    - Dynamic batch sizing based on orphan count
+    - Expected: 20-30s → 15-20s for large RFPs
+    
+    Strategy: Batched LLM calls with orphans + connected entities
     for focused inference. More efficient than per-orphan calls and more
     adaptive than regex patterns.
     
@@ -432,8 +437,6 @@ async def _resolve_orphan_patterns(
         logger.info("    → No orphaned entities found")
         return []
     
-    logger.info(f"    → Found {len(orphaned)} orphaned entities")
-    
     # Build entity type indices for candidate relationships
     entities_by_type = {}
     for e in entities:
@@ -442,16 +445,7 @@ async def _resolve_orphan_patterns(
             entities_by_type[etype] = []
         entities_by_type[etype].append(e)
     
-    # Gather candidate entities for linking (focus on high-value types)
-    candidate_types = ['requirement', 'deliverable', 'document', 'clause', 'section', 
-                      'work_statement', 'evaluation_factor', 'technology', 'equipment']
-    
-    candidates = []
-    for etype in candidate_types:
-        candidates.extend(entities_by_type.get(etype, []))
-    
-    # Limit candidates to avoid massive prompts (take top 200 most relevant)
-    # Prioritize requirements and deliverables (most common link targets)
+    # Gather candidate entities for linking (prioritized by importance)
     priority_candidates = (
         entities_by_type.get('requirement', [])[:100] +
         entities_by_type.get('deliverable', [])[:50] +
@@ -463,7 +457,58 @@ async def _resolve_orphan_patterns(
         logger.info("    → No candidate entities for linking")
         return []
     
-    logger.info(f"    → Using {len(orphaned)} orphans × {len(priority_candidates)} candidates for inference")
+    # PHASE 2: Conditional batching based on orphan count
+    BATCH_THRESHOLD = 100
+    orphan_count = len(orphaned)
+    
+    if orphan_count < BATCH_THRESHOLD:
+        # Small count: Single LLM call
+        logger.info(f"    → Processing {orphan_count} orphans × {len(priority_candidates)} candidates (single batch)")
+        return await _process_orphan_batch(orphaned, priority_candidates, id_to_entity, model, temperature)
+    else:
+        # Large count: Batch processing
+        batch_size = 80  # 80 orphans per batch
+        num_batches = (orphan_count + batch_size - 1) // batch_size
+        logger.info(f"    → Processing {orphan_count} orphans × {len(priority_candidates)} candidates ({num_batches} batches)")
+        
+        batch_tasks = []
+        for batch_num in range(num_batches):
+            batch_start = batch_num * batch_size
+            batch_end = min(batch_start + batch_size, orphan_count)
+            orphan_batch = orphaned[batch_start:batch_end]
+            
+            batch_tasks.append(_process_orphan_batch(
+                orphan_batch, priority_candidates, id_to_entity, model, temperature
+            ))
+        
+        # Process all batches in parallel
+        batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+        
+        # Combine results
+        all_rels = []
+        for i, result in enumerate(batch_results, 1):
+            if isinstance(result, Exception):
+                logger.error(f"    ❌ Orphan batch {i} failed: {result}")
+            else:
+                all_rels.extend(result)
+        
+        logger.info(f"    → Found {len(all_rels)} orphan relationships ({num_batches} batches)")
+        return all_rels
+
+
+async def _process_orphan_batch(
+    orphaned: List[Dict],
+    candidates: List[Dict],
+    id_to_entity: Dict,
+    model: str,
+    temperature: float
+) -> List[Dict]:
+    """
+    Process a single batch of orphaned entities.
+    
+    Helper function for conditional batching in _resolve_orphan_patterns.
+    """
+    import json
     
     # Build JSON representations (truncate descriptions to save tokens)
     orphan_json = json.dumps([{
@@ -478,7 +523,7 @@ async def _resolve_orphan_patterns(
         'name': c['entity_name'],
         'type': c.get('entity_type'),
         'description': c.get('description', '')[:5000]
-    } for c in priority_candidates], indent=2)
+    } for c in candidates], indent=2)
     
     # LLM prompt optimized for orphan resolution
     prompt = f"""You are analyzing orphaned entities in a government contracting knowledge graph. 
@@ -522,11 +567,10 @@ If no relationships found, return []."""
     try:
         response = await _call_llm_async(prompt, model=model, temperature=temperature)
         rels = json.loads(response.strip())
-        valid_rels = _validate_relationships(rels, id_to_entity, "Algorithm 8")
-        logger.info(f"    → Found {len(valid_rels)} orphan relationships")
+        valid_rels = _validate_relationships(rels, id_to_entity, "Orphan Batch")
         return valid_rels
     except Exception as e:
-        logger.error(f"    ❌ Algorithm 8 failed: {e}")
+        logger.error(f"    ❌ Orphan batch processing failed: {e}")
         return []
 
 
@@ -542,10 +586,15 @@ async def _algorithm_1_instruction_eval(
     temperature: float
 ) -> List[Dict]:
     """
-    ALGORITHM 1: Instruction-Evaluation Linking
+    ALGORITHM 1: Instruction-Evaluation Linking (PHASE 2 OPTIMIZED)
     
     Maps submission instructions → evaluation factors.
     Content-based agnostic search across instruction, deliverable, and requirement entities.
+    
+    PHASE 2 OPTIMIZATION:
+    - Batch by instruction type (submission, deliverable, requirement)
+    - Process batches in parallel
+    - Expected: 15-30s → 10s
     
     Args:
         entities_by_type: Entities grouped by type
@@ -577,25 +626,19 @@ async def _algorithm_1_instruction_eval(
                            'page limit', 'format', 'electronic', 'hard copy'])
     ]
     
-    all_instruction_entities = instructions + deliverables_with_instructions + requirements_with_instructions
     eval_factors = entities_by_type.get('evaluation_factor', [])
     
-    if not all_instruction_entities or not eval_factors:
+    if not (instructions or deliverables_with_instructions or requirements_with_instructions) or not eval_factors:
         return []
     
-    logger.info(f"\n  [Algorithm 1/8] Instruction-Evaluation Linking: {len(all_instruction_entities)} instruction entities × {len(eval_factors)} eval factors")
-    logger.info(f"      Sources: {len(instructions)} submission_instruction, {len(deliverables_with_instructions)} deliverables, {len(requirements_with_instructions)} requirements")
+    total_instruction_entities = len(instructions) + len(deliverables_with_instructions) + len(requirements_with_instructions)
+    logger.info(f"\n  [Algorithm 1/8] Instruction-Evaluation Linking (TYPE-BATCHED): {total_instruction_entities} instruction entities × {len(eval_factors)} eval factors")
+    logger.info(f"      Batches: {len(instructions)} submission_instruction, {len(deliverables_with_instructions)} deliverables, {len(requirements_with_instructions)} requirements")
     
     try:
         prompt_instructions = await _load_prompt_template("instruction_evaluation_linking.md")
         
-        inst_json = json.dumps([{
-            'id': i['id'],
-            'name': i['entity_name'],
-            'type': i.get('entity_type'),
-            'description': i.get('description', '')[:5000]
-        } for i in all_instruction_entities], indent=2)
-        
+        # Prepare evaluation factors JSON (reused across all batches)
         factors_json = json.dumps([{
             'id': f['id'],
             'name': f['entity_name'],
@@ -603,9 +646,21 @@ async def _algorithm_1_instruction_eval(
             'description': f.get('description', '')[:5000]
         } for f in eval_factors], indent=2)
         
-        prompt = f"""{prompt_instructions}
+        # Create parallel tasks for each instruction type batch
+        batch_tasks = []
+        
+        # Batch 1: Traditional submission instructions
+        if instructions:
+            inst_json = json.dumps([{
+                'id': i['id'],
+                'name': i['entity_name'],
+                'type': i.get('entity_type'),
+                'description': i.get('description', '')[:5000]
+            } for i in instructions], indent=2)
+            
+            prompt = f"""{prompt_instructions}
 
-SUBMISSION INSTRUCTIONS (and instruction-like entities):
+SUBMISSION INSTRUCTIONS (traditional):
 {inst_json}
 
 EVALUATION CRITERIA/FACTORS:
@@ -617,12 +672,76 @@ Return ONLY valid JSON array:
   {{"source_id": "instruction_id", "target_id": "factor_id", "relationship_type": "GUIDES", "confidence": 0.7-0.95, "reasoning": "pattern explanation"}}
 ]
 """
+            batch_tasks.append(_call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature))
         
-        response = await _call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
-        rels = json.loads(response.strip())
-        valid_rels = _validate_relationships(rels, id_to_entity, "Algorithm 1")
-        logger.info(f"    → Found {len(valid_rels)} instruction-evaluation relationships")
-        return valid_rels
+        # Batch 2: Deliverable-based instructions
+        if deliverables_with_instructions:
+            deliv_json = json.dumps([{
+                'id': d['id'],
+                'name': d['entity_name'],
+                'type': d.get('entity_type'),
+                'description': d.get('description', '')[:5000]
+            } for d in deliverables_with_instructions], indent=2)
+            
+            prompt = f"""{prompt_instructions}
+
+SUBMISSION INSTRUCTIONS (from deliverables):
+{deliv_json}
+
+EVALUATION CRITERIA/FACTORS:
+{factors_json}
+
+Apply the inference patterns from the instructions above. Use entity IDs from 'id' field.
+Return ONLY valid JSON array:
+[
+  {{"source_id": "instruction_id", "target_id": "factor_id", "relationship_type": "GUIDES", "confidence": 0.7-0.95, "reasoning": "pattern explanation"}}
+]
+"""
+            batch_tasks.append(_call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature))
+        
+        # Batch 3: Requirement-based instructions
+        if requirements_with_instructions:
+            req_json = json.dumps([{
+                'id': r['id'],
+                'name': r['entity_name'],
+                'type': r.get('entity_type'),
+                'description': r.get('description', '')[:5000]
+            } for r in requirements_with_instructions], indent=2)
+            
+            prompt = f"""{prompt_instructions}
+
+SUBMISSION INSTRUCTIONS (from requirements):
+{req_json}
+
+EVALUATION CRITERIA/FACTORS:
+{factors_json}
+
+Apply the inference patterns from the instructions above. Use entity IDs from 'id' field.
+Return ONLY valid JSON array:
+[
+  {{"source_id": "instruction_id", "target_id": "factor_id", "relationship_type": "GUIDES", "confidence": 0.7-0.95, "reasoning": "pattern explanation"}}
+]
+"""
+            batch_tasks.append(_call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature))
+        
+        # Process all batches in parallel
+        batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+        
+        # Combine and validate results
+        all_rels = []
+        for i, result in enumerate(batch_results, 1):
+            if isinstance(result, Exception):
+                logger.error(f"    ❌ Batch {i} failed: {result}")
+            else:
+                try:
+                    rels = json.loads(result.strip())
+                    valid_rels = _validate_relationships(rels, id_to_entity, f"Algorithm 1 Batch {i}")
+                    all_rels.extend(valid_rels)
+                except Exception as e:
+                    logger.error(f"    ❌ Batch {i} parsing failed: {e}")
+        
+        logger.info(f"    → Found {len(all_rels)} instruction-evaluation relationships ({len(batch_tasks)} parallel batches)")
+        return all_rels
     except Exception as e:
         logger.error(f"    ❌ Algorithm 1 failed: {e}")
         return []
@@ -636,9 +755,14 @@ async def _algorithm_2_eval_hierarchy(
     temperature: float
 ) -> List[Dict]:
     """
-    ALGORITHM 2: Evaluation Hierarchy & Metrics
+    ALGORITHM 2: Evaluation Hierarchy & Metrics (PHASE 2 OPTIMIZED)
     
     Structures evaluation framework with HAS_SUBFACTOR, MEASURED_BY, HAS_THRESHOLD edges.
+    
+    PHASE 2 OPTIMIZATION:
+    - Group by root factor (Factor A, B, C hierarchies)
+    - Process hierarchies independently in parallel
+    - Expected: 10-20s → 5-8s
     
     Args:
         entities_by_type: Entities grouped by type
@@ -655,21 +779,62 @@ async def _algorithm_2_eval_hierarchy(
     if not eval_factors:
         return []
     
-    logger.info(f"\n  [Algorithm 2/8] Evaluation Hierarchy: {len(eval_factors)} evaluation entities")
+    logger.info(f"\n  [Algorithm 2/8] Evaluation Hierarchy (BATCHED BY ROOT FACTOR): {len(eval_factors)} evaluation entities")
     
     try:
         prompt_instructions = await _load_prompt_template("evaluation_hierarchy.md")
         
-        factors_json = json.dumps([{
-            'id': f['id'],
-            'name': f['entity_name'],
-            'type': f.get('entity_type'),
-            'description': f.get('description', '')[:5000]
-        } for f in eval_factors], indent=2)
+        # Group factors by root parent (e.g., "Factor A", "Factor 1", "Technical Factor")
+        # Use simple heuristics: look for single-letter/number factors or top-level keywords
+        hierarchies = {}
+        orphan_factors = []
         
-        prompt = f"""{prompt_instructions}
+        for factor in eval_factors:
+            name = factor.get('entity_name', '').strip()
+            desc = factor.get('description', '').lower()
+            
+            # Try to identify root factor patterns
+            root_key = None
+            
+            # Pattern 1: "Factor A", "Factor B", etc.
+            if re.match(r'^Factor [A-Z]$', name, re.I):
+                root_key = name.upper()
+            # Pattern 2: "Factor 1", "Factor 2", etc.
+            elif re.match(r'^Factor \d+$', name, re.I):
+                root_key = name.upper()
+            # Pattern 3: "Technical Factor", "Management Factor", etc.
+            elif any(keyword in name.lower() for keyword in ['technical', 'management', 'price', 'cost', 'past performance']):
+                root_key = name.split()[0].upper()  # Use first word as key
+            # Pattern 4: Sub-factors (contains "Sub", digit suffix, or is very long)
+            elif 'sub' in name.lower() or re.search(r'[A-Z]\.\d+', name) or len(name) > 50:
+                orphan_factors.append(factor)
+                continue
+            else:
+                # Default: treat as independent root factor
+                root_key = name[:20]  # Truncate for grouping
+            
+            hierarchies.setdefault(root_key, []).append(factor)
+        
+        # If we have orphans, add them as their own group
+        if orphan_factors:
+            hierarchies['_orphans_'] = orphan_factors
+        
+        logger.info(f"      Found {len(hierarchies)} root factor hierarchies: {list(hierarchies.keys())[:5]}...")
+        
+        # Create parallel tasks for each hierarchy
+        batch_tasks = []
+        
+        for hierarchy_name, hierarchy_factors in hierarchies.items():
+            factors_json = json.dumps([{
+                'id': f['id'],
+                'name': f['entity_name'],
+                'type': f.get('entity_type'),
+                'description': f.get('description', '')[:5000]
+            } for f in hierarchy_factors], indent=2)
+            
+            prompt = f"""{prompt_instructions}
 
-EVALUATION_FACTOR_ENTITIES:
+EVALUATION_FACTOR_ENTITIES (hierarchy: {hierarchy_name}):
 {factors_json}
 
 Apply the hierarchy inference patterns from the instructions above. Use entity IDs from 'id' field (NOT names).
@@ -678,12 +843,26 @@ Return ONLY valid JSON array:
   {{"source_id": "parent_id", "target_id": "child_id", "relationship_type": "HAS_SUBFACTOR|HAS_RATING_SCALE|MEASURED_BY|HAS_THRESHOLD|EVALUATED_USING|DEFINES_SCALE", "confidence": 0.75-0.95, "reasoning": "pattern explanation"}}
 ]
 """
+            batch_tasks.append(_call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature))
         
-        response = await _call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
-        rels = json.loads(response.strip())
-        valid_rels = _validate_relationships(rels, id_to_entity, "Algorithm 2")
-        logger.info(f"    → Found {len(valid_rels)} evaluation hierarchy relationships")
-        return valid_rels
+        # Process all hierarchies in parallel
+        batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+        
+        # Combine and validate results
+        all_rels = []
+        for i, result in enumerate(batch_results, 1):
+            if isinstance(result, Exception):
+                logger.error(f"    ❌ Hierarchy batch {i} failed: {result}")
+            else:
+                try:
+                    rels = json.loads(result.strip())
+                    valid_rels = _validate_relationships(rels, id_to_entity, f"Algorithm 2 Batch {i}")
+                    all_rels.extend(valid_rels)
+                except Exception as e:
+                    logger.error(f"    ❌ Hierarchy batch {i} parsing failed: {e}")
+        
+        logger.info(f"    → Found {len(all_rels)} evaluation hierarchy relationships ({len(batch_tasks)} parallel hierarchies)")
+        return all_rels
     except Exception as e:
         logger.error(f"    ❌ Algorithm 2 failed: {e}")
         return []
@@ -697,9 +876,14 @@ async def _algorithm_5_doc_hierarchy(
     temperature: float
 ) -> List[Dict]:
     """
-    ALGORITHM 5: Document Hierarchy
+    ALGORITHM 5: Document Hierarchy (PHASE 2 OPTIMIZED)
     
     Maps document structure (attachments, sections, clauses, standards) with CHILD_OF edges.
+    
+    PHASE 2 OPTIMIZATION:
+    - Group documents by type (attachments, sections, clauses, standards)
+    - Process types in parallel
+    - Expected: 10-15s → 5-8s
     
     Args:
         entities: All entities
@@ -711,43 +895,78 @@ async def _algorithm_5_doc_hierarchy(
     Returns:
         List of relationship dicts with CHILD_OF edges
     """
-    documents = [e for e in entities if e.get('entity_type') in [
-        'document', 'section', 'attachment', 'annex', 'amendment', 
-        'clause', 'standard', 'specification', 'regulation', 'exhibit'
-    ]]
+    # Document type taxonomy
+    document_types = {
+        'core_documents': ['document'],
+        'sections': ['section'],
+        'attachments': ['attachment', 'annex', 'exhibit'],
+        'amendments': ['amendment'],
+        'clauses': ['clause', 'standard', 'specification', 'regulation']
+    }
     
-    if len(documents) <= 1:
+    # Group documents by type category
+    doc_groups = {}
+    for category, types in document_types.items():
+        docs = [e for e in entities if e.get('entity_type') in types]
+        if docs:
+            doc_groups[category] = docs
+    
+    if not doc_groups:
         return []
     
-    logger.info(f"\n  [Algorithm 5/8] Document Hierarchy (All Document Types): {len(documents)} document entities")
+    total_docs = sum(len(docs) for docs in doc_groups.values())
+    logger.info(f"\n  [Algorithm 5/8] Document Hierarchy (TYPE-BATCHED): {total_docs} document entities across {len(doc_groups)} type groups")
+    logger.info(f"      Groups: {', '.join(f'{k}:{len(v)}' for k, v in doc_groups.items())}")
     
     try:
         prompt_instructions = await _load_prompt_template("document_hierarchy.md")
         
-        docs_json = json.dumps([{
-            'id': d['id'],
-            'name': d['entity_name'],
-            'type': d.get('entity_type'),
-            'description': d.get('description', '')[:5000]
-        } for d in documents], indent=2)
+        # Create parallel tasks for each document type group
+        batch_tasks = []
         
-        prompt = f"""{prompt_instructions}
+        for category, docs in doc_groups.items():
+            docs_json = json.dumps([{
+                'id': d['id'],
+                'name': d['entity_name'],
+                'type': d.get('entity_type'),
+                'description': d.get('description', '')[:5000]
+            } for d in docs], indent=2)
+            
+            prompt = f"""{prompt_instructions}
 
-DOCUMENTS (all types - attachments, sections, annexes, clauses, standards):
+DOCUMENTS ({category}):
 {docs_json}
 
-Apply the inference patterns from the instructions above to identify ALL document relationships.
+Apply the inference patterns from the instructions above to identify document relationships within this type group.
 Use entity IDs from 'id' field.
 Return ONLY valid JSON array:
 [
   {{"source_id": "child_id", "target_id": "parent_id", "relationship_type": "CHILD_OF|ATTACHMENT_OF", "confidence": 0.7-1.0, "reasoning": "pattern explanation"}}
 ]
 """
+            batch_tasks.append(_call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature))
         
-        response = await _call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
-        rels = json.loads(response.strip())
-        valid_rels = _validate_relationships(rels, id_to_entity, "Algorithm 5")
-        logger.info(f"    → Found {len(valid_rels)} document hierarchy relationships")
+        # Process all document type groups in parallel
+        batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+        
+        # Combine and validate results
+        all_rels = []
+        for i, result in enumerate(batch_results, 1):
+            if isinstance(result, Exception):
+                logger.error(f"    ❌ Document type batch {i} failed: {result}")
+            else:
+                try:
+                    rels = json.loads(result.strip())
+                    valid_rels = _validate_relationships(rels, id_to_entity, f"Algorithm 5 Batch {i}")
+                    all_rels.extend(valid_rels)
+                except Exception as e:
+                    logger.error(f"    ❌ Document type batch {i} parsing failed: {e}")
+        
+        logger.info(f"    → Found {len(all_rels)} document hierarchy relationships ({len(batch_tasks)} parallel type groups)")
+        return all_rels
+    except Exception as e:
+        logger.error(f"    ❌ Algorithm 5 failed: {e}")
+        return []
         return valid_rels
     except Exception as e:
         logger.error(f"    ❌ Algorithm 5 failed: {e}")
@@ -762,9 +981,15 @@ async def _algorithm_6_concept_linking(
     temperature: float
 ) -> List[Dict]:
     """
-    ALGORITHM 6: Semantic Concept Linking
+    ALGORITHM 6: Semantic Concept Linking (PHASE 2 OPTIMIZED)
     
     Links concepts/strategic themes to high-value entities with INFORMS/IMPACTS edges.
+    
+    PHASE 2 OPTIMIZATION:
+    - Remove 50-concept hardcoded limit
+    - Dynamic batch sizing based on concept count
+    - Process in parallel batches if > 100 concepts
+    - Expected: 15-25s → 10-15s
     
     Args:
         entities_by_type: Entities grouped by type
@@ -776,7 +1001,7 @@ async def _algorithm_6_concept_linking(
     Returns:
         List of relationship dicts with semantic edges
     """
-    concepts = entities_by_type.get('concept', [])[:50]
+    concepts = entities_by_type.get('concept', [])  # REMOVED [:50] LIMIT
     strategic_themes = entities_by_type.get('strategic_theme', [])
     eval_factors = entities_by_type.get('evaluation_factor', [])
     requirements = entities_by_type.get('requirement', [])
@@ -787,21 +1012,54 @@ async def _algorithm_6_concept_linking(
     if not concept_pool or not eval_factors:
         return []
     
-    logger.info(f"\n  [Algorithm 6/8] Semantic Concept Linking: {len(concept_pool)} concepts/themes")
+    # Dynamic batch sizing based on concept count
+    if len(concept_pool) <= 50:
+        batch_size = len(concept_pool)  # Single batch for small counts
+    elif len(concept_pool) <= 200:
+        batch_size = 100  # Medium batches
+    else:
+        batch_size = 150  # Large batches for high concept counts
+    
+    logger.info(f"\n  [Algorithm 6/8] Semantic Concept Linking (DYNAMIC BATCHING): {len(concept_pool)} concepts/themes (batch size: {batch_size})")
     
     try:
         prompt_instructions = await _load_prompt_template("semantic_concept_linking.md")
         
+        # High-value entities (reused across all batches)
         high_value_entities = requirements[:30] + deliverables[:20] + eval_factors[:20]
-        
-        prompt_json = json.dumps([{
+        high_value_json = json.dumps([{
             'id': e['id'],
             'name': e['entity_name'],
             'type': e.get('entity_type'),
             'description': e.get('description', '')[:5000]
-        } for e in concept_pool + high_value_entities], indent=2)
+        } for e in high_value_entities], indent=2)
         
-        prompt = f"""{prompt_instructions}
+        # Create batches for concepts
+        batch_tasks = []
+        num_batches = (len(concept_pool) + batch_size - 1) // batch_size
+        
+        for batch_num in range(num_batches):
+            batch_start = batch_num * batch_size
+            batch_end = min(batch_start + batch_size, len(concept_pool))
+            concept_batch = concept_pool[batch_start:batch_end]
+            
+            concept_json = json.dumps([{
+                'id': c['id'],
+                'name': c['entity_name'],
+                'type': c.get('entity_type'),
+                'description': c.get('description', '')[:5000]
+            } for c in concept_batch], indent=2)
+            
+            # Combine concepts + high-value entities
+            prompt_json = f"""
+CONCEPTS/THEMES (batch {batch_num + 1}/{num_batches}):
+{concept_json}
+
+HIGH-VALUE ENTITIES (requirements, deliverables, eval factors):
+{high_value_json}
+"""
+            
+            prompt = f"""{prompt_instructions}
 
 ENTITIES:
 {prompt_json}
@@ -813,12 +1071,26 @@ Return ONLY valid JSON array:
   {{"source_id": "concept_id", "target_id": "entity_id", "relationship_type": "INFORMS|IMPACTS|DETERMINES|GUIDES|ADDRESSED_BY|RELATED_TO", "confidence": 0.6-0.9, "reasoning": "semantic connection"}}
 ]
 """
+            batch_tasks.append(_call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature))
         
-        response = await _call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
-        rels = json.loads(response.strip())
-        valid_rels = _validate_relationships(rels, id_to_entity, "Algorithm 6")
-        logger.info(f"    → Found {len(valid_rels)} semantic concept relationships")
-        return valid_rels
+        # Process all batches in parallel
+        batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+        
+        # Combine and validate results
+        all_rels = []
+        for i, result in enumerate(batch_results, 1):
+            if isinstance(result, Exception):
+                logger.error(f"    ❌ Concept batch {i} failed: {result}")
+            else:
+                try:
+                    rels = json.loads(result.strip())
+                    valid_rels = _validate_relationships(rels, id_to_entity, f"Algorithm 6 Batch {i}")
+                    all_rels.extend(valid_rels)
+                except Exception as e:
+                    logger.error(f"    ❌ Concept batch {i} parsing failed: {e}")
+        
+        logger.info(f"    → Found {len(all_rels)} semantic concept relationships ({len(batch_tasks)} dynamic batches)")
+        return all_rels
     except Exception as e:
         logger.error(f"    ❌ Algorithm 6 failed: {e}")
         return []
