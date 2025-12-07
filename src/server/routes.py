@@ -137,6 +137,118 @@ class DocumentQueueTracker:
 _queue_tracker = DocumentQueueTracker()
 
 
+async def extract_with_semaphore(
+    chunk_text: str,
+    chunk_idx: int,
+    json_extractor,
+    semaphore: asyncio.Semaphore,
+    total_chunks: int
+):
+    """
+    Extract entities/relationships from a single chunk with concurrency control.
+    
+    Issue #17: Parallel chunk processing for 87% extraction time reduction.
+    Uses semaphore to limit concurrent LLM calls (respects API rate limits).
+    """
+    from src.ontology.schema import ExtractionResult
+    
+    async with semaphore:
+        chunk_id = f"chunk-{chunk_idx+1}"
+        logger.info(f"   Processing chunk {chunk_idx+1}/{total_chunks} ({len(chunk_text):,} chars)...")
+        try:
+            return await json_extractor.extract(chunk_text, chunk_id=chunk_id)
+        except Exception as e:
+            logger.error(f"Chunk {chunk_idx+1} extraction failed: {e}")
+            # Return empty result to continue pipeline (graceful degradation)
+            return ExtractionResult(entities=[], relationships=[])
+
+
+async def extract_multimodal_with_semaphore(
+    modal_item: dict,
+    item_idx: int,
+    json_extractor,
+    semaphore: asyncio.Semaphore,
+    total_items: int
+):
+    """
+    Extract entities/relationships from a single table/image/equation with concurrency control.
+    
+    Parallel multimodal processing (similar to text chunk extraction).
+    Processes tables, images, equations concurrently to reduce extraction time.
+    """
+    from src.ontology.schema import ExtractionResult
+    
+    async with semaphore:
+        content_type = modal_item.get('type', 'unknown')
+        page_idx = modal_item.get('page_idx', 0)
+        chunk_id = f"govcon_{content_type}_p{page_idx}"
+        
+        logger.info(f"   Processing {content_type} {item_idx+1}/{total_items} (page {page_idx}) [{chunk_id}]...")
+        
+        try:
+            # Extract textualized content (MinerU already did vision work)
+            if content_type == "table":
+                text_content = modal_item.get("table_body", "")
+                caption = ", ".join(modal_item.get("table_caption", []))
+            elif content_type == "image":
+                text_content = modal_item.get("text", "")
+                caption = ", ".join(modal_item.get("image_caption", []))
+            elif content_type == "equation":
+                text_content = modal_item.get("latex", "")
+                caption = modal_item.get("equation_caption", "")
+            else:
+                text_content = str(modal_item)
+                caption = ""
+            
+            # Build ontology-aware prompt (same as GovconMultimodalProcessor)
+            caption_section = f"{content_type.title()}: {caption}\n\n" if caption else ""
+            ontology_prompt = f"""
+{caption_section}Content:
+{text_content}
+
+Extract government contracting entities from this {content_type}:
+
+1. REQUIREMENTS - Compliance criteria, specifications, constraints
+   - Include frequencies, standards, completion criteria
+   - Tag with requirement type (performance, technical, delivery)
+
+2. METRICS - Quantifiable measures for estimation
+   - Quantities (counts, volumes, capacities)
+   - Frequencies (daily, weekly, monthly, yearly)
+   - Coverage (hours, days, locations)
+   - Thresholds (minimums, maximums, ranges)
+
+3. DELIVERABLES - Work outputs, reports, schedules
+   - Document types and formats
+   - Submission frequencies and deadlines
+   - Review/approval processes
+
+4. RESOURCES - Equipment, personnel, facilities, materials
+   - Specific models/types
+   - Quantities required
+   - Qualifications/certifications
+
+5. RELATIONSHIPS - How entities connect
+   - Requirements ↔ Metrics (compliance measurement)
+   - Deliverables ↔ Requirements (evidence of compliance)
+   - Resources ↔ Requirements (capability enablers)
+
+Focus on workload drivers and basis of estimate elements.
+            
+            result = await json_extractor.extract_from_text(
+                text=ontology_prompt,
+                chunk_id=chunk_id
+            )
+            
+            logger.info(f"   ✅ [{chunk_id}] Extracted {len(result.entities)} entities from {content_type}")
+            return result, modal_item
+            
+        except Exception as e:
+            logger.error(f"{content_type.title()} {item_idx+1} extraction failed: {e}")
+            # Return empty result to continue pipeline (graceful degradation)
+            return ExtractionResult(entities=[], relationships=[]), modal_item
+
+
 async def process_document_with_semantic_inference(
     file_path: str,
     file_name: str,
@@ -273,11 +385,24 @@ async def process_document_with_semantic_inference(
         all_relationships = []
         
         try:
-            for i, chunk_text in enumerate(chunked_texts):
-                logger.info(f"   Processing text chunk {i+1}/{len(chunked_texts)}...")
-                extraction_result = await json_extractor.extract(chunk_text)
-                all_entities.extend(extraction_result.entities)
-                all_relationships.extend(extraction_result.relationships)
+            # Parallel extraction with semaphore-based concurrency (text + multimodal)
+            max_parallel = int(os.getenv("MAX_ASYNC", "8"))
+            semaphore = asyncio.Semaphore(max_parallel)
+            logger.info(f"⚡ Extracting from {len(chunked_texts)} text chunks in parallel (max concurrency: {max_parallel})...")
+            
+            # Create parallel tasks for all chunks
+            tasks = [
+                extract_with_semaphore(chunk, i, json_extractor, semaphore, len(chunked_texts))
+                for i, chunk in enumerate(chunked_texts)
+            ]
+            
+            # Execute in parallel, collecting results
+            results = await asyncio.gather(*tasks)
+            
+            # Aggregate results
+            for result in results:
+                all_entities.extend(result.entities)
+                all_relationships.extend(result.relationships)
             
             # De-duplicate entities by name
             unique_entities = {}
@@ -332,38 +457,98 @@ async def process_document_with_semantic_inference(
                     "source_id": doc_id
                 })
             
-            # PHASE 3: PROCESS MULTIMODAL CONTENT (tables, images) with custom processor
-            logger.info("📊 Registering GovconMultimodalProcessor for tables/images/equations...")
+            # PHASE 3: PARALLEL MULTIMODAL EXTRACTION (tables, images, equations)
+            logger.info("📊 Running parallel multimodal extraction...")
             
-            # Create custom processor instance
-            govcon_processor = GovconMultimodalProcessor(
-                lightrag=rag_instance.lightrag,
-                modal_caption_func=llm_func,
-                context_extractor=rag_instance.context_extractor
-            )
-            
-            # Override RAG-Anything's default processors with our ontology-aware processor
-            rag_instance.modal_processors["table"] = govcon_processor
-            rag_instance.modal_processors["image"] = govcon_processor
-            rag_instance.modal_processors["equation"] = govcon_processor
-            
-            logger.info("✅ Custom processors registered")
-            
-            # Insert text entities + process multimodal content
-            logger.info("💾 Inserting custom text ontology and processing multimodal content...")
-            await rag_instance.lightrag.ainsert_custom_kg(custom_kg, full_doc_id=doc_id)
-            
-            # Process multimodal content (tables, images) through RAG-Anything pipeline
-            # This will use our GovconMultimodalProcessor for entity extraction
             multimodal_items = [item for item in filtered_content if item.get('type') in ['table', 'image', 'equation']]
+            
             if multimodal_items:
-                logger.info(f"📊 Processing {len(multimodal_items)} multimodal items with govcon ontology...")
-                await rag_instance.insert_content_list(
-                    content_list=multimodal_items,
-                    file_path=file_name,  # Use clean filename for citations, not temp path
-                    doc_id=doc_id
+                logger.info(f"⚡ Extracting from {len(multimodal_items)} multimodal items in parallel (max concurrency: {max_parallel})...")
+                
+                # Create parallel tasks for all multimodal items
+                tasks = [
+                    extract_multimodal_with_semaphore(item, i, json_extractor, semaphore, len(multimodal_items))
+                    for i, item in enumerate(multimodal_items)
+                ]
+                
+                # Execute in parallel, collecting results
+                multimodal_results = await asyncio.gather(*tasks)
+                
+                # Aggregate multimodal entities and relationships
+                multimodal_entities = []
+                multimodal_relationships = []
+                
+                for extraction_result, modal_item in multimodal_results:
+                    multimodal_entities.extend(extraction_result.entities)
+                    multimodal_relationships.extend(extraction_result.relationships)
+                    
+                    # Add multimodal content as chunk (preserves source text)
+                    content_type = modal_item.get('type', 'unknown')
+                    page_idx = modal_item.get('page_idx', 0)
+                    
+                    # Extract raw content for chunk storage
+                    if content_type == "table":
+                        raw_content = modal_item.get("table_body", "")
+                    elif content_type == "image":
+                        raw_content = modal_item.get("text", "")
+                    elif content_type == "equation":
+                        raw_content = modal_item.get("latex", "")
+                    else:
+                        raw_content = str(modal_item)
+                    
+                    # Only add chunk if content is non-empty (OpenAI embeddings reject empty strings)
+                    if raw_content and raw_content.strip():
+                        custom_kg["chunks"].append({
+                            "content": raw_content,
+                            "source_id": doc_id,
+                            "file_path": file_name,
+                            "chunk_order_index": len(custom_kg["chunks"]),  # After text chunks
+                            "modal_type": content_type,
+                            "page_idx": page_idx
+                        })
+                
+                # De-duplicate multimodal entities by name
+                unique_multimodal_entities = {}
+                for entity in multimodal_entities:
+                    if entity.entity_name not in unique_multimodal_entities:
+                        unique_multimodal_entities[entity.entity_name] = entity
+                
+                multimodal_entities = list(unique_multimodal_entities.values())
+                
+                logger.info(
+                    f"✅ MULTIMODAL EXTRACTION: "
+                    f"{len(multimodal_entities)} unique entities, "
+                    f"{len(multimodal_relationships)} relationships "
+                    f"from {len(multimodal_items)} items (tables/images/equations)"
                 )
-                logger.info("✅ Multimodal content processed")
+                
+                # Add multimodal entities to custom_kg (filter empty names)
+                for entity in multimodal_entities:
+                    if entity.entity_name and entity.entity_name.strip():
+                        custom_kg["entities"].append({
+                            "entity_name": entity.entity_name,
+                            "entity_type": entity.entity_type,
+                            "description": entity.entity_name,
+                            "source_id": doc_id,
+                            "file_path": file_name
+                        })
+                
+                # Add multimodal relationships to custom_kg (filter invalid entity names)
+                for rel in multimodal_relationships:
+                    if (rel.source_entity.entity_name and rel.source_entity.entity_name.strip() and
+                        rel.target_entity.entity_name and rel.target_entity.entity_name.strip()):
+                        custom_kg["relationships"].append({
+                            "src_id": rel.source_entity.entity_name,
+                            "tgt_id": rel.target_entity.entity_name,
+                            "description": rel.relationship_type,
+                            "keywords": rel.relationship_type,
+                            "weight": 1.0,
+                            "source_id": doc_id
+                        })
+            
+            # PHASE 4: INSERT COMPLETE KNOWLEDGE GRAPH (text + multimodal)
+            logger.info("💾 Inserting complete knowledge graph (text + multimodal entities)...")
+            await rag_instance.lightrag.ainsert_custom_kg(custom_kg, full_doc_id=doc_id)
             
             logger.info("✅ Complete knowledge graph inserted")
             
