@@ -26,6 +26,7 @@ import re
 import asyncio
 import json
 from typing import Dict, Callable, Awaitable, List
+from pydantic import ValidationError
 
 from src.inference.neo4j_graph_io import Neo4jGraphIO, group_entities_by_type
 from src.ontology.schema import VALID_ENTITY_TYPES, InferredRelationship, InferredRelationshipBatch

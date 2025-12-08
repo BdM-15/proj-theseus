@@ -608,25 +608,78 @@ async def process_document_with_semantic_inference(
             # PHASE 5: INSERT COMPLETE CUSTOM KG (text + multimodal) ONCE
             total_entities = len(custom_kg["entities"])
             total_rels = len(custom_kg["relationships"])
+            
+            # Count duplicates in custom_kg BEFORE insertion
+            entity_count_before_insert = {}
+            for entity_dict in custom_kg["entities"]:
+                name = entity_dict.get("entity_name")
+                if name:
+                    entity_count_before_insert[name] = entity_count_before_insert.get(name, 0) + 1
+            
+            duplicates_in_custom_kg = {name: count for name, count in entity_count_before_insert.items() if count > 1}
+            
             logger.info(f"💾 Inserting complete custom ontology ({total_entities} entities, {total_rels} relationships)...")
+            if duplicates_in_custom_kg:
+                logger.info(f"   📊 Found {len(duplicates_in_custom_kg)} entity names appearing multiple times in custom_kg (will be merged):")
+                for name, count in sorted(duplicates_in_custom_kg.items(), key=lambda x: -x[1])[:5]:
+                    logger.info(f"      • `{name}` appears {count} times")
+            else:
+                logger.info(f"   📊 No duplicate entity names in custom_kg (all {total_entities} are unique)")
             
             # Track entities before insertion for merge detection
             entity_names_before = set()
+            node_count_before = 0
             try:
                 # Access Neo4j/NetworkX storage (not VDB - that's for embeddings)
                 kg_storage = rag_instance.lightrag.chunk_entity_relation_graph
                 if hasattr(kg_storage, 'graph') and hasattr(kg_storage.graph, 'nodes'):
                     # NetworkX/Neo4j stores nodes with entity_name attribute
+                    node_count_before = kg_storage.graph.number_of_nodes()
                     entity_names_before = {
                         data.get('entity_name') 
                         for node, data in kg_storage.graph.nodes(data=True)
                         if data.get('entity_name')
                     }
+                    logger.info(f"   📊 Graph state BEFORE insertion: {node_count_before} nodes, {len(entity_names_before)} unique entity_names")
             except Exception as e:
                 logger.debug(f"Could not capture pre-insertion entities: {e}")
             
             await rag_instance.lightrag.ainsert_custom_kg(custom_kg, full_doc_id=doc_id)
-            logger.info("✅ Custom ontology inserted (text + multimodal)")
+            
+            # CHECK IMMEDIATELY AFTER INSERTION (before finalize)
+            try:
+                kg_storage = rag_instance.lightrag.chunk_entity_relation_graph
+                if hasattr(kg_storage, 'graph') and hasattr(kg_storage.graph, 'nodes'):
+                    node_count_after_insert = kg_storage.graph.number_of_nodes()
+                    entity_names_after_insert = {
+                        data.get('entity_name')
+                        for node, data in kg_storage.graph.nodes(data=True)
+                        if data.get('entity_name')
+                    }
+                    nodes_added = node_count_after_insert - node_count_before
+                    unique_names_added = len(entity_names_after_insert) - len(entity_names_before)
+                    
+                    logger.info(f"✅ Custom ontology inserted (text + multimodal)")
+                    logger.info(f"   📊 Graph state AFTER insertion: {node_count_after_insert} nodes (+{nodes_added}), {len(entity_names_after_insert)} unique entity_names (+{unique_names_added})")
+                    
+                    # Calculate and show merge details like LightRAG does
+                    duplicates_merged_during_upsert = total_entities - unique_names_added
+                    if duplicates_merged_during_upsert > 0:
+                        logger.info(f"   🔀 LightRAG upsert deduplication: {total_entities} attempted → {unique_names_added} inserted = {duplicates_merged_during_upsert} duplicates merged")
+                        
+                        # Show itemized merge output (top 10)
+                        sample_size = min(10, len(duplicates_in_custom_kg))
+                        if sample_size > 0:
+                            logger.info(f"   📋 Itemized merges:")
+                            for name, count in sorted(duplicates_in_custom_kg.items(), key=lambda x: -x[1])[:sample_size]:
+                                logger.info(f"      Merged: `{name}` | {count-1}+1")
+                            if len(duplicates_in_custom_kg) > sample_size:
+                                logger.info(f"      ... and {len(duplicates_in_custom_kg) - sample_size} more entities merged")
+                    else:
+                        logger.info(f"   ℹ️  No duplicates merged (all {total_entities} entity names were unique)")
+            except Exception as e:
+                logger.info("✅ Custom ontology inserted (text + multimodal)")
+                logger.debug(f"Could not check post-insertion state: {e}")
             
             # PHASE 6: TRIGGER MERGE PHASES ONLY (no chunking, no extraction)
             logger.info("🔄 Triggering LightRAG merge phases (Entity Dedup, Relationship Dedup, Graph Indexing)...")
@@ -650,9 +703,11 @@ async def process_document_with_semantic_inference(
                         if data.get('entity_name')
                     }
                     
-                    # Calculate merge stats
-                    new_unique_entities = entity_names_after - entity_names_before
-                    entities_merged = total_entities - len(new_unique_entities)
+                    # Calculate merge stats: duplicates = what we tried to insert - what actually got inserted
+                    # This works regardless of whether workspace had prior entities
+                    entities_merged = total_entities - (len(entity_names_after) - len(entity_names_before))
+                    
+                    logger.debug(f"   Debug: entity_names_before={len(entity_names_before)}, entity_names_after={len(entity_names_after)}, total_entities={total_entities}, entities_merged={entities_merged}")
                     
                     # Show itemized merge output
                     if entities_merged > 0:
