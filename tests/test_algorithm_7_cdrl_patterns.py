@@ -216,6 +216,12 @@ entities_test5 = [
         'entity_name': 'Annex reference',
         'description': 'Refer to Annex B for specifications',
         'entity_type': 'requirement'
+    },
+    {
+        'id': 'entity_9b',
+        'entity_name': 'Appendix reference',
+        'description': 'Refer to Appendix C for requirements',
+        'entity_type': 'requirement'
     }
 ]
 
@@ -231,16 +237,22 @@ deliverables_test5 = [
         'entity_name': 'Annex B',
         'description': 'Specifications annex',
         'entity_type': 'deliverable'
+    },
+    {
+        'id': 'deliv_9b',
+        'entity_name': 'Appendix C',
+        'description': 'Requirements appendix',
+        'entity_type': 'deliverable'
     }
 ]
 
 entities_by_type_5 = {'deliverable': deliverables_test5}
 results_5 = _algorithm_7_heuristic(entities_test5, entities_by_type_5)
 
-if len(results_5) == 2:
-    print(f"✅ Found {len(results_5)} Exhibit/Annex relationships")
+if len(results_5) == 3:
+    print(f"✅ Found {len(results_5)} Exhibit/Annex/Appendix relationships")
 else:
-    print(f"❌ Expected 2 relationships, got {len(results_5)}")
+    print(f"❌ Expected 3 relationships, got {len(results_5)}")
     sys.exit(1)
 
 # ==================================================================================
@@ -374,7 +386,7 @@ print(f"   - CDRL letter+number: ✅")
 print(f"   - CDRL number-only: ✅")
 print(f"   - DID references: ✅")
 print(f"   - DD Form 1423: ✅")
-print(f"   - Exhibit/Annex: ✅")
+print(f"   - Exhibit/Annex/Appendix: ✅")
 print(f"   - Case insensitivity: ✅")
 print(f"   - Multiple patterns: ✅")
 print(f"   - No false positives: ✅")

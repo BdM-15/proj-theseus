@@ -28,7 +28,7 @@ cdrl_patterns = [
     (r'cdrl\s*\d{4,5}', 'CDRL number-only'),              # CDRL 6022
     (r'did\s*[a-z]?\d{3,5}', 'DID reference'),            # DID 6022, DID A001
     (r'dd\s*form\s*1423', 'DD Form 1423'),                # DD Form 1423
-    (r'(?:exhibit|annex)\s*[a-z]\d*', 'Attachment ref'),  # Exhibit A1, Annex B
+    (r'(?:exhibit|annex|appendix)\s*[a-z]\d*', 'Attachment ref'),  # Exhibit A1, Annex B, Appendix C
 ]
 ```
 
@@ -72,7 +72,7 @@ if cdrl_id in deliv_name_normalized or cdrl_id in deliv_desc_normalized:
    - CDRL number-only: ✅ (CDRL 6022, CDRL 1234)
    - DID references: ✅ (DID 6022, DID A001)
    - DD Form 1423: ✅
-   - Exhibit/Annex: ✅ (Exhibit A1, Annex B)
+   - Exhibit/Annex/Appendix: ✅ (Exhibit A1, Annex B, Appendix C)
    - Case insensitivity: ✅
    - Multiple patterns: ✅ (4 patterns in single entity)
    - No false positives: ✅

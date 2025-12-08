@@ -104,13 +104,13 @@ new_relationships = await infer_relationships(
 4. **Deliverable Traceability**: REQUIREMENT → DELIVERABLE, STATEMENT_OF_WORK → DELIVERABLE (SATISFIED_BY, PRODUCES)
 5. **Document Hierarchy**: DOCUMENT → SECTION, ATTACHMENT → DOCUMENT (CHILD_OF, ATTACHMENT_OF)
 6. **Semantic Concept Linking**: CONCEPT/STRATEGIC_THEME → high-value entities (INFORMS, IMPACTS)
-7. **Heuristic Pattern Matching**: CDRL/DID/DD Form/Exhibit/Annex cross-references (REFERENCES)
+7. **Heuristic Pattern Matching**: CDRL/DID/DD Form/Exhibit/Annex/Appendix cross-references (REFERENCES)
    - **Comprehensive regex coverage** (Issue #30 Phase 1):
      - CDRL letter+number: CDRL A001, CDRL B123
      - CDRL number-only: CDRL 6022, CDRL 1234
      - DID references: DID 6022, DID A001
      - DD Form 1423: DD Form 1423
-     - Exhibit/Annex: Exhibit A1, Annex B
+     - Exhibit/Annex/Appendix: Exhibit A1, Annex B, Appendix C
    - **Zero-cost**: Regex-based, no LLM calls
    - **Performance**: < 1s for 3,868 entities (21,861 entities/second)
    - **Expected impact**: 20-50 CDRL relationships per typical RFP

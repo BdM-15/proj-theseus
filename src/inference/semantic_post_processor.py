@@ -1276,7 +1276,7 @@ def _algorithm_7_heuristic(
         (r'cdrl\s*\d{4,5}', 'CDRL number-only'),              # CDRL 6022
         (r'did\s*[a-z]?\d{3,5}', 'DID reference'),            # DID 6022, DID A001
         (r'dd\s*form\s*1423', 'DD Form 1423'),                # DD Form 1423
-        (r'(?:exhibit|annex)\s*[a-z]\d*', 'Attachment ref'),  # Exhibit A1, Annex B
+        (r'(?:exhibit|annex|appendix)\s*[a-z]\d*', 'Attachment ref'),  # Exhibit A1, Annex B, Appendix C
     ]
     
     for entity in entities:
