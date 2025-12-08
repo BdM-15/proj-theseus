@@ -1249,7 +1249,14 @@ def _algorithm_7_heuristic(
     """
     ALGORITHM 7: Heuristic Pattern Matching (CDRL cross-refs)
     
-    Detects explicit CDRL references using regex patterns. Non-async (no LLM calls).
+    Detects explicit CDRL/DID references using regex patterns. Non-async (no LLM calls).
+    
+    Comprehensive pattern coverage (Issue #30 Phase 1):
+    - CDRL letter+number: CDRL A001, CDRL B123
+    - CDRL number-only: CDRL 6022, CDRL 1234
+    - DID references: DID 6022, DID A001
+    - DD Form 1423: DD Form 1423
+    - Exhibit/Annex: Exhibit A1, Annex B
     
     Args:
         entities: All entities
@@ -1263,26 +1270,46 @@ def _algorithm_7_heuristic(
     deliverables = entities_by_type.get('deliverable', [])
     heuristic_rels = []
     
+    # Expanded: Multiple patterns for comprehensive coverage
+    cdrl_patterns = [
+        (r'cdrl\s*[a-z]\d{3,4}', 'CDRL letter+number'),      # CDRL A001
+        (r'cdrl\s*\d{4,5}', 'CDRL number-only'),              # CDRL 6022
+        (r'did\s*[a-z]?\d{3,5}', 'DID reference'),            # DID 6022, DID A001
+        (r'dd\s*form\s*1423', 'DD Form 1423'),                # DD Form 1423
+        (r'(?:exhibit|annex)\s*[a-z]\d*', 'Attachment ref'),  # Exhibit A1, Annex B
+    ]
+    
     for entity in entities:
         desc = (entity.get('description') or '').lower()
         name = (entity.get('entity_name') or '').lower()
+        text = desc + ' ' + name
         
-        # Pattern: CDRL cross-reference (e.g., "CDRL A001")
-        cdrl_pattern = r'cdrl\s+[a-z]\d{3,4}'
-        matches = re.findall(cdrl_pattern, desc + ' ' + name)
-        
-        for match in matches:
-            cdrl_id = match.replace(' ', '').upper()
-            for deliv in deliverables:
-                if cdrl_id in (deliv.get('entity_name') or '').upper() or cdrl_id in (deliv.get('description') or '').upper():
-                    heuristic_rels.append({
-                        'source_id': entity['id'],
-                        'target_id': deliv['id'],
-                        'relationship_type': 'REFERENCES',
-                        'confidence': 0.95,
-                        'reasoning': f"Heuristic: Explicit CDRL cross-reference '{match}'"
-                    })
-                    break
+        for pattern, pattern_name in cdrl_patterns:
+            matches = re.findall(pattern, text)
+            
+            for match in matches:
+                # Normalize the match - remove spaces, uppercase
+                cdrl_id = match.replace(' ', '').upper()
+                
+                # Try to match against deliverable entities
+                for deliv in deliverables:
+                    deliv_name = (deliv.get('entity_name') or '').upper()
+                    deliv_desc = (deliv.get('description') or '').upper()
+                    
+                    # Normalize deliverable text for matching (remove spaces)
+                    deliv_name_normalized = deliv_name.replace(' ', '')
+                    deliv_desc_normalized = deliv_desc.replace(' ', '')
+                    
+                    if cdrl_id in deliv_name_normalized or cdrl_id in deliv_desc_normalized:
+                        heuristic_rels.append({
+                            'source_id': entity['id'],
+                            'target_id': deliv['id'],
+                            'relationship_type': 'REFERENCES',
+                            'confidence': 0.95,
+                            'reasoning': f"Heuristic: {pattern_name} '{match}'"
+                        })
+                        logger.debug(f"      Matched {pattern_name}: {match} → {deliv_name}")
+                        break  # Only link to first matching deliverable
     
     logger.info(f"    → Found {len(heuristic_rels)} heuristic relationships")
     return heuristic_rels
