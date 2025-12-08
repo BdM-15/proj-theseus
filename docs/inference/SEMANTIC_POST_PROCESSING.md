@@ -98,13 +98,23 @@ new_relationships = await infer_relationships(
 
 **Algorithms**:
 
-1. **Document Hierarchy**: DOCUMENT → SECTION (CHILD_OF)
-2. **Clause Clustering**: CLAUSE → SECTION (CHILD_OF)
-3. **Instruction↔Factor Mapping**: SUBMISSION_INSTRUCTION ↔ EVALUATION_FACTOR (CORRESPONDS_TO)
-4. **Requirement Evaluation**: REQUIREMENT → EVALUATION_FACTOR (EVALUATED_BY)
-5. **SOW Deliverables**: STATEMENT_OF_WORK → DELIVERABLE (REQUIRES)
-6. **Type-Based Heuristics**: Auto-linkage based on entity types
-7. **Entity Deduplication**: Merge duplicate entities
+1. **Instruction-Evaluation Linking**: SUBMISSION_INSTRUCTION ↔ EVALUATION_FACTOR (GUIDES)
+2. **Evaluation Hierarchy**: EVALUATION_FACTOR → EVALUATION_FACTOR (HAS_SUBFACTOR, MEASURED_BY, etc.)
+3. **Requirement-Evaluation Mapping**: REQUIREMENT → EVALUATION_FACTOR (EVALUATED_BY)
+4. **Deliverable Traceability**: REQUIREMENT → DELIVERABLE, STATEMENT_OF_WORK → DELIVERABLE (SATISFIED_BY, PRODUCES)
+5. **Document Hierarchy**: DOCUMENT → SECTION, ATTACHMENT → DOCUMENT (CHILD_OF, ATTACHMENT_OF)
+6. **Semantic Concept Linking**: CONCEPT/STRATEGIC_THEME → high-value entities (INFORMS, IMPACTS)
+7. **Heuristic Pattern Matching**: CDRL/DID/DD Form/Exhibit/Annex cross-references (REFERENCES)
+   - **Comprehensive regex coverage** (Issue #30 Phase 1):
+     - CDRL letter+number: CDRL A001, CDRL B123
+     - CDRL number-only: CDRL 6022, CDRL 1234
+     - DID references: DID 6022, DID A001
+     - DD Form 1423: DD Form 1423
+     - Exhibit/Annex: Exhibit A1, Annex B
+   - **Zero-cost**: Regex-based, no LLM calls
+   - **Performance**: < 1s for 3,868 entities (21,861 entities/second)
+   - **Expected impact**: 20-50 CDRL relationships per typical RFP
+8. **Orphan Pattern Resolution**: Equipment→Requirements, Person→Deliverable, Concept→Document (REQUIRES, ENABLED_BY, RESPONSIBLE_FOR, FIELD_IN)
 
 **Batching**: 50 items per algorithm per LLM call
 **Cost**: ~$0.03 per document (5 LLM batches)
