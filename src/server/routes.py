@@ -604,71 +604,11 @@ async def process_document_with_semantic_inference(
                 logger.info("✅ Custom ontology inserted (text + multimodal)")
                 logger.debug(f"Could not check post-insertion state: {e}")
             
-            # PHASE 6: TRIGGER MERGE PHASES ONLY (no chunking, no extraction)
-            logger.info("🔄 Triggering LightRAG merge phases (Entity Dedup, Relationship Dedup, Graph Indexing)...")
-            logger.info("   📊 Pre-merge stats:")
-            logger.info(f"      • Entities inserted: {total_entities}")
-            logger.info(f"      • Relationships inserted: {total_rels}")
+            # NOTE: LightRAG's ainsert_custom_kg() handles deduplication during insertion via upsert.
+            # DO NOT call finalize_storages() here - it's a SHUTDOWN function that closes the Neo4j
+            # driver, causing subsequent documents in a batch to fail with '_driver is None'.
+            # See Issue #35 for details.
             
-            # Run merge phases (combines duplicate entities/relationships, updates embeddings)
-            await rag_instance.lightrag.finalize_storages()
-            
-            # Query final counts and show what got merged
-            try:
-                kg_storage = rag_instance.lightrag.chunk_entity_relation_graph
-                
-                if hasattr(kg_storage, 'graph') and hasattr(kg_storage.graph, 'nodes'):
-                    # Count final entities in graph
-                    final_entity_count = kg_storage.graph.number_of_nodes()
-                    entity_names_after = {
-                        data.get('entity_name')
-                        for node, data in kg_storage.graph.nodes(data=True)
-                        if data.get('entity_name')
-                    }
-                    
-                    # Calculate merge stats: duplicates = what we tried to insert - what actually got inserted
-                    # This works regardless of whether workspace had prior entities
-                    entities_merged = total_entities - (len(entity_names_after) - len(entity_names_before))
-                    
-                    logger.debug(f"   Debug: entity_names_before={len(entity_names_before)}, entity_names_after={len(entity_names_after)}, total_entities={total_entities}, entities_merged={entities_merged}")
-                    
-                    # Show itemized merge output
-                    if entities_merged > 0:
-                        logger.info(f"   🔀 Merged {entities_merged} duplicate entities:")
-                        # Count entity occurrences in custom_kg
-                        entity_count = {}
-                        for entity_dict in custom_kg["entities"]:
-                            name = entity_dict.get("entity_name")
-                            if name:
-                                entity_count[name] = entity_count.get(name, 0) + 1
-                        
-                        # Find duplicates (entities that appeared multiple times)
-                        duplicates_found = {name: count for name, count in entity_count.items() if count > 1}
-                        sample_size = min(10, len(duplicates_found))
-                        for i, (name, count) in enumerate(sorted(duplicates_found.items(), key=lambda x: -x[1])[:sample_size]):
-                            logger.info(f"      • `{name}` | {count-1}+1 (consolidated from {count} instances)")
-                        
-                        if len(duplicates_found) > sample_size:
-                            logger.info(f"      • ... and {len(duplicates_found) - sample_size} more duplicates merged")
-                else:
-                    final_entity_count = total_entities
-                    entities_merged = 0
-                
-                # Count final relationships
-                if hasattr(kg_storage, 'graph') and hasattr(kg_storage.graph, 'edges'):
-                    final_rel_count = kg_storage.graph.number_of_edges()
-                    rels_merged = total_rels - final_rel_count
-                else:
-                    final_rel_count = total_rels
-                    rels_merged = 0
-                
-                logger.info("   ✅ Post-merge stats:")
-                logger.info(f"      • Final entities: {final_entity_count} (pre-deduplicated by KG processor, {entities_merged} additional duplicates merged by LightRAG)")
-                logger.info(f"      • Final relationships: {final_rel_count} (pre-deduplicated by KG processor, {rels_merged} additional duplicates merged by LightRAG)")
-            except Exception as e:
-                logger.warning(f"   ⚠️ Could not retrieve detailed merge stats: {e}")
-            
-            logger.info("✅ Merge phases completed (Entity Dedup, Relationship Dedup, Graph Indexing)")
             logger.info("✅ Complete knowledge graph inserted with deduplication")
             
             # Log queue status
