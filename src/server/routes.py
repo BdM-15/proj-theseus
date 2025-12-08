@@ -323,17 +323,18 @@ async def process_document_with_semantic_inference(
             # MinerU provides: {'type': 'text'/'table'/'image', 'text': '...', 'page_idx': N}
             from src.extraction.json_extractor import JsonExtractor
             from src.processors import GovconMultimodalProcessor
+            from src.processors.govcon_kg_processor import GovconKGProcessor
+            from src.deduplication.entity_deduplicator import deduplicate_entities, log_deduplication_stats
             
-            # Initialize extractors
+            # Initialize processor and extractors
+            kg_processor = GovconKGProcessor()
             json_extractor = JsonExtractor()
-            # Note: llm_func is passed as parameter to this function
             
-            # PHASE 1: TEXT EXTRACTION (for custom ontology extraction)
+            # PHASE 1: TEXT EXTRACTION (chunk text blocks)
             text_chunks = []
             for item in filtered_content:
-                # Filter ONLY text blocks (tables/images handled by RAG-Anything processors)
                 if item.get('type') == 'text':
-                    content_text = item.get('text', '')  # MinerU uses 'text' field, not 'content'
+                    content_text = item.get('text', '')
                     if content_text and content_text.strip():
                         text_chunks.append(content_text)
             
@@ -353,7 +354,6 @@ async def process_document_with_semantic_inference(
                 
                 # Skip text processing, go directly to multimodal
                 full_text = ""
-                text_entity_count = 0
                 chunked_texts = []  # Empty list - no text chunks to process
             else:
                 full_text = "\n\n".join(text_chunks)
@@ -379,19 +379,21 @@ async def process_document_with_semantic_inference(
                 
                 logger.info(f"🔪 Chunked text into {len(chunked_texts)} chunks ({chunk_size} tokens, {chunk_overlap} overlap)")
         
-        # PHASE 2: CUSTOM ONTOLOGY EXTRACTION (text only - tables handled by processor)
-        logger.info("🚀 Running custom ontology extraction with Pydantic schema (TEXT)...")
-        
-        all_entities = []
-        all_relationships = []
+        # PHASE 2: PARALLEL EXTRACTION (Text + Multimodal)
+        logger.info("🚀 Running parallel extraction with custom ontology...")
         
         try:
-            # Parallel extraction with semaphore-based concurrency (text + multimodal)
             max_parallel = int(os.getenv("MAX_ASYNC", "8"))
             semaphore = asyncio.Semaphore(max_parallel)
+            
+            # ============================================================================
+            # PHASE 2A: TEXT CHUNK EXTRACTION
+            # ============================================================================
             logger.info(f"⚡ Extracting from {len(chunked_texts)} text chunks in parallel (max concurrency: {max_parallel})...")
             
-            # Create parallel tasks for all chunks
+            text_chunk_data = []  # Will store (chunk_id, entities, rels) tuples
+            
+            # Create parallel tasks for all text chunks
             tasks = [
                 extract_with_semaphore(chunk, i, json_extractor, semaphore, len(chunked_texts))
                 for i, chunk in enumerate(chunked_texts)
@@ -400,68 +402,44 @@ async def process_document_with_semantic_inference(
             # Execute in parallel, collecting results
             results = await asyncio.gather(*tasks)
             
-            # Aggregate results
-            for result in results:
-                all_entities.extend(result.entities)
-                all_relationships.extend(result.relationships)
+            # Convert Pydantic results to dicts for processor
+            for i, result in enumerate(results):
+                chunk_id = f"text_chunk_{i}"
+                
+                # Convert entities to dicts
+                entities_dicts = [
+                    {
+                        "entity_name": entity.entity_name,
+                        "entity_type": entity.entity_type,
+                        "description": entity.entity_name,
+                        "source_id": doc_id,
+                        "file_path": file_name
+                    }
+                    for entity in result.entities
+                ]
+                
+                # Convert relationships to dicts
+                rels_dicts = [
+                    {
+                        "src_id": rel.source_entity.entity_name,
+                        "tgt_id": rel.target_entity.entity_name,
+                        "description": rel.relationship_type,
+                        "keywords": rel.relationship_type,
+                        "weight": 1.0,
+                        "source_id": doc_id
+                    }
+                    for rel in result.relationships
+                ]
+                
+                text_chunk_data.append((chunk_id, entities_dicts, rels_dicts))
             
-            # De-duplicate entities by name
-            unique_entities = {}
-            for entity in all_entities:
-                if entity.entity_name not in unique_entities:
-                    unique_entities[entity.entity_name] = entity
+            logger.info(f"✅ TEXT EXTRACTION: Collected {len(text_chunk_data)} chunks for processing")
             
-            all_entities = list(unique_entities.values())
-            
-            logger.info(
-                f"✅ TEXT EXTRACTION: "
-                f"{len(all_entities)} unique entities, "
-                f"{len(all_relationships)} relationships "
-                f"from {len(chunked_texts)} text chunks"
-            )
-            
-            # Convert Pydantic extraction to LightRAG custom_kg format
-            custom_kg = {
-                "chunks": [],
-                "entities": [],
-                "relationships": []
-            }
-            
-            # Convert text chunks only (tables handled by RAG-Anything's modal processors)
-            # NOTE: Use file_name (clean filename) not file_path (temp path) for citations
-            for i, chunk_text in enumerate(chunked_texts):
-                custom_kg["chunks"].append({
-                    "content": chunk_text,
-                    "source_id": doc_id,
-                    "file_path": file_name,
-                    "chunk_order_index": i
-                })
-            
-            # Convert entities from text extraction
-            for entity in all_entities:
-                custom_kg["entities"].append({
-                    "entity_name": entity.entity_name,
-                    "entity_type": entity.entity_type,
-                    "description": entity.entity_name,  # Use entity_name for embedding - full text is in chunks
-                    "source_id": doc_id,
-                    "file_path": file_name
-                })
-            
-            # Convert relationships
-            for rel in all_relationships:
-                custom_kg["relationships"].append({
-                    "src_id": rel.source_entity.entity_name,
-                    "tgt_id": rel.target_entity.entity_name,
-                    "description": rel.relationship_type,  # Use relationship_type as description
-                    "keywords": rel.relationship_type,
-                    "weight": 1.0,
-                    "source_id": doc_id
-                })
-            
-            # PHASE 3: PARALLEL MULTIMODAL EXTRACTION (tables, images, equations)
-            logger.info("📊 Running parallel multimodal extraction...")
-            
+            # ============================================================================
+            # PHASE 2B: MULTIMODAL EXTRACTION
+            # ============================================================================
             multimodal_items = [item for item in filtered_content if item.get('type') in ['table', 'image', 'equation']]
+            multimodal_chunk_data = []  # Will store (item_id, entities, rels) tuples
             
             if multimodal_items:
                 logger.info(f"⚡ Extracting from {len(multimodal_items)} multimodal items in parallel (max concurrency: {max_parallel})...")
@@ -475,27 +453,87 @@ async def process_document_with_semantic_inference(
                 # Execute in parallel, collecting results
                 multimodal_results = await asyncio.gather(*tasks)
                 
-                # Aggregate multimodal entities and relationships
-                multimodal_entities = []
-                multimodal_relationships = []
-                
-                for extraction_result, modal_item in multimodal_results:
-                    multimodal_entities.extend(extraction_result.entities)
-                    multimodal_relationships.extend(extraction_result.relationships)
-                    
-                    # Add multimodal content as chunk (preserves source text)
+                # Convert Pydantic results to dicts for processor
+                for i, (extraction_result, modal_item) in enumerate(multimodal_results):
                     content_type = modal_item.get('type', 'unknown')
-                    page_idx = modal_item.get('page_idx', 0)
+                    page_idx = modal_item.get('page_idx', i)
+                    item_id = f"multimodal_{content_type}_p{page_idx}"
+                    
+                    # Convert entities to dicts
+                    entities_dicts = [
+                        {
+                            "entity_name": entity.entity_name,
+                            "entity_type": entity.entity_type,
+                            "description": entity.entity_name,
+                            "source_id": doc_id,
+                            "file_path": file_name
+                        }
+                        for entity in extraction_result.entities
+                        if entity.entity_name and entity.entity_name.strip()
+                    ]
+                    
+                    # Convert relationships to dicts
+                    rels_dicts = [
+                        {
+                            "src_id": rel.source_entity.entity_name,
+                            "tgt_id": rel.target_entity.entity_name,
+                            "description": rel.relationship_type,
+                            "keywords": rel.relationship_type,
+                            "weight": 1.0,
+                            "source_id": doc_id
+                        }
+                        for rel in extraction_result.relationships
+                        if (rel.source_entity.entity_name and rel.source_entity.entity_name.strip() and
+                            rel.target_entity.entity_name and rel.target_entity.entity_name.strip())
+                    ]
+                    
+                    multimodal_chunk_data.append((item_id, entities_dicts, rels_dicts))
+                
+                logger.info(f"✅ MULTIMODAL EXTRACTION: Collected {len(multimodal_chunk_data)} items for processing")
+            
+            # ============================================================================
+            # PHASE 3-5: USE GOVCON KG PROCESSOR (Extract → Merge → Finalize)
+            # ============================================================================
+            # This replaces all the manual deduplication and custom_kg building
+            processed_kg = kg_processor.process_document(
+                text_chunks=text_chunk_data,
+                multimodal_items=multimodal_chunk_data if multimodal_chunk_data else None
+            )
+            
+            # ============================================================================
+            # BUILD CUSTOM_KG FOR LIGHTRAG INSERTION
+            # ============================================================================
+            # Add chunks (needed for LightRAG's vector DB)
+            custom_kg = {
+                "chunks": [],
+                "entities": processed_kg["entities"],
+                "relationships": processed_kg["relationships"]
+            }
+            
+            # Add text chunks
+            for i, chunk_text in enumerate(chunked_texts):
+                custom_kg["chunks"].append({
+                    "content": chunk_text,
+                    "source_id": doc_id,
+                    "file_path": file_name,
+                    "chunk_order_index": i
+                })
+            
+            # Add multimodal chunks
+            if multimodal_items:
+                for item in multimodal_items:
+                    content_type = item.get('type', 'unknown')
+                    page_idx = item.get('page_idx', 0)
                     
                     # Extract raw content for chunk storage
                     if content_type == "table":
-                        raw_content = modal_item.get("table_body", "")
+                        raw_content = item.get("table_body", "")
                     elif content_type == "image":
-                        raw_content = modal_item.get("text", "")
+                        raw_content = item.get("text", "")
                     elif content_type == "equation":
-                        raw_content = modal_item.get("latex", "")
+                        raw_content = item.get("latex", "")
                     else:
-                        raw_content = str(modal_item)
+                        raw_content = str(item)
                     
                     # Only add chunk if content is non-empty (OpenAI embeddings reject empty strings)
                     if raw_content and raw_content.strip():
@@ -503,55 +541,135 @@ async def process_document_with_semantic_inference(
                             "content": raw_content,
                             "source_id": doc_id,
                             "file_path": file_name,
-                            "chunk_order_index": len(custom_kg["chunks"]),  # After text chunks
+                            "chunk_order_index": len(custom_kg["chunks"]),
                             "modal_type": content_type,
                             "page_idx": page_idx
                         })
-                
-                # De-duplicate multimodal entities by name
-                unique_multimodal_entities = {}
-                for entity in multimodal_entities:
-                    if entity.entity_name not in unique_multimodal_entities:
-                        unique_multimodal_entities[entity.entity_name] = entity
-                
-                multimodal_entities = list(unique_multimodal_entities.values())
-                
-                logger.info(
-                    f"✅ MULTIMODAL EXTRACTION: "
-                    f"{len(multimodal_entities)} unique entities, "
-                    f"{len(multimodal_relationships)} relationships "
-                    f"from {len(multimodal_items)} items (tables/images/equations)"
-                )
-                
-                # Add multimodal entities to custom_kg (filter empty names)
-                for entity in multimodal_entities:
-                    if entity.entity_name and entity.entity_name.strip():
-                        custom_kg["entities"].append({
-                            "entity_name": entity.entity_name,
-                            "entity_type": entity.entity_type,
-                            "description": entity.entity_name,
-                            "source_id": doc_id,
-                            "file_path": file_name
-                        })
-                
-                # Add multimodal relationships to custom_kg (filter invalid entity names)
-                for rel in multimodal_relationships:
-                    if (rel.source_entity.entity_name and rel.source_entity.entity_name.strip() and
-                        rel.target_entity.entity_name and rel.target_entity.entity_name.strip()):
-                        custom_kg["relationships"].append({
-                            "src_id": rel.source_entity.entity_name,
-                            "tgt_id": rel.target_entity.entity_name,
-                            "description": rel.relationship_type,
-                            "keywords": rel.relationship_type,
-                            "weight": 1.0,
-                            "source_id": doc_id
-                        })
             
-            # PHASE 4: INSERT COMPLETE KNOWLEDGE GRAPH (text + multimodal)
-            logger.info("💾 Inserting complete knowledge graph (text + multimodal entities)...")
+            total_entities = len(custom_kg["entities"])
+            total_rels = len(custom_kg["relationships"])
+            
+            logger.info(f"💾 Phase 5B: Inserting deduplicated ontology ({total_entities} entities, {total_rels} relationships)...")            # Track entities before insertion for merge detection
+            entity_names_before = set()
+            node_count_before = 0
+            try:
+                # Access Neo4j/NetworkX storage (not VDB - that's for embeddings)
+                kg_storage = rag_instance.lightrag.chunk_entity_relation_graph
+                if hasattr(kg_storage, 'graph') and hasattr(kg_storage.graph, 'nodes'):
+                    # NetworkX/Neo4j stores nodes with entity_name attribute
+                    node_count_before = kg_storage.graph.number_of_nodes()
+                    entity_names_before = {
+                        data.get('entity_name') 
+                        for node, data in kg_storage.graph.nodes(data=True)
+                        if data.get('entity_name')
+                    }
+                    logger.info(f"   📊 Graph state BEFORE insertion: {node_count_before} nodes, {len(entity_names_before)} unique entity_names")
+            except Exception as e:
+                logger.debug(f"Could not capture pre-insertion entities: {e}")
+            
             await rag_instance.lightrag.ainsert_custom_kg(custom_kg, full_doc_id=doc_id)
             
-            logger.info("✅ Complete knowledge graph inserted")
+            # CHECK IMMEDIATELY AFTER INSERTION (before finalize)
+            try:
+                kg_storage = rag_instance.lightrag.chunk_entity_relation_graph
+                if hasattr(kg_storage, 'graph') and hasattr(kg_storage.graph, 'nodes'):
+                    node_count_after_insert = kg_storage.graph.number_of_nodes()
+                    entity_names_after_insert = {
+                        data.get('entity_name')
+                        for node, data in kg_storage.graph.nodes(data=True)
+                        if data.get('entity_name')
+                    }
+                    nodes_added = node_count_after_insert - node_count_before
+                    unique_names_added = len(entity_names_after_insert) - len(entity_names_before)
+                    
+                    logger.info(f"✅ Custom ontology inserted (text + multimodal)")
+                    logger.info(f"   📊 Graph state AFTER insertion: {node_count_after_insert} nodes (+{nodes_added}), {len(entity_names_after_insert)} unique entity_names (+{unique_names_added})")
+                    
+                    # Calculate and show merge details like LightRAG does
+                    duplicates_merged_during_upsert = total_entities - unique_names_added
+                    if duplicates_merged_during_upsert > 0:
+                        logger.info(f"   🔀 LightRAG upsert deduplication: {total_entities} attempted → {unique_names_added} inserted = {duplicates_merged_during_upsert} duplicates merged")
+                        
+                        # Show itemized merge output (top 10)
+                        sample_size = min(10, len(duplicates_in_custom_kg))
+                        if sample_size > 0:
+                            logger.info(f"   📋 Itemized merges:")
+                            for name, count in sorted(duplicates_in_custom_kg.items(), key=lambda x: -x[1])[:sample_size]:
+                                logger.info(f"      Merged: `{name}` | {count-1}+1")
+                            if len(duplicates_in_custom_kg) > sample_size:
+                                logger.info(f"      ... and {len(duplicates_in_custom_kg) - sample_size} more entities merged")
+                    else:
+                        logger.info(f"   ℹ️  No duplicates merged (all {total_entities} entity names were unique)")
+            except Exception as e:
+                logger.info("✅ Custom ontology inserted (text + multimodal)")
+                logger.debug(f"Could not check post-insertion state: {e}")
+            
+            # PHASE 6: TRIGGER MERGE PHASES ONLY (no chunking, no extraction)
+            logger.info("🔄 Triggering LightRAG merge phases (Entity Dedup, Relationship Dedup, Graph Indexing)...")
+            logger.info("   📊 Pre-merge stats:")
+            logger.info(f"      • Entities inserted: {total_entities}")
+            logger.info(f"      • Relationships inserted: {total_rels}")
+            
+            # Run merge phases (combines duplicate entities/relationships, updates embeddings)
+            await rag_instance.lightrag.finalize_storages()
+            
+            # Query final counts and show what got merged
+            try:
+                kg_storage = rag_instance.lightrag.chunk_entity_relation_graph
+                
+                if hasattr(kg_storage, 'graph') and hasattr(kg_storage.graph, 'nodes'):
+                    # Count final entities in graph
+                    final_entity_count = kg_storage.graph.number_of_nodes()
+                    entity_names_after = {
+                        data.get('entity_name')
+                        for node, data in kg_storage.graph.nodes(data=True)
+                        if data.get('entity_name')
+                    }
+                    
+                    # Calculate merge stats: duplicates = what we tried to insert - what actually got inserted
+                    # This works regardless of whether workspace had prior entities
+                    entities_merged = total_entities - (len(entity_names_after) - len(entity_names_before))
+                    
+                    logger.debug(f"   Debug: entity_names_before={len(entity_names_before)}, entity_names_after={len(entity_names_after)}, total_entities={total_entities}, entities_merged={entities_merged}")
+                    
+                    # Show itemized merge output
+                    if entities_merged > 0:
+                        logger.info(f"   🔀 Merged {entities_merged} duplicate entities:")
+                        # Count entity occurrences in custom_kg
+                        entity_count = {}
+                        for entity_dict in custom_kg["entities"]:
+                            name = entity_dict.get("entity_name")
+                            if name:
+                                entity_count[name] = entity_count.get(name, 0) + 1
+                        
+                        # Find duplicates (entities that appeared multiple times)
+                        duplicates_found = {name: count for name, count in entity_count.items() if count > 1}
+                        sample_size = min(10, len(duplicates_found))
+                        for i, (name, count) in enumerate(sorted(duplicates_found.items(), key=lambda x: -x[1])[:sample_size]):
+                            logger.info(f"      • `{name}` | {count-1}+1 (consolidated from {count} instances)")
+                        
+                        if len(duplicates_found) > sample_size:
+                            logger.info(f"      • ... and {len(duplicates_found) - sample_size} more duplicates merged")
+                else:
+                    final_entity_count = total_entities
+                    entities_merged = 0
+                
+                # Count final relationships
+                if hasattr(kg_storage, 'graph') and hasattr(kg_storage.graph, 'edges'):
+                    final_rel_count = kg_storage.graph.number_of_edges()
+                    rels_merged = total_rels - final_rel_count
+                else:
+                    final_rel_count = total_rels
+                    rels_merged = 0
+                
+                logger.info("   ✅ Post-merge stats:")
+                logger.info(f"      • Final entities: {final_entity_count} (pre-deduplicated by KG processor, {entities_merged} additional duplicates merged by LightRAG)")
+                logger.info(f"      • Final relationships: {final_rel_count} (pre-deduplicated by KG processor, {rels_merged} additional duplicates merged by LightRAG)")
+            except Exception as e:
+                logger.warning(f"   ⚠️ Could not retrieve detailed merge stats: {e}")
+            
+            logger.info("✅ Merge phases completed (Entity Dedup, Relationship Dedup, Graph Indexing)")
+            logger.info("✅ Complete knowledge graph inserted with deduplication")
             
             # Log queue status
             stats = await _queue_tracker.get_stats()
@@ -562,8 +680,8 @@ async def process_document_with_semantic_inference(
                 logger.info(f"⏭️  Document added to batch | Queue: {stats['processing']} processing, {stats['completed']} completed")
             
             return {
-                "entities_extracted": len(all_entities),
-                "relationships_extracted": len(all_relationships),
+                "entities_extracted": total_entities,
+                "relationships_extracted": total_rels,
                 "message": "✅ Document processed. Enhancement will run automatically when batch completes."
             }
             

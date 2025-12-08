@@ -103,19 +103,19 @@ class Neo4jGraphIO:
         Find entity IDs that have no relationships (true orphans).
         
         Returns:
-            List of element IDs for entities with no incoming or outgoing relationships
+            List of entity names (entity_id property) for entities with no incoming or outgoing relationships
         """
         query = f"""
         MATCH (n:`{self.workspace}`)
         WHERE NOT (n)-[]-()
-        RETURN elementId(n) as id
+        RETURN n.entity_id as entity_name
         """
         
         with self.driver.session(database=self.database) as session:
             result = session.run(query)
-            orphan_ids = [record['id'] for record in result]
-            logger.info(f"  📊 Found {len(orphan_ids)} truly orphaned entities in Neo4j")
-            return orphan_ids
+            orphan_names = [record['entity_name'] for record in result]
+            logger.info(f"  📊 Found {len(orphan_names)} truly orphaned entities in Neo4j")
+            return orphan_names
     
     def update_entity_types(self, entity_updates: List[Dict]) -> int:
         """

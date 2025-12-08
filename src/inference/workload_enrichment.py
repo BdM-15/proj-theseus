@@ -31,8 +31,8 @@ Output properties added to REQUIREMENT entities:
 
 import os
 import logging
-import json
 import asyncio
+import json
 from typing import Dict, List, Callable, Awaitable
 from pathlib import Path
 from pydantic import ValidationError
@@ -44,6 +44,7 @@ from src.ontology.schema import (
     WorkloadEnrichmentResponse,
     normalize_boe_category
 )
+from src.utils.llm_parsing import extract_json_from_response
 
 logger = logging.getLogger(__name__)
 
@@ -243,17 +244,8 @@ Return JSON array with {len(batch)} objects (one per requirement above):
             try:
                 response = await llm_func(prompt, model=model, temperature=temperature)
                 
-                # Parse JSON response (handle markdown code blocks if present)
-                response_clean = response.strip()
-                if response_clean.startswith("```json"):
-                    response_clean = response_clean[7:]
-                if response_clean.startswith("```"):
-                    response_clean = response_clean[3:]
-                if response_clean.endswith("```"):
-                    response_clean = response_clean[:-3]
-                response_clean = response_clean.strip()
-                
-                raw_data = json.loads(response_clean)
+                # Parse JSON response using centralized utility
+                raw_data = extract_json_from_response(response)
                 
                 # Normalize to list format
                 if not isinstance(raw_data, list):

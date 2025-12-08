@@ -236,6 +236,96 @@ class Relationship(BaseModel):
     target_entity: BaseEntity = Field(..., description="Full target entity object with entity_name and entity_type.")
     relationship_type: str = Field(..., description="Type of relationship (e.g., EVALUATED_BY, GUIDES, CHILD_OF, ATTACHMENT_OF, PRODUCES).")
 
+
+# ==========================================
+# Inferred Relationship Model (Post-Processing)
+# ==========================================
+
+class InferredRelationship(BaseModel):
+    """
+    Pydantic model for LLM-inferred relationships in semantic post-processing.
+    
+    Validates relationship structure and prevents common LLM errors:
+    - Self-loops (source_id == target_id)
+    - Missing required fields
+    - Invalid confidence scores
+    - Malformed reasoning text
+    
+    Pattern: Follows WorkloadEnrichmentItem proven approach (100% success rate).
+    """
+    source_id: str = Field(..., min_length=1, description="Entity ID of source node")
+    target_id: str = Field(..., min_length=1, description="Entity ID of target node")
+    relationship_type: str = Field(..., min_length=1, description="Relationship type (e.g., EVALUATED_BY, GUIDES)")
+    confidence: float = Field(default=0.7, ge=0.0, le=1.0, description="Confidence score 0.0-1.0")
+    reasoning: str = Field(default="", description="LLM explanation for this relationship")
+    
+    @field_validator('relationship_type')
+    @classmethod
+    def normalize_relationship_type(cls, v: str) -> str:
+        """Normalize relationship type to uppercase for consistency."""
+        return v.strip().upper()
+    
+    @field_validator('reasoning')
+    @classmethod
+    def clean_reasoning(cls, v: str) -> str:
+        """Remove markdown formatting and excessive whitespace from reasoning."""
+        cleaned = v.strip()
+        # Remove markdown bold/italics
+        cleaned = cleaned.replace('**', '').replace('__', '').replace('*', '').replace('_', '')
+        # Collapse multiple spaces
+        cleaned = ' '.join(cleaned.split())
+        return cleaned
+    
+    @model_validator(mode='after')
+    def prevent_self_loops(self):
+        """Prevent self-referential relationships (source == target)."""
+        if self.source_id == self.target_id:
+            raise ValueError(
+                f"Self-loop detected: {self.source_id} cannot reference itself. "
+                f"Relationship type: {self.relationship_type}"
+            )
+        return self
+    
+    def to_dict(self) -> dict:
+        """Convert to dict format for backward compatibility with existing code."""
+        return {
+            'source_id': self.source_id,
+            'target_id': self.target_id,
+            'relationship_type': self.relationship_type,
+            'confidence': self.confidence,
+            'reasoning': self.reasoning
+        }
+
+
+class InferredRelationshipBatch(BaseModel):
+    """
+    Container for batch relationship inference LLM responses.
+    
+    Handles various LLM response formats:
+    - {"relationships": [...]}
+    - {"results": [...]}
+    - Direct array: [...]
+    """
+    relationships: List[InferredRelationship] = Field(default_factory=list)
+    
+    @model_validator(mode='before')
+    @classmethod
+    def handle_response_formats(cls, values):
+        """Normalize various LLM response formats to expected structure."""
+        # Handle direct array response
+        if isinstance(values, list):
+            return {'relationships': values}
+        
+        # Handle dict with alternative keys
+        if isinstance(values, dict):
+            # Try common alternative keys
+            for key in ['results', 'data', 'items']:
+                if key in values and 'relationships' not in values:
+                    values['relationships'] = values.pop(key)
+        
+        return values
+
+
 # ==========================================
 # Container for LLM Output
 # ==========================================
