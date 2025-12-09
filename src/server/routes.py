@@ -200,44 +200,20 @@ async def extract_multimodal_with_semaphore(
                 text_content = str(modal_item)
                 caption = ""
             
-            # Build ontology-aware prompt (same as GovconMultimodalProcessor)
-            caption_section = f"{content_type.title()}: {caption}\n\n" if caption else ""
-            ontology_prompt = f"""
-{caption_section}Content:
-{text_content}
-
-Extract government contracting entities from this {content_type}:
-
-1. REQUIREMENTS - Compliance criteria, specifications, constraints
-   - Include frequencies, standards, completion criteria
-   - Tag with requirement type (performance, technical, delivery)
-
-2. METRICS - Quantifiable measures for estimation
-   - Quantities (counts, volumes, capacities)
-   - Frequencies (daily, weekly, monthly, yearly)
-   - Coverage (hours, days, locations)
-   - Thresholds (minimums, maximums, ranges)
-
-3. DELIVERABLES - Work outputs, reports, schedules
-   - Document types and formats
-   - Submission frequencies and deadlines
-   - Review/approval processes
-
-4. RESOURCES - Equipment, personnel, facilities, materials
-   - Specific models/types
-   - Quantities required
-   - Qualifications/certifications
-
-5. RELATIONSHIPS - How entities connect
-   - Requirements ↔ Metrics (compliance measurement)
-   - Deliverables ↔ Requirements (evidence of compliance)
-   - Resources ↔ Requirements (capability enablers)
-
-Focus on workload drivers and basis of estimate elements.
-"""
+            # FIX (Issue #39): Pass raw text_content directly to extract()
+            # DO NOT use inline prompts - the full 121K system prompt in JsonExtractor
+            # handles all 18 entity types and relationship inference rules.
+            # Previous bug: extract_from_text(ontology_prompt) used degraded 30-line inline prompt
+            # with only 5 categories, bypassing the established ontology architecture.
             
-            result = await json_extractor.extract_from_text(
-                text=ontology_prompt,
+            # Prepend caption for context if available
+            if caption:
+                extraction_text = f"{content_type.title()}: {caption}\n\n{text_content}"
+            else:
+                extraction_text = text_content
+            
+            result = await json_extractor.extract(
+                text=extraction_text,
                 chunk_id=chunk_id
             )
             
