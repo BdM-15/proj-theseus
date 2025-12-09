@@ -1,5 +1,15 @@
 # Submission Instructions ↔ Evaluation Criteria Linking
 
+## ⚠️ CRITICAL: Entity ID Usage
+
+**MANDATORY**: When generating relationships, you MUST use the EXACT `id` values from the entity JSON input.
+
+- ❌ **NEVER** invent IDs (e.g., "instruction_l3_2", "factor_1")
+- ✅ **ALWAYS** copy the `id` field value exactly as provided in the input entities
+- ✅ Entity IDs look like: `"4:f7g8h9i0j1k2:123"` or similar alphanumeric strings
+
+---
+
 **Purpose**: Link submission instructions to their corresponding evaluation factors/criteria  
 **Entity Types**: SUBMISSION_INSTRUCTION --GUIDES--> EVALUATION_FACTOR  
 **Why This Matters**: Proposal teams need to know which format requirements (page limits, volumes, fonts)

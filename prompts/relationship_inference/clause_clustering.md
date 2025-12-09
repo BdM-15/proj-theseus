@@ -1,5 +1,15 @@
 # Clause Clustering Rules
 
+## ⚠️ CRITICAL: Entity ID Usage
+
+**MANDATORY**: When generating relationships, you MUST use the EXACT `id` values from the entity JSON input.
+
+- ❌ **NEVER** invent IDs (e.g., "clause_far_52_212_4", "section_i")
+- ✅ **ALWAYS** copy the `id` field value exactly as provided in the input entities
+- ✅ Entity IDs look like: `"4:f7g8h9i0j1k2:123"` or similar alphanumeric strings
+
+---
+
 **Purpose**: Group scattered FAR/DFARS/AFFARS clauses under parent sections  
 **Why This Matters**: Clauses may be fragmented across document; need logical grouping  
 **Method**: LLM-powered semantic inference (26+ agency supplements)

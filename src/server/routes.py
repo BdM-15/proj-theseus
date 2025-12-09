@@ -565,15 +565,6 @@ async def process_document_with_semantic_inference(
                     duplicates_merged_during_upsert = total_entities - unique_names_added
                     if duplicates_merged_during_upsert > 0:
                         logger.info(f"   🔀 LightRAG upsert deduplication: {total_entities} attempted → {unique_names_added} inserted = {duplicates_merged_during_upsert} duplicates merged")
-                        
-                        # Show itemized merge output (top 10)
-                        sample_size = min(10, len(duplicates_in_custom_kg))
-                        if sample_size > 0:
-                            logger.info(f"   📋 Itemized merges:")
-                            for name, count in sorted(duplicates_in_custom_kg.items(), key=lambda x: -x[1])[:sample_size]:
-                                logger.info(f"      Merged: `{name}` | {count-1}+1")
-                            if len(duplicates_in_custom_kg) > sample_size:
-                                logger.info(f"      ... and {len(duplicates_in_custom_kg) - sample_size} more entities merged")
                     else:
                         logger.info(f"   ℹ️  No duplicates merged (all {total_entities} entity names were unique)")
             except Exception as e:

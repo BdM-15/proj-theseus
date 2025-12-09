@@ -1,5 +1,15 @@
 # Document Hierarchy: DOCUMENT → SECTION
 
+## ⚠️ CRITICAL: Entity ID Usage
+
+**MANDATORY**: When generating relationships, you MUST use the EXACT `id` values from the entity JSON input.
+
+- ❌ **NEVER** invent IDs (e.g., "document_j0005", "section_j")
+- ✅ **ALWAYS** copy the `id` field value exactly as provided in the input entities
+- ✅ Entity IDs look like: `"4:f7g8h9i0j1k2:123"` or similar alphanumeric strings
+
+---
+
 **Purpose**: Link referenced documents (attachments, annexes, specs, standards, regulations) to their parent sections  
 **Relationship Type**: CHILD_OF (directional)  
 **Pattern**: Prefix matching, explicit naming, content similarity  

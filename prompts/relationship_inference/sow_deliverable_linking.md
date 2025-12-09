@@ -1,5 +1,15 @@
 # Work to Deliverables: STATEMENT_OF_WORK → DELIVERABLE
 
+## ⚠️ CRITICAL: Entity ID Usage
+
+**MANDATORY**: When generating relationships, you MUST use the EXACT `id` values from the entity JSON input.
+
+- ❌ **NEVER** invent IDs (e.g., "sow_task_001", "deliverable_cdrl_a001")
+- ✅ **ALWAYS** copy the `id` field value exactly as provided in the input entities
+- ✅ Entity IDs look like: `"4:f7g8h9i0j1k2:123"` or similar alphanumeric strings
+
+---
+
 **Purpose**: Link work statements (SOW/PWS/SOO) to contract deliverables  
 **Relationship Type**: PRODUCES (directional)  
 **Pattern**: Task→deliverable mentions, work-product mapping, timeline alignment  

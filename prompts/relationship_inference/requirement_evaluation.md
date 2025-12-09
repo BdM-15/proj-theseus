@@ -1,5 +1,15 @@
 # Requirement → Evaluation Factor Mapping Rules
 
+## ⚠️ CRITICAL: Entity ID Usage
+
+**MANDATORY**: When generating relationships, you MUST use the EXACT `id` values from the entity JSON input.
+
+- ❌ **NEVER** invent IDs (e.g., "requirement_helpdesk_247", "factor_technical_helpdesk")
+- ✅ **ALWAYS** copy the `id` field value exactly as provided in the input entities
+- ✅ Entity IDs look like: `"4:f7g8h9i0j1k2:123"` or similar alphanumeric strings
+
+---
+
 **Purpose**: Link requirements to the evaluation factors that score them  
 **Why This Matters**: Enables effort allocation and proposal outline optimization  
 **Method**: LLM-powered semantic inference (topic alignment + criticality)

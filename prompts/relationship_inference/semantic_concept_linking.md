@@ -1,5 +1,15 @@
 # Semantic Concept Linking Rules
 
+## ⚠️ CRITICAL: Entity ID Usage
+
+**MANDATORY**: When generating relationships, you MUST use the EXACT `id` values from the entity JSON input.
+
+- ❌ **NEVER** invent IDs (e.g., "concept_past_performance", "factor_technical")
+- ✅ **ALWAYS** copy the `id` field value exactly as provided in the input entities
+- ✅ Entity IDs look like: `"4:f7g8h9i0j1k2:123"` or similar alphanumeric strings
+
+---
+
 **Purpose**: Infer implicit relationships between concepts that inform proposal evaluation  
 **Why This Matters**: Reveals hidden connections (e.g., "Safety Factor mentioned alongside Management Approach")  
 **Method**: LLM-powered semantic inference across CONCEPT, STRATEGIC_THEME, EVALUATION_FACTOR entities  

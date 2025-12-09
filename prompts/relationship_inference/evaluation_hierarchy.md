@@ -1,5 +1,15 @@
 # Evaluation Hierarchy & Metrics Inference
 
+## ⚠️ CRITICAL: Entity ID Usage
+
+**MANDATORY**: When generating relationships, you MUST use the EXACT `id` or `entity_id` values from the entity JSON input.
+
+- ❌ **NEVER** invent IDs (e.g., "factor_1", "subfactor_1_1")
+- ✅ **ALWAYS** copy the `id`/`entity_id` field value exactly as provided in the input entities
+- ✅ Entity IDs look like: `"4:f7g8h9i0j1k2:123"` or similar alphanumeric strings
+
+---
+
 ## Objective
 
 Identify hierarchical and measurement relationships within evaluation factor entities to model the complete evaluation framework structure.

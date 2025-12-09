@@ -1,3 +1,41 @@
+# Document Hierarchy Rules
+
+## ⚠️ CRITICAL: Entity ID Usage
+
+**MANDATORY**: When generating relationships, you MUST use the EXACT `id` values from the entity JSON input.
+
+- ❌ **NEVER** invent or fabricate IDs (e.g., "section_j", "annex_001", "document_010")
+- ❌ **NEVER** use example IDs from this prompt documentation
+- ✅ **ALWAYS** copy the `id` field value exactly as provided in the input entities
+- ✅ Entity IDs look like: `"4:f7g8h9i0j1k2:123"` or similar alphanumeric strings
+
+**Example of CORRECT usage:**
+
+```json
+Input entity: {"id": "4:abc123def456:789", "name": "J-02000000", "type": "annex"}
+
+Output relationship:
+{
+  "source_id": "4:abc123def456:789",  // ← Copied EXACTLY from input
+  "target_id": "4:xyz987uvw654:321",  // ← Copied EXACTLY from another input entity
+  "relationship_type": "CHILD_OF",
+  "confidence": 0.95,
+  "reasoning": "Pattern match explanation"
+}
+```
+
+**Example of WRONG usage (causes validation failures):**
+
+```json
+{
+  "source_id": "annex_j02000000",  // ← WRONG: Fabricated ID, will be rejected!
+  "target_id": "section_j",        // ← WRONG: Fabricated ID, will be rejected!
+  ...
+}
+```
+
+---
+
 # Document Hierarchy Rules# Annex Linking Rules
 
 **Purpose**: Build hierarchical relationships between parent and child documents **Purpose**: Link numbered attachments (J-####, Annex ##) to parent sections
