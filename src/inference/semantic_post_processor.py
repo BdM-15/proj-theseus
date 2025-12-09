@@ -520,6 +520,12 @@ async def _resolve_orphan_patterns(
         List of relationships for orphan patterns
     """
     
+    # Load prompt template (consistent with other algorithms)
+    prompt_instructions = await _load_prompt_template("orphan_resolution.md")
+    if not prompt_instructions:
+        logger.error("    ❌ Failed to load orphan_resolution.md prompt")
+        return []
+    
     # Get truly orphaned entity names from Neo4j (nodes with NO relationships)
     orphan_names = set(neo4j_io.get_orphaned_entity_ids())
     
@@ -561,7 +567,7 @@ async def _resolve_orphan_patterns(
     if orphan_count < BATCH_THRESHOLD:
         # Small count: Single LLM call
         logger.info(f"    → Processing {orphan_count} orphans × {len(priority_candidates)} candidates (single batch)")
-        return await _process_orphan_batch(orphaned, priority_candidates, id_to_entity, model, temperature)
+        return await _process_orphan_batch(orphaned, priority_candidates, id_to_entity, model, temperature, prompt_instructions)
     else:
         # Large count: Batch processing
         batch_size = 80  # 80 orphans per batch
@@ -575,7 +581,7 @@ async def _resolve_orphan_patterns(
             orphan_batch = orphaned[batch_start:batch_end]
             
             batch_tasks.append(_process_orphan_batch(
-                orphan_batch, priority_candidates, id_to_entity, model, temperature
+                orphan_batch, priority_candidates, id_to_entity, model, temperature, prompt_instructions
             ))
         
         # Process all batches in parallel
@@ -598,12 +604,21 @@ async def _process_orphan_batch(
     candidates: List[Dict],
     id_to_entity: Dict,
     model: str,
-    temperature: float
+    temperature: float,
+    prompt_instructions: str
 ) -> List[Dict]:
     """
     Process a single batch of orphaned entities with Pydantic validation.
     
     Helper function for conditional batching in _resolve_orphan_patterns.
+    
+    Args:
+        orphaned: List of orphaned entity dicts
+        candidates: List of candidate entity dicts for linking
+        id_to_entity: Entity ID lookup dictionary
+        model: LLM model name
+        temperature: LLM temperature
+        prompt_instructions: Loaded prompt template from orphan_resolution.md
     """
     import json
     
@@ -622,8 +637,8 @@ async def _process_orphan_batch(
         'description': c.get('description', '')[:5000]
     } for c in candidates], indent=2)
     
-    # LLM prompt optimized for orphan resolution
-    prompt = f"""You are analyzing orphaned entities in a government contracting knowledge graph. 
+    # Build prompt using loaded template + entity data
+    prompt = f"""You are analyzing orphaned entities in a government contracting knowledge graph.
 These entities were extracted correctly but lack relationships to other entities.
 
 ORPHANED ENTITIES (need relationships):
@@ -632,29 +647,7 @@ ORPHANED ENTITIES (need relationships):
 CANDIDATE ENTITIES (potential relationship targets):
 {candidate_json}
 
-Find logical relationships for as many orphans as possible. Common patterns:
-
-REQUIREMENT-CENTRIC:
-- REQUIRES: Requirement → Equipment/Resource (e.g., "Trash must be emptied" → trash receptacles)
-- ENABLED_BY: Requirement → Gov't-provided Technology/Equipment (e.g., "GFE ancillary hardware")
-- SATISFIED_BY: Requirement → Deliverable
-
-PERSON-CENTRIC:
-- RESPONSIBLE_FOR: Person → Deliverable they submit/create (e.g., "Program Manager submits QCP")
-
-DOCUMENT-CENTRIC:
-- FIELD_IN: Table field/Data element → Document/Clause containing it (e.g., "DODAAC field in WAWF table")
-- PART_OF: Sub-component → Parent document
-- REFERENCES: Document → Another document
-
-SPECIAL PATTERNS:
-- Quantified items: "X equipment must be Y times" → REQUIRES
-- Government-provided: "furnished by Government" → ENABLED_BY
-- Conditional requirements: "may substitute" → REQUIRES
-- Table/data references: "field in X" → FIELD_IN
-
-CRITICAL: Use EXACT entity IDs from the 'id' field above. Copy them character-for-character.
-DO NOT create new IDs. DO NOT simplify IDs. Use the exact strings provided.
+{prompt_instructions}
 
 Return ONLY valid JSON array:
 [
