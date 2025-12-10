@@ -291,6 +291,65 @@ EXTRACTION RULE:
     3. Normalize clause format: "FAR 52.XXX-X"
 
 ================================================================================
+PATTERN 7: GLOSSARY AND ABBREVIATION HANDLING
+================================================================================
+
+PURPOSE: Extract meaningful relationships from acronym lists and glossaries
+
+DETECTION SIGNALS (Glossary Content):
+  - Multiple lines of "ACRONYM - Full Name" or "ACRONYM: Full Name"
+  - Alphabetically ordered short definitions
+  - "Abbreviations", "Acronyms", "Definitions", "Glossary" section headers
+  - Dense abbreviation content with minimal narrative text
+
+EXTRACTION STRATEGY:
+
+FOR STANDARD GLOSSARIES (definitions list):
+  Extract each definition as:
+    entity_type: concept
+    entity_name: Full expanded name (NOT the acronym alone)
+    abbreviation: Store acronym in entity description
+  
+  Create relationship:
+    acronym_entity --DEFINES_AS--> full_name_entity
+    (only if both are significant concepts worth tracking)
+
+SELECTIVE EXTRACTION RULE:
+  - Extract definitions that represent ACTIONABLE CONCEPTS in the RFP
+  - SKIP generic industry acronyms (e.g., "CEO - Chief Executive Officer")
+  - EXTRACT domain-specific terms (e.g., "MCPP - Marine Corps Prepositioning Program")
+  - EXTRACT program/system names (e.g., "GCSS-MC - Global Combat Support System-Marine Corps")
+  - EXTRACT regulatory references (e.g., "MCO - Marine Corps Order")
+
+CONSOLIDATION RULE:
+  When acronym appears in glossary AND in document body:
+    - Use FULL NAME as canonical entity_name
+    - Include acronym in entity description
+    - Create relationships using full name (not acronym)
+
+EXAMPLE:
+  Glossary entry: "QASP - Quality Assurance Surveillance Plan"
+  
+  Extract as:
+  {
+    "entity_name": "Quality Assurance Surveillance Plan",
+    "entity_type": "document",
+    "description": "QASP - Plan defining surveillance methods for contract performance"
+  }
+  
+  NOT:
+  {
+    "entity_name": "QASP",
+    "entity_type": "concept"  // Too vague, no context
+  }
+
+AVOID GLOSSARY ENTITY EXPLOSION:
+  If chunk contains 50+ acronym definitions with no narrative context:
+    - Extract ONLY acronyms that appear elsewhere in document as entities
+    - For pure glossary chunks, limit to most significant program/system terms
+    - Do NOT extract every abbreviation as separate entity
+
+================================================================================
 CONFIDENCE SCORING GUIDELINES
 ================================================================================
 

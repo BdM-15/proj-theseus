@@ -281,6 +281,48 @@ class Neo4jGraphIO:
             logger.info(f"  ✅ Enriched {count} entities with metadata in Neo4j")
             return count
     
+    def get_entity_connectivity(self) -> Dict[str, Dict]:
+        """
+        Get connectivity statistics for each entity type.
+        
+        Used for paradigm shift implementation - helps decide which algorithms to run
+        based on how well-connected entities already are from main extraction.
+        
+        Returns:
+            Dict mapping entity_type to stats dict with:
+                - total: Total entities of this type
+                - connected: Entities with at least one relationship
+                - orphans: Entities with no relationships
+                - avg_relationships: Average relationships per connected entity
+        """
+        query = f"""
+        MATCH (n:`{self.workspace}`)
+        WHERE n.entity_type IS NOT NULL
+        WITH n.entity_type as entity_type, n
+        OPTIONAL MATCH (n)-[r]-()
+        WITH entity_type, n, count(DISTINCT r) as rel_count
+        WITH entity_type, 
+             count(n) as total,
+             sum(CASE WHEN rel_count > 0 THEN 1 ELSE 0 END) as connected,
+             sum(CASE WHEN rel_count = 0 THEN 1 ELSE 0 END) as orphans,
+             avg(CASE WHEN rel_count > 0 THEN rel_count ELSE null END) as avg_rels
+        RETURN entity_type, total, connected, orphans, avg_rels
+        ORDER BY total DESC
+        """
+        
+        with self.driver.session(database=self.database) as session:
+            result = session.run(query)
+            connectivity = {}
+            for record in result:
+                connectivity[record['entity_type']] = {
+                    'total': record['total'],
+                    'connected': record['connected'],
+                    'orphans': record['orphans'],
+                    'avg_relationships': record['avg_rels'] or 0
+                }
+            
+            return connectivity
+    
     def get_entity_count_by_type(self) -> Dict[str, int]:
         """
         Get count of entities by type.

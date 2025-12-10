@@ -61,6 +61,8 @@ class ProcessingFilter(logging.Filter):
             "src.server.routes",  # Our processing pipeline
             "src.inference",  # Semantic inference (entity correction, relationship inference, metadata enrichment)
             "src.ingestion",  # Document ingestion
+            "src.processors",  # KG processor, multimodal processor
+            "src.extraction",  # Entity extraction (json_extractor)
         ]
         
         for logger_name in processing_loggers:

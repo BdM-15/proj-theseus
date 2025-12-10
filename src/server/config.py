@@ -72,7 +72,7 @@ def configure_raganything_args():
     global_args.embedding_api_key = openai_api_key
     global_args.embedding_dim = int(os.getenv("EMBEDDING_DIM", "3072"))  # Environment-driven for flexibility
     
-    # Government contracting entity types (17 specialized types - consolidated for flexibility)
+    # Government contracting entity types (18 specialized types - consolidated for flexibility)
     # Semantic-first detection: Content determines entity type, not section labels
     # NOTE: LightRAG normalizes to lowercase internally - use lowercase for consistency
     global_args.entity_types = [

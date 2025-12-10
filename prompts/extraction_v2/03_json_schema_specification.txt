@@ -23,8 +23,8 @@ requirement:
 {
   "entity_name": "string",
   "entity_type": "requirement",
-  "criticality": "MANDATORY|IMPORTANT|OPTIONAL|INFORMATIONAL",
-  "modal_verb": "shall|must|will|should|may",
+  "criticality": "MANDATORY|IMPORTANT|OPTIONAL|INFORMATIONAL",  // REQUIRED: use INFORMATIONAL if unclear
+  "modal_verb": "shall|must|will|should|may|none",               // REQUIRED: use 'none' if no explicit verb
   "req_type": "FUNCTIONAL|PERFORMANCE|SECURITY|TECHNICAL|INTERFACE|MANAGEMENT|DESIGN|QUALITY|OTHER",
   "labor_drivers": ["volume", "frequency", "shift"],  // Raw workload data
   "material_needs": ["equipment", "supplies"]          // Physical items needed

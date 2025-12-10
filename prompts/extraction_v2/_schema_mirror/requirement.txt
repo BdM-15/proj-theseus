@@ -4,13 +4,13 @@ ENTITY_TYPE: requirement
 Pydantic Model: Requirement
 
 REQUIRED FIELDS:
-  - criticality: Literal
-    Description: MANDATORY (shall), IMPORTANT (should), OPTIONAL (may).
-    Default: PydanticUndefined
+  - criticality: Literal[MANDATORY, IMPORTANT, OPTIONAL, INFORMATIONAL]
+    Description: Semantic criticality level based on contract obligation strength. MANDATORY: Legal obligation (shall/must/will), contractor MUST comply. IMPORTANT: Strong expectation (should), failure may impact evaluation. OPTIONAL: Permitted but not required (may), contractor discretion. INFORMATIONAL: Descriptive requirement without obligation language.
+    Default: INFORMATIONAL
 
   - modal_verb: str
-    Description: The exact verb used (shall, must, will, should, may).
-    Default: PydanticUndefined
+    Description: EXACT modal verb or phrase as written in source document. Examples: 'shall provide', 'must ensure', 'is responsible for', 'will comply with', 'agrees to submit'. Preserves original contract language for traceability and compliance validation. Use criticality field (MANDATORY/IMPORTANT/OPTIONAL) to capture semantic intent. If no explicit modal verb, use 'none'.
+    Default: none
 
   - req_type: Literal
     Description: Functional classification of the requirement.

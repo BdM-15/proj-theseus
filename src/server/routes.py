@@ -338,7 +338,7 @@ async def process_document_with_semantic_inference(
                 # Use LightRAG's chunking strategy for consistent extraction
                 import tiktoken
                 chunk_size = int(os.getenv("CHUNK_SIZE", "8192"))
-                chunk_overlap = int(os.getenv("CHUNK_OVERLAP_TOKEN_SIZE", "1024"))
+                chunk_overlap = int(os.getenv("CHUNK_OVERLAP_TOKEN_SIZE", "1200"))
                 
                 tokenizer = tiktoken.get_encoding("cl100k_base")
                 tokens = tokenizer.encode(full_text)

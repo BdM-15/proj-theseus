@@ -67,13 +67,19 @@ class GovconKGProcessor:
                 entity["source_chunk_id"] = chunk_id
                 self.phase1_entities[entity_name].append(entity)
         
-        # Group relationships by (source, target) pair
+        # Group relationships by (source, target, relationship_type) tuple
+        # This preserves different semantic relationships between same entity pairs
+        # e.g., A --GUIDES--> B and A --EVALUATED_BY--> B are distinct relationships
         for rel in relationships:
             src_id = rel.get("src_id")
             tgt_id = rel.get("tgt_id")
+            rel_type = rel.get("description", rel.get("keywords", "RELATED_TO"))
             if src_id and tgt_id:
-                # Normalize relationship key (undirected - sorted order)
-                rel_key = tuple(sorted([src_id, tgt_id]))
+                # Normalize relationship key: (sorted entity pair, relationship_type)
+                # Sorted pair treats A→B and B→A as same direction (undirected)
+                # But different relationship types between same pair are preserved
+                entity_pair = tuple(sorted([src_id, tgt_id]))
+                rel_key = (entity_pair, rel_type.upper() if rel_type else "RELATED_TO")
                 rel["source_chunk_id"] = chunk_id
                 self.phase1_relationships[rel_key].append(rel)
         

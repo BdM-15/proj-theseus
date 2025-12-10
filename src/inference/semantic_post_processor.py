@@ -1704,53 +1704,121 @@ async def _infer_relationships_multi_algorithm(
     semaphore = asyncio.Semaphore(MAX_CONCURRENT_LLM_CALLS)
     
     # =========================================================================
-    # PARALLEL EXECUTION ARCHITECTURE (Issue #30 Phase 3B)
+    # PARADIGM SHIFT: Connectivity-Based Algorithm Selection (Issue #37)
     # =========================================================================
-    # ALL algorithms execute in parallel (no wave-based sequencing):
-    # - Algorithms 1-6, 8: Run concurrently with shared semaphore (MAX_ASYNC=8)
-    # - Algorithm 7: Heuristic (instant, regex-based) - no LLM, runs separately
-    # 
-    # Phase 3B Optimization:
-    # - OLD (Phase 2): Sequential waves → 5.1 min total
-    #   * Wave 1 (Algos 1,2,5): 49s
-    #   * Wave 2 (Algos 3,4): 195s (sequential!)
-    #   * Wave 3 (Algos 6,8): 63s
-    # - NEW (Phase 3B): Full parallelization → ~2 min (longest algorithm)
-    #   * All algos run concurrently, limited only by semaphore (MAX_ASYNC=8)
-    #   * Total time = max(algo_times) ≈ 121s (Algorithm 3)
+    # Main extraction should handle most relationships. Post-processing focuses on:
+    # 1. Cross-chunk relationships (can't be seen during single-chunk extraction)
+    # 2. Orphan resolution (entities with zero relationships)
+    # 3. Validation and gap-filling for poorly-connected entity types
     #
-    # Expected Impact: 5.1 min → 2 min (60% reduction, 186s savings)
+    # SKIP algorithms for well-connected entity types (>70% connected with avg >2 rels)
+    # ALWAYS run: Algorithm 7 (heuristic, instant) and Algorithm 8 (orphan resolution)
     # =========================================================================
     
-    logger.info("\n⚡ Starting ALL algorithms in parallel (Phase 3B full parallelization)...")
+    # Check entity connectivity from main extraction
+    connectivity = neo4j_io.get_entity_connectivity()
     
-    # Prepare all algorithm tasks
-    all_tasks = [
-        _algorithm_1_instruction_eval(entities_by_type, id_to_entity, system_prompt, model, temperature),
-        _algorithm_2_eval_hierarchy(entities_by_type, id_to_entity, system_prompt, model, temperature),
-        _algorithm_3_req_eval_batched(entities_by_type, id_to_entity, system_prompt, model, temperature, semaphore),
-        _algorithm_4_deliverable_trace_batched(entities_by_type, id_to_entity, system_prompt, model, temperature, semaphore),
-        _algorithm_5_doc_hierarchy(entities, id_to_entity, system_prompt, model, temperature),
-        _algorithm_6_concept_linking(entities_by_type, id_to_entity, system_prompt, model, temperature),
-        _algorithm_8_orphan_resolution(entities, id_to_entity, neo4j_io, model, temperature),
-    ]
+    # Log connectivity status
+    logger.info("\n📊 Entity Connectivity Analysis (from main extraction):")
+    total_entities = sum(c['total'] for c in connectivity.values())
+    total_connected = sum(c['connected'] for c in connectivity.values())
+    total_orphans = sum(c['orphans'] for c in connectivity.values())
+    orphan_rate = (total_orphans / total_entities * 100) if total_entities > 0 else 0
     
-    # Execute all algorithms in parallel
-    logger.info(f"   Executing 7 LLM-powered algorithms concurrently (MAX_ASYNC={MAX_CONCURRENT_LLM_CALLS})...")
+    logger.info(f"   Total: {total_entities} entities | Connected: {total_connected} ({100-orphan_rate:.1f}%) | Orphans: {total_orphans} ({orphan_rate:.1f}%)")
+    
+    # Determine which algorithms to run based on connectivity
+    # Thresholds for "well-connected" entity types
+    # Adjusted based on retrieval performance requirements (lower = run more algorithms)
+    CONNECTIVITY_THRESHOLD = 0.75  # 75% of entities have relationships
+    AVG_REL_THRESHOLD = 2.0  # Average 2.0+ relationships per connected entity
+    
+    # Entity types relevant to each algorithm
+    algo_entity_types = {
+        1: ['submission_instruction', 'evaluation_factor'],  # Instruction-Evaluation
+        2: ['evaluation_factor', 'performance_metric'],  # Evaluation Hierarchy
+        3: ['requirement', 'evaluation_factor'],  # Requirement-Evaluation
+        4: ['requirement', 'deliverable', 'statement_of_work'],  # Deliverable Traceability
+        5: ['document', 'section', 'clause'],  # Document Hierarchy
+        6: ['concept', 'strategic_theme'],  # Concept Linking
+    }
+    
+    # Check each algorithm's entity types for connectivity
+    algorithms_to_run = {}
+    for algo_num, entity_types in algo_entity_types.items():
+        types_with_data = [t for t in entity_types if t in connectivity]
+        if not types_with_data:
+            algorithms_to_run[algo_num] = True  # Run if no data to check
+            continue
+        
+        # Calculate average connectivity across relevant entity types
+        total = sum(connectivity[t]['total'] for t in types_with_data)
+        connected = sum(connectivity[t]['connected'] for t in types_with_data)
+        connectivity_rate = connected / total if total > 0 else 0
+        
+        avg_rels = sum(
+            connectivity[t]['avg_relationships'] * connectivity[t]['connected']
+            for t in types_with_data
+        ) / connected if connected > 0 else 0
+        
+        # Decide whether to run
+        is_well_connected = (
+            connectivity_rate >= CONNECTIVITY_THRESHOLD and 
+            avg_rels >= AVG_REL_THRESHOLD
+        )
+        algorithms_to_run[algo_num] = not is_well_connected
+        
+        status = "SKIP (well-connected)" if is_well_connected else "RUN"
+        logger.info(f"   Algorithm {algo_num} [{status}]: {', '.join(types_with_data)} - {connectivity_rate*100:.1f}% connected, {avg_rels:.1f} avg rels")
+    
+    # Always run orphan resolution
+    algorithms_to_run[8] = True
+    
+    # =========================================================================
+    # PARALLEL EXECUTION with Paradigm Shift
+    # =========================================================================
+    
+    logger.info("\n⚡ Starting selected algorithms in parallel (Paradigm Shift enabled)...")
+    
+    # Prepare algorithm tasks (only for algorithms we're running)
+    all_tasks = []
+    task_names = []
+    
+    if algorithms_to_run.get(1, True):
+        all_tasks.append(_algorithm_1_instruction_eval(entities_by_type, id_to_entity, system_prompt, model, temperature))
+        task_names.append("Algorithm 1: Instruction-Evaluation")
+    
+    if algorithms_to_run.get(2, True):
+        all_tasks.append(_algorithm_2_eval_hierarchy(entities_by_type, id_to_entity, system_prompt, model, temperature))
+        task_names.append("Algorithm 2: Evaluation Hierarchy")
+    
+    if algorithms_to_run.get(3, True):
+        all_tasks.append(_algorithm_3_req_eval_batched(entities_by_type, id_to_entity, system_prompt, model, temperature, semaphore))
+        task_names.append("Algorithm 3: Requirement-Evaluation")
+    
+    if algorithms_to_run.get(4, True):
+        all_tasks.append(_algorithm_4_deliverable_trace_batched(entities_by_type, id_to_entity, system_prompt, model, temperature, semaphore))
+        task_names.append("Algorithm 4: Deliverable Traceability")
+    
+    if algorithms_to_run.get(5, True):
+        all_tasks.append(_algorithm_5_doc_hierarchy(entities, id_to_entity, system_prompt, model, temperature))
+        task_names.append("Algorithm 5: Document Hierarchy")
+    
+    if algorithms_to_run.get(6, True):
+        all_tasks.append(_algorithm_6_concept_linking(entities_by_type, id_to_entity, system_prompt, model, temperature))
+        task_names.append("Algorithm 6: Concept Linking")
+    
+    # Always run orphan resolution
+    all_tasks.append(_algorithm_8_orphan_resolution(entities, id_to_entity, neo4j_io, model, temperature))
+    task_names.append("Algorithm 8: Orphan Resolution")
+    
+    # Execute selected algorithms in parallel
+    skipped_count = sum(1 for v in algorithms_to_run.values() if not v)
+    logger.info(f"   Executing {len(all_tasks)} algorithms ({skipped_count} skipped due to good connectivity)")
     algorithm_results = await asyncio.gather(*all_tasks, return_exceptions=True)
     
     # Process results
-    algorithm_names = [
-        "Algorithm 1: Instruction-Evaluation",
-        "Algorithm 2: Evaluation Hierarchy",
-        "Algorithm 3: Requirement-Evaluation",
-        "Algorithm 4: Deliverable Traceability",
-        "Algorithm 5: Document Hierarchy",
-        "Algorithm 6: Concept Linking",
-        "Algorithm 8: Orphan Resolution"
-    ]
-    
-    for i, (name, result) in enumerate(zip(algorithm_names, algorithm_results), 1):
+    for name, result in zip(task_names, algorithm_results):
         if isinstance(result, Exception):
             logger.error(f"  ❌ {name} failed: {result}")
         else:

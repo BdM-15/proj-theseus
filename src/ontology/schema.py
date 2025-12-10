@@ -140,8 +140,26 @@ class BaseEntity(BaseModel):
 
 class Requirement(BaseEntity):
     entity_type: Literal["requirement"] = "requirement"
-    criticality: CriticalityLevel = Field(..., description="MANDATORY (shall), IMPORTANT (should), OPTIONAL (may).")
-    modal_verb: str = Field(..., description="The exact verb used (shall, must, will, should, may).")
+    criticality: CriticalityLevel = Field(
+        "INFORMATIONAL",  # Default for requirements without clear obligation language
+        description=(
+            "Semantic criticality level based on contract obligation strength. "
+            "MANDATORY: Legal obligation (shall/must/will), contractor MUST comply. "
+            "IMPORTANT: Strong expectation (should), failure may impact evaluation. "
+            "OPTIONAL: Permitted but not required (may), contractor discretion. "
+            "INFORMATIONAL: Descriptive requirement without obligation language (default)."
+        )
+    )
+    modal_verb: str = Field(
+        "none",  # Default when no modal verb present
+        description=(
+            "EXACT modal verb or phrase as written in source document. "
+            "Examples: 'shall provide', 'must ensure', 'is responsible for', 'will comply with', 'agrees to submit'. "
+            "Preserves original contract language for traceability and compliance validation. "
+            "Use criticality field (MANDATORY/IMPORTANT/OPTIONAL) to capture semantic intent. "
+            "If no explicit modal verb, use 'none'."
+        )
+    )
     req_type: RequirementType = Field("OTHER", description="Functional classification of the requirement.")
     # Workload specific fields (captured upfront!)
     labor_drivers: List[str] = Field(default_factory=list, description="Raw workload data (volumes, frequencies, shifts, quantities, customer counts) that drive staffing requirements. NOT staffing roles.")
@@ -151,21 +169,21 @@ class Requirement(BaseEntity):
     @classmethod
     def normalize_modal_verb(cls, v: str) -> str:
         """
-        Normalize modal verb to lowercase and validate against accepted set.
-        Accepted: shall, must, will, should, may
+        Normalize modal verb to lowercase for consistent storage.
         
-        This allows prompts to be simpler - LLM can use any case, code normalizes it.
+        Philosophy: Store the EXACT phrasing from the contract (e.g., 'shall provide', 
+        'is responsible for') for traceability and compliance validation.
+        
+        The LLM already determined criticality level based on semantic analysis.
+        We trust that and preserve the original contract language.
+        
+        No pattern matching needed - the criticality field captures the semantic intent.
         """
-        if not v:
-            return v
+        if not v or not v.strip():
+            return "none"
         
-        normalized = v.lower().strip()
-        accepted = {'shall', 'must', 'will', 'should', 'may'}
-        
-        if normalized not in accepted:
-            logger.warning(f"Unexpected modal_verb '{v}' - keeping as-is. Expected: {accepted}")
-        
-        return normalized
+        # Just normalize to lowercase for consistent querying
+        return v.lower().strip()
     
     @field_validator('req_type', mode='before')
     @classmethod
