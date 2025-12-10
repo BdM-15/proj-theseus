@@ -1,0 +1,13 @@
+Attachment–Section Linking (Compact)
+
+Goal:
+- Link attachments/annex/exhibits to parent sections and referenced content.
+
+Rules:
+- Prefix patterns (J-####, Attachment #, Annex ##) → parent Section J.
+- Link SECTION --CONTAINS--> DOCUMENT; DOCUMENT --CONTAINS--> STATEMENT_OF_WORK or specifications.
+- Map references in text ("See Attachment X") via REFERENCES.
+
+Output:
+- Entities: section, document, statement_of_work.
+- Relationships: CONTAINS, REFERENCES.

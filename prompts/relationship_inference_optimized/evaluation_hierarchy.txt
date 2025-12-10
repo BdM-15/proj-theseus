@@ -1,0 +1,14 @@
+Evaluation Hierarchy (Compact)
+
+Goal:
+- Preserve factor hierarchy and importance/weights.
+
+Rules:
+- Factor → Subfactor → Sub-subfactor (CHILD_OF relationships).
+- Carry attributes: importance (Most/Significantly More), weights (points/%), ratings (Excellent/Good/etc.).
+- Map non-standard labels (Selection Criteria) to evaluation_factor structure.
+- Link embedded submission instructions: SUBMISSION_INSTRUCTION --EVALUATED_BY--> EVALUATION_FACTOR.
+
+Output:
+- Entities: evaluation_factor (with importance/weights/subfactors).
+- Relationships: CHILD_OF links for hierarchy; EVALUATED_BY links for instructions.

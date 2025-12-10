@@ -1,0 +1,14 @@
+Document Hierarchy (Compact)
+
+Goal:
+- Build a tree of sections and attachments; enable attribution.
+
+Rules:
+- Sections A–M with semantic types per UCF mapping.
+- Non-UCF labels map to standard (Selection Criteria→M; Technical Requirements→C; Proposal Instructions→L; RFQ→A).
+- Attachments/Annex/Exhibit: prefix patterns (J-####, Attachment #) → parent Section J.
+- Link SECTION --CONTAINS--> DOCUMENT/STATEMENT_OF_WORK/REQUIREMENT.
+
+Output:
+- Entities: section, document, statement_of_work.
+- Relationships: CONTAINS, REFERENCES.

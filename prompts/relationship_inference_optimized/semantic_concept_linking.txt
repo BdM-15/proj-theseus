@@ -1,0 +1,12 @@
+Semantic Concept Linking (Compact)
+
+Goal:
+- Connect abstract concepts (readiness, risk, interoperability) to concrete entities when explicit references exist.
+
+Rules:
+- Link CONCEPT → REQUIREMENT/EVALUATION_FACTOR when text ties the idea to obligations or evaluation.
+- Avoid speculative links; require explicit phrases or repeated emphasis.
+
+Output:
+- Entities: concept, requirement, evaluation_factor.
+- Relationships: RELATED_TO.

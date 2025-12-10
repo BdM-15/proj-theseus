@@ -1,0 +1,14 @@
+Deliverable Traceability (Compact)
+
+Goal:
+- Ensure deliverables (CDRLs) trace to SOW tasks and due dates.
+
+Rules:
+- Identify deliverables via CDRL refs (A001, DD Form 1423), report names.
+- Link STATEMENT_OF_WORK tasks → DELIVERABLE via APPLIES_TO/GUIDES.
+- Capture due_date, format, frequency; validate against submission_instruction.
+- Create program-level summary of deliverables.
+
+Output:
+- Entities: deliverable, statement_of_work, submission_instruction.
+- Relationships: APPLIES_TO/GUIDES links; CONTAINS where listed in Section J.
