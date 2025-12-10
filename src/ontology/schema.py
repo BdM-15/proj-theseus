@@ -92,7 +92,7 @@ EntityType = Literal[
 # ==========================================
 
 class BaseEntity(BaseModel):
-    entity_name: str = Field(..., description="The canonical name of the entity (Title Case).")
+    entity_name: str = Field(..., description="Canonical entity identifier (lowercase, normalized).")
     entity_type: EntityType = Field(..., description="The strict entity type from the government contracting ontology.")
 
     @model_validator(mode='before')
@@ -115,11 +115,21 @@ class BaseEntity(BaseModel):
     @model_validator(mode='after')
     def clean_entity_name(self):
         """
-        Clean entity name by removing leading '#' characters often added by Grok.
+        Clean and normalize entity name:
+        1. Remove leading '#' characters (common Grok artifact)
+        2. Normalize to lowercase for consistent graph queries
+        
+        Lowercase ensures case-insensitive matching in Neo4j queries.
+        Display formatting (Title Case, etc.) should happen in UI layer.
         """
         if self.entity_name:
             # Strip leading '#' and whitespace
             cleaned_name = self.entity_name.lstrip('#').strip()
+            
+            # Normalize to lowercase for database consistency
+            # Preserves all content, eliminates case-matching issues
+            cleaned_name = cleaned_name.lower()
+            
             if cleaned_name != self.entity_name:
                 self.entity_name = cleaned_name
         return self
@@ -136,6 +146,50 @@ class Requirement(BaseEntity):
     # Workload specific fields (captured upfront!)
     labor_drivers: List[str] = Field(default_factory=list, description="Raw workload data (volumes, frequencies, shifts, quantities, customer counts) that drive staffing requirements. NOT staffing roles.")
     material_needs: List[str] = Field(default_factory=list, description="List of equipment, supplies, or facilities mentioned.")
+    
+    @field_validator('modal_verb', mode='before')
+    @classmethod
+    def normalize_modal_verb(cls, v: str) -> str:
+        """
+        Normalize modal verb to lowercase and validate against accepted set.
+        Accepted: shall, must, will, should, may
+        
+        This allows prompts to be simpler - LLM can use any case, code normalizes it.
+        """
+        if not v:
+            return v
+        
+        normalized = v.lower().strip()
+        accepted = {'shall', 'must', 'will', 'should', 'may'}
+        
+        if normalized not in accepted:
+            logger.warning(f"Unexpected modal_verb '{v}' - keeping as-is. Expected: {accepted}")
+        
+        return normalized
+    
+    @field_validator('req_type', mode='before')
+    @classmethod
+    def validate_requirement_type(cls, v: str) -> str:
+        """
+        Validate requirement_type is one of the 9 allowed values.
+        Defaults to 'OTHER' if invalid to prevent extraction failures.
+        """
+        if not v:
+            return "OTHER"
+            
+        valid_types = {
+            "FUNCTIONAL", "PERFORMANCE", "SECURITY", "TECHNICAL", 
+            "INTERFACE", "MANAGEMENT", "DESIGN", "QUALITY", "OTHER"
+        }
+        
+        normalized = v.upper().strip()
+        
+        if normalized not in valid_types:
+            logger.warning(f"Invalid requirement_type '{v}' - defaulting to 'OTHER'. Valid: {valid_types}")
+            return "OTHER"
+        
+        return normalized
+
 
 class EvaluationFactor(BaseEntity):
     entity_type: Literal["evaluation_factor"] = "evaluation_factor"

@@ -1,0 +1,15 @@
+ENTITY_TYPE: submission_instruction
+================================================================================
+
+Pydantic Model: SubmissionInstruction
+
+REQUIRED FIELDS:
+  - page_limit: Optional[str]
+    Description: Page count constraints.
+
+  - format_reqs: Optional[str]
+    Description: Font, margin, or file format requirements.
+
+  - volume: Optional[str]
+    Description: The proposal volume this applies to (e.g., 'Volume I').
+

@@ -1,0 +1,6 @@
+Baseline Token Counts
+=====================
+
+Extraction Prompts: 40,327 tokens
+Relationship Inference: 33,369 tokens
+Grand Total: 73,696 tokens

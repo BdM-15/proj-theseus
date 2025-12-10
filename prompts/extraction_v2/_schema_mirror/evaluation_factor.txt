@@ -1,0 +1,16 @@
+ENTITY_TYPE: evaluation_factor
+================================================================================
+
+Pydantic Model: EvaluationFactor
+
+REQUIRED FIELDS:
+  - weight: Optional[str]
+    Description: Numerical weight (e.g., '40%', '25 points').
+
+  - importance: Optional[str]
+    Description: Relative importance (e.g., 'Most Important').
+
+  - subfactors: List[str]
+    Description: List of sub-criteria or subfactors.
+    Default: PydanticUndefined
+

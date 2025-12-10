@@ -1,0 +1,13 @@
+ENTITY_TYPE: performance_metric
+================================================================================
+
+Pydantic Model: PerformanceMetric
+
+REQUIRED FIELDS:
+  - threshold: str
+    Description: The specific value/limit (e.g., '99.9%', '< 2 errors').
+    Default: PydanticUndefined
+
+  - measurement_method: Optional[str]
+    Description: How the metric is calculated or inspected.
+

@@ -1,0 +1,9 @@
+ENTITY_TYPE: statement_of_work
+================================================================================
+
+Pydantic Model: BaseEntity (generic entity)
+
+REQUIRED FIELDS:
+  - entity_name: str (canonical name in Title Case)
+  - entity_type: EntityType (must be one of 18 valid types)
+

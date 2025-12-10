@@ -1,0 +1,124 @@
+ENTITY_TYPE: requirement
+================================================================================
+
+Pydantic Model: Requirement
+
+REQUIRED FIELDS:
+  - criticality: Literal
+    Description: MANDATORY (shall), IMPORTANT (should), OPTIONAL (may).
+    Default: PydanticUndefined
+
+  - modal_verb: str
+    Description: The exact verb used (shall, must, will, should, may).
+    Default: PydanticUndefined
+
+  - req_type: Literal
+    Description: Functional classification of the requirement.
+    Default: OTHER
+
+  - labor_drivers: List[str]
+    Description: Raw workload data (volumes, frequencies, shifts, quantities, customer counts) that drive staffing requirements. NOT staffing roles.
+    Default: PydanticUndefined
+
+  - material_needs: List[str]
+    Description: List of equipment, supplies, or facilities mentioned.
+    Default: PydanticUndefined
+
+
+CRITICALITY_LEVEL_DETECTION:
+  MANDATORY:
+    - modal_verb: shall | must | will
+    - subject: Contractor | Offeror | Personnel
+    - pattern: "[Subject] shall [action]"
+    - examples:
+      * "Contractor shall provide 24/7 support"
+      * "Offeror must submit past performance"
+      * "Personnel will complete training"
+  
+  IMPORTANT:
+    - modal_verb: should
+    - subject: Contractor | Offeror | Personnel
+    - pattern: "[Subject] should [action]"
+    - examples:
+      * "Contractor should maintain 99.9% uptime"
+      * "Offeror should demonstrate certifications"
+  
+  OPTIONAL:
+    - modal_verb: may
+    - subject: Contractor | Offeror
+    - pattern: "[Subject] may [action]"
+    - examples:
+      * "Contractor may use open-source tools"
+      * "Offeror may propose alternative approaches"
+  
+  INFORMATIONAL:
+    - modal_verb: shall | must | will
+    - subject: Government | Program Manager | COR
+    - pattern: "Government [action]" (NOT a contractor obligation)
+    - action: Extract as 'concept', NOT 'requirement'
+    - examples:
+      * "Government shall provide office space"
+      * "COR will conduct weekly reviews"
+
+
+REQUIREMENT_TYPE_CLASSIFICATION:
+  FUNCTIONAL:
+    - definition: What the system/service must do (capabilities, features)
+    - patterns: "shall provide", "shall support", "shall enable"
+    - examples:
+      * "System shall generate daily reports"
+      * "Service shall support 1,000 concurrent users"
+  
+  PERFORMANCE:
+    - definition: Speed, capacity, throughput, efficiency standards
+    - patterns: timeframes, volumes, rates, response times
+    - examples:
+      * "System shall respond within 2 seconds"
+      * "Service shall handle 10,000 transactions/hour"
+  
+  SECURITY:
+    - definition: Protection, access control, compliance safeguards
+    - patterns: "clearance", "encryption", "authentication", "NIST", "FedRAMP"
+    - examples:
+      * "Personnel shall have Secret clearances"
+      * "Data shall be encrypted using AES-256"
+  
+  TECHNICAL:
+    - definition: Technology stack, platforms, standards, protocols
+    - patterns: specific technologies, frameworks, operating systems
+    - examples:
+      * "Application shall run on Windows Server 2022"
+      * "Interface shall use RESTful APIs"
+  
+  INTERFACE:
+    - definition: Integration points, data exchange, interoperability
+    - patterns: "integrate with", "interface to", "compatible with"
+    - examples:
+      * "System shall integrate with Active Directory"
+      * "Service shall interface to existing COTS tools"
+  
+  MANAGEMENT:
+    - definition: Administration, oversight, reporting, governance
+    - patterns: "management plan", "oversight", "governance", "reporting"
+    - examples:
+      * "Contractor shall submit monthly status reports"
+      * "Contractor shall maintain risk management plan"
+  
+  DESIGN:
+    - definition: Architecture, structure, usability, user experience
+    - patterns: "user interface", "architecture", "design", "usability"
+    - examples:
+      * "Interface shall follow Section 508 guidelines"
+      * "System architecture shall use microservices"
+  
+  QUALITY:
+    - definition: Testing, validation, quality assurance, defect tracking
+    - patterns: "quality assurance", "testing", "validation", "defect"
+    - examples:
+      * "Software shall undergo IV&V testing"
+      * "Contractor shall maintain defect tracking system"
+  
+  OTHER:
+    - definition: Requirements not fitting other categories
+    - use_when: Cannot classify into above 8 types
+

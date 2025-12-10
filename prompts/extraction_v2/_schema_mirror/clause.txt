@@ -1,0 +1,14 @@
+ENTITY_TYPE: clause
+================================================================================
+
+Pydantic Model: Clause
+
+REQUIRED FIELDS:
+  - clause_number: str
+    Description: The FAR/DFARS citation (e.g., 'FAR 52.212-1').
+    Default: PydanticUndefined
+
+  - regulation: str
+    Description: FAR, DFARS, AFFARS, etc.
+    Default: PydanticUndefined
+

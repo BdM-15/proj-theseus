@@ -1,0 +1,159 @@
+JSON OUTPUT FORMAT SPECIFICATION
+
+CRITICAL: Output must match ExtractionResult Pydantic schema exactly.
+
+ROOT STRUCTURE:
+
+{
+  "entities": [... list of entity objects ...],
+  "relationships": [... list of relationship objects ...]
+}
+
+ENTITY OBJECT STRUCTURE:
+
+Base Fields (ALL entities):
+{
+  "entity_name": "string",      // Canonical name in Title Case
+  "entity_type": "string"        // One of 18 valid types (see Entity Types section)
+}
+
+Specialized Fields (type-specific):
+
+requirement:
+{
+  "entity_name": "string",
+  "entity_type": "requirement",
+  "criticality": "MANDATORY|IMPORTANT|OPTIONAL|INFORMATIONAL",
+  "modal_verb": "shall|must|will|should|may",
+  "req_type": "FUNCTIONAL|PERFORMANCE|SECURITY|TECHNICAL|INTERFACE|MANAGEMENT|DESIGN|QUALITY|OTHER",
+  "labor_drivers": ["volume", "frequency", "shift"],  // Raw workload data
+  "material_needs": ["equipment", "supplies"]          // Physical items needed
+}
+
+evaluation_factor:
+{
+  "entity_name": "string",
+  "entity_type": "evaluation_factor",
+  "weight": "40%",                 // Numerical weight (optional)
+  "importance": "Most Important",  // Relative importance (optional)
+  "subfactors": ["Sub 1", "Sub 2"] // List of sub-criteria
+}
+
+submission_instruction:
+{
+  "entity_name": "string",
+  "entity_type": "submission_instruction",
+  "page_limit": "20 pages",        // Page count constraints (optional)
+  "format_reqs": "12pt Times",     // Font/margin/file format (optional)
+  "volume": "Volume I"             // Proposal volume (optional)
+}
+
+strategic_theme:
+{
+  "entity_name": "string",
+  "entity_type": "strategic_theme",
+  "theme_type": "CUSTOMER_HOT_BUTTON|DISCRIMINATOR|PROOF_POINT|WIN_THEME"
+}
+
+clause:
+{
+  "entity_name": "string",
+  "entity_type": "clause",
+  "clause_number": "FAR 52.212-1",  // Normalized citation
+  "regulation": "FAR"                // FAR, DFARS, AFFARS, etc.
+}
+
+performance_metric:
+{
+  "entity_name": "string",
+  "entity_type": "performance_metric",
+  "threshold": "99.9%",                      // Specific value/limit
+  "measurement_method": "Periodic Inspection" // How measured (optional)
+}
+
+RELATIONSHIP OBJECT STRUCTURE:
+
+{
+  "source_entity": {
+    "entity_name": "Source Entity Name",
+    "entity_type": "requirement"
+  },
+  "target_entity": {
+    "entity_name": "Target Entity Name",
+    "entity_type": "performance_metric"
+  },
+  "relationship_type": "MEASURED_BY"
+}
+
+CRITICAL RELATIONSHIP RULES:
+
+1. Full Entity Objects (NOT strings)
+   ✅ "source_entity": {"entity_name": "X", "entity_type": "requirement"}
+   ❌ "source_entity": "X"
+
+2. Must Reference Extracted Entities
+   - source_entity.entity_name MUST exist in entities list
+   - target_entity.entity_name MUST exist in entities list
+   - Orphan relationships are dropped during validation
+
+3. Relationship Types (common patterns)
+   - MEASURED_BY: requirement → performance_metric
+   - EVALUATED_BY: submission_instruction → evaluation_factor
+   - GUIDES: evaluation_factor → submission_instruction
+   - PRODUCES: requirement → deliverable
+   - CHILD_OF: section → section (hierarchy)
+   - ATTACHMENT_OF: document → section
+   - REFERENCES: clause → requirement
+
+VALIDATION CHECKPOINTS:
+
+Before outputting JSON, verify:
+□ Root object has "entities" and "relationships" keys
+□ All entities have "entity_name" and "entity_type"
+□ Specialized entities have required fields (criticality, threshold, etc.)
+□ Entity types are from the 18 valid types
+□ Relationships use full entity objects (not strings)
+□ All relationship sources/targets exist in entities list
+
+FIELD NAMING RULES:
+
+✅ Use exact field names: entity_name, entity_type, criticality
+❌ Do NOT use: name, type, priority, severity
+
+✅ Use exact type values: requirement, evaluation_factor, submission_instruction
+❌ Do NOT use: req, eval_factor, instruction
+
+EXAMPLE OUTPUT:
+
+{
+  "entities": [
+    {
+      "entity_name": "Daily Equipment Cleaning",
+      "entity_type": "requirement",
+      "criticality": "MANDATORY",
+      "modal_verb": "shall",
+      "req_type": "FUNCTIONAL",
+      "labor_drivers": ["daily frequency"],
+      "material_needs": ["cleaning supplies"]
+    },
+    {
+      "entity_name": "Equipment Defect Threshold",
+      "entity_type": "performance_metric",
+      "threshold": "No more than 2 defects per month",
+      "measurement_method": "Periodic Inspection"
+    }
+  ],
+  "relationships": [
+    {
+      "source_entity": {
+        "entity_name": "Daily Equipment Cleaning",
+        "entity_type": "requirement"
+      },
+      "target_entity": {
+        "entity_name": "Equipment Defect Threshold",
+        "entity_type": "performance_metric"
+      },
+      "relationship_type": "MEASURED_BY"
+    }
+  ]
+}

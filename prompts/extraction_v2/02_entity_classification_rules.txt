@@ -1,0 +1,480 @@
+DETECTION TAXONOMY: Government Contracting Entity Recognition
+
+Purpose: Semantic-first extraction rules for federal RFPs
+Philosophy: Content determines entity type, NOT section labels
+Optimization: Grok-4 fast-reasoning decision trees
+
+================================================================================
+PRIORITY RULE 1: QASP SPLIT (Performance Metric vs Requirement)
+================================================================================
+
+CRITICAL: This is the #1 extraction error. Separate action from measurement.
+
+DETECTION_LOGIC:
+
+performance_metric_patterns:
+  - /Performance Objective \(PO-\d+\)/
+  - /Performance Threshold:/
+  - /Acceptable Quality Level|AQL/
+  - /QASP|Quality Assurance Surveillance/
+  - /Method of Surveillance:/
+  - /\d+\.?\d*%/
+  - /Zero \(0\) (errors?|defects?|discrepancies?)/
+  - /No more than \d+/
+  - /At least \d+\.?\d*%/
+  - /per (month|week|quarter|year)/
+
+requirement_patterns:
+  - /(Contractor|Offeror|Personnel) (shall|must|will)/
+  - /(provide|maintain|perform|deliver|ensure|implement)/
+
+SPLIT_RULE:
+  IF sentence contains requirement_pattern AND performance_metric_pattern:
+    EXTRACT_TWO:
+      entity_1 = {
+        type: requirement
+        content: action + frequency
+        example: "Daily Equipment Cleaning"
+      }
+      entity_2 = {
+        type: performance_metric
+        content: numerical_standard
+        threshold: extract_threshold()
+        example: "Equipment Defect Threshold (≤2/month)"
+      }
+      relationship = {
+        type: MEASURED_BY
+        source: entity_1
+        target: entity_2
+      }
+
+TEST_CASES:
+  ✅ "Contractor shall clean daily with ≤2 defects/month"
+     → [requirement: "Daily Equipment Cleaning"]
+     + [performance_metric: "Equipment Defect Threshold (≤2/month)"]
+  
+  ✅ "Provide 24/7 support with 99.9% uptime"
+     → [requirement: "24/7 Support Service"]
+     + [performance_metric: "99.9% Uptime Standard"]
+  
+  ✅ "Maintain 500 users with 4hr response time"
+     → [requirement: "500 User Support Capacity"]
+     + [performance_metric: "4-Hour Response Time SLA"]
+
+QASP_TABLE_EXTRACTION:
+  Structure:
+    | Performance Objective | Threshold | Surveillance Method |
+  
+  Extract_Each_Row_As:
+    entity_type: performance_metric
+    entity_name: "PO-{N} {description}"
+    threshold: column[1]
+    measurement_method: column[2]
+  
+  Example:
+    | PO-1: Escort Monitoring | Zero (0) discrepancies/month | Periodic Inspection |
+    →
+    {
+      "entity_name": "PO-1 Escort Monitoring Compliance",
+      "entity_type": "performance_metric",
+      "threshold": "Zero (0) discrepancies per month",
+      "measurement_method": "Periodic Inspection (Monthly)"
+    }
+
+================================================================================
+PRIORITY RULE 2: STRATEGIC THEMES (Shipley Capture Intelligence)
+================================================================================
+
+Purpose: Extract competitive intelligence revealing customer priorities
+
+THEME_TYPE_DETECTION:
+
+CUSTOMER_HOT_BUTTON:
+  signals:
+    - /emphasizes|emphasis on/
+    - /critical to|paramount|essential/
+    - /key to (success|award)/
+    - /primary concern/
+    - evaluation_factor.weight > 30%
+    - repeated_mentions >= 3
+  
+  examples:
+    ✅ "Mission Readiness (50%) - Most Important"
+       → strategic_theme: "Mission Readiness Priority" (CUSTOMER_HOT_BUTTON)
+    
+    ✅ "Cultural sensitivity is essential to contract success"
+       → strategic_theme: "Cultural Sensitivity Mandate" (CUSTOMER_HOT_BUTTON)
+    
+    ✅ "Government emphasizes cybersecurity compliance" (mentioned 4x)
+       → strategic_theme: "Cybersecurity Compliance Priority" (CUSTOMER_HOT_BUTTON)
+
+DISCRIMINATOR:
+  signals:
+    - unique_capability_requirements
+    - innovation_emphasis
+    - specific_technology_preferences
+    - specialized_certifications
+  
+  examples:
+    ✅ "Cloud-native architecture required"
+       → strategic_theme: "Cloud-Native Mandate" (DISCRIMINATOR)
+    
+    ✅ "DevSecOps automation strongly preferred"
+       → strategic_theme: "DevSecOps Automation Preference" (DISCRIMINATOR)
+
+PROOF_POINT:
+  signals:
+    - /(must|shall) demonstrate/
+    - /past performance .* (required|essential)/
+    - /certification .* (mandate|required)/
+    - /relevant experience in/
+  
+  examples:
+    ✅ "Offerors must demonstrate austere environment experience"
+       → strategic_theme: "Austere Operations Past Performance" (PROOF_POINT)
+    
+    ✅ "CMMI Level 3 certification required"
+       → strategic_theme: "CMMI L3 Requirement" (PROOF_POINT)
+
+WIN_THEME:
+  signals:
+    - /in accordance with|supports/
+    - strategic_goals_in_background
+    - value_proposition_language
+  
+  examples:
+    ✅ "Supports Total Force Readiness Initiative"
+       → strategic_theme: "Total Force Readiness Alignment" (WIN_THEME)
+
+================================================================================
+PRIORITY RULE 3: REQUIREMENTS vs CONCEPTS (Subject Detection)
+================================================================================
+
+REQUIREMENT_SUBJECT_RULE:
+  IF subject IN [Contractor, Offeror, Personnel, Awardee]:
+    AND modal_verb IN [shall, must, will, should, may]:
+      entity_type = requirement
+      criticality = detect_criticality(modal_verb)
+  ELSE IF subject IN [Government, COR, PM, Contracting Officer]:
+    entity_type = concept
+    note = "Government obligation, not contractor requirement"
+
+CRITICALITY_DETECTION:
+  MANDATORY:
+    modal_verb: shall | must | will
+    subject: Contractor | Offeror
+  
+  IMPORTANT:
+    modal_verb: should
+    subject: Contractor | Offeror
+  
+  OPTIONAL:
+    modal_verb: may
+    subject: Contractor | Offeror
+  
+  INFORMATIONAL:
+    modal_verb: shall | must | will
+    subject: Government | COR | PM
+    action: extract_as_concept()
+
+TEST_CASES:
+  ✅ "Contractor shall provide support" → requirement (MANDATORY)
+  ✅ "Contractor should maintain 99.9%" → requirement (IMPORTANT)
+  ✅ "Contractor may propose alternatives" → requirement (OPTIONAL)
+  ❌ "Government shall provide workspace" → concept (INFORMATIONAL)
+  ❌ "COR will conduct reviews" → concept (INFORMATIONAL)
+
+================================================================================
+ENTITY TYPE TAXONOMY (18 Types)
+================================================================================
+
+SPECIALIZED TYPES (6 with extra fields):
+
+requirement:
+  fields: criticality, modal_verb, req_type, labor_drivers, material_needs
+  detection: "(Contractor|Offeror) (shall|must|will|should|may)"
+  location: Section C (SOW), Section H (Special Requirements)
+
+evaluation_factor:
+  fields: weight, importance, subfactors
+  detection: "will be evaluated", "factor", "adjectival rating"
+  location: Section M (Evaluation Factors)
+
+submission_instruction:
+  fields: page_limit, format_reqs, volume
+  detection: "page limit", "font", "proposal shall"
+  location: Section L (Instructions to Offerors)
+
+strategic_theme:
+  fields: theme_type
+  detection: See Priority Rule 2
+  location: Throughout RFP (cross-cutting)
+
+clause:
+  fields: clause_number, regulation
+  detection: "FAR|DFARS|AFFARS \\d+\\.\\d+-\\d+"
+  location: Section I (Contract Clauses)
+
+performance_metric:
+  fields: threshold, measurement_method
+  detection: See Priority Rule 1 (QASP patterns)
+  location: Section C (QASP tables), Performance objectives
+
+GENERIC TYPES (12 with BaseEntity only):
+
+organization:
+  detection: agencies, companies, units
+  examples: "Navy", "Leidos", "45th Space Wing"
+
+document:
+  detection: "Attachment", "Annex", "Exhibit", "J-####"
+  examples: "Attachment 1", "ISO 9001", "DD Form 254"
+
+section:
+  detection: "Section [A-M]", "Paragraph \\d+"
+  examples: "Section C.4 Scope", "Section L.3"
+
+deliverable:
+  detection: "CDRL", "Data Item", "submit", "deliver"
+  examples: "CDRL A001 Monthly Report", "Status Report"
+
+statement_of_work:
+  detection: SOW/PWS/SOO describing work tasks
+  location: Section C or Attachment J
+
+program:
+  detection: major initiatives, system names
+  examples: "MCPP II", "JADC2", "F-35 Program"
+
+equipment:
+  detection: physical hardware, model numbers
+  examples: "M1A1 Tank", "Dell Server R740"
+
+location:
+  detection: geographic places, facilities
+  examples: "Camp Pendleton", "CONUS", "Building 123"
+
+person:
+  detection: POCs, specific individuals
+  examples: "John Smith, COR", "Jane Doe (Contracting Officer)"
+
+technology:
+  detection: software, systems, tools
+  examples: "SharePoint", "Python", "ServiceNow"
+
+concept:
+  detection: abstract ideas, catch-all for unclassified entities
+  examples: "Innovation", "Risk Management", "Quality"
+
+event:
+  detection: deadlines, milestones, Q&A sessions
+  examples: "Questions Due March 15", "Contract Award April 1"
+
+================================================================================
+UCF REFERENCE (Uniform Contract Format - FAR 15.210)
+================================================================================
+
+PRINCIPLE: Extract by CONTENT, not section label.
+
+RFPs vary: Task Orders may use "Selection Criteria" instead of "Section M".
+Content signals are universal; labels are not.
+
+STANDARD_SECTIONS:
+  Section A: Solicitation/Contract Form
+    entities: section, organization, person, event
+    signals: SF 1449, POCs, Q&A deadline
+  
+  Section B: Supplies/Services & Prices
+    entities: section, concept, program
+    signals: CLIN/SLIN, pricing tables
+  
+  Section C: Statement of Work
+    entities: section, statement_of_work, requirement, deliverable, performance_metric
+    signals: "contractor shall", QASP tables, task descriptions
+  
+  Section H: Special Requirements
+    entities: section, requirement, person, location
+    signals: security clearances, key personnel, facility requirements
+  
+  Section I: Contract Clauses
+    entities: section, clause
+    signals: FAR/DFARS citations, "52.###-##"
+  
+  Section J: Attachments
+    entities: section, document, statement_of_work
+    signals: "Attachment", "Annex", "Exhibit", "J-####"
+  
+  Section L: Instructions to Offerors
+    entities: section, submission_instruction
+    signals: page limits, font requirements, volume structure
+  
+  Section M: Evaluation Factors
+    entities: section, evaluation_factor, strategic_theme
+    signals: "will be evaluated", factor hierarchy, relative importance
+
+NON_STANDARD_MAPPING:
+  "Request for Quote" → Section A (cover page)
+  "Technical Requirements" → Section C (task descriptions)
+  "Work Requirements" → Section C ("shall perform")
+  "Statement of Objectives" → Section C (outcome-based)
+  "Proposal Instructions" → Section L (page limits, format)
+  "Selection Criteria" → Section M (evaluation factors)
+
+================================================================================
+SEMANTIC EQUIVALENCE (Agnostic Extraction)
+================================================================================
+
+RULE: Identify by content pattern, regardless of location.
+
+PWS_DETECTION:
+  IF contains_task_descriptions():
+    AND contains_contractor_obligations():
+      entity_type = statement_of_work
+      note = "Could be Section C, Attachment J, or Exhibit A"
+
+EVALUATION_FACTOR_DETECTION:
+  IF contains_evaluation_language():
+    OR contains_scoring_methodology():
+      entity_type = evaluation_factor
+      note = "Could be Section M or 'Selection Criteria'"
+
+SUBMISSION_INSTRUCTION_DETECTION:
+  IF contains_page_limits():
+    OR contains_format_requirements():
+      entity_type = submission_instruction
+      note = "Could be Section L or embedded in Section M"
+
+================================================================================
+NORMALIZATION RULES
+================================================================================
+
+CLAUSE_NORMALIZATION:
+  Input variants:
+    - "far 52.212.1"
+    - "FAR clause 52.212-1"
+    - "52.212-1 (FAR)"
+  
+  Output standard:
+    "FAR 52.212-1"
+  
+  Pattern: "{REGULATION} {number with hyphens}"
+
+SECTION_NORMALIZATION:
+  Input variants:
+    - "SECTION C.4 - SCOPE"
+    - "section c.4"
+    - "Sec C.4"
+    - "C-4"
+  
+  Output standard:
+    "Section C.4"
+  
+  Pattern: "Section {letter}.{number} {title}" (Title Case)
+
+CDRL_NORMALIZATION:
+  Input variants:
+    - "cdrl a001"
+    - "CDRL Item A001"
+    - "Data Item A001"
+  
+  Output standard:
+    "CDRL A001 {description}"
+  
+  Pattern: "CDRL {ID} {name}"
+
+================================================================================
+TABLE EXTRACTION PATTERNS
+================================================================================
+
+EQUIPMENT_INVENTORY_TABLES:
+  Pattern: HTML tables with equipment lists
+  
+  Extract:
+    - location entities (buildings, facilities)
+    - equipment entities (by type and quantity)
+    - requirement entities (maintenance schedules)
+  
+  Example:
+    | Building | Refrigerators | Maintenance |
+    | Bldg 123 | 25 units      | Weekly      |
+    
+    →
+    location: "Building 123"
+    equipment: "25 Refrigerators"
+    requirement: "Weekly Refrigerator Maintenance" (labor_drivers: ["25 units", "weekly"])
+
+QASP_TABLES:
+  Pattern: Performance objectives with thresholds
+  
+  Extract: performance_metric entities (see Priority Rule 1)
+
+EVALUATION_FACTOR_TABLES:
+  Pattern: Factor hierarchy with weights
+  
+  Extract:
+    - evaluation_factor entities (parent factors)
+    - evaluation_factor entities (subfactors)
+    - relationships (CHILD_OF for hierarchy)
+
+================================================================================
+RELATIONSHIP INFERENCE PATTERNS
+================================================================================
+
+MEASURED_BY:
+  source: requirement
+  target: performance_metric
+  trigger: requirement + metric in same sentence
+
+EVALUATED_BY:
+  source: submission_instruction
+  target: evaluation_factor
+  trigger: "addresses Factor X"
+
+GUIDES:
+  source: evaluation_factor
+  target: submission_instruction
+  trigger: embedded instructions in factor description
+
+PRODUCES:
+  source: requirement
+  target: deliverable
+  trigger: "shall submit", "shall deliver"
+
+CHILD_OF:
+  source: section
+  target: section
+  trigger: hierarchical numbering (C.4.1 → C.4)
+
+ATTACHMENT_OF:
+  source: document
+  target: section
+  trigger: "Attachment to Section X"
+
+REFERENCES:
+  source: clause
+  target: requirement
+  trigger: clause mentioned near requirement
+
+================================================================================
+EDGE CASE HANDLING
+================================================================================
+
+EMBEDDED_INSTRUCTIONS:
+  Problem: Section M contains page limits
+  Solution: Extract submission_instruction separately, link with GUIDES
+
+AMBIGUOUS_SUBJECTS:
+  Problem: "Personnel shall..." - contractor or government?
+  Solution: Check context - if contractor workforce, it's a requirement
+
+MULTI_SECTION_ENTITIES:
+  Problem: Same deliverable mentioned in Section C and Section J
+  Solution: Extract once with canonical name, note both locations
+
+ACRONYM_EXPANSION:
+  Problem: "PWS" vs "Performance Work Statement"
+  Solution: Extract with full name, note acronym in context
+
+DUPLICATE_PREVENTION:
+  Problem: "Section C.4" vs "SECTION C.4 - SCOPE"
+  Solution: Normalize to canonical form before extraction

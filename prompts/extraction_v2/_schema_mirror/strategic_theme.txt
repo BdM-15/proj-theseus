@@ -1,0 +1,61 @@
+ENTITY_TYPE: strategic_theme
+================================================================================
+
+Pydantic Model: StrategicTheme
+
+REQUIRED FIELDS:
+  - theme_type: Literal
+    Description: Classification of the strategic element.
+    Default: PydanticUndefined
+
+
+THEME_TYPE_CLASSIFICATION:
+  CUSTOMER_HOT_BUTTON:
+    - definition: Government's explicit priority or concern revealed in RFP
+    - detection_signals:
+      * "The Government places emphasis on..."
+      * "Critical to mission success..."
+      * "Of paramount importance..."
+      * "Essential to successful performance..."
+      * Evaluation factors weighted >30%
+      * Repeated emphasis (3+ mentions across sections)
+    - examples:
+      * "Mission Readiness Priority" (45% weighted factor)
+      * "Austere Environment Experience Requirement"
+      * "Cultural Sensitivity in Host Nation Operations"
+  
+  DISCRIMINATOR:
+    - definition: Key differentiator between competitors (favors specific approaches)
+    - detection_signals:
+      * Unique capability requirements
+      * Specific technology or methodology preferences
+      * Innovation emphasis
+      * Specialized certifications or clearances
+    - examples:
+      * "Cloud-Native Architecture Requirement"
+      * "DevSecOps Automation Emphasis"
+      * "Small Business Set-Aside Preference"
+  
+  PROOF_POINT:
+    - definition: Evidence validating capability (past performance, certifications)
+    - detection_signals:
+      * "Offerors must demonstrate..."
+      * Past performance requirements
+      * Certification mandates (ISO, CMMI, FedRAMP)
+      * Relevant experience emphasis
+    - examples:
+      * "Austere Environment Past Performance Requirement"
+      * "CMMI Level 3 Certification Mandate"
+      * "Relevant DoD Contract Experience"
+  
+  WIN_THEME:
+    - definition: Overarching proposal positioning and value proposition
+    - detection_signals:
+      * Alignment language ("in accordance with", "supports")
+      * Value proposition indicators
+      * Strategic goals mentioned in background section
+    - examples:
+      * "Total Force Readiness Alignment"
+      * "Cost Efficiency Through Automation"
+      * "Incumbent Knowledge Transfer Value"
+
