@@ -72,11 +72,19 @@ class JsonExtractor:
         """
         base_path = os.getcwd()
         prompts_dir = os.path.join(base_path, "prompts")
+        use_compressed = os.getenv("USE_COMPRESSED_PROMPTS", "false").lower() == "true"
         
-        logger.info(f"Loading original prompts from {prompts_dir}")
+        logger.info(f"Loading prompts from {prompts_dir} (compressed={use_compressed})")
         
         # 1. Base JSON Instructions
-        json_prompt_path = os.path.join(prompts_dir, "extraction", "grok_json_prompt.md")
+        if use_compressed:
+            # Prefer optimized text if available
+            json_prompt_path = os.path.join(prompts_dir, "extraction_optimized", "grok_json_prompt.txt")
+            if not os.path.exists(json_prompt_path):
+                logger.warning("Compressed grok_json_prompt not found; falling back to original .md")
+                json_prompt_path = os.path.join(prompts_dir, "extraction", "grok_json_prompt.md")
+        else:
+            json_prompt_path = os.path.join(prompts_dir, "extraction", "grok_json_prompt.md")
         try:
             with open(json_prompt_path, "r", encoding="utf-8") as f:
                 json_instructions = f.read()
