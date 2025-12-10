@@ -64,81 +64,75 @@ class JsonExtractor:
 
     def _load_full_system_prompt(self) -> str:
         """
-        Constructs the full system prompt by combining:
-        1. Base JSON formatting instructions (grok_json_prompt.md)
-        2. Entity Detection Rules (entity_detection_rules.md)
-        3. Entity Extraction Prompt (entity_extraction_prompt.md)
-        4. Relationship inference rules (prompts/relationship_inference/*.md)
+        Build the full system prompt using optimized prompts by default,
+        falling back to original .md files only if an optimized file is missing.
         """
         base_path = os.getcwd()
         prompts_dir = os.path.join(base_path, "prompts")
-        use_compressed = os.getenv("USE_COMPRESSED_PROMPTS", "false").lower() == "true"
-        
-        logger.info(f"Loading prompts from {prompts_dir} (compressed={use_compressed})")
-        
-        # 1. Base JSON Instructions
-        if use_compressed:
-            # Prefer optimized text if available
-            json_prompt_path = os.path.join(prompts_dir, "extraction_optimized", "grok_json_prompt.txt")
-            if not os.path.exists(json_prompt_path):
-                logger.warning("Compressed grok_json_prompt not found; falling back to original .md")
-                json_prompt_path = os.path.join(prompts_dir, "extraction", "grok_json_prompt.md")
-        else:
-            json_prompt_path = os.path.join(prompts_dir, "extraction", "grok_json_prompt.md")
-        try:
-            with open(json_prompt_path, "r", encoding="utf-8") as f:
-                json_instructions = f.read()
-        except FileNotFoundError:
-            logger.error(f"Base prompt not found at {json_prompt_path}")
-            raise
 
-        # 2. Entity Detection Rules (The "Rules")
-        if use_compressed:
-            detection_rules_path = os.path.join(prompts_dir, "extraction_optimized", "entity_detection_rules.txt")
-            if not os.path.exists(detection_rules_path):
-                logger.warning("Compressed entity_detection_rules not found; falling back to original .md")
-                detection_rules_path = os.path.join(prompts_dir, "extraction", "entity_detection_rules.md")
-        else:
+        logger.info(f"Loading prompts from {prompts_dir} (optimized=true)")
+
+        # 1) Base JSON Instructions
+        json_prompt_path = os.path.join(prompts_dir, "extraction_optimized", "grok_json_prompt.txt")
+        if not os.path.exists(json_prompt_path):
+            logger.warning("Optimized grok_json_prompt not found; falling back to original .md")
+            json_prompt_path = os.path.join(prompts_dir, "extraction", "grok_json_prompt.md")
+        with open(json_prompt_path, "r", encoding="utf-8") as f:
+            json_instructions = f.read()
+
+        # 2) Entity Detection Rules
+        detection_rules_path = os.path.join(prompts_dir, "extraction_optimized", "entity_detection_rules.txt")
+        if not os.path.exists(detection_rules_path):
+            logger.warning("Optimized entity_detection_rules not found; falling back to original .md")
             detection_rules_path = os.path.join(prompts_dir, "extraction", "entity_detection_rules.md")
         detection_rules = ""
         if os.path.exists(detection_rules_path):
             with open(detection_rules_path, "r", encoding="utf-8") as f:
                 detection_rules = f.read()
-        else:
-            logger.warning(f"Detection rules not found at {detection_rules_path}")
 
-        # 3. Entity Extraction Prompt (The "Prompt" with examples)
-        if use_compressed:
-            extraction_prompt_path = os.path.join(prompts_dir, "extraction_optimized", "entity_extraction_prompt.txt")
-            if not os.path.exists(extraction_prompt_path):
-                logger.warning("Compressed entity_extraction_prompt not found; falling back to original .md")
-                extraction_prompt_path = os.path.join(prompts_dir, "extraction", "entity_extraction_prompt.md")
-        else:
+        # 3) Entity Extraction Prompt
+        extraction_prompt_path = os.path.join(prompts_dir, "extraction_optimized", "entity_extraction_prompt.txt")
+        if not os.path.exists(extraction_prompt_path):
+            logger.warning("Optimized entity_extraction_prompt not found; falling back to original .md")
             extraction_prompt_path = os.path.join(prompts_dir, "extraction", "entity_extraction_prompt.md")
         extraction_prompt = ""
         if os.path.exists(extraction_prompt_path):
             with open(extraction_prompt_path, "r", encoding="utf-8") as f:
                 extraction_prompt = f.read()
-                # Strip the "Real Data" section if it exists at the end
                 if "---Real Data---" in extraction_prompt:
                     extraction_prompt = extraction_prompt.split("---Real Data---")[0]
-        else:
-            logger.warning(f"Extraction prompt not found at {extraction_prompt_path}")
 
-        # 4. Relationship Inference Rules
-        inference_dir = os.path.join(prompts_dir, "relationship_inference")
-        inference_rules = []
-        if os.path.exists(inference_dir):
-            # Sort to ensure deterministic order
-            for filename in sorted(os.listdir(inference_dir)):
-                if filename.endswith(".md"):
-                    file_path = os.path.join(inference_dir, filename)
-                    with open(file_path, "r", encoding="utf-8") as f:
-                        inference_rules.append(f"--- RULE FROM {filename} ---\n{f.read()}")
-        
-        full_inference_text = "\n\n".join(inference_rules)
+        # 4) Relationship Inference Rules (prefer optimized .txt; fall back to originals)
+        optimized_rel_dir = os.path.join(prompts_dir, "relationship_inference_optimized")
+        original_rel_dir = os.path.join(prompts_dir, "relationship_inference")
+        rel_files_order = [
+            "system_prompt",
+            "evaluation_hierarchy",
+            "document_hierarchy",
+            "deliverable_traceability",
+            "clause_clustering",
+            "instruction_evaluation_linking",
+            "attachment_section_linking",
+            "sow_deliverable_linking",
+            "semantic_concept_linking",
+            "requirement_evaluation",
+            "orphan_resolution",
+            "workload_enrichment",
+            "document_section_linking",
+        ]
+        rel_texts: List[str] = []
+        for name in rel_files_order:
+            opt_path = os.path.join(optimized_rel_dir, f"{name}.txt")
+            orig_path = os.path.join(original_rel_dir, f"{name}.md")
+            path = opt_path if os.path.exists(opt_path) else orig_path
+            if os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    rel_texts.append(f"--- RULE FROM {os.path.basename(path)} ---\n{f.read()}")
+            else:
+                logger.warning(f"Relationship rule missing: {name} ({path})")
+        full_inference_text = "\n\n".join(rel_texts)
 
-        # Combine everything
+        # Combine
         full_prompt = f"""
 {json_instructions}
 
