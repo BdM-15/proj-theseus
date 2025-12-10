@@ -93,7 +93,13 @@ class JsonExtractor:
             raise
 
         # 2. Entity Detection Rules (The "Rules")
-        detection_rules_path = os.path.join(prompts_dir, "extraction", "entity_detection_rules.md")
+        if use_compressed:
+            detection_rules_path = os.path.join(prompts_dir, "extraction_optimized", "entity_detection_rules.txt")
+            if not os.path.exists(detection_rules_path):
+                logger.warning("Compressed entity_detection_rules not found; falling back to original .md")
+                detection_rules_path = os.path.join(prompts_dir, "extraction", "entity_detection_rules.md")
+        else:
+            detection_rules_path = os.path.join(prompts_dir, "extraction", "entity_detection_rules.md")
         detection_rules = ""
         if os.path.exists(detection_rules_path):
             with open(detection_rules_path, "r", encoding="utf-8") as f:
@@ -102,7 +108,13 @@ class JsonExtractor:
             logger.warning(f"Detection rules not found at {detection_rules_path}")
 
         # 3. Entity Extraction Prompt (The "Prompt" with examples)
-        extraction_prompt_path = os.path.join(prompts_dir, "extraction", "entity_extraction_prompt.md")
+        if use_compressed:
+            extraction_prompt_path = os.path.join(prompts_dir, "extraction_optimized", "entity_extraction_prompt.txt")
+            if not os.path.exists(extraction_prompt_path):
+                logger.warning("Compressed entity_extraction_prompt not found; falling back to original .md")
+                extraction_prompt_path = os.path.join(prompts_dir, "extraction", "entity_extraction_prompt.md")
+        else:
+            extraction_prompt_path = os.path.join(prompts_dir, "extraction", "entity_extraction_prompt.md")
         extraction_prompt = ""
         if os.path.exists(extraction_prompt_path):
             with open(extraction_prompt_path, "r", encoding="utf-8") as f:
