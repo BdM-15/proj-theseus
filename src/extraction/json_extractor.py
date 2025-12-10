@@ -112,14 +112,14 @@ class JsonExtractor:
         """
         Load modular prompt components and assemble into full system prompt.
         
-        Structure (prompts/extraction_v2/):
-        - 01_core_extraction_philosophy.txt: Core extraction philosophy and quality requirements
-        - 02_entity_classification_rules.txt: Decision tree patterns for entity classification
-        - 03_json_schema_specification.txt: JSON schema specification and validation checkpoints
+        V2 Architecture (prompts/extraction_v2/) - Self-contained, examples inline with rules:
+        - 01_core_extraction_philosophy.txt: Core philosophy and quality requirements
+        - 02_entity_classification_rules.txt: Entity detection patterns + 12 annotated examples
+        - 03_json_schema_specification.txt: JSON schema specification and validation
+        - 04_relationship_extraction_rules.txt: Relationship patterns + 11 annotated examples
         - _schema_mirror/*.txt: 18 auto-generated entity type definitions from Pydantic models
-        - (examples preserved from baseline for intelligence continuity)
         
-        Returns assembled prompt ~29K tokens (vs 40K baseline).
+        Returns assembled prompt ~32K tokens (23% reduction from original 42K).
         """
         base_path = os.getcwd()
         prompts_dir = os.path.join(base_path, "prompts", "extraction_v2")
@@ -128,11 +128,13 @@ class JsonExtractor:
         
         components = []
         
-        # 1. Core components (required)
+        # Core components (required) - ALL from V2 architecture
+        # Examples are now inline with their respective rule files
         core_files = [
             ("01_core_extraction_philosophy.txt", "CORE PHILOSOPHY"),
             ("02_entity_classification_rules.txt", "ENTITY CLASSIFICATION RULES"),
             ("03_json_schema_specification.txt", "JSON SCHEMA SPECIFICATION"),
+            ("04_relationship_extraction_rules.txt", "RELATIONSHIP EXTRACTION RULES"),
         ]
         
         for filename, section_name in core_files:
@@ -161,30 +163,6 @@ class JsonExtractor:
                     + "\n".join(entity_defs)
                 )
                 logger.debug(f"  ✅ {len(entity_defs)} entity type definitions")
-        
-        # 3. Annotated examples (preserve baseline intelligence)
-        # NOTE: These are from v1 baseline - contains 23 unique RFP patterns
-        # TODO: Refactor examples into v2 format when time permits
-        baseline_examples_file = os.path.join(base_path, "prompts", "extraction_optimized", "entity_extraction_prompt.txt")
-        
-        if os.path.exists(baseline_examples_file):
-            with open(baseline_examples_file, "r", encoding="utf-8") as f:
-                baseline_content = f.read()
-            
-            # Extract examples section (23 patterns: equipment tables, QASP, Section L↔M, etc.)
-            if "Annotated RFP Examples:" in baseline_content:
-                examples_start = baseline_content.find("Annotated RFP Examples:")
-                examples_end = len(baseline_content)
-                
-                # Find natural end of examples
-                for marker in ["---Real Data---", "FINAL REMINDER"]:
-                    if marker in baseline_content[examples_start:]:
-                        examples_end = baseline_content.find(marker, examples_start)
-                        break
-                
-                examples = baseline_content[examples_start:examples_end].strip()
-                components.append(f"{'=' * 80}\nANNOTATED EXAMPLES\n{'=' * 80}\n\n{examples}")
-                logger.debug(f"  ✅ Examples section: {len(examples)} chars (23 unique patterns preserved)")
         
         # Assemble final prompt
         full_prompt = "\n\n".join(components)

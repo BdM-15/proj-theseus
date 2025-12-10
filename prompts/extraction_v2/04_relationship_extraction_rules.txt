@@ -1,0 +1,806 @@
+RELATIONSHIP EXTRACTION RULES: Single-Pass Intelligence
+
+Purpose: Extract relationships DURING main processing when full source context is available
+Philosophy: Rich extraction now beats inference later
+Post-Processing Role: Validation + cross-document gap-filling (NOT primary inference)
+
+================================================================================
+WHY EXTRACT RELATIONSHIPS DURING MAIN PROCESSING
+================================================================================
+
+CONTEXT ADVANTAGE:
+  During extraction: Full source text, tables, surrounding paragraphs available
+  During post-processing: Only entity names + metadata (no source text)
+
+EXAMPLE:
+  Source text: "Technical Volume (25 pages) addresses Factor 1: Technical Approach"
+  
+  Main extraction (HAS context):
+    - Sees explicit "addresses Factor 1" cross-reference
+    - Confidence: 0.95 (explicit signal)
+    
+  Post-processing (NO context):
+    - Only sees: entity "Technical Volume" + entity "Factor 1: Technical Approach"
+    - Must infer from name similarity alone
+    - Confidence: 0.70 (topic alignment guess)
+
+RULE: Extract relationships when you see them. Don't defer to post-processing.
+
+================================================================================
+CORE RELATIONSHIP TYPES (Priority Order)
+================================================================================
+
+1. MEASURED_BY (requirement → performance_metric)
+   - Signal: QASP table, threshold in requirement sentence
+   - Pattern: "shall [action] with [metric]" → split into two entities + link
+   - Confidence: 0.90 (explicit metric reference)
+
+2. GUIDES (submission_instruction → evaluation_factor)
+   - Signal: "addresses Factor X", "responds to", volume↔factor alignment
+   - Pattern: Section L instruction → Section M factor
+   - Confidence: 0.70-0.95 (depends on explicitness)
+
+3. EVALUATED_BY (requirement → evaluation_factor)
+   - Signal: Requirement topic matches factor topic
+   - Pattern: Technical requirement → Technical Approach factor
+   - Confidence: 0.75-0.95 (topic vs explicit)
+
+4. SATISFIED_BY (requirement → deliverable)
+   - Signal: Requirement demands evidence, deliverable provides it
+   - Pattern: "shall maintain 99.9% uptime" → "Monthly Uptime Report"
+   - Confidence: 0.75-0.95 (evidence chain)
+
+5. PRODUCES (statement_of_work → deliverable)
+   - Signal: Task explicitly mentions deliverable/CDRL
+   - Pattern: "Prepare monthly reports per CDRL A001"
+   - Confidence: 0.85-0.96 (CDRL reference)
+
+6. CHILD_OF (entity → parent_entity)
+   - Signal: Hierarchical structure (subfactors, subsections, clause series)
+   - Pattern: "Subfactor 1.1" → "Factor 1"
+   - Confidence: 0.85-0.95 (numbering scheme)
+
+7. REFERENCES (clause → requirement OR requirement → clause)
+   - Signal: Clause citation in requirement text
+   - Pattern: "per FAR 52.212-4" or "in accordance with DFARS 252.204-7012"
+   - Confidence: 0.95 (explicit citation)
+
+8. APPLIES_TO (requirement → location/equipment/technology)
+   - Signal: Requirement scoped to specific asset
+   - Pattern: "shall maintain [equipment] at [location]"
+   - Confidence: 0.85 (explicit scope)
+
+================================================================================
+PATTERN 1: SECTION L ↔ M MAPPING (GUIDES relationships)
+================================================================================
+
+PURPOSE: Link proposal instructions to evaluation criteria
+
+DETECTION SIGNALS (in order of confidence):
+
+EXPLICIT CROSS-REFERENCE (0.95):
+  - "Technical Volume addresses Factor 2"
+  - "Volume I shall address evaluation criteria M1-M3"
+  - "Management proposal (L.3.2) responds to Factors 3-4"
+
+EMBEDDED INSTRUCTION (0.85):
+  - Instruction appears within factor description
+  - "Factor 2: Management Approach... The Management Volume shall not exceed 15 pages."
+
+TOPIC ALIGNMENT (0.70):
+  - Section L "Technical Volume" ↔ Section M "Technical Approach"
+  - Section L "Staffing Plan" ↔ Section M "Personnel/Staffing"
+  - Section L "Past Performance Volume" ↔ Section M "Past Performance Factor"
+
+EXTRACTION RULE:
+  When you extract a submission_instruction:
+    1. Look for explicit factor references in same paragraph
+    2. Match volume name to factor name (Technical, Management, Past Performance)
+    3. Create GUIDES relationship immediately
+
+EXAMPLE OUTPUT:
+{
+  "entities": [
+    {"entity_name": "technical volume format", "entity_type": "submission_instruction", "page_limit": "25 pages"},
+    {"entity_name": "factor 1 technical approach", "entity_type": "evaluation_factor", "weight": "40%"}
+  ],
+  "relationships": [
+    {
+      "source_entity": {"entity_name": "technical volume format", "entity_type": "submission_instruction"},
+      "target_entity": {"entity_name": "factor 1 technical approach", "entity_type": "evaluation_factor"},
+      "relationship_type": "GUIDES"
+    }
+  ]
+}
+
+================================================================================
+PATTERN 2: QASP SPLIT (MEASURED_BY relationships)
+================================================================================
+
+PURPOSE: Separate requirements from their performance metrics
+
+CRITICAL: This is Priority Rule 1 from entity classification. When you split:
+  - Entity 1: requirement (the action)
+  - Entity 2: performance_metric (the measurement)
+  - Relationship: requirement --MEASURED_BY--> performance_metric
+
+DETECTION IN QASP TABLES:
+  | Performance Objective | Threshold | Surveillance Method |
+  
+  For each row:
+    1. Extract performance_metric with threshold + measurement_method
+    2. If row implies contractor action, also extract requirement
+    3. Link: requirement --MEASURED_BY--> performance_metric
+
+DETECTION IN PROSE:
+  "Contractor shall [action] with [metric]"
+  
+  Split: 
+    - requirement: "[action]"
+    - performance_metric: "[metric]"
+    - relationship: MEASURED_BY
+
+EXAMPLE:
+  Source: "Contractor shall provide 24/7 support with 99.9% uptime and 4hr response time"
+  
+  Extract:
+    - requirement: "24/7 support service"
+    - performance_metric: "99.9% uptime standard"
+    - performance_metric: "4-hour response time sla"
+    - relationship: requirement --MEASURED_BY--> "99.9% uptime standard"
+    - relationship: requirement --MEASURED_BY--> "4-hour response time sla"
+
+================================================================================
+PATTERN 3: DELIVERABLE TRACEABILITY (SATISFIED_BY + PRODUCES)
+================================================================================
+
+PURPOSE: Link deliverables to requirements and work statements
+
+KEY INSIGHT: Most deliverables (60-80%) come from CDRLs/clauses/eval criteria, NOT SOW text.
+Therefore: requirement → deliverable (SATISFIED_BY) is PRIMARY
+           statement_of_work → deliverable (PRODUCES) is SECONDARY
+
+SATISFIED_BY PATTERNS:
+
+Reporting Requirements:
+  requirement: "shall maintain 99.9% uptime"
+  deliverable: "Monthly Uptime Report (CDRL A001)"
+  reasoning: Report provides evidence of compliance
+  confidence: 0.85-0.95
+
+Documentation Requirements:
+  requirement: "system shall support 500 concurrent users"
+  deliverable: "Performance Test Report (CDRL B003)"
+  reasoning: Test validates requirement
+  confidence: 0.75-0.85
+
+Compliance Evidence:
+  requirement: "comply with NIST SP 800-171"
+  deliverable: "System Security Plan (CDRL C002)"
+  reasoning: SSP documents compliance
+  confidence: 0.85-0.95
+
+PRODUCES PATTERNS:
+
+Explicit CDRL Reference:
+  work_statement: "Prepare monthly status reports per CDRL A001"
+  deliverable: "Monthly Status Report (CDRL A001)"
+  confidence: 0.90-0.96 (HIGH - direct reference)
+
+Work-Product Mapping:
+  work_statement: "Maintain facility infrastructure"
+  deliverable: "Facility Maintenance Logs (CDRL B012)"
+  confidence: 0.70-0.80 (MEDIUM - semantic overlap)
+
+EXTRACTION RULE:
+  When you see a deliverable entity:
+    1. Look for requirements it satisfies (evidence chain)
+    2. Look for SOW tasks that produce it (CDRL references)
+    3. Create relationships in same extraction pass
+
+================================================================================
+PATTERN 4: REQUIREMENT → EVALUATION FACTOR (EVALUATED_BY)
+================================================================================
+
+PURPOSE: Link requirements to the factors that score them
+BUSINESS VALUE: Proposal teams allocate effort based on factor weights
+
+TOPIC ALIGNMENT (0.80):
+  requirement: "24/7 help desk support"
+  factor: "Technical Approach - Help Desk Operations"
+  match: "help desk" topic alignment
+
+CRITICALITY MAPPING (0.75):
+  MANDATORY requirements → high-weight factors (40%+)
+  Management requirements → Management Approach factor
+  Technical requirements → Technical Approach factor
+
+EXPLICIT CROSS-REFERENCE (0.95):
+  requirement: "provide quality assurance plan (see Section M, Factor 3)"
+  factor: "Factor 3: Quality Control"
+  match: explicit citation
+
+TOPIC CATEGORIES:
+
+Technical Requirements → Technical Approach Factor:
+  - System architecture, integration, cybersecurity
+  - Performance specifications, SLAs
+  - Technical methodologies
+
+Management Requirements → Management Approach Factor:
+  - Schedule, staffing, cost control
+  - Risk management, quality assurance
+  - Reporting, status updates
+
+Past Performance → Past Performance Factor:
+  - Contract references, relevance
+  - Performance ratings, CPARs
+
+Security Requirements → Security Factor (if separate):
+  - Clearances, NIST compliance
+  - OPSEC, information security
+
+================================================================================
+PATTERN 5: HIERARCHICAL STRUCTURES (CHILD_OF)
+================================================================================
+
+PURPOSE: Preserve document hierarchy and organizational relationships
+
+SECTION HIERARCHY:
+  "Section C.4.1 Network Administration"
+    --CHILD_OF-->
+  "Section C.4 Technical Services"
+
+EVALUATION FACTOR HIERARCHY:
+  "Subfactor 1.1 System Architecture (20%)"
+    --CHILD_OF-->
+  "Factor 1: Technical Approach (40%)"
+
+CLAUSE SERIES:
+  "FAR 52.212-4 Contract Terms"
+    --CHILD_OF-->
+  "Section I Contract Clauses"
+
+NUMBERING PATTERNS:
+  - X.Y is child of X
+  - X.Y.Z is child of X.Y
+  - "Subfactor" is child of "Factor"
+  - Clause 52.2XX series → Section I
+
+================================================================================
+PATTERN 6: CLAUSE REFERENCES
+================================================================================
+
+PURPOSE: Link clauses to requirements and sections they govern
+
+DETECTION SIGNALS:
+  - "per FAR 52.212-4"
+  - "in accordance with DFARS 252.204-7012"
+  - "subject to FAR clause 52.222-50"
+  - "IAW" (in accordance with)
+
+RELATIONSHIP TYPES:
+  requirement --REFERENCES--> clause (requirement cites clause)
+  clause --APPLIES_TO--> requirement (clause governs requirement)
+  clause --CHILD_OF--> section (clause belongs to section)
+
+EXTRACTION RULE:
+  When you see clause citation in requirement text:
+    1. Extract clause entity (if not already extracted)
+    2. Create REFERENCES relationship: requirement → clause
+    3. Normalize clause format: "FAR 52.XXX-X"
+
+================================================================================
+CONFIDENCE SCORING GUIDELINES
+================================================================================
+
+HIGH CONFIDENCE (0.85-0.95):
+  - Explicit cross-reference in text ("addresses Factor 1")
+  - Direct CDRL citation ("per CDRL A001")
+  - Numbering hierarchy (X.Y child of X)
+  - Clause citation ("per FAR 52.212-4")
+
+MEDIUM CONFIDENCE (0.70-0.85):
+  - Topic alignment (technical requirement → technical factor)
+  - Semantic overlap (maintenance task → maintenance log)
+  - Co-location (instruction embedded in factor description)
+
+LOWER CONFIDENCE (0.50-0.70):
+  - Weak topic alignment only
+  - General status report → specific requirement
+  - Inferred from entity types alone
+
+RULE: When in doubt about relationship, extract it with appropriate confidence.
+Post-processing can validate, but won't have source context to discover.
+
+================================================================================
+WHAT POST-PROCESSING SHOULD HANDLE
+================================================================================
+
+Post-processing fills gaps that single-chunk extraction cannot see:
+
+1. CROSS-CHUNK RELATIONSHIPS
+   - Requirement in Chunk 5 relates to Deliverable in Chunk 12
+   - Main extraction only sees one chunk at a time
+
+2. ORPHAN RESOLUTION
+   - Entities extracted but no relationships created
+   - Post-processing attempts to link orphans
+
+3. VALIDATION
+   - Confirm relationship targets exist
+   - Remove duplicate relationships
+   - Check relationship type consistency
+
+4. CONSOLIDATION
+   - Merge near-duplicate entities across chunks
+   - Standardize entity names for matching
+
+5. GRAPH ENRICHMENT
+   - Add transitive relationships (A→B→C implies A→C for some types)
+   - Calculate derived metrics
+
+POST-PROCESSING SHOULD NOT:
+  - Be primary source of L↔M mappings (main extraction has context)
+  - Re-infer QASP splits (main extraction saw the table)
+  - Guess at deliverable traceability without text evidence
+
+================================================================================
+VALIDATION CHECKLIST
+================================================================================
+
+Before finalizing extraction output, verify:
+
+□ Every MEASURED_BY has both requirement and performance_metric entities
+□ Every GUIDES has submission_instruction and evaluation_factor entities
+□ Every SATISFIED_BY has requirement and deliverable entities
+□ Hierarchical relationships (CHILD_OF) follow numbering logic
+□ Clause references use normalized format (FAR 52.XXX-X)
+□ All relationship source/target entities exist in entities list
+□ No orphan relationships (targets must exist)
+
+================================================================================
+EXAMPLE: COMPLETE EXTRACTION WITH RELATIONSHIPS
+================================================================================
+
+SOURCE TEXT:
+"Section L.3.1 Technical Volume
+Submit your technical approach (maximum 25 pages, 12pt font).
+The Technical Volume addresses Evaluation Factor 1: Technical Approach (40%).
+
+The contractor shall provide 24/7 help desk support with 99.9% uptime
+and response time not to exceed 4 hours, per FAR 52.212-4.
+Monthly performance reports (CDRL A001) shall document compliance."
+
+EXTRACTION:
+{
+  "entities": [
+    {
+      "entity_name": "technical volume instructions",
+      "entity_type": "submission_instruction",
+      "page_limit": "25 pages",
+      "format_reqs": "12pt font",
+      "volume": "Technical Volume"
+    },
+    {
+      "entity_name": "factor 1 technical approach",
+      "entity_type": "evaluation_factor",
+      "weight": "40%"
+    },
+    {
+      "entity_name": "24/7 help desk support",
+      "entity_type": "requirement",
+      "criticality": "MANDATORY",
+      "modal_verb": "shall",
+      "req_type": "TECHNICAL"
+    },
+    {
+      "entity_name": "99.9% uptime standard",
+      "entity_type": "performance_metric",
+      "threshold": "99.9% uptime"
+    },
+    {
+      "entity_name": "4-hour response time sla",
+      "entity_type": "performance_metric",
+      "threshold": "not to exceed 4 hours"
+    },
+    {
+      "entity_name": "far 52.212-4",
+      "entity_type": "clause",
+      "clause_number": "FAR 52.212-4",
+      "regulation": "FAR"
+    },
+    {
+      "entity_name": "monthly performance report cdrl a001",
+      "entity_type": "deliverable"
+    }
+  ],
+  "relationships": [
+    {
+      "source_entity": {"entity_name": "technical volume instructions", "entity_type": "submission_instruction"},
+      "target_entity": {"entity_name": "factor 1 technical approach", "entity_type": "evaluation_factor"},
+      "relationship_type": "GUIDES"
+    },
+    {
+      "source_entity": {"entity_name": "24/7 help desk support", "entity_type": "requirement"},
+      "target_entity": {"entity_name": "99.9% uptime standard", "entity_type": "performance_metric"},
+      "relationship_type": "MEASURED_BY"
+    },
+    {
+      "source_entity": {"entity_name": "24/7 help desk support", "entity_type": "requirement"},
+      "target_entity": {"entity_name": "4-hour response time sla", "entity_type": "performance_metric"},
+      "relationship_type": "MEASURED_BY"
+    },
+    {
+      "source_entity": {"entity_name": "24/7 help desk support", "entity_type": "requirement"},
+      "target_entity": {"entity_name": "far 52.212-4", "entity_type": "clause"},
+      "relationship_type": "REFERENCES"
+    },
+    {
+      "source_entity": {"entity_name": "24/7 help desk support", "entity_type": "requirement"},
+      "target_entity": {"entity_name": "monthly performance report cdrl a001", "entity_type": "deliverable"},
+      "relationship_type": "SATISFIED_BY"
+    }
+  ]
+}
+
+Note: 5 relationships extracted from single paragraph because we have full context.
+Post-processing with entities-only would struggle to infer these connections.
+
+================================================================================
+RELATIONSHIP EXTRACTION EXAMPLES
+================================================================================
+
+**Example 1: Hierarchical Document Structure (CHILD_OF)**
+
+    Entities extracted:
+
+    - Section C Statement of Work (section)
+    - Section C.3 Technical Requirements (section)
+    - Section C.3.2 System Architecture (section)
+
+    Relationships to extract:
+
+    [
+    {
+    "source_entity": "Section C.3 Technical Requirements",
+    "target_entity": "Section C Statement of Work",
+    "relationship_type": "CHILD_OF",
+    "description": "Subsection C.3 is hierarchically contained within Section C"
+    },
+    {
+    "source_entity": "Section C.3.2 System Architecture",
+    "target_entity": "Section C.3 Technical Requirements",
+    "relationship_type": "CHILD_OF",
+    "description": "Subsection C.3.2 is hierarchically contained within Section C.3"
+    }
+    ]
+
+    Why: Numbered sections follow explicit hierarchy - extract parent-child relationships based on numbering pattern.
+
+**Example 2: Clause Incorporation (CHILD_OF)**
+
+    Entities extracted:
+
+    - Section I Contract Clauses (section)
+    - FAR 52.212-1 (clause)
+    - DFARS 252.204-7012 (clause)
+
+    Relationships to extract:
+
+    [
+    {
+    "source_entity": "FAR 52.212-1",
+    "target_entity": "Section I Contract Clauses",
+    "relationship_type": "CHILD_OF",
+    "description": "FAR clause incorporated by reference in Section I per UCF standard"
+    },
+    {
+    "source_entity": "DFARS 252.204-7012",
+    "target_entity": "Section I Contract Clauses",
+    "relationship_type": "CHILD_OF",
+    "description": "DFARS clause incorporated by reference in Section I per UCF standard"
+    }
+    ]
+
+    Why: Federal clauses are standardly incorporated in Section I - create relationships even if not explicitly listed together.
+
+**Example 3: Instruction-Evaluation Linking (GUIDES)**
+
+    Entities extracted:
+
+    - Technical Approach Volume (submission_instruction)
+    - Factor 1 Technical Approach (evaluation_factor)
+
+    Relationships to extract:
+
+    [
+    {
+    "source_entity": "Technical Approach Volume",
+    "target_entity": "Factor 1 Technical Approach",
+    "relationship_type": "GUIDES",
+    "description": "Submission instruction addresses content evaluated in this factor based on topic matching (technical, architecture, system)"
+    }
+    ]
+
+    Why: Both mention "technical approach" and "system" - semantic similarity indicates the instruction guides content for this evaluation factor.
+
+**Example 4: Requirement-Evaluation Mapping (EVALUATED_BY)**
+
+    Entities extracted:
+
+    - ISO 9001 Certification Requirement (requirement)
+    - Factor 3 Quality Assurance (evaluation_factor)
+
+    Relationships to extract:
+
+    [
+    {
+    "source_entity": "ISO 9001 Certification Requirement",
+    "target_entity": "Factor 3 Quality Assurance",
+    "relationship_type": "EVALUATED_BY",
+    "description": "Quality certification requirement will be evaluated in quality assurance factor based on topic match (ISO, quality)"
+    }
+    ]
+
+    Why: Requirement mentions "ISO 9001" and factor evaluates "ISO certification" - direct topic alignment indicates evaluation relationship.
+
+**Example 5: Work-Deliverable Production (PRODUCES)**
+
+    Entities extracted:
+
+    - Performance Work Statement (statement_of_work)
+    - CDRL A001 Monthly Status Report (deliverable)
+
+    Relationships to extract:
+
+    [
+    {
+    "source_entity": "Performance Work Statement",
+    "target_entity": "CDRL A001 Monthly Status Report",
+    "relationship_type": "PRODUCES",
+    "description": "PWS defines monthly reporting requirement that produces this CDRL deliverable"
+    }
+    ]
+
+    Why: PWS task descriptions specify deliverable requirements that result in CDRLs - extract production relationship.
+
+**Example 6: Attachment Hierarchy (ATTACHMENT_OF)**
+
+    Entities extracted:
+
+    - Section J List of Attachments (section)
+    - J-02000000 Performance Work Statement (document)
+    - Attachment 1 Quality Assurance Plan (document)
+
+    Relationships to extract:
+
+    [
+    {
+    "source_entity": "J-02000000 Performance Work Statement",
+    "target_entity": "Section J List of Attachments",
+    "relationship_type": "ATTACHMENT_OF",
+    "description": "Numbered attachment J-02000000 is listed under Section J per naming convention"
+    },
+    {
+    "source_entity": "Attachment 1 Quality Assurance Plan",
+    "target_entity": "Section J List of Attachments",
+    "relationship_type": "ATTACHMENT_OF",
+    "description": "Attachment 1 is incorporated in Section J attachments list"
+    }
+    ]
+
+    Why: Naming patterns (J-####, Attachment #) indicate document is an attachment of Section J.
+
+**Example 7: Cross-Topic Semantic Relationships (RELATED_TO)**
+
+    Entities extracted:
+
+    - Cybersecurity Requirements (requirement)
+    - System Architecture Design (requirement)
+    - NIST SP 800-171 Compliance (concept)
+
+    Relationships to extract:
+
+    [
+    {
+    "source_entity": "Cybersecurity Requirements",
+    "target_entity": "NIST SP 800-171 Compliance",
+    "relationship_type": "RELATED_TO",
+    "description": "Cybersecurity requirement references NIST SP 800-171 standard"
+    },
+    {
+    "source_entity": "System Architecture Design",
+    "target_entity": "Cybersecurity Requirements",
+    "relationship_type": "RELATED_TO",
+    "description": "Architecture requirement incorporates security principles related to cybersecurity requirements"
+    }
+    ]
+
+    Why: Both requirements discuss security/cybersecurity topics - thematic connection justifies RELATED_TO relationship.
+
+**Example 8: Program-Equipment Relationships (RELATED_TO)**
+
+    Entities extracted:
+
+    - MCPP II Program (program)
+    - M1A1 Abrams Tank (equipment)
+    - Equipment Maintenance Services (requirement)
+
+    Relationships to extract:
+
+    [
+    {
+    "source_entity": "M1A1 Abrams Tank",
+    "target_entity": "MCPP II Program",
+    "relationship_type": "RELATED_TO",
+    "description": "Tank equipment is part of MCPP II prepositioned stocks"
+    },
+    {
+    "source_entity": "Equipment Maintenance Services",
+    "target_entity": "M1A1 Abrams Tank",
+    "relationship_type": "RELATED_TO",
+    "description": "Maintenance requirement applies to tank equipment"
+    },
+    {
+    "source_entity": "Equipment Maintenance Services",
+    "target_entity": "MCPP II Program",
+    "relationship_type": "RELATED_TO",
+    "description": "Maintenance services support MCPP II program objectives"
+    }
+    ]
+
+    Why: Program, equipment, and maintenance requirement form semantic cluster around prepositioning concept.
+
+**Example 9: Strategic Theme Clustering (SUPPORTS)**
+
+    Entities extracted:
+
+    - Veteran Hiring Initiative (strategic_theme)
+    - Small Business Partnerships (strategic_theme)
+    - Workforce Development Plan (requirement)
+
+    Relationships to extract:
+
+    [
+    {
+    "source_entity": "Veteran Hiring Initiative",
+    "target_entity": "Workforce Development Plan",
+    "relationship_type": "SUPPORTS",
+    "description": "Strategic theme supports workforce planning requirement focused on veteran hiring"
+    },
+    {
+    "source_entity": "Small Business Partnerships",
+    "target_entity": "Veteran Hiring Initiative",
+    "relationship_type": "RELATED_TO",
+    "description": "Small business teaming theme relates to veteran hiring through VOSB partnerships"
+    }
+    ]
+
+    Why: Strategic themes and requirements aligned on veteran employment create meaningful support/thematic relationships.
+
+**Example 10: Requirement-Metric Separation (MEASURED_BY)**
+
+    Entities extracted:
+
+    - Daily Equipment Cleaning (requirement)
+    - Cleaning Error Threshold (performance_metric)
+
+    Relationships to extract:
+
+    [
+    {
+    "source_entity": "Daily Equipment Cleaning",
+    "target_entity": "Cleaning Error Threshold",
+    "relationship_type": "MEASURED_BY",
+    "description": "Daily cleaning requirement performance is measured by the error threshold"
+    }
+    ]
+
+**Example 11: NOT Extracting Forced Relationships**
+
+    Entities extracted:
+
+    - Payment Terms (concept)
+    - Cybersecurity Controls (requirement)
+
+    Relationships to AVOID:
+
+    // DO NOT CREATE THIS RELATIONSHIP
+    {
+    "source_entity": "Payment Terms",
+    "target_entity": "Cybersecurity Controls",
+    "relationship_type": "RELATED_TO",
+    "description": "Both are contract requirements"
+    }
+
+    Why NOT extract: Payment and cybersecurity have NO semantic connection - different topics, no shared keywords, no logical relationship. DO NOT create relationships just to connect isolated entities.
+
+    ***
+
+    **METADATA EXTRACTION SUMMARY - CRITICAL REMINDERS:**
+
+    Before proceeding to relationship extraction, verify you have extracted ALL required metadata:
+
+    **✅ For EVERY EVALUATION_FACTOR entity:**
+
+    - [ ] Numerical weight extracted (percentage, points, or fraction)
+    - [ ] Relative importance hierarchy stated (Most Important, Significantly More Important, etc.)
+    - [ ] Subfactors listed with individual weights if hierarchical
+    - [ ] Evaluation criteria described (what aspects are evaluated)
+
+    **✅ For EVERY SUBMISSION_INSTRUCTION entity:**
+
+    - [ ] Page limit specified (exact number or "unlimited")
+    - [ ] Format requirements detailed (font, margins, spacing)
+    - [ ] Volume identifier clear (which volume/section)
+    - [ ] Addressed evaluation factors listed (which factors this guides)
+    - [ ] Special constraints noted (cross-reference rules, standalone requirements)
+
+    **✅ For EVERY REQUIREMENT entity:**
+
+    - [ ] Criticality bracketed: [MANDATORY], [IMPORTANT], or [OPTIONAL]
+    - [ ] Modal verb preserved: shall, should, may, must, will
+    - [ ] Subject identified: Contractor, Offeror, Personnel, etc.
+    - [ ] Government obligations excluded (Government shall = CONCEPT, not REQUIREMENT)
+    - [ ] Context/rationale included in description
+
+    **Common Extraction Errors to AVOID:**
+
+    - ❌ Missing weights: "Factor 1 Technical Approach" → Should include "worth 40%"
+    - ❌ Missing page limits: "Technical Volume" → Should include "limited to 25 pages"
+    - ❌ Missing criticality: "Maintain ISO certification" → Should start with "[MANDATORY]"
+    - ❌ Extracting Government obligations: "Government shall provide GFE" → Extract as CONCEPT, NOT REQUIREMENT
+    - ❌ Vague descriptions: "Technical factor" → Should detail what's evaluated and weight
+
+    ***
+
+    - **Identification:** Identify ALL direct and implicit relationships between previously extracted entities.
+    - **N-ary Relationship Decomposition:** If a single statement describes a relationship involving more than two entities (an N-ary relationship), decompose it into multiple binary (two-entity) relationship pairs for separate description.
+    - **Example:** For "Alice, Bob, and Carol collaborated on Project X," extract binary relationships such as "Alice collaborated with Project X," "Bob collaborated with Project X," and "Carol collaborated with Project X," or "Alice collaborated with Bob," based on the most reasonable binary interpretations.
+    - **Relationship Details:** For each binary relationship, extract the following fields:
+    - `source_entity`: The name of the source entity. Ensure **consistent naming** with entity extraction. Capitalize the first letter of each significant word (title case) if the name is case-insensitive.
+    - `target_entity`: The name of the target entity. Ensure **consistent naming** with entity extraction. Capitalize the first letter of each significant word (title case) if the name is case-insensitive.
+    - `relationship_keywords`: One or more high-level keywords summarizing the relationship. Separate multiple keywords with a comma.
+    - `relationship_description`: A concise explanation of the nature of the relationship between the source and target entities, providing a clear rationale for their connection.
+    - **Output Format - Relationships:**
+
+    Relationships are part of the JSON object under the `relationships` key.
+
+    {
+    "source_entity": "Source Name",
+    "target_entity": "Target Name",
+    "relationship_type": "TYPE", // e.g. EVALUATED_BY, GUIDES, CHILD_OF
+    "description": "Explanation of the relationship."
+    }
+
+3.  **JSON Compliance:**
+
+    - Ensure the output is valid JSON.
+    - Escape special characters in strings.
+
+4.  **Relationship Direction & Duplication:**
+
+    - Treat all relationships as **undirected** unless explicitly stated otherwise. Swapping the source and target entities for an undirected relationship does not constitute a new relationship.
+    - Avoid outputting duplicate relationships.
+
+5.  **Output Order & Prioritization:**
+
+    - Output all extracted entities first, followed by all extracted relationships.
+    - Within the list of relationships, prioritize and output those relationships that are **most significant** to the core meaning of the input text first.
+
+6.  **Context & Objectivity:**
+
+    - Ensure all entity names and descriptions are written in the **third person**.
+    - Explicitly name the subject or object; **avoid using pronouns** such as `this article`, `this paper`, `our company`, `I`, `you`, and `he/she`.
+
+7.  **Language & Proper Nouns:**
+
+    - Write all output in English.
+    - Keep proper nouns (personal names, place names, organization names) in their original language if appropriate.
+
+8.  **Completion Signal:** Output the completion marker only after all entities and relationships have been extracted.
+
+---
+
+**

@@ -1,8 +1,70 @@
 # Semantic Post-Processing Architecture
 
-**Branch**: 013-neo4j-implementation-main  
-**Date**: January 2025  
-**Status**: ✅ Implemented
+**Branch**: 037-prompt-compression-intelligence-first  
+**Date**: December 2025  
+**Status**: ✅ Implemented (Role Updated)
+
+---
+
+## ⚠️ PARADIGM SHIFT: Post-Processing Role (December 2025)
+
+### OLD MODEL (Before Branch 037):
+
+- **Main extraction**: Basic entities + minimal relationships
+- **Post-processing**: Heavy lifting (8 algorithms inferring relationships after the fact)
+
+### NEW MODEL (After Branch 037):
+
+- **Main extraction**: Rich entities + intelligent relationships (has full source context)
+- **Post-processing**: Validation + cross-document gap-filling (trust but verify)
+
+### Why This Matters:
+
+During main extraction, the LLM has **full source text context**. Post-processing only sees extracted entity names and metadata - it's inferring relationships **without the original text**. That's backwards.
+
+**Key Insight**: Extract relationships when you see them. Don't defer to post-processing.
+
+---
+
+## Post-Processing Roles (Updated)
+
+### ✅ KEEP: Cross-Chunk Relationships
+
+- Main extraction sees ONE chunk at a time (~8,192 tokens)
+- A requirement in Chunk 5 may relate to a deliverable in Chunk 12
+- Post-processing can see ALL entities across chunks
+
+### ✅ KEEP: Orphan Resolution
+
+- Entities extracted but with zero relationships
+- Post-processing attempts to connect orphans to existing graph
+
+### ✅ KEEP: Validation & Deduplication
+
+- Confirm relationship targets exist
+- Merge near-duplicate entities across chunks
+- Remove circular/invalid relationships
+
+### ✅ KEEP: Document Hierarchy (Algorithm 5)
+
+- Structure detection needs document-wide view
+- Section numbering patterns (X.Y is child of X)
+- Cannot be detected in single-chunk extraction
+
+### ⚠️ REDUCED ROLE: L↔M Mapping (Algorithm 1)
+
+- **Primary**: Main extraction (has "addresses Factor X" text)
+- **Secondary**: Post-processing (topic alignment fallback)
+
+### ⚠️ REDUCED ROLE: Requirement→Evaluation (Algorithm 3)
+
+- **Primary**: Main extraction (sees requirement + factor in context)
+- **Secondary**: Post-processing (cross-chunk topic mapping)
+
+### ⚠️ REDUCED ROLE: Deliverable Traceability (Algorithm 4)
+
+- **Primary**: Main extraction (sees "per CDRL A001" in text)
+- **Secondary**: Post-processing (work-product semantic inference)
 
 ---
 
