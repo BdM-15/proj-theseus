@@ -941,25 +941,63 @@ async def _algorithm_2_eval_hierarchy(
     if not eval_factors:
         return []
     
-    logger.info(f"\n  [Algorithm 2/8] Evaluation Hierarchy (LLM-based discovery): {len(eval_factors)} evaluation entities")
+    logger.info(f"\n  [Algorithm 2/8] Evaluation Hierarchy (BATCHED BY ROOT FACTOR): {len(eval_factors)} evaluation entities")
     
     try:
         prompt_instructions = await _load_prompt_template("evaluation_hierarchy.md")
         
-        # SIMPLIFIED: Send ALL evaluation factors to LLM in single batch
-        # LLM will discover hierarchies using its reasoning (no brittle pattern matching)
-        # Typical RFPs have 10-30 eval factors - well within Grok-4's 2M context window
+        # Group factors by root parent (e.g., "Factor A", "Factor 1", "Technical Factor")
+        # Use simple heuristics: look for single-letter/number factors or top-level keywords
+        hierarchies = {}
+        orphan_factors = []
         
-        factors_json = json.dumps([{
-            'id': f['id'],
-            'name': f['entity_name'],
-            'type': f.get('entity_type'),
-            'description': f.get('description', '')[:5000]
-        } for f in eval_factors], indent=2)
+        for factor in eval_factors:
+            name = factor.get('entity_name', '').strip()
+            desc = factor.get('description', '').lower()
+            
+            # Try to identify root factor patterns
+            root_key = None
+            
+            # Pattern 1: "Factor A", "Factor B", etc.
+            if re.match(r'^Factor [A-Z]$', name, re.I):
+                root_key = name.upper()
+            # Pattern 2: "Factor 1", "Factor 2", etc.
+            elif re.match(r'^Factor \d+$', name, re.I):
+                root_key = name.upper()
+            # Pattern 3: "Technical Factor", "Management Factor", etc.
+            elif any(keyword in name.lower() for keyword in ['technical', 'management', 'price', 'cost', 'past performance']):
+                parts = name.split()
+                root_key = parts[0].upper() if parts else "UNKNOWN"  # Safe access with fallback
+            # Pattern 4: Sub-factors (contains "Sub", digit suffix, or is very long)
+            elif 'sub' in name.lower() or re.search(r'[A-Z]\.\d+', name) or len(name) > 50:
+                orphan_factors.append(factor)
+                continue
+            else:
+                # Default: treat as independent root factor
+                root_key = name[:20] if name else "UNKNOWN"  # Truncate for grouping with fallback
+            
+            hierarchies.setdefault(root_key, []).append(factor)
         
-        prompt = f"""{prompt_instructions}
+        # If we have orphans, add them as their own group
+        if orphan_factors:
+            hierarchies['_orphans_'] = orphan_factors
+        
+        logger.info(f"      Found {len(hierarchies)} root factor hierarchies: {list(hierarchies.keys())[:5]}...")
+        
+        # Create parallel tasks for each hierarchy
+        batch_tasks = []
+        
+        for hierarchy_name, hierarchy_factors in hierarchies.items():
+            factors_json = json.dumps([{
+                'id': f['id'],
+                'name': f['entity_name'],
+                'type': f.get('entity_type'),
+                'description': f.get('description', '')[:5000]
+            } for f in hierarchy_factors], indent=2)
+            
+            prompt = f"""{prompt_instructions}
 
-EVALUATION_FACTOR_ENTITIES:
+EVALUATION_FACTOR_ENTITIES (hierarchy: {hierarchy_name}):
 {factors_json}
 
 Apply the hierarchy inference patterns from the instructions above. Use entity IDs from 'id' field (NOT names).
@@ -968,9 +1006,7 @@ Return ONLY valid JSON array:
   {{"source_id": "parent_id", "target_id": "child_id", "relationship_type": "HAS_SUBFACTOR|HAS_RATING_SCALE|MEASURED_BY|HAS_THRESHOLD|EVALUATED_USING|DEFINES_SCALE", "confidence": 0.75-0.95, "reasoning": "pattern explanation"}}
 ]
 """
-        
-        # Single LLM call for all factors
-        batch_tasks = [call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)]
+            batch_tasks.append(call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature))
         
         # Process all hierarchies in parallel
         batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
