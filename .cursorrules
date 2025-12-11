@@ -323,6 +323,14 @@ When reviewing or writing code:
 - Commit messages: `<type>: <description>` (feat/fix/docs/refactor)
 - Reference GitHub issues in commits: `Fixes #42`
 
+### Git Pager (Avoid Interactive `less`)
+
+Some git commands page output via `less`, which looks like a “stuck menu” and requires `q` to exit. To keep all git commands non-interactive in this repo:
+
+- Prefer `git --no-pager <command>` for any command that could produce long output.
+- Or use `git -c core.pager=cat <command>` to override the pager for a single command.
+- Avoid running `git log`, `git diff`, `git show`, etc. without one of the above flags unless output is known to be short.
+
 ---
 
 *Last Updated: December 2025*
