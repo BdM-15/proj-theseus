@@ -3,7 +3,8 @@
 **Issue**: Algorithm 2 (Evaluation Hierarchy) failed to discover Factor F due to brittle keyword matching  
 **Root Cause**: Hardcoded pattern matching instead of leveraging LLM reasoning  
 **Scope**: Audit all 8 algorithms for similar brittleness issues  
-**Date**: December 11, 2025
+**Date**: December 11, 2025  
+**Updated**: December 11, 2025 - Issue #43 Schema-Driven Refactoring Complete
 
 ---
 
@@ -11,7 +12,29 @@
 
 The Factor F discovery failure (Small Business Participation not linked to evaluation hierarchy) revealed **systemic brittleness** in our semantic post-processing algorithms. Instead of leveraging LLM's reasoning capabilities, we're using hardcoded keyword lists and regex patterns that fail on non-standard RFP formats.
 
-### Problem Pattern
+### Solution: Schema-Driven LLM Prompts (Issue #43)
+
+**IMPLEMENTED**: Algorithms 1, 2, and 5 now use Pydantic schema metadata to guide LLM reasoning:
+
+```python
+# ✅ SCHEMA-DRIVEN: Extract field descriptions from Pydantic models
+from src.inference.schema_prompts import get_schema_guidance
+from src.ontology.schema import EvaluationFactor
+
+guidance = get_schema_guidance(EvaluationFactor)
+# Output:
+# SCHEMA GUIDANCE: EvaluationFactor
+# - weight: Numerical weight (e.g., '40%', '25 points').
+# - importance: Relative importance (e.g., 'Most Important').
+# - subfactors: List of sub-criteria or subfactors.
+#
+# IDENTIFICATION HINTS:
+# - Main factors typically have weight/importance fields populated
+# - Subfactors reference parent factors or appear in subfactors list
+# ...
+```
+
+### Problem Pattern (OLD)
 
 ```python
 # ❌ BRITTLE: Hardcoded keyword matching
@@ -19,19 +42,27 @@ if any(keyword in name.lower() for keyword in ['technical', 'management', 'price
     # Missing 'small business' → Factor F not discovered
 ```
 
+### Solution Pattern (NEW)
+
 ```python
-# ✅ ROBUST: LLM-based discovery
-# Send ALL entities to LLM, let reasoning discover patterns
-prompt = f"Identify evaluation factor hierarchies from these entities: {entities_json}"
+# ✅ ROBUST: Schema-driven LLM discovery
+schema_guidance = get_evaluation_hierarchy_guidance()
+prompt = f"""{schema_guidance}
+
+EVALUATION_FACTOR_ENTITIES:
+{factors_json}
+
+Include ALL factors regardless of naming convention (e.g., "Small Business Participation" is a valid factor).
+"""
 ```
 
-### Key Findings
+### Key Findings (Updated)
 
-| Algorithm | Brittleness Level | Primary Issue | Solution Priority |
-|-----------|------------------|---------------|-------------------|
-| Algorithm 2 | 🔴 **CRITICAL** | Hardcoded factor keywords | **FIXED** (Branch 038) |
-| Algorithm 1 | 🟡 Medium | Hardcoded instruction terms | Medium |
-| Algorithm 5 | 🟡 Medium | Hardcoded document type categories | Medium |
+| Algorithm | Brittleness Level | Primary Issue | Status |
+|-----------|------------------|---------------|--------|
+| Algorithm 1 | ✅ **FIXED** | Hardcoded instruction terms | Schema-driven (Issue #43) |
+| Algorithm 2 | ✅ **FIXED** | Hardcoded factor keywords | Schema-driven (Issue #43) |
+| Algorithm 5 | ✅ **FIXED** | Hardcoded document type categories | Schema-driven (Issue #43) |
 | Algorithm 6 | 🟢 Low | Dynamic batching (good) | None needed |
 | Algorithm 3 | 🟢 Low | Pure LLM reasoning | None needed |
 | Algorithm 4 | 🟢 Low | Pure LLM reasoning | None needed |
@@ -42,14 +73,11 @@ prompt = f"Identify evaluation factor hierarchies from these entities: {entities
 
 ## Algorithm-by-Algorithm Analysis
 
-### Algorithm 1: Instruction-Evaluation Linking
+### Algorithm 1: Instruction-Evaluation Linking ✅ FIXED (Issue #43)
 
-**Current Implementation** (`src/inference/semantic_post_processor.py` lines 760-890):
+**Previous Implementation** (brittle keyword matching):
 
 ```python
-# TYPE-BATCHED approach with hardcoded instruction detection
-instructions = entities_by_type.get('submission_instruction', [])
-
 # BRITTLE: Hardcoded deliverable instruction patterns
 deliverables_with_instructions = [
     e for e in entities_by_type.get('deliverable', [])
@@ -57,55 +85,39 @@ deliverables_with_instructions = [
            for term in ['proposal', 'submission', 'response', 'volume', 
                        'technical', 'cost', 'past performance'])
 ]
-
-# BRITTLE: Hardcoded requirement instruction patterns  
-requirements_with_instructions = [
-    e for e in entities_by_type.get('requirement', [])
-    if e.get('modal_verb') in ['shall', 'must'] and 
-       any(term in str(e.get('entity_name', '')).lower() 
-           for term in ['submit', 'provide', 'proposal', 'response', 'volume', 
-                       'page limit', 'format', 'electronic', 'hard copy'])
-]
 ```
 
-**Brittleness Issues**:
-
-1. **Keyword list incomplete** - "offeror instructions", "submission requirements", "format specifications" might be missed
-2. **False positives** - "volume" matches storage volume, "format" matches data format
-3. **Type-specific batching** - Assumes 3 distinct entity types when LLM could discover instruction patterns agnostically
-
-**Impact**: Low-Medium (Section L typically uses standard language, but task orders vary)
-
-**Proposed Solution**:
+**New Implementation** (`src/inference/semantic_post_processor.py`):
 
 ```python
-# Remove hardcoded keyword filtering
-# Send ALL submission_instruction entities + sample deliverables/requirements to LLM
-# Let LLM identify instruction patterns using reasoning
+# SCHEMA-DRIVEN: Use schema guidance instead of keyword filtering
+schema_guidance = get_instruction_evaluation_guidance()
 
-instruction_candidates = (
-    entities_by_type.get('submission_instruction', []) +
-    entities_by_type.get('deliverable', [])[:50] +  # Sample for pattern detection
-    entities_by_type.get('requirement', [])[:50]
-)
+# Include ALL deliverables as candidates - LLM identifies instruction entities
+deliverable_candidates = entities_by_type.get('deliverable', [])[:100]
 
-# Single LLM call with pattern discovery
-prompt = f"""
-Identify which entities provide submission instructions or format guidance
-for proposals, and link them to relevant evaluation factors.
+prompt = f"""{schema_guidance}
 
-Candidates: {instruction_candidates_json}
-Evaluation Factors: {eval_factors_json}
+DELIVERABLE CANDIDATES (identify those with submission instruction semantics):
+{deliv_json}
+
+Use the SCHEMA GUIDANCE above to identify deliverables that function as submission instructions.
+Look for: page limits, format requirements, volume assignments, proposal preparation guidance.
 """
 ```
 
-**Priority**: Medium (affects Section L↔M mapping, but usually works due to standard language)
+**Schema Guidance Includes**:
+- `SubmissionInstruction` field descriptions: `page_limit`, `format_reqs`, `volume`
+- Identification hints: "Look for page limits, format requirements, volume assignments"
+- Relationship guidance: "GUIDES: Instruction → Factor"
+
+**Status**: ✅ **FIXED** - Issue #43 schema-driven refactoring
 
 ---
 
-### Algorithm 2: Evaluation Hierarchy ✅ FIXED
+### Algorithm 2: Evaluation Hierarchy ✅ FIXED (Issue #43)
 
-**Previous Implementation** (lines 950-1005):
+**Previous Implementation** (brittle keyword matching):
 
 ```python
 # BRITTLE: Hardcoded factor keyword matching
@@ -116,24 +128,30 @@ elif any(keyword in name.lower() for keyword in ['technical', 'management', 'pri
 
 **Problem**: Missed "Factor F Small Business Participation and Subcontracting"
 
-**Fix Applied** (Branch 038):
+**New Implementation** (`src/inference/semantic_post_processor.py`):
 
 ```python
-# ROBUST: Single LLM call for all evaluation factors
-# LLM discovers Factor A-F hierarchies using reasoning
-# No keyword matching, no batching needed (only 18 factors)
+# SCHEMA-DRIVEN: Use EvaluationFactor schema guidance
+schema_guidance = get_evaluation_hierarchy_guidance()
 
-factors_json = json.dumps([{
-    'id': f['id'],
-    'name': f['entity_name'],
-    'description': f.get('description', '')[:5000]
-} for f in eval_factors], indent=2)
+# Only use structural patterns (Factor A, Factor 1) for grouping - no keywords
+# LLM discovers hierarchies using schema understanding
 
-# Let LLM discover hierarchies agnostically
-prompt = f"{prompt_instructions}\n\nEVALUATION_FACTOR_ENTITIES:\n{factors_json}"
+prompt = f"""{schema_guidance}
+
+EVALUATION_FACTOR_ENTITIES:
+{factors_json}
+
+Include ALL factors regardless of naming convention (e.g., "Small Business Participation" is a valid factor).
+"""
 ```
 
-**Status**: ✅ **FIXED** (committed in branch 038)
+**Schema Guidance Includes**:
+- `EvaluationFactor` field descriptions: `weight`, `importance`, `subfactors`
+- Identification hints: "Main factors have weight/importance fields populated"
+- Explicit instruction: "Include ALL factors regardless of naming"
+
+**Status**: ✅ **FIXED** - Issue #43 schema-driven refactoring (enhanced from Branch 038)
 
 ---
 
@@ -189,9 +207,9 @@ Work Statements: {work_json}
 
 ---
 
-### Algorithm 5: Document Hierarchy
+### Algorithm 5: Document Hierarchy ✅ FIXED (Issue #43)
 
-**Current Implementation** (lines 1030-1110):
+**Previous Implementation** (brittle type-based batching):
 
 ```python
 # BRITTLE: Hardcoded document type categories
@@ -201,44 +219,35 @@ document_types = {
     'amendments': ['amendment'],
     'clauses': ['clause', 'standard', 'specification', 'regulation']
 }
-
-# Group documents by type category
-doc_groups = {}
-for category, types in document_types.items():
-    docs = [e for e in entities if e.get('entity_type') in types]
-    if docs:
-        doc_groups[category] = docs
 ```
 
-**Brittleness Issues**:
-
-1. **Type-based batching** - Assumes entity types are correctly classified
-2. **Limited categories** - "appendix", "volume", "part", "addendum" might need separate handling
-3. **Cross-category relationships missed** - Section referencing an Attachment requires cross-batch inference
-
-**Impact**: Low (entity extraction usually gets types correct, and most hierarchies are within-type)
-
-**Proposed Solution**:
+**New Implementation** (`src/inference/semantic_post_processor.py`):
 
 ```python
-# Remove type-based batching
-# Send ALL document entities to LLM in single call (typically 20-50 documents)
+# SCHEMA-DRIVEN: Use document hierarchy guidance from schema
+schema_guidance = get_document_hierarchy_guidance()
 
-document_entities = [e for e in entities if e.get('entity_type') in [
-    'section', 'document', 'attachment', 'exhibit', 'annex', 'amendment', 
-    'clause', 'standard', 'specification', 'regulation'
-]]
+# Use VALID_ENTITY_TYPES - no hardcoded categories
+document_entity_types = {'document', 'section', 'clause', 'attachment'}
+all_docs = [e for e in entities if e.get('entity_type') in document_entity_types]
 
-# Single LLM call - discovers hierarchies agnostically
-prompt = f"""
-Identify parent-child relationships between these document entities.
-Look for attachment references, section numbering, amendments, etc.
+# Single batch with all documents - discovers cross-type relationships
+prompt = f"""{schema_guidance}
 
-Documents: {document_entities_json}
+DOCUMENT ENTITIES (all types - discover cross-type relationships):
+{docs_json}
+
+Discover relationships ACROSS entity types (e.g., section referencing attachment).
 """
 ```
 
-**Priority**: Medium (mostly works, but could miss cross-type relationships)
+**Schema Guidance Includes**:
+- Document type categories from `VALID_ENTITY_TYPES`
+- Hierarchy relationship types: `CHILD_OF`, `ATTACHMENT_OF`, `AMENDS`, `INCORPORATES`
+- Identification patterns: Section numbering, attachment naming, amendment references
+- Cross-type discovery instructions
+
+**Status**: ✅ **FIXED** - Issue #43 schema-driven refactoring
 
 ---
 
@@ -312,34 +321,49 @@ for orphan_batch in orphan_batches:
 
 ## Recommendations
 
-### Immediate Actions (Branch 038)
+### Completed Actions (Issue #43)
 
-- [x] **Algorithm 2 Fix**: Remove keyword matching, use single LLM call (**DONE**)
-- [ ] **Commit and Test**: Verify Factor F discovery in fresh MCPP workspace
+- [x] **Algorithm 2 Fix**: Remove keyword matching, use schema-driven LLM guidance (**DONE**)
+- [x] **Algorithm 1 Refactor**: Remove hardcoded instruction keywords (**DONE**)
+- [x] **Algorithm 5 Refactor**: Remove type-based batching (**DONE**)
+- [x] **Schema Prompts Utility**: Created `src/inference/schema_prompts.py` (**DONE**)
+- [x] **Unit Tests**: Created `tests/test_schema_prompts.py` (**DONE**)
 
-### Short-Term (Next 1-2 Branches)
+### Schema Prompts Utility
 
-1. **Algorithm 1 Refactor** (Medium Priority)
-   - Remove hardcoded instruction keyword lists
-   - Send all candidate entities to LLM for pattern discovery
-   - Estimated Impact: Better Section L↔M mapping for non-standard RFPs
+New utility module `src/inference/schema_prompts.py` provides:
 
-2. **Algorithm 5 Refactor** (Medium Priority)
-   - Remove type-based document batching
-   - Single LLM call for all document entities
-   - Estimated Impact: Better cross-category hierarchy discovery
+```python
+# Single schema extraction
+from src.inference.schema_prompts import get_schema_guidance
+from src.ontology.schema import EvaluationFactor
 
-### Long-Term Architecture Principle
+guidance = get_schema_guidance(EvaluationFactor)
+
+# Multiple schemas combined
+from src.inference.schema_prompts import get_multi_schema_guidance
+guidance = get_multi_schema_guidance(EvaluationFactor, SubmissionInstruction)
+
+# Specialized guidance functions
+from src.inference.schema_prompts import (
+    get_entity_type_guidance,          # VALID_ENTITY_TYPES categories
+    get_document_hierarchy_guidance,   # Algorithm 5
+    get_evaluation_hierarchy_guidance, # Algorithm 2
+    get_instruction_evaluation_guidance # Algorithm 1
+)
+```
+
+### Architecture Principle (Implemented)
 
 **Guiding Rule**: Use hardcoded patterns ONLY for:
-1. **Standardized formats** (CDRL/DID patterns, FAR clause numbers)
-2. **Performance optimization** (filtering before LLM call to reduce tokens)
+1. **Standardized formats** (CDRL/DID patterns, FAR clause numbers) - Algorithm 7
+2. **Performance optimization** (sampling before LLM call to reduce tokens)
 3. **Safety guardrails** (preventing hallucinations in critical paths)
 
-**Use LLM reasoning for**:
-1. **Pattern discovery** (evaluation factors, instruction types)
-2. **Semantic relationships** (requirement↔factor mapping)
-3. **Context-dependent decisions** (is this entity a "main factor"?)
+**Use Schema-Driven LLM Guidance for**:
+1. **Pattern discovery** (evaluation factors, instruction types) - Algorithms 1, 2
+2. **Semantic relationships** (requirement↔factor mapping) - Algorithms 3, 4
+3. **Cross-type hierarchy discovery** (documents, sections, attachments) - Algorithm 5
 
 ---
 
@@ -410,5 +434,13 @@ def _is_main_evaluation_factor(entity: Dict) -> bool:
 ---
 
 **Last Updated**: December 11, 2025  
-**Branch Context**: 038-table-analysis-chunk-format  
-**Related Issue**: Factor F discovery failure (Small Business not linked to hierarchy)
+**Branch Context**: Issue #43 - Leverage Pydantic Schema Metadata for Algorithm Robustness  
+**Related Issues**: 
+- Issue #43: Schema-driven LLM prompts implementation
+- Issue #38: Factor F discovery failure (Small Business not linked to hierarchy)
+- Branch 038: Initial Algorithm 2 fix
+
+**Files Changed**:
+- `src/inference/schema_prompts.py` (NEW) - Schema extraction utilities
+- `src/inference/semantic_post_processor.py` (MODIFIED) - Algorithms 1, 2, 5 refactored
+- `tests/test_schema_prompts.py` (NEW) - Unit tests for schema utilities

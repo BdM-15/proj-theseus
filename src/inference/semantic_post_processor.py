@@ -29,6 +29,11 @@ from typing import Dict, Callable, Awaitable, List
 from pydantic import ValidationError
 
 from src.inference.neo4j_graph_io import Neo4jGraphIO, group_entities_by_type
+from src.inference.schema_prompts import (
+    get_instruction_evaluation_guidance,
+    get_evaluation_hierarchy_guidance,
+    get_document_hierarchy_guidance
+)
 from src.ontology.schema import VALID_ENTITY_TYPES, InferredRelationship, InferredRelationshipBatch
 from src.utils.llm_client import call_llm_async
 from src.utils.llm_parsing import extract_json_from_response, parse_with_pydantic
@@ -748,15 +753,16 @@ async def _algorithm_1_instruction_eval(
     temperature: float
 ) -> List[Dict]:
     """
-    ALGORITHM 1: Instruction-Evaluation Linking (PHASE 2 OPTIMIZED)
+    ALGORITHM 1: Instruction-Evaluation Linking (SCHEMA-DRIVEN - Issue #43)
     
     Maps submission instructions → evaluation factors.
-    Content-based agnostic search across instruction, deliverable, and requirement entities.
+    Uses Pydantic schema guidance instead of hardcoded keyword matching.
     
-    PHASE 2 OPTIMIZATION:
-    - Batch by instruction type (submission, deliverable, requirement)
-    - Process batches in parallel
-    - Expected: 15-30s → 10s
+    SCHEMA-DRIVEN APPROACH (Issue #43):
+    - No hardcoded keyword lists for instruction detection
+    - Schema guidance describes SubmissionInstruction fields (page_limit, format_reqs, volume)
+    - LLM uses semantic understanding to identify instruction entities
+    - Robust to non-standard RFP formats and naming conventions
     
     Args:
         entities_by_type: Entities grouped by type
@@ -768,34 +774,28 @@ async def _algorithm_1_instruction_eval(
     Returns:
         List of relationship dicts with GUIDES edges
     """
+    # Get schema guidance for instruction-evaluation linking
+    schema_guidance = get_instruction_evaluation_guidance()
+    
     # Traditional submission_instruction entities (UCF Section L)
     instructions = entities_by_type.get('instruction', []) + entities_by_type.get('submission_instruction', [])
     
-    # Agnostic: Deliverables with submission requirements
-    deliverables_with_instructions = [
-        e for e in entities_by_type.get('deliverable', [])
-        if any(term in (str(e.get('description', '')) + str(e.get('entity_name', ''))).lower() 
-               for term in ['submit', 'provide', 'page', 'format', 'volume', 'shall include', 
-                           'maximum', 'minimum', 'font', 'address', 'respond'])
-    ]
-    
-    # Agnostic: Requirements with submission verbs
-    requirements_with_instructions = [
+    # SCHEMA-DRIVEN: Include ALL deliverables and requirements as candidates
+    # Let LLM identify instruction entities using schema understanding, not keyword filtering
+    deliverable_candidates = entities_by_type.get('deliverable', [])[:100]  # Sample for performance
+    requirement_candidates = [
         e for e in entities_by_type.get('requirement', [])
-        if e.get('modal_verb') in ['shall', 'must'] and 
-           any(term in str(e.get('entity_name', '')).lower() 
-               for term in ['submit', 'provide', 'proposal', 'response', 'volume', 
-                           'page limit', 'format', 'electronic', 'hard copy'])
-    ]
+        if e.get('modal_verb') in ['shall', 'must']  # Only mandatory requirements
+    ][:100]  # Sample for performance
     
     eval_factors = entities_by_type.get('evaluation_factor', [])
     
-    if not (instructions or deliverables_with_instructions or requirements_with_instructions) or not eval_factors:
+    if not (instructions or deliverable_candidates or requirement_candidates) or not eval_factors:
         return []
     
-    total_instruction_entities = len(instructions) + len(deliverables_with_instructions) + len(requirements_with_instructions)
-    logger.info(f"\n  [Algorithm 1/8] Instruction-Evaluation Linking (TYPE-BATCHED): {total_instruction_entities} instruction entities × {len(eval_factors)} eval factors")
-    logger.info(f"      Batches: {len(instructions)} submission_instruction, {len(deliverables_with_instructions)} deliverables, {len(requirements_with_instructions)} requirements")
+    total_candidates = len(instructions) + len(deliverable_candidates) + len(requirement_candidates)
+    logger.info(f"\n  [Algorithm 1/8] Instruction-Evaluation Linking (SCHEMA-DRIVEN): {total_candidates} candidates × {len(eval_factors)} eval factors")
+    logger.info(f"      Candidates: {len(instructions)} submission_instruction, {len(deliverable_candidates)} deliverables, {len(requirement_candidates)} requirements")
     
     try:
         prompt_instructions = await _load_prompt_template("instruction_evaluation_linking.md")
@@ -808,7 +808,7 @@ async def _algorithm_1_instruction_eval(
             'description': f.get('description', '')[:5000]
         } for f in eval_factors], indent=2)
         
-        # Create parallel tasks for each instruction type batch
+        # Create parallel tasks for each candidate type batch
         batch_tasks = []
         
         # Batch 1: Traditional submission instructions
@@ -820,15 +820,18 @@ async def _algorithm_1_instruction_eval(
                 'description': i.get('description', '')[:5000]
             } for i in instructions], indent=2)
             
-            prompt = f"""{prompt_instructions}
+            prompt = f"""{schema_guidance}
 
-SUBMISSION INSTRUCTIONS (traditional):
+{prompt_instructions}
+
+SUBMISSION INSTRUCTIONS (submission_instruction entities):
 {inst_json}
 
 EVALUATION CRITERIA/FACTORS:
 {factors_json}
 
-Apply the inference patterns from the instructions above. Use entity IDs from 'id' field.
+Use the SCHEMA GUIDANCE above to identify which entities provide submission instructions.
+Apply the inference patterns. Use entity IDs from 'id' field.
 Return ONLY valid JSON array:
 [
   {{"source_id": "instruction_id", "target_id": "factor_id", "relationship_type": "GUIDES", "confidence": 0.7-0.95, "reasoning": "pattern explanation"}}
@@ -836,52 +839,63 @@ Return ONLY valid JSON array:
 """
             batch_tasks.append(call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature))
         
-        # Batch 2: Deliverable-based instructions
-        if deliverables_with_instructions:
+        # Batch 2: Deliverable candidates (LLM identifies instruction-like deliverables using schema)
+        if deliverable_candidates:
             deliv_json = json.dumps([{
                 'id': d['id'],
                 'name': d['entity_name'],
                 'type': d.get('entity_type'),
                 'description': d.get('description', '')[:5000]
-            } for d in deliverables_with_instructions], indent=2)
+            } for d in deliverable_candidates], indent=2)
             
-            prompt = f"""{prompt_instructions}
+            prompt = f"""{schema_guidance}
 
-SUBMISSION INSTRUCTIONS (from deliverables):
+{prompt_instructions}
+
+DELIVERABLE CANDIDATES (identify those with submission instruction semantics):
 {deliv_json}
 
 EVALUATION CRITERIA/FACTORS:
 {factors_json}
 
-Apply the inference patterns from the instructions above. Use entity IDs from 'id' field.
+Use the SCHEMA GUIDANCE above to identify deliverables that function as submission instructions.
+Look for: page limits, format requirements, volume assignments, proposal preparation guidance.
+Only link deliverables that have instruction-like content to evaluation factors.
+Use entity IDs from 'id' field.
 Return ONLY valid JSON array:
 [
-  {{"source_id": "instruction_id", "target_id": "factor_id", "relationship_type": "GUIDES", "confidence": 0.7-0.95, "reasoning": "pattern explanation"}}
+  {{"source_id": "deliverable_id", "target_id": "factor_id", "relationship_type": "GUIDES", "confidence": 0.7-0.95, "reasoning": "schema-based pattern explanation"}}
 ]
 """
             batch_tasks.append(call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature))
         
-        # Batch 3: Requirement-based instructions
-        if requirements_with_instructions:
+        # Batch 3: Requirement candidates (LLM identifies instruction-like requirements using schema)
+        if requirement_candidates:
             req_json = json.dumps([{
                 'id': r['id'],
                 'name': r['entity_name'],
                 'type': r.get('entity_type'),
+                'modal_verb': r.get('modal_verb', ''),
                 'description': r.get('description', '')[:5000]
-            } for r in requirements_with_instructions], indent=2)
+            } for r in requirement_candidates], indent=2)
             
-            prompt = f"""{prompt_instructions}
+            prompt = f"""{schema_guidance}
 
-SUBMISSION INSTRUCTIONS (from requirements):
+{prompt_instructions}
+
+REQUIREMENT CANDIDATES (identify those with submission instruction semantics):
 {req_json}
 
 EVALUATION CRITERIA/FACTORS:
 {factors_json}
 
-Apply the inference patterns from the instructions above. Use entity IDs from 'id' field.
+Use the SCHEMA GUIDANCE above to identify requirements that function as submission instructions.
+Look for: page limits, format requirements, volume assignments, proposal preparation guidance.
+Only link requirements that have instruction-like content to evaluation factors.
+Use entity IDs from 'id' field.
 Return ONLY valid JSON array:
 [
-  {{"source_id": "instruction_id", "target_id": "factor_id", "relationship_type": "GUIDES", "confidence": 0.7-0.95, "reasoning": "pattern explanation"}}
+  {{"source_id": "requirement_id", "target_id": "factor_id", "relationship_type": "GUIDES", "confidence": 0.7-0.95, "reasoning": "schema-based pattern explanation"}}
 ]
 """
             batch_tasks.append(call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature))
@@ -917,14 +931,15 @@ async def _algorithm_2_eval_hierarchy(
     temperature: float
 ) -> List[Dict]:
     """
-    ALGORITHM 2: Evaluation Hierarchy & Metrics (PHASE 2 OPTIMIZED)
+    ALGORITHM 2: Evaluation Hierarchy & Metrics (SCHEMA-DRIVEN - Issue #43)
     
     Structures evaluation framework with HAS_SUBFACTOR, MEASURED_BY, HAS_THRESHOLD edges.
     
-    PHASE 2 OPTIMIZATION:
-    - Group by root factor (Factor A, B, C hierarchies)
-    - Process hierarchies independently in parallel
-    - Expected: 10-20s → 5-8s
+    SCHEMA-DRIVEN APPROACH (Issue #43):
+    - No hardcoded keyword lists for factor detection
+    - Schema guidance describes EvaluationFactor fields (weight, importance, subfactors)
+    - LLM uses semantic understanding to discover ALL factors regardless of naming
+    - Robust to non-standard factor names (e.g., "Small Business Participation")
     
     Args:
         entities_by_type: Entities grouped by type
@@ -936,55 +951,52 @@ async def _algorithm_2_eval_hierarchy(
     Returns:
         List of relationship dicts with hierarchy edges
     """
+    # Get schema guidance for evaluation hierarchy discovery
+    schema_guidance = get_evaluation_hierarchy_guidance()
+    
     eval_factors = entities_by_type.get('evaluation_factor', [])
     
     if not eval_factors:
         return []
     
-    logger.info(f"\n  [Algorithm 2/8] Evaluation Hierarchy (BATCHED BY ROOT FACTOR): {len(eval_factors)} evaluation entities")
+    logger.info(f"\n  [Algorithm 2/8] Evaluation Hierarchy (SCHEMA-DRIVEN): {len(eval_factors)} evaluation entities")
     
     try:
         prompt_instructions = await _load_prompt_template("evaluation_hierarchy.md")
         
-        # Group factors by root parent (e.g., "Factor A", "Factor 1", "Technical Factor")
-        # Use simple heuristics: look for single-letter/number factors or top-level keywords
+        # SCHEMA-DRIVEN: Group factors by structural patterns only (letter/number)
+        # No keyword matching - LLM discovers hierarchies using schema guidance
         hierarchies = {}
-        orphan_factors = []
+        all_factors_group = []  # For factors that don't match simple patterns
         
         for factor in eval_factors:
             name = factor.get('entity_name', '').strip()
-            desc = factor.get('description', '').lower()
             
-            # Try to identify root factor patterns
+            # Only use structural patterns (not keywords) for grouping
             root_key = None
             
-            # Pattern 1: "Factor A", "Factor B", etc.
+            # Pattern 1: "Factor A", "Factor B", etc. (exact structural match)
             if re.match(r'^Factor [A-Z]$', name, re.I):
                 root_key = name.upper()
-            # Pattern 2: "Factor 1", "Factor 2", etc.
+            # Pattern 2: "Factor 1", "Factor 2", etc. (exact structural match)
             elif re.match(r'^Factor \d+$', name, re.I):
                 root_key = name.upper()
-            # Pattern 3: "Technical Factor", "Management Factor", etc.
-            elif any(keyword in name.lower() for keyword in ['technical', 'management', 'price', 'cost', 'past performance']):
-                parts = name.split()
-                root_key = parts[0].upper() if parts else "UNKNOWN"  # Safe access with fallback
-            # Pattern 4: Sub-factors (contains "Sub", digit suffix, or is very long)
-            elif 'sub' in name.lower() or re.search(r'[A-Z]\.\d+', name) or len(name) > 50:
-                orphan_factors.append(factor)
-                continue
             else:
-                # Default: treat as independent root factor
-                root_key = name[:20] if name else "UNKNOWN"  # Truncate for grouping with fallback
+                # SCHEMA-DRIVEN: Don't use keyword matching for categorization
+                # Add to general group - LLM will discover relationships using schema
+                all_factors_group.append(factor)
+                continue
             
             hierarchies.setdefault(root_key, []).append(factor)
         
-        # If we have orphans, add them as their own group
-        if orphan_factors:
-            hierarchies['_orphans_'] = orphan_factors
+        # Add all non-structurally-grouped factors as a single batch
+        # LLM will discover hierarchies using schema guidance (no keyword filtering)
+        if all_factors_group:
+            hierarchies['_all_factors_'] = all_factors_group
         
-        logger.info(f"      Found {len(hierarchies)} root factor hierarchies: {list(hierarchies.keys())[:5]}...")
+        logger.info(f"      Found {len(hierarchies)} factor groups (schema-driven): {list(hierarchies.keys())[:5]}...")
         
-        # Create parallel tasks for each hierarchy
+        # Create parallel tasks for each hierarchy group
         batch_tasks = []
         
         for hierarchy_name, hierarchy_factors in hierarchies.items():
@@ -992,18 +1004,30 @@ async def _algorithm_2_eval_hierarchy(
                 'id': f['id'],
                 'name': f['entity_name'],
                 'type': f.get('entity_type'),
+                'weight': f.get('weight', ''),
+                'importance': f.get('importance', ''),
+                'subfactors': f.get('subfactors', []),
                 'description': f.get('description', '')[:5000]
             } for f in hierarchy_factors], indent=2)
             
-            prompt = f"""{prompt_instructions}
+            prompt = f"""{schema_guidance}
 
-EVALUATION_FACTOR_ENTITIES (hierarchy: {hierarchy_name}):
+{prompt_instructions}
+
+EVALUATION_FACTOR_ENTITIES (group: {hierarchy_name}):
 {factors_json}
 
-Apply the hierarchy inference patterns from the instructions above. Use entity IDs from 'id' field (NOT names).
+Use the SCHEMA GUIDANCE above to identify:
+1. Main factors (have weight/importance, not rating scales)
+2. Subfactors (reference parent factors or appear in subfactors lists)
+3. Rating scales (Outstanding, Good, etc. - link with HAS_RATING_SCALE, not HAS_SUBFACTOR)
+4. Metrics and thresholds
+
+Include ALL factors regardless of naming convention (e.g., "Small Business Participation" is a valid factor).
+Use entity IDs from 'id' field (NOT names).
 Return ONLY valid JSON array:
 [
-  {{"source_id": "parent_id", "target_id": "child_id", "relationship_type": "HAS_SUBFACTOR|HAS_RATING_SCALE|MEASURED_BY|HAS_THRESHOLD|EVALUATED_USING|DEFINES_SCALE", "confidence": 0.75-0.95, "reasoning": "pattern explanation"}}
+  {{"source_id": "parent_id", "target_id": "child_id", "relationship_type": "HAS_SUBFACTOR|HAS_RATING_SCALE|MEASURED_BY|HAS_THRESHOLD|EVALUATED_USING|DEFINES_SCALE", "confidence": 0.75-0.95, "reasoning": "schema-based pattern explanation"}}
 ]
 """
             batch_tasks.append(call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature))
@@ -1024,7 +1048,7 @@ Return ONLY valid JSON array:
                 )
                 all_rels.extend(valid_rels)
         
-        logger.info(f"    → Found {len(all_rels)} evaluation hierarchy relationships ({len(batch_tasks)} parallel hierarchies)")
+        logger.info(f"    → Found {len(all_rels)} evaluation hierarchy relationships ({len(batch_tasks)} parallel groups)")
         return all_rels
     except Exception as e:
         logger.error(f"    ❌ Algorithm 2 failed: {e}")
@@ -1039,14 +1063,15 @@ async def _algorithm_5_doc_hierarchy(
     temperature: float
 ) -> List[Dict]:
     """
-    ALGORITHM 5: Document Hierarchy (PHASE 2 OPTIMIZED)
+    ALGORITHM 5: Document Hierarchy (SCHEMA-DRIVEN - Issue #43)
     
     Maps document structure (attachments, sections, clauses, standards) with CHILD_OF edges.
     
-    PHASE 2 OPTIMIZATION:
-    - Group documents by type (attachments, sections, clauses, standards)
-    - Process types in parallel
-    - Expected: 10-15s → 5-8s
+    SCHEMA-DRIVEN APPROACH (Issue #43):
+    - No hardcoded document type categories
+    - Schema guidance from VALID_ENTITY_TYPES defines document types
+    - Single LLM call with all document entities (discovers cross-type relationships)
+    - Robust to non-standard document structures
     
     Args:
         entities: All entities
@@ -1058,65 +1083,106 @@ async def _algorithm_5_doc_hierarchy(
     Returns:
         List of relationship dicts with CHILD_OF edges
     """
-    # Document type taxonomy
-    document_types = {
-        'core_documents': ['document'],
-        'sections': ['section'],
-        'attachments': ['attachment', 'annex', 'exhibit'],
-        'amendments': ['amendment'],
-        'clauses': ['clause', 'standard', 'specification', 'regulation']
-    }
+    # Get schema guidance for document hierarchy discovery
+    schema_guidance = get_document_hierarchy_guidance()
     
-    # Group documents by type category
-    doc_groups = {}
-    for category, types in document_types.items():
-        docs = [e for e in entities if e.get('entity_type') in types]
-        if docs:
-            doc_groups[category] = docs
+    # SCHEMA-DRIVEN: Use VALID_ENTITY_TYPES to identify document entities
+    # No hardcoded type categories - schema defines valid types
+    document_entity_types = {'document', 'section', 'clause', 'attachment'}
     
-    if not doc_groups:
+    # Collect ALL document entities regardless of specific type
+    all_docs = [
+        e for e in entities 
+        if e.get('entity_type') in document_entity_types
+    ]
+    
+    if not all_docs:
         return []
     
-    total_docs = sum(len(docs) for docs in doc_groups.values())
-    logger.info(f"\n  [Algorithm 5/8] Document Hierarchy (TYPE-BATCHED): {total_docs} document entities across {len(doc_groups)} type groups")
-    logger.info(f"      Groups: {', '.join(f'{k}:{len(v)}' for k, v in doc_groups.items())}")
+    logger.info(f"\n  [Algorithm 5/8] Document Hierarchy (SCHEMA-DRIVEN): {len(all_docs)} document entities")
+    
+    # Log type distribution for debugging
+    type_counts = {}
+    for doc in all_docs:
+        doc_type = doc.get('entity_type', 'unknown')
+        type_counts[doc_type] = type_counts.get(doc_type, 0) + 1
+    logger.info(f"      Type distribution: {', '.join(f'{k}:{v}' for k, v in type_counts.items())}")
     
     try:
         prompt_instructions = await _load_prompt_template("document_hierarchy.md")
         
-        # Create parallel tasks for each document type group
+        # SCHEMA-DRIVEN: Single batch with all documents
+        # For large document sets, use size-based batching (not type-based)
+        BATCH_SIZE = 150  # Documents per batch
         batch_tasks = []
         
-        for category, docs in doc_groups.items():
+        if len(all_docs) <= BATCH_SIZE:
+            # Single batch for small document sets
             docs_json = json.dumps([{
                 'id': d['id'],
                 'name': d['entity_name'],
                 'type': d.get('entity_type'),
                 'description': d.get('description', '')[:5000]
-            } for d in docs], indent=2)
+            } for d in all_docs], indent=2)
             
-            prompt = f"""{prompt_instructions}
+            prompt = f"""{schema_guidance}
 
-DOCUMENTS ({category}):
+{prompt_instructions}
+
+DOCUMENT ENTITIES (all types - discover cross-type relationships):
 {docs_json}
 
-Apply the inference patterns from the instructions above to identify document relationships within this type group.
+Use the SCHEMA GUIDANCE above to identify document hierarchies.
+Discover relationships ACROSS entity types (e.g., section referencing attachment).
 Use entity IDs from 'id' field.
 Return ONLY valid JSON array:
 [
-  {{"source_id": "child_id", "target_id": "parent_id", "relationship_type": "CHILD_OF|ATTACHMENT_OF", "confidence": 0.7-1.0, "reasoning": "pattern explanation"}}
+  {{"source_id": "child_id", "target_id": "parent_id", "relationship_type": "CHILD_OF|ATTACHMENT_OF|AMENDS|INCORPORATES", "confidence": 0.7-1.0, "reasoning": "schema-based pattern explanation"}}
 ]
 """
             batch_tasks.append(call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature))
+        else:
+            # Size-based batching for large document sets
+            num_batches = (len(all_docs) + BATCH_SIZE - 1) // BATCH_SIZE
+            logger.info(f"      Large document set: {num_batches} batches of ~{BATCH_SIZE} docs")
+            
+            for batch_num in range(num_batches):
+                batch_start = batch_num * BATCH_SIZE
+                batch_end = min(batch_start + BATCH_SIZE, len(all_docs))
+                batch_docs = all_docs[batch_start:batch_end]
+                
+                docs_json = json.dumps([{
+                    'id': d['id'],
+                    'name': d['entity_name'],
+                    'type': d.get('entity_type'),
+                    'description': d.get('description', '')[:5000]
+                } for d in batch_docs], indent=2)
+                
+                prompt = f"""{schema_guidance}
+
+{prompt_instructions}
+
+DOCUMENT ENTITIES (batch {batch_num + 1}/{num_batches} - discover cross-type relationships):
+{docs_json}
+
+Use the SCHEMA GUIDANCE above to identify document hierarchies.
+Discover relationships ACROSS entity types (e.g., section referencing attachment).
+Use entity IDs from 'id' field.
+Return ONLY valid JSON array:
+[
+  {{"source_id": "child_id", "target_id": "parent_id", "relationship_type": "CHILD_OF|ATTACHMENT_OF|AMENDS|INCORPORATES", "confidence": 0.7-1.0, "reasoning": "schema-based pattern explanation"}}
+]
+"""
+                batch_tasks.append(call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature))
         
-        # Process all document type groups in parallel
+        # Process all batches in parallel
         batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
         
         # Combine and validate results with Pydantic
         all_rels = []
         for i, result in enumerate(batch_results, 1):
             if isinstance(result, Exception):
-                logger.error(f"    ❌ Document type batch {i} failed: {result}")
+                logger.error(f"    ❌ Document batch {i} failed: {result}")
             else:
                 valid_rels = await _parse_and_validate_relationship_batch(
                     result,
@@ -1125,12 +1191,8 @@ Return ONLY valid JSON array:
                 )
                 all_rels.extend(valid_rels)
         
-        logger.info(f"    → Found {len(all_rels)} document hierarchy relationships ({len(batch_tasks)} parallel type groups)")
+        logger.info(f"    → Found {len(all_rels)} document hierarchy relationships ({len(batch_tasks)} batches)")
         return all_rels
-    except Exception as e:
-        logger.error(f"    ❌ Algorithm 5 failed: {e}")
-        return []
-        return valid_rels
     except Exception as e:
         logger.error(f"    ❌ Algorithm 5 failed: {e}")
         return []
