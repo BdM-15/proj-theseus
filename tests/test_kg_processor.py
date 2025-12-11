@@ -74,6 +74,9 @@ for entity in custom_kg['entities']:
 
 print("\n--- Relationships ---")
 for rel in custom_kg['relationships']:
-    print(f"  - {rel['source_id']} → {rel['target_id']} ({rel['description']})")
+    # Handle both src_id/tgt_id and source_id/target_id formats
+    src = rel.get('src_id') or rel.get('source_id', 'unknown')
+    tgt = rel.get('tgt_id') or rel.get('target_id', 'unknown')
+    print(f"  - {src} → {tgt} ({rel['description']})")
 
 print("\n✅ Test complete - check logs for three-phase logging")

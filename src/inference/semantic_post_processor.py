@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 ALLOWED_TYPES = list(VALID_ENTITY_TYPES)
 
 # Configuration for semantic post-processing optimization (Issue #30)
-MAX_CONCURRENT_LLM_CALLS = int(os.getenv("MAX_ASYNC", 4))
+MAX_CONCURRENT_LLM_CALLS = int(os.getenv("MAX_ASYNC", "8"))
 BATCH_SIZE_ALGO3 = int(os.getenv("BATCH_SIZE_ALGORITHM_3", 100))
 BATCH_OVERLAP_ALGO3 = int(os.getenv("BATCH_OVERLAP_ALGORITHM_3", 20))
 BATCH_SIZE_ALGO4 = int(os.getenv("BATCH_SIZE_ALGORITHM_4", 50))
