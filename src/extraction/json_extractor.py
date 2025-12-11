@@ -311,46 +311,7 @@ Output the result strictly as a JSON object matching the schema defined in the f
         """
         return self.failed_chunks.copy()
 
-    async def extract_from_text(self, text: str, chunk_id: str) -> ExtractionResult:
-        """
-        Extract entities from arbitrary text using govcon ontology.
-        
-        Used by modal processors (tables, images) to analyze converted descriptions.
-        
-        Args:
-            text: Text to extract entities from (e.g., table description)
-            chunk_id: Identifier for provenance tracking (e.g., "table-page42-idx15")
-        
-        Returns:
-            ExtractionResult with entities and relationships
-        """
-        user_prompt = f"""Extract entities and relationships from this government contracting content.
-
-SOURCE: {chunk_id}
-
-CONTENT:
-{text}
-
-Extract all relevant entities following the government contracting ontology:
-- Requirements (with criticality: MANDATORY/IMPORTANT/OPTIONAL)
-- Performance metrics (with thresholds and measurement methods)
-- Evaluation factors (with weights and subfactors)
-- Deliverables (with formats and due dates)
-- Strategic themes (customer hot buttons, discriminators, proof points)
-- Other entity types as appropriate
-
-Return structured JSON using the ExtractionResult schema."""
-
-        try:
-            result = await self._extract_with_retry(user_prompt, chunk_id)
-            
-            logger.info(
-                f"📝 Extracted from text ({chunk_id}): "
-                f"{len(result.entities)} entities, {len(result.relationships)} relationships"
-            )
-            
-            return result
-            
-        except Exception as e:
-            log_graceful_failure(logger, "Entity extraction", e, chunk_id)
-            return ExtractionResult(entities=[], relationships=[])
+    # NOTE: extract_from_text() was removed in Issue #42
+    # The lightrag_llm_adapter now handles ALL extraction with the full 121K ontology prompt.
+    # Previously, extract_from_text() used a degraded 30-line inline prompt that bypassed
+    # the established ontology, causing inconsistent entity extraction for multimodal content.

@@ -136,94 +136,10 @@ class DocumentQueueTracker:
 # Global queue tracker instance
 _queue_tracker = DocumentQueueTracker()
 
-
-async def extract_with_semaphore(
-    chunk_text: str,
-    chunk_idx: int,
-    json_extractor,
-    semaphore: asyncio.Semaphore,
-    total_chunks: int
-):
-    """
-    Extract entities/relationships from a single chunk with concurrency control.
-    
-    Issue #17: Parallel chunk processing for 87% extraction time reduction.
-    Uses semaphore to limit concurrent LLM calls (respects API rate limits).
-    """
-    from src.ontology.schema import ExtractionResult
-    
-    async with semaphore:
-        chunk_id = f"chunk-{chunk_idx+1}"
-        logger.info(f"   Processing chunk {chunk_idx+1}/{total_chunks} ({len(chunk_text):,} chars)...")
-        try:
-            return await json_extractor.extract(chunk_text, chunk_id=chunk_id)
-        except Exception as e:
-            logger.error(f"Chunk {chunk_idx+1} extraction failed: {e}")
-            # Return empty result to continue pipeline (graceful degradation)
-            return ExtractionResult(entities=[], relationships=[])
-
-
-async def extract_multimodal_with_semaphore(
-    modal_item: dict,
-    item_idx: int,
-    json_extractor,
-    semaphore: asyncio.Semaphore,
-    total_items: int
-):
-    """
-    Extract entities/relationships from a single table/image/equation with concurrency control.
-    
-    Parallel multimodal processing (similar to text chunk extraction).
-    Processes tables, images, equations concurrently to reduce extraction time.
-    """
-    from src.ontology.schema import ExtractionResult
-    
-    async with semaphore:
-        content_type = modal_item.get('type', 'unknown')
-        page_idx = modal_item.get('page_idx', 0)
-        chunk_id = f"govcon_{content_type}_p{page_idx}"
-        
-        logger.info(f"   Processing {content_type} {item_idx+1}/{total_items} (page {page_idx}) [{chunk_id}]...")
-        
-        try:
-            # Extract textualized content (MinerU already did vision work)
-            if content_type == "table":
-                text_content = modal_item.get("table_body", "")
-                caption = ", ".join(modal_item.get("table_caption", []))
-            elif content_type == "image":
-                text_content = modal_item.get("text", "")
-                caption = ", ".join(modal_item.get("image_caption", []))
-            elif content_type == "equation":
-                text_content = modal_item.get("latex", "")
-                caption = modal_item.get("equation_caption", "")
-            else:
-                text_content = str(modal_item)
-                caption = ""
-            
-            # FIX (Issue #39): Pass raw text_content directly to extract()
-            # DO NOT use inline prompts - the full 121K system prompt in JsonExtractor
-            # handles all 18 entity types and relationship inference rules.
-            # Previous bug: extract_from_text(ontology_prompt) used degraded 30-line inline prompt
-            # with only 5 categories, bypassing the established ontology architecture.
-            
-            # Prepend caption for context if available
-            if caption:
-                extraction_text = f"{content_type.title()}: {caption}\n\n{text_content}"
-            else:
-                extraction_text = text_content
-            
-            result = await json_extractor.extract(
-                text=extraction_text,
-                chunk_id=chunk_id
-            )
-            
-            logger.info(f"   ✅ [{chunk_id}] Extracted {len(result.entities)} entities from {content_type}")
-            return result, modal_item
-            
-        except Exception as e:
-            logger.error(f"{content_type.title()} {item_idx+1} extraction failed: {e}")
-            # Return empty result to continue pipeline (graceful degradation)
-            return ExtractionResult(entities=[], relationships=[]), modal_item
+# NOTE: extract_with_semaphore() and extract_multimodal_with_semaphore() were removed
+# in Issue #42. The lightrag_llm_adapter now intercepts ALL LightRAG extraction calls,
+# providing unified Pydantic validation with the full 121K ontology prompt.
+# RAG-Anything's native parallelization handles concurrency.
 
 
 async def process_document_with_semantic_inference(
@@ -293,33 +209,19 @@ async def process_document_with_semantic_inference(
         # ============================================================================
         # RAG-ANYTHING PIPELINE WITH GOVCON ONTOLOGY
         # ============================================================================
-        # Issue #42: Restored original design - RAG-Anything handles ALL content
-        # - Text → LightRAG's text pipeline (uses addon_params.entity_types = our ontology)
-        # - Multimodal → GovconMultimodalProcessor (Pydantic-validated extraction)
+        # Issue #42: RAG-Anything handles ALL content with unified extraction
+        # - Text → LightRAG's text pipeline → lightrag_llm_adapter (Pydantic + ontology)
+        # - Multimodal → RAG-Anything default processors → same adapter path
         # 
-        # This replaces the manual GovconKGProcessor approach that duplicated LightRAG's
-        # deduplication and bypassed our custom processor.
+        # The lightrag_llm_adapter intercepts ALL extraction calls, ensuring:
+        # - Full 121K ontology prompt for all content types
+        # - Pydantic validation via JsonExtractor
+        # - No duplicate extraction (removed GovconMultimodalProcessor)
         # ============================================================================
         
         import os
-        from src.processors import GovconMultimodalProcessor
         
         try:
-            # Register our govcon processor for multimodal content
-            # This processor uses JsonExtractor with Pydantic validation
-            govcon_processor = GovconMultimodalProcessor(
-                lightrag=rag_instance.lightrag,
-                modal_caption_func=llm_func,
-                context_extractor=rag_instance.context_extractor
-            )
-            
-            # Override RAG-Anything's default processors with our ontology-aware processor
-            rag_instance.modal_processors["table"] = govcon_processor
-            rag_instance.modal_processors["image"] = govcon_processor
-            rag_instance.modal_processors["equation"] = govcon_processor
-            
-            logger.info("🏛️ GovconMultimodalProcessor registered for tables/images/equations")
-            
             # Count content types for logging
             text_count = sum(1 for item in filtered_content if item.get('type') == 'text')
             table_count = sum(1 for item in filtered_content if item.get('type') == 'table')
@@ -329,9 +231,12 @@ async def process_document_with_semantic_inference(
             logger.info(f"📊 Content breakdown: {text_count} text, {table_count} tables, {image_count} images, {equation_count} equations")
             
             # RAG-Anything handles ALL content in one call:
-            # - Text items → LightRAG's ainsert() → uses addon_params.entity_types (our ontology)
-            # - Multimodal items → _process_multimodal_content() → our GovconMultimodalProcessor
+            # - Text items → LightRAG's ainsert() → lightrag_llm_adapter → Pydantic extraction
+            # - Multimodal items → default processors → lightrag_llm_adapter → same path
             # - Deduplication → LightRAG's merge_nodes_and_edges() (Stage 6)
+            # 
+            # All extraction goes through lightrag_llm_adapter which uses the full 121K
+            # ontology prompt, eliminating the need for custom multimodal processors.
             logger.info(f"🚀 Processing {len(filtered_content)} content items through RAG-Anything pipeline...")
             
             await rag_instance.insert_content_list(
@@ -340,7 +245,7 @@ async def process_document_with_semantic_inference(
                 doc_id=doc_id
             )
             
-            logger.info("✅ RAG-Anything pipeline complete (text + multimodal with govcon ontology)")
+            logger.info("✅ RAG-Anything pipeline complete (unified extraction via lightrag_llm_adapter)")
             
             # Log queue status
             stats = await _queue_tracker.get_stats()
