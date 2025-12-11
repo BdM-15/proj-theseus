@@ -113,6 +113,22 @@ def configure_raganything_args():
         "performance_metric",       # Distinct from requirements: accuracy, frequency, response times
     ]
     
+    # CRITICAL: Set addon_params with our entity types
+    # LightRAG's extract_entities() reads from addon_params.entity_types, NOT global_args.entity_types
+    # Without this, text extraction uses LightRAG's generic types (Person, Organization, Location, etc.)
+    global_args.addon_params = {
+        "language": "English",
+        "entity_types": global_args.entity_types,  # Use our govcon ontology for ALL extraction
+    }
+    
+    # Parallel processing configuration
+    # NOTE: These global_args settings are for LightRAG SERVER API only (not used by RAGAnything)
+    # For RAGAnything: parallelization must be set via lightrag_kwargs in initialization.py
+    # max_parallel_insert: controls concurrent document processing (file-level parallelism)
+    max_async = int(os.getenv("MAX_ASYNC", "16"))
+    global_args.max_parallel_insert = max_async
+    # llm_model_max_async and embedding_func_max_async are set via lightrag_kwargs in initialization.py
+    
     # Chunking configuration (optimized for focused extraction)
     # CHUNK_SIZE: Document chunking for BOTH LLM entity extraction and embeddings
     # - 8K chunks = multiple focused extraction passes = comprehensive coverage

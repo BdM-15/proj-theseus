@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 ALLOWED_TYPES = list(VALID_ENTITY_TYPES)
 
 # Configuration for semantic post-processing optimization (Issue #30)
-MAX_CONCURRENT_LLM_CALLS = int(os.getenv("MAX_ASYNC", 4))
+MAX_CONCURRENT_LLM_CALLS = int(os.getenv("MAX_ASYNC", "8"))
 BATCH_SIZE_ALGO3 = int(os.getenv("BATCH_SIZE_ALGORITHM_3", 100))
 BATCH_OVERLAP_ALGO3 = int(os.getenv("BATCH_OVERLAP_ALGORITHM_3", 20))
 BATCH_SIZE_ALGO4 = int(os.getenv("BATCH_SIZE_ALGORITHM_4", 50))
@@ -668,17 +668,35 @@ If no relationships found, return []."""
                 entity_id = e.get('id') if isinstance(e.get('id'), str) else e.get('id', {}).get('elementId', str(e.get('id')))
                 name_to_id[e['entity_name']] = entity_id
         
-        # Parse with Pydantic (using entity_name IDs as LLM uses those)
-        batch_result = parse_with_pydantic(
-            response,
-            InferredRelationshipBatch,
-            context="Orphan Batch",
-            allow_partial=False
-        )
+        # RESILIENT PARSING: Parse items individually, keep valid ones, skip invalid
+        # This prevents 1 malformed item from rejecting 24 valid relationships
+        try:
+            raw_json = extract_json_from_response(response, allow_array=True)
+        except ValueError as e:
+            logger.error(f"    ❌ Orphan Batch: Failed to extract JSON: {e}")
+            return []
         
-        # Map entity_name IDs (from LLM) back to Neo4j element IDs (for validation/storage)
+        # Normalize to list (handle both array and wrapped formats)
+        if isinstance(raw_json, dict):
+            raw_items = raw_json.get('relationships', raw_json.get('results', raw_json.get('data', [])))
+        else:
+            raw_items = raw_json if isinstance(raw_json, list) else []
+        
+        # Parse each relationship individually - skip invalid, keep valid
+        valid_count = 0
+        invalid_count = 0
         mapped_rels = []
-        for rel in batch_result.relationships:
+        
+        for i, item in enumerate(raw_items):
+            try:
+                rel = InferredRelationship.model_validate(item)
+                valid_count += 1
+            except ValidationError as e:
+                invalid_count += 1
+                # Log first 3 invalid items for debugging, summarize rest
+                if invalid_count <= 3:
+                    logger.warning(f"    ⚠️ Orphan item {i}: Validation failed - {e.errors()[0]['msg']}")
+                continue
             source_name = rel.source_id
             target_name = rel.target_id
             
@@ -705,6 +723,12 @@ If no relationships found, return []."""
                     f"    ⚠️ Orphan Batch: LLM hallucinated entity name - "
                     f"source: '{source_name}', target: '{target_name}'. Skipping."
                 )
+        
+        # Summary logging for resilient parsing
+        if invalid_count > 3:
+            logger.warning(f"    ⚠️ Orphan Batch: {invalid_count} total invalid items skipped (showing first 3)")
+        if invalid_count > 0 and valid_count > 0:
+            logger.info(f"    → Orphan Batch: Kept {valid_count}/{valid_count + invalid_count} valid relationships (resilient parsing)")
         
         return mapped_rels
     except Exception as e:

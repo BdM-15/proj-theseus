@@ -114,8 +114,8 @@ async def initialize_raganything():
         enable_equation_processing=enable_equation,
     )
     
-    # Define LLM function (xAI Grok wrapper)
-    async def llm_model_func(prompt, system_prompt=None, history_messages=[], **kwargs):
+    # Define base LLM function (xAI Grok wrapper)
+    async def base_llm_model_func(prompt, system_prompt=None, history_messages=[], **kwargs):
         return await openai_complete_if_cache(
             os.getenv("LLM_MODEL", "grok-4-fast-reasoning"),
             prompt,
@@ -125,6 +125,18 @@ async def initialize_raganything():
             base_url=xai_base_url,
             **kwargs,
         )
+    
+    # Wrap with Pydantic extraction adapter for entity validation
+    # Issue #43: Routes extraction calls through JsonExtractor + Pydantic schema
+    # Non-extraction calls (queries, summaries) pass through to base function
+    use_pydantic_extraction = os.getenv("USE_PYDANTIC_TEXT_EXTRACTION", "true").lower() == "true"
+    if use_pydantic_extraction:
+        from src.extraction.lightrag_llm_adapter import create_extraction_adapter
+        llm_model_func = create_extraction_adapter(base_llm_model_func)
+        logger.info("✅ Pydantic text extraction adapter ENABLED (USE_PYDANTIC_TEXT_EXTRACTION=true)")
+    else:
+        llm_model_func = base_llm_model_func
+        logger.info("⚠️ Pydantic text extraction adapter DISABLED - using LightRAG native extraction")
     
     # Define vision function (multimodal Grok wrapper)
     async def vision_model_func(prompt, system_prompt=None, history_messages=[], image_data=None, messages=None, **kwargs):
@@ -151,7 +163,8 @@ async def initialize_raganything():
                 api_key=xai_api_key, base_url=xai_base_url, **kwargs
             )
         else:
-            return await llm_model_func(prompt, system_prompt, history_messages, **kwargs)
+            # Use base function directly for non-multimodal calls (no adapter needed)
+            return await base_llm_model_func(prompt, system_prompt, history_messages, **kwargs)
     
     # Define embedding function with safety truncation (8K chunks can slightly exceed 8192 due to overlap)
     async def safe_embed_func(texts):
@@ -195,6 +208,12 @@ async def initialize_raganything():
     # IMPORTANT: LightRAG reads chunk_token_size from environment at import time
     # Don't override via lightrag_kwargs - let it use CHUNK_SIZE from .env
     
+    # Parallelization: Controls concurrent chunk extraction within extract_entities()
+    # LightRAG uses asyncio.Semaphore(llm_model_max_async) in operate.py extract_entities()
+    # RAGAnything uses asyncio.Semaphore(max_parallel_insert) for multimodal item processing
+    # MUST be passed via lightrag_kwargs - setting global_args doesn't propagate to RAGAnything!
+    max_async = int(os.getenv("MAX_ASYNC", "16"))  # Default 16 workers for parallel extraction
+    
     # Build lightrag_kwargs with Neo4j configuration if enabled
     lightrag_kwargs = {
         "addon_params": {
@@ -202,6 +221,13 @@ async def initialize_raganything():
             "entity_extraction_system_prompt": custom_entity_extraction_prompt,
             # NOTE: entity_extraction_examples is handled at module load time via PROMPTS override
         },
+        # CRITICAL: Parallelization settings - must be in lightrag_kwargs to reach LightRAG instance
+        # - llm_model_max_async: concurrent LLM calls for text chunk entity extraction
+        # - max_parallel_insert: concurrent multimodal item processing (images, tables, equations)
+        # - embedding_func_max_async: concurrent embedding calls
+        "llm_model_max_async": max_async,
+        "max_parallel_insert": max_async,
+        "embedding_func_max_async": max_async,
         # Chunking configuration comes from environment variables:
         # - CHUNK_SIZE controls chunk_token_size (default: 8192)
         # - CHUNK_OVERLAP_SIZE controls chunk_overlap_token_size (default: 1200)
@@ -257,6 +283,7 @@ async def initialize_raganything():
     logger.info(f"{CYAN}{'═' * 80}{RESET}")
     logger.info(f"{GREEN}Entity Types:{RESET} {BOLD}{len(entity_types)}{RESET} specialized (organization, requirement, evaluation_factor, etc.)")
     logger.info(f"{GREEN}Parser:{RESET} {BOLD}MinerU 2.6.4{RESET} | Device: {BOLD}{GREEN if device == 'cuda' else YELLOW}{device.upper()}{RESET} | Method: {parse_method.upper()}")
+    logger.info(f"{GREEN}Parallelization:{RESET} {BOLD}{GREEN}{max_async}{RESET} concurrent (text chunks + multimodal items)")
     logger.info(f"{GREEN}Multimodal:{RESET} Images, Tables, Equations {BOLD}{GREEN}ENABLED{RESET}")
     logger.info(f"{GREEN}Advanced:{RESET} Formula Recognition, Table Merge {BOLD}{GREEN}ENABLED{RESET} | Timeout: {YELLOW}600s{RESET}")
     logger.info(f"{CYAN}{'═' * 80}{RESET}")

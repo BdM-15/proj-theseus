@@ -136,94 +136,10 @@ class DocumentQueueTracker:
 # Global queue tracker instance
 _queue_tracker = DocumentQueueTracker()
 
-
-async def extract_with_semaphore(
-    chunk_text: str,
-    chunk_idx: int,
-    json_extractor,
-    semaphore: asyncio.Semaphore,
-    total_chunks: int
-):
-    """
-    Extract entities/relationships from a single chunk with concurrency control.
-    
-    Issue #17: Parallel chunk processing for 87% extraction time reduction.
-    Uses semaphore to limit concurrent LLM calls (respects API rate limits).
-    """
-    from src.ontology.schema import ExtractionResult
-    
-    async with semaphore:
-        chunk_id = f"chunk-{chunk_idx+1}"
-        logger.info(f"   Processing chunk {chunk_idx+1}/{total_chunks} ({len(chunk_text):,} chars)...")
-        try:
-            return await json_extractor.extract(chunk_text, chunk_id=chunk_id)
-        except Exception as e:
-            logger.error(f"Chunk {chunk_idx+1} extraction failed: {e}")
-            # Return empty result to continue pipeline (graceful degradation)
-            return ExtractionResult(entities=[], relationships=[])
-
-
-async def extract_multimodal_with_semaphore(
-    modal_item: dict,
-    item_idx: int,
-    json_extractor,
-    semaphore: asyncio.Semaphore,
-    total_items: int
-):
-    """
-    Extract entities/relationships from a single table/image/equation with concurrency control.
-    
-    Parallel multimodal processing (similar to text chunk extraction).
-    Processes tables, images, equations concurrently to reduce extraction time.
-    """
-    from src.ontology.schema import ExtractionResult
-    
-    async with semaphore:
-        content_type = modal_item.get('type', 'unknown')
-        page_idx = modal_item.get('page_idx', 0)
-        chunk_id = f"govcon_{content_type}_p{page_idx}"
-        
-        logger.info(f"   Processing {content_type} {item_idx+1}/{total_items} (page {page_idx}) [{chunk_id}]...")
-        
-        try:
-            # Extract textualized content (MinerU already did vision work)
-            if content_type == "table":
-                text_content = modal_item.get("table_body", "")
-                caption = ", ".join(modal_item.get("table_caption", []))
-            elif content_type == "image":
-                text_content = modal_item.get("text", "")
-                caption = ", ".join(modal_item.get("image_caption", []))
-            elif content_type == "equation":
-                text_content = modal_item.get("latex", "")
-                caption = modal_item.get("equation_caption", "")
-            else:
-                text_content = str(modal_item)
-                caption = ""
-            
-            # FIX (Issue #39): Pass raw text_content directly to extract()
-            # DO NOT use inline prompts - the full 121K system prompt in JsonExtractor
-            # handles all 18 entity types and relationship inference rules.
-            # Previous bug: extract_from_text(ontology_prompt) used degraded 30-line inline prompt
-            # with only 5 categories, bypassing the established ontology architecture.
-            
-            # Prepend caption for context if available
-            if caption:
-                extraction_text = f"{content_type.title()}: {caption}\n\n{text_content}"
-            else:
-                extraction_text = text_content
-            
-            result = await json_extractor.extract(
-                text=extraction_text,
-                chunk_id=chunk_id
-            )
-            
-            logger.info(f"   ✅ [{chunk_id}] Extracted {len(result.entities)} entities from {content_type}")
-            return result, modal_item
-            
-        except Exception as e:
-            logger.error(f"{content_type.title()} {item_idx+1} extraction failed: {e}")
-            # Return empty result to continue pipeline (graceful degradation)
-            return ExtractionResult(entities=[], relationships=[]), modal_item
+# NOTE: extract_with_semaphore() and extract_multimodal_with_semaphore() were removed
+# in Issue #42. The lightrag_llm_adapter now intercepts ALL LightRAG extraction calls,
+# providing unified Pydantic validation with the full 121K ontology prompt.
+# RAG-Anything's native parallelization handles concurrency.
 
 
 async def process_document_with_semantic_inference(
@@ -290,293 +206,46 @@ async def process_document_with_semantic_inference(
         if discarded_count > 0:
             logger.info(f"🚫 Filtered {discarded_count} discarded content blocks (keeping {filtered_count}/{original_count} legitimate items)")
         
-        # Check if Neo4j storage is enabled - use custom ontology extraction BEFORE standard processing
-        import os
-        if os.getenv("GRAPH_STORAGE") == "Neo4JStorage":
-            logger.info("📊 Neo4j storage detected - using custom ontology extraction (bypassing LightRAG)")
-            
-            # Extract text from content_list for ontology processing
-            # MinerU provides: {'type': 'text'/'table'/'image', 'text': '...', 'page_idx': N}
-            from src.extraction.json_extractor import JsonExtractor
-            from src.processors import GovconMultimodalProcessor
-            from src.processors.govcon_kg_processor import GovconKGProcessor
-            from src.deduplication.entity_deduplicator import deduplicate_entities, log_deduplication_stats
-            
-            # Initialize processor and extractors
-            kg_processor = GovconKGProcessor()
-            json_extractor = JsonExtractor()
-            
-            # PHASE 1: TEXT EXTRACTION (chunk text blocks)
-            text_chunks = []
-            for item in filtered_content:
-                if item.get('type') == 'text':
-                    content_text = item.get('text', '')
-                    if content_text and content_text.strip():
-                        text_chunks.append(content_text)
-            
-            # FIX: Spreadsheets with only tables may have zero text content - allow empty text
-            # RAG-Anything's multimodal processors will handle table extraction
-            if not text_chunks:
-                logger.warning(f"⚠️ No text content found in {file_name} - likely spreadsheet with only tables")
-                logger.info("📊 Skipping text extraction, proceeding with multimodal processing only")
-                
-                # Count multimodal items to verify document has extractable content
-                multimodal_count = sum(1 for item in filtered_content if item.get('type') in ['table', 'image'])
-                if multimodal_count == 0:
-                    logger.error(f"❌ Document {file_name} has no extractable content (no text, tables, or images)")
-                    return {"error": "No extractable content", "relationships_inferred": 0}
-                
-                logger.info(f"✅ Found {multimodal_count} multimodal items (tables/images) to process")
-                
-                # Skip text processing, go directly to multimodal
-                full_text = ""
-                chunked_texts = []  # Empty list - no text chunks to process
-            else:
-                full_text = "\n\n".join(text_chunks)
-                logger.info(f"📝 TEXT: Extracted {len(text_chunks)} text blocks ({len(full_text)} chars total)")
-                
-                # Use LightRAG's chunking strategy for consistent extraction
-                import tiktoken
-                chunk_size = int(os.getenv("CHUNK_SIZE", "8192"))
-                chunk_overlap = int(os.getenv("CHUNK_OVERLAP_TOKEN_SIZE", "1024"))
-                
-                tokenizer = tiktoken.get_encoding("cl100k_base")
-                tokens = tokenizer.encode(full_text)
-                
-                # Create overlapping chunks
-                chunked_texts = []
-                start = 0
-                while start < len(tokens):
-                    end = min(start + chunk_size, len(tokens))
-                    chunk_tokens = tokens[start:end]
-                    chunk_text = tokenizer.decode(chunk_tokens)
-                    chunked_texts.append(chunk_text)
-                    start += (chunk_size - chunk_overlap)  # Overlap for context
-                
-                logger.info(f"🔪 Chunked text into {len(chunked_texts)} chunks ({chunk_size} tokens, {chunk_overlap} overlap)")
+        # ============================================================================
+        # RAG-ANYTHING PIPELINE WITH GOVCON ONTOLOGY
+        # ============================================================================
+        # Issue #42: RAG-Anything handles ALL content with unified extraction
+        # - Text → LightRAG's text pipeline → lightrag_llm_adapter (Pydantic + ontology)
+        # - Multimodal → RAG-Anything default processors → same adapter path
+        # 
+        # The lightrag_llm_adapter intercepts ALL extraction calls, ensuring:
+        # - Full 121K ontology prompt for all content types
+        # - Pydantic validation via JsonExtractor
+        # - No duplicate extraction (removed GovconMultimodalProcessor)
+        # ============================================================================
         
-        # PHASE 2: PARALLEL EXTRACTION (Text + Multimodal)
-        logger.info("🚀 Running parallel extraction with custom ontology...")
+        import os
         
         try:
-            max_parallel = int(os.getenv("MAX_ASYNC", "8"))
-            semaphore = asyncio.Semaphore(max_parallel)
+            # Count content types for logging
+            text_count = sum(1 for item in filtered_content if item.get('type') == 'text')
+            table_count = sum(1 for item in filtered_content if item.get('type') == 'table')
+            image_count = sum(1 for item in filtered_content if item.get('type') == 'image')
+            equation_count = sum(1 for item in filtered_content if item.get('type') == 'equation')
             
-            # ============================================================================
-            # PHASE 2A: TEXT CHUNK EXTRACTION
-            # ============================================================================
-            logger.info(f"⚡ Extracting from {len(chunked_texts)} text chunks in parallel (max concurrency: {max_parallel})...")
+            logger.info(f"📊 Content breakdown: {text_count} text, {table_count} tables, {image_count} images, {equation_count} equations")
             
-            text_chunk_data = []  # Will store (chunk_id, entities, rels) tuples
+            # RAG-Anything handles ALL content in one call:
+            # - Text items → LightRAG's ainsert() → lightrag_llm_adapter → Pydantic extraction
+            # - Multimodal items → default processors → lightrag_llm_adapter → same path
+            # - Deduplication → LightRAG's merge_nodes_and_edges() (Stage 6)
+            # 
+            # All extraction goes through lightrag_llm_adapter which uses the full 121K
+            # ontology prompt, eliminating the need for custom multimodal processors.
+            logger.info(f"🚀 Processing {len(filtered_content)} content items through RAG-Anything pipeline...")
             
-            # Create parallel tasks for all text chunks
-            tasks = [
-                extract_with_semaphore(chunk, i, json_extractor, semaphore, len(chunked_texts))
-                for i, chunk in enumerate(chunked_texts)
-            ]
-            
-            # Execute in parallel, collecting results
-            results = await asyncio.gather(*tasks)
-            
-            # Convert Pydantic results to dicts for processor
-            for i, result in enumerate(results):
-                chunk_id = f"text_chunk_{i}"
-                
-                # Convert entities to dicts
-                entities_dicts = [
-                    {
-                        "entity_name": entity.entity_name,
-                        "entity_type": entity.entity_type,
-                        "description": entity.entity_name,
-                        "source_id": doc_id,
-                        "file_path": file_name
-                    }
-                    for entity in result.entities
-                ]
-                
-                # Convert relationships to dicts
-                rels_dicts = [
-                    {
-                        "src_id": rel.source_entity.entity_name,
-                        "tgt_id": rel.target_entity.entity_name,
-                        "description": rel.relationship_type,
-                        "keywords": rel.relationship_type,
-                        "weight": 1.0,
-                        "source_id": doc_id
-                    }
-                    for rel in result.relationships
-                ]
-                
-                text_chunk_data.append((chunk_id, entities_dicts, rels_dicts))
-            
-            logger.info(f"✅ TEXT EXTRACTION: Collected {len(text_chunk_data)} chunks for processing")
-            
-            # ============================================================================
-            # PHASE 2B: MULTIMODAL EXTRACTION
-            # ============================================================================
-            multimodal_items = [item for item in filtered_content if item.get('type') in ['table', 'image', 'equation']]
-            multimodal_chunk_data = []  # Will store (item_id, entities, rels) tuples
-            
-            if multimodal_items:
-                logger.info(f"⚡ Extracting from {len(multimodal_items)} multimodal items in parallel (max concurrency: {max_parallel})...")
-                
-                # Create parallel tasks for all multimodal items
-                tasks = [
-                    extract_multimodal_with_semaphore(item, i, json_extractor, semaphore, len(multimodal_items))
-                    for i, item in enumerate(multimodal_items)
-                ]
-                
-                # Execute in parallel, collecting results
-                multimodal_results = await asyncio.gather(*tasks)
-                
-                # Convert Pydantic results to dicts for processor
-                for i, (extraction_result, modal_item) in enumerate(multimodal_results):
-                    content_type = modal_item.get('type', 'unknown')
-                    page_idx = modal_item.get('page_idx', i)
-                    item_id = f"multimodal_{content_type}_p{page_idx}"
-                    
-                    # Convert entities to dicts
-                    entities_dicts = [
-                        {
-                            "entity_name": entity.entity_name,
-                            "entity_type": entity.entity_type,
-                            "description": entity.entity_name,
-                            "source_id": doc_id,
-                            "file_path": file_name
-                        }
-                        for entity in extraction_result.entities
-                        if entity.entity_name and entity.entity_name.strip()
-                    ]
-                    
-                    # Convert relationships to dicts
-                    rels_dicts = [
-                        {
-                            "src_id": rel.source_entity.entity_name,
-                            "tgt_id": rel.target_entity.entity_name,
-                            "description": rel.relationship_type,
-                            "keywords": rel.relationship_type,
-                            "weight": 1.0,
-                            "source_id": doc_id
-                        }
-                        for rel in extraction_result.relationships
-                        if (rel.source_entity.entity_name and rel.source_entity.entity_name.strip() and
-                            rel.target_entity.entity_name and rel.target_entity.entity_name.strip())
-                    ]
-                    
-                    multimodal_chunk_data.append((item_id, entities_dicts, rels_dicts))
-                
-                logger.info(f"✅ MULTIMODAL EXTRACTION: Collected {len(multimodal_chunk_data)} items for processing")
-            
-            # ============================================================================
-            # PHASE 3-5: USE GOVCON KG PROCESSOR (Extract → Merge → Finalize)
-            # ============================================================================
-            # This replaces all the manual deduplication and custom_kg building
-            processed_kg = kg_processor.process_document(
-                text_chunks=text_chunk_data,
-                multimodal_items=multimodal_chunk_data if multimodal_chunk_data else None
+            await rag_instance.insert_content_list(
+                content_list=filtered_content,
+                file_path=file_name,  # Clean filename for citations
+                doc_id=doc_id
             )
             
-            # ============================================================================
-            # BUILD CUSTOM_KG FOR LIGHTRAG INSERTION
-            # ============================================================================
-            # Add chunks (needed for LightRAG's vector DB)
-            custom_kg = {
-                "chunks": [],
-                "entities": processed_kg["entities"],
-                "relationships": processed_kg["relationships"]
-            }
-            
-            # Add text chunks
-            for i, chunk_text in enumerate(chunked_texts):
-                custom_kg["chunks"].append({
-                    "content": chunk_text,
-                    "source_id": doc_id,
-                    "file_path": file_name,
-                    "chunk_order_index": i
-                })
-            
-            # Add multimodal chunks
-            if multimodal_items:
-                for item in multimodal_items:
-                    content_type = item.get('type', 'unknown')
-                    page_idx = item.get('page_idx', 0)
-                    
-                    # Extract raw content for chunk storage
-                    if content_type == "table":
-                        raw_content = item.get("table_body", "")
-                    elif content_type == "image":
-                        raw_content = item.get("text", "")
-                    elif content_type == "equation":
-                        raw_content = item.get("latex", "")
-                    else:
-                        raw_content = str(item)
-                    
-                    # Only add chunk if content is non-empty (OpenAI embeddings reject empty strings)
-                    if raw_content and raw_content.strip():
-                        custom_kg["chunks"].append({
-                            "content": raw_content,
-                            "source_id": doc_id,
-                            "file_path": file_name,
-                            "chunk_order_index": len(custom_kg["chunks"]),
-                            "modal_type": content_type,
-                            "page_idx": page_idx
-                        })
-            
-            total_entities = len(custom_kg["entities"])
-            total_rels = len(custom_kg["relationships"])
-            
-            logger.info(f"💾 Phase 5B: Inserting deduplicated ontology ({total_entities} entities, {total_rels} relationships)...")            # Track entities before insertion for merge detection
-            entity_names_before = set()
-            node_count_before = 0
-            try:
-                # Access Neo4j/NetworkX storage (not VDB - that's for embeddings)
-                kg_storage = rag_instance.lightrag.chunk_entity_relation_graph
-                if hasattr(kg_storage, 'graph') and hasattr(kg_storage.graph, 'nodes'):
-                    # NetworkX/Neo4j stores nodes with entity_name attribute
-                    node_count_before = kg_storage.graph.number_of_nodes()
-                    entity_names_before = {
-                        data.get('entity_name') 
-                        for node, data in kg_storage.graph.nodes(data=True)
-                        if data.get('entity_name')
-                    }
-                    logger.info(f"   📊 Graph state BEFORE insertion: {node_count_before} nodes, {len(entity_names_before)} unique entity_names")
-            except Exception as e:
-                logger.debug(f"Could not capture pre-insertion entities: {e}")
-            
-            await rag_instance.lightrag.ainsert_custom_kg(custom_kg, full_doc_id=doc_id)
-            
-            # CHECK IMMEDIATELY AFTER INSERTION (before finalize)
-            try:
-                kg_storage = rag_instance.lightrag.chunk_entity_relation_graph
-                if hasattr(kg_storage, 'graph') and hasattr(kg_storage.graph, 'nodes'):
-                    node_count_after_insert = kg_storage.graph.number_of_nodes()
-                    entity_names_after_insert = {
-                        data.get('entity_name')
-                        for node, data in kg_storage.graph.nodes(data=True)
-                        if data.get('entity_name')
-                    }
-                    nodes_added = node_count_after_insert - node_count_before
-                    unique_names_added = len(entity_names_after_insert) - len(entity_names_before)
-                    
-                    logger.info(f"✅ Custom ontology inserted (text + multimodal)")
-                    logger.info(f"   📊 Graph state AFTER insertion: {node_count_after_insert} nodes (+{nodes_added}), {len(entity_names_after_insert)} unique entity_names (+{unique_names_added})")
-                    
-                    # Calculate and show merge details like LightRAG does
-                    duplicates_merged_during_upsert = total_entities - unique_names_added
-                    if duplicates_merged_during_upsert > 0:
-                        logger.info(f"   🔀 LightRAG upsert deduplication: {total_entities} attempted → {unique_names_added} inserted = {duplicates_merged_during_upsert} duplicates merged")
-                    else:
-                        logger.info(f"   ℹ️  No duplicates merged (all {total_entities} entity names were unique)")
-            except Exception as e:
-                logger.info("✅ Custom ontology inserted (text + multimodal)")
-                logger.debug(f"Could not check post-insertion state: {e}")
-            
-            # NOTE: LightRAG's ainsert_custom_kg() handles deduplication during insertion via upsert.
-            # DO NOT call finalize_storages() here - it's a SHUTDOWN function that closes the Neo4j
-            # driver, causing subsequent documents in a batch to fail with '_driver is None'.
-            # See Issue #35 for details.
-            
-            logger.info("✅ Complete knowledge graph inserted with deduplication")
+            logger.info("✅ RAG-Anything pipeline complete (unified extraction via lightrag_llm_adapter)")
             
             # Log queue status
             stats = await _queue_tracker.get_stats()
@@ -587,13 +256,18 @@ async def process_document_with_semantic_inference(
                 logger.info(f"⏭️  Document added to batch | Queue: {stats['processing']} processing, {stats['completed']} completed")
             
             return {
-                "entities_extracted": total_entities,
-                "relationships_extracted": total_rels,
+                "status": "success",
+                "content_processed": {
+                    "text": text_count,
+                    "tables": table_count,
+                    "images": image_count,
+                    "equations": equation_count
+                },
                 "message": "✅ Document processed. Enhancement will run automatically when batch completes."
             }
             
         except Exception as e:
-            logger.error(f"❌ Custom ontology extraction failed: {e}")
+            logger.error(f"❌ RAG-Anything pipeline failed: {e}")
             import traceback
             logger.error(traceback.format_exc())
             return {"error": str(e)}

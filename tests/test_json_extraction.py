@@ -70,9 +70,6 @@ async def test_extraction():
                 print(f"   Importance: {entity.importance}")
             elif entity.entity_type == "submission_instruction" and hasattr(entity, 'page_limit'):
                 print(f"   Page Limit: {entity.page_limit}")
-            # source_text is the verbatim extraction (no description field)
-            if entity.source_text:
-                print(f"   Source Text: {entity.source_text[:100]}...")
             print("")
             
         print("\n--- Relationships ---")
