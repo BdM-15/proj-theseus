@@ -1949,3 +1949,244 @@ REASONING_LLM_NAME=grok-4-1-fast-reasoning
 - Query quality ≥95% of baseline
 
 **If test fails:** Fall back to unified `grok-4-1-fast-reasoning` for both
+
+---
+
+## Branch 041: Surgical Fix Attempt (December 13, 2025)
+
+### What Was Attempted
+
+Branch 041 (`041-surgical-fixes-descriptions`) attempted to fix the root cause issues without a full reset:
+
+**Commit**: `c34a144` - "fix: Restore entity descriptions and upgrade to Grok 4-1"
+
+### Changes Made
+
+| File | Change | Lines |
+|------|--------|-------|
+| `src/ontology/schema.py` | Added `description` field back to BaseEntity | +4 |
+| `prompts/extraction/entity_extraction_prompt.md` | Changed "NO DESCRIPTIONS" → "DESCRIPTIONS ARE REQUIRED" | ~30 |
+| `src/extraction/lightrag_llm_adapter.py` | Updated `_build_entity_description` to use actual description | ~62 |
+| `.env.example` | CHUNK_SIZE=4096, MAX_ASYNC=24, Grok 4-1 models | ~26 |
+| `src/inference/description_enrichment.py` | **DELETED** (916 lines of compensation code) | **-916** |
+| `src/inference/semantic_post_processor.py` | Removed Steps 4a/4b (description enrichment calls) | ~-29 |
+
+**Net change**: 78 additions, 989 deletions = **-911 lines**
+
+### Configuration Changes
+
+```bash
+# Model upgrade to Grok 4-1 with split extraction/query
+EXTRACTION_LLM_NAME=grok-4-1-fast-non-reasoning  # Classification task
+REASONING_LLM_NAME=grok-4-1-fast-reasoning       # Synthesis task
+
+# Smaller chunks to accommodate descriptions
+CHUNK_SIZE=4096           # Was 8192
+CHUNK_OVERLAP_SIZE=600    # Was 1200
+
+# More workers to compensate for 2x chunks
+MAX_ASYNC=24              # Was 16
+EMBEDDING_FUNC_MAX_ASYNC=24
+```
+
+### Rationale
+
+The surgical fix approach was based on:
+
+1. **Root cause identified**: Branch 023 removed `description` field, causing all downstream issues
+2. **Compensation code**: 916 lines of `description_enrichment.py` existed only to work around missing descriptions
+3. **Architecture is sound**: Instructor + Pydantic + xAI SDK provide good foundation
+4. **Grok 4-1 improvements**: Optimized for structured output, less hallucination
+
+### Why This May Still Not Be Enough
+
+Despite the surgical fixes, concerns remain:
+
+1. **Accumulated Technical Debt**: 20 branches of changes have introduced:
+   - Query override complexity (`ontology_context.py`, `analysis_override.py`, `compliance_override.py`)
+   - 8 semantic post-processing algorithms (2054 lines)
+   - Custom adapters and interceptors
+   - Multiple layers of abstraction
+
+2. **Unknown Interactions**: Changes across branches may have subtle interactions that cause:
+   - Over-extraction (1,100+ entities vs 368 baseline)
+   - Ghost relationships (3,000+ vs 154 baseline)
+   - Generic query responses
+
+3. **Testing Burden**: Validating surgical fixes requires:
+   - Processing same RFP as Branch 022
+   - Comparing entity counts, types, relationships
+   - Running identical queries
+   - Subjective quality assessment
+
+4. **Risk of Partial Fix**: If surgical fixes don't fully resolve quality issues, we're left debugging a complex codebase rather than a clean baseline.
+
+---
+
+## RECOMMENDATION: Reset to Branch 021
+
+### Why Reset is Preferred
+
+| Factor | Surgical Fix (Branch 041) | Reset to Branch 021 |
+|--------|--------------------------|---------------------|
+| **Complexity** | High - working within accumulated debt | Low - clean slate |
+| **Risk** | Unknown interactions may persist | Known good state |
+| **Testing** | Must validate against complex codebase | Simple baseline validation |
+| **Time to Quality** | Unknown - may need more fixes | Predictable - proven 98%+ |
+| **Maintainability** | Complex codebase with patches | Simple, understandable code |
+
+### What Branch 021 Provides
+
+Branch 021 (or 022 "Perfect Run") represents:
+
+- **Proven quality**: 98%+ workload query accuracy
+- **Simple architecture**: LightRAG defaults with minimal customization
+- **Known configuration**: Documented settings that work
+- **Clean codebase**: No accumulated patches and workarounds
+
+### Reset Strategy
+
+#### Phase 1: Clean Reset (Week 1)
+
+```bash
+# Create new branch from Branch 021/022
+git checkout 022  # or 021
+git checkout -b 050-clean-reset
+
+# Verify baseline still works
+# Process test RFP
+# Validate 98%+ quality
+```
+
+#### Phase 2: Selective Reintroduction (Week 2-3)
+
+Only add back **proven valuable** components:
+
+| Component | Value | Reintroduce? |
+|-----------|-------|--------------|
+| 18-entity ontology | Domain expertise | ✅ YES |
+| Pydantic schema validation | Type safety | ✅ YES (graceful) |
+| xAI SDK integration | Reliability | ✅ YES |
+| BOE workload enrichment | Domain value | ✅ YES |
+| Schema-driven algorithms | Robustness | ✅ YES (1, 2, 5 only) |
+| CDRL pattern matching | Standardized formats | ✅ YES (Algorithm 7) |
+| Query overrides | Complexity | ❌ NO - use WebUI |
+| Description enrichment | Compensation | ❌ NO - fix upstream |
+| Custom parallelization | Redundant | ❌ NO - use native |
+| 8 post-processing algorithms | Over-engineering | ⚠️ MAYBE - test without first |
+
+#### Phase 3: Grok 4-1 Integration (Week 3-4)
+
+Once baseline is stable:
+
+```bash
+# Test Grok 4-1 models
+EXTRACTION_LLM_NAME=grok-4-1-fast-non-reasoning
+REASONING_LLM_NAME=grok-4-1-fast-reasoning
+
+# Validate quality matches baseline
+# If quality drops, fall back to unified reasoning
+```
+
+### What to Preserve (Copy from Main)
+
+Before reset, extract these files for later reintegration:
+
+```
+# Valuable domain knowledge
+prompts/extraction/entity_extraction_prompt.md  # The 121K ontology prompt
+prompts/extraction/entity_detection_rules.md    # Detection rules
+src/ontology/schema.py                          # 18 entity types + Pydantic models
+
+# Valuable algorithms (after testing)
+src/inference/schema_prompts.py                 # Schema-driven LLM guidance
+src/inference/workload_enrichment.py            # BOE categorization
+
+# Infrastructure (if needed)
+src/extraction/json_extractor.py                # Instructor integration
+```
+
+### What NOT to Bring Back
+
+```
+# Compensation code
+src/inference/description_enrichment.py         # DELETED in Branch 041
+
+# Over-engineering
+src/query/ontology_context.py                   # Use LightRAG defaults
+src/query/analysis_override.py                  # Use WebUI configuration
+src/query/compliance_override.py                # Use WebUI configuration
+
+# Redundant code
+Custom parallelization functions                # Use native library settings
+GovconKGProcessor                               # Use RAG-Anything pipeline
+```
+
+---
+
+## Final Assessment
+
+### The Journey (Branches 021 → 041)
+
+```
+Branch 021/022: Perfect Run (98%+ quality)
+    ↓
+Branch 023: Removed descriptions (START OF PROBLEMS)
+    ↓
+Branches 024-040: Accumulated fixes, workarounds, compensation
+    ↓
+Branch 041: Surgical fix attempt (restore descriptions)
+    ↓
+Current: Uncertain if surgical fix is sufficient
+```
+
+### The Core Lesson
+
+> **The system was ALREADY WORKING in Branch 021/022.**
+> 
+> Every change after that was either:
+> 1. A genuine improvement (rare)
+> 2. A fix for a problem we created (common)
+> 3. Over-engineering that added complexity (common)
+>
+> The cleanest path forward is to return to the known-good state and selectively add only proven improvements.
+
+### Decision Point
+
+| Option | Action | Risk | Recommendation |
+|--------|--------|------|----------------|
+| **A: Test Branch 041** | Process RFP, compare to baseline | Medium - may still have issues | Try first if time permits |
+| **B: Reset to 021/022** | Clean slate, reintroduce selectively | Low - proven baseline | **RECOMMENDED** if quality is priority |
+| **C: Continue on Main** | Debug current codebase | High - unknown interactions | Not recommended |
+
+### If Choosing Reset
+
+```bash
+# Step 1: Preserve valuable files
+mkdir -p /tmp/preserve
+cp prompts/extraction/*.md /tmp/preserve/
+cp src/ontology/schema.py /tmp/preserve/
+cp src/inference/workload_enrichment.py /tmp/preserve/
+
+# Step 2: Reset
+git checkout 022  # Perfect Run baseline
+git checkout -b 050-clean-reset
+
+# Step 3: Validate baseline
+# Process test RFP
+# Confirm 98%+ quality
+
+# Step 4: Selectively reintegrate
+# One component at a time
+# Test after each addition
+```
+
+---
+
+**Document Status**: Updated December 13, 2025  
+**Branch 041 Status**: Pushed to origin, awaiting testing  
+**Recommendation**: Consider reset to Branch 021/022 for guaranteed quality baseline
+
+---
+
+*"Sometimes the best code is the code you delete."*
