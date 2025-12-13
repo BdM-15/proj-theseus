@@ -71,12 +71,15 @@ def apply_pain_points_override(param: QueryParam, query: str) -> Tuple[QueryPara
     param.chunk_top_k = max(getattr(param, "chunk_top_k", 0) or 0, 120)
     param.top_k = max(getattr(param, "top_k", 0) or 0, 80)
 
-    # More room for synthesis (quality > brevity).
-    param.max_total_tokens = max(getattr(param, "max_total_tokens", 0) or 0, 70000)
+    # FIXED: Increased to 100K to leverage Grok-4's 2M context. Previous 70K cap
+    # was too conservative and dropped granular workload/staffing details.
+    param.max_total_tokens = max(getattr(param, "max_total_tokens", 0) or 0, 100000)
 
-    # Keep some KG context (pain points benefit from evaluation factor structure), but don't let it dominate.
-    param.max_entity_tokens = min(getattr(param, "max_entity_tokens", 6000) or 6000, 4500)
-    param.max_relation_tokens = min(getattr(param, "max_relation_tokens", 8000) or 8000, 6000)
+    # FIXED: Previously capped KG tokens at 4500/6000 which dropped granular workload details.
+    # Pain points analysis benefits from BOTH evaluation factor structure AND workload details.
+    # With Grok-4's 2M context, we can afford generous KG context.
+    param.max_entity_tokens = max(getattr(param, "max_entity_tokens", 6000) or 6000, 15000)
+    param.max_relation_tokens = max(getattr(param, "max_relation_tokens", 8000) or 8000, 20000)
 
     param.response_type = "Markdown (Detailed)"
 
@@ -126,14 +129,15 @@ def apply_evaluation_factors_override(param: QueryParam, query: str) -> Tuple[Qu
     param.enable_rerank = False
     param.mode = "mix" if param.mode != "bypass" else "mix"
 
-    # Pull more evidence than defaults; still not as huge as compliance.
+    # Pull more evidence than defaults. With Grok-4's 2M context, we can afford generous budgets.
     param.chunk_top_k = max(getattr(param, "chunk_top_k", 0) or 0, 120)
     param.top_k = max(getattr(param, "top_k", 0) or 0, 80)
-    param.max_total_tokens = max(getattr(param, "max_total_tokens", 0) or 0, 70000)
+    param.max_total_tokens = max(getattr(param, "max_total_tokens", 0) or 0, 100000)
 
-    # Keep KG structure; evaluation factors usually live in a smaller slice of KG.
-    param.max_entity_tokens = min(getattr(param, "max_entity_tokens", 6000) or 6000, 6000)
-    param.max_relation_tokens = min(getattr(param, "max_relation_tokens", 8000) or 8000, 8000)
+    # FIXED: Keep KG structure without artificial caps. Evaluation factor queries benefit
+    # from full entity context including related requirements, deliverables, and subfactors.
+    param.max_entity_tokens = max(getattr(param, "max_entity_tokens", 6000) or 6000, 15000)
+    param.max_relation_tokens = max(getattr(param, "max_relation_tokens", 8000) or 8000, 20000)
 
     param.response_type = "Markdown Bullet Points"
 

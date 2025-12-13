@@ -144,12 +144,12 @@ def apply_compliance_override(param: QueryParam, query: str) -> Tuple[QueryParam
     param.chunk_top_k = max(getattr(param, "chunk_top_k", 0) or 0, 200)
     param.top_k = max(getattr(param, "top_k", 0) or 0, 120)
 
-    # With description enrichment enabled, entity/relation context can grow large and crowd out the
-    # text chunks that contain exact compliance requirements (page limits, CDs, etc.).
-    # For exhaustive Section L checklists, prioritize chunk evidence over KG summaries.
-    param.max_entity_tokens = min(getattr(param, "max_entity_tokens", 6000) or 6000, 2500)
-    param.max_relation_tokens = min(getattr(param, "max_relation_tokens", 8000) or 8000, 3500)
-    param.max_total_tokens = max(getattr(param, "max_total_tokens", 0) or 0, 60000)
+    # FIXED: Previously reduced KG tokens to 2500/3500 which dropped granular workload details.
+    # With Grok-4's 2M context, we can afford generous KG context alongside chunk evidence.
+    # Use environment defaults (50K) or ensure reasonable minimums, don't cap artificially low.
+    param.max_entity_tokens = max(getattr(param, "max_entity_tokens", 6000) or 6000, 15000)
+    param.max_relation_tokens = max(getattr(param, "max_relation_tokens", 8000) or 8000, 20000)
+    param.max_total_tokens = max(getattr(param, "max_total_tokens", 0) or 0, 100000)
     # Force Markdown-ish bullet behavior (LightRAG rag_response uses this label verbatim).
     param.response_type = "Markdown Bullet Points"
 
