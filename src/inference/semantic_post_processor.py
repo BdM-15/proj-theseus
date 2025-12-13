@@ -1945,27 +1945,10 @@ async def _semantic_post_processor_neo4j(
         if category_distribution:
             logger.info(f"  BOE categories used:   {', '.join([f'{k}:{v}' for k,v in category_distribution.items() if v > 0])}")
 
-        # Step 4a: KV Store Context Enrichment (Issue #46 - pure Python, no LLM)
-        logger.info("\n🔍 Step 4a: Enriching kv_store with context snippets...")
-        from src.inference.description_enrichment import enrich_entity_chunk_context, enrich_entity_descriptions
-        
-        context_stats = enrich_entity_chunk_context(rag_storage_path)
-        context_enriched = context_stats.get("entities_enriched", 0)
-        logger.info(f"  Context snippets added: {context_enriched}")
-        
-        # Step 4b: Entity Description Enrichment (post-processing, bounded)
-        logger.info("\n📝 Step 4b: Enriching entity descriptions (using context snippets)...")
-
-        descriptions_updated = 0
-        desc_stats = await enrich_entity_descriptions(
-            neo4j_io=neo4j_io,
-            rag_storage_path=rag_storage_path,
-            model=llm_model_name,
-            temperature=temperature,
-            max_concurrency=MAX_CONCURRENT_LLM_CALLS,
-        )
-        descriptions_updated = desc_stats.get("entities_updated", 0)
-        logger.info(f"  Descriptions updated:  {descriptions_updated}")
+        # NOTE: Branch 041 removed description enrichment steps (4a, 4b)
+        # Descriptions are now extracted during entity extraction with smaller chunks.
+        # The 916-line description_enrichment.py was deleted as it was compensation
+        # for the upstream bug of removing descriptions from extraction.
         
         # Summary statistics
         processing_time = time.time() - start_time
@@ -1974,8 +1957,6 @@ async def _semantic_post_processor_neo4j(
         logger.info("="*80)
         logger.info(f"  Relationships inferred:  {relationships_inferred}")
         logger.info(f"  Requirements enriched:   {requirements_enriched}")
-        logger.info(f"  Context snippets added:  {context_enriched}")
-        logger.info(f"  Descriptions updated:    {descriptions_updated}")
         logger.info(f"  Processing time:         {processing_time:.2f}s")
         logger.info("="*80)
         
@@ -1989,8 +1970,6 @@ async def _semantic_post_processor_neo4j(
             "status": "success",
             "relationships_inferred": relationships_inferred,
             "requirements_enriched": requirements_enriched,
-            "context_snippets_added": context_enriched,
-            "descriptions_updated": descriptions_updated,
             "enrichment_rate": enrichment_rate,
             "category_distribution": category_distribution,
             "processing_time": processing_time,

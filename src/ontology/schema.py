@@ -95,6 +95,10 @@ EntityType = Literal[
 class BaseEntity(BaseModel):
     entity_name: str = Field(..., description="The canonical name of the entity (Title Case).")
     entity_type: EntityType = Field(..., description="The strict entity type from the government contracting ontology.")
+    description: str = Field(
+        default="",
+        description="Comprehensive semantic description including context, source location, and key details for retrieval."
+    )
 
     @model_validator(mode='before')
     @classmethod
