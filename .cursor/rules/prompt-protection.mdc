@@ -1,0 +1,73 @@
+# GovCon Prompt Protection Rule
+
+## Rule: Never Alter Prompts Without Explicit User Confirmation
+
+**This rule MUST be followed for all code changes in this repository.**
+
+### Protected Prompt Locations
+
+All prompts in the `prompts/` directory contain critical business intelligence:
+
+```
+prompts/
+├── extraction/           # Entity extraction (CRITICAL - affects all data)
+│   ├── entity_extraction_prompt.md    # ~3,189 lines of domain knowledge
+│   ├── entity_detection_rules.md      # Semantic detection rules
+│   └── grok_json_prompt.md            # JSON formatting instructions
+│
+├── relationship_inference/  # Post-processing algorithms
+│   ├── attachment_section_linking.md
+│   ├── clause_clustering.md
+│   ├── deliverable_traceability.md
+│   ├── document_hierarchy.md
+│   ├── evaluation_hierarchy.md
+│   ├── instruction_evaluation_linking.md
+│   ├── orphan_resolution.md
+│   ├── requirement_evaluation.md
+│   ├── semantic_concept_linking.md
+│   ├── sow_deliverable_linking.md
+│   ├── system_prompt.md
+│   └── workload_enrichment.md
+│
+├── query/                # Query-time prompts (reference only)
+│   └── base_user_prompt.md
+│
+└── user_queries/         # Example queries (documentation)
+```
+
+### Forbidden Actions
+
+1. **DO NOT** modify extraction prompts without explicit user approval
+2. **DO NOT** rewrite, refactor, or "improve" prompt content
+3. **DO NOT** change prompt structure or formatting
+4. **DO NOT** add new prompts without discussing with the user
+5. **DO NOT** remove prompts
+6. **DO NOT** modify examples in prompts
+
+### Allowed Actions (Assessment Only)
+
+You MAY:
+- Read and analyze prompts to understand the system
+- Identify potential issues in prompts
+- Recommend non-code fixes (documentation, clarifications)
+- Report findings to the user without making changes
+
+### Why Prompts Are Sacred
+
+These prompts contain:
+- Months of refinement based on real RFP processing
+- Domain expertise in federal contracting (FAR, DFARS, UCF)
+- Shipley methodology capture/proposal patterns
+- Edge case handling developed through iteration
+- Format-specific extraction rules
+
+### If Asked to Modify Prompts
+
+If a user requests prompt changes, respond:
+
+> "The extraction and inference prompts contain refined business intelligence for federal contracting. Before making changes, please confirm:
+> 1. Which specific prompt file needs modification
+> 2. What specific issue you're trying to solve
+> 3. Whether you've tested the current prompts with your data
+> 
+> I can analyze the prompts and recommend changes, but I will not modify them without your explicit approval."

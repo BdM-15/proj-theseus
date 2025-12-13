@@ -31,8 +31,11 @@ from lightrag.api.config import global_args
 from lightrag.api.routers.query_routes import QueryRequest
 from lightrag.base import QueryParam
 
-from src.query.ontology_context import build_query_context
-from src.core.prompt_loader import load_prompt
+# REMOVED: Query-time custom context and prompt loading
+# from src.query.ontology_context import build_query_context
+# from src.core.prompt_loader import load_prompt
+# REASON: Using LightRAG defaults for query processing improves retrieval quality.
+# Domain knowledge is applied at extraction time, not query time.
 
 logger = logging.getLogger(__name__)
 
@@ -83,9 +86,15 @@ def create_query_stream_endpoint(app, rag_instance) -> None:
     """
     Override LightRAG's /query/stream to route queries through RAG-Anything.
 
-    Important: This endpoint is intentionally *pass-through* for QueryParam values. We do
-    not perform automatic intent detection or parameter overrides here; users should adjust
-    retrieval/formatting manually via request parameters and/or user_prompt.
+    DESIGN PRINCIPLE: Pure LightRAG Default Passthrough
+    ====================================================
+    This endpoint uses LightRAG's native query behavior without modifications:
+    - No custom user_prompt injection (LightRAG handles response formatting)
+    - No ontology context appending (extraction-time prompts handle domain knowledge)
+    - No custom keyword overrides (LightRAG's keyword extraction is well-tuned)
+    - Parameters from request are passed through unchanged (user controls behavior)
+
+    This aligns with LightRAG/RAG-Anything design intent for reliable retrieval.
     """
 
     async def query_stream_override(request: QueryRequest):
@@ -95,56 +104,56 @@ def create_query_stream_endpoint(app, rag_instance) -> None:
             stream_mode = request.stream if request.stream is not None else True
             param: QueryParam = request.to_query_params(stream_mode)
             logger.info(
-                "🔎 /query/stream request: mode=%s top_k=%s chunk_top_k=%s max_total_tokens=%s enable_rerank=%s response_type=%s include_references=%s",
+                "🔎 /query/stream request: mode=%s top_k=%s chunk_top_k=%s",
                 getattr(param, "mode", None),
                 getattr(param, "top_k", None),
                 getattr(param, "chunk_top_k", None),
-                getattr(param, "max_total_tokens", None),
-                getattr(param, "enable_rerank", None),
-                getattr(param, "response_type", None),
-                getattr(param, "include_references", None),
             )
 
-            # Compose user_prompt: base prompt + ontology context for organic GovCon guidance
-            # This keeps queries connected to our foundational entity extraction and processing
-            final_user_prompt = getattr(param, "user_prompt", None)
-            if final_user_prompt is None:
-                # Load the base prompt when none provided - keeps responses grounded and formatted
-                try:
-                    final_user_prompt = load_prompt("query/base_user_prompt")
-                except Exception as e:
-                    logger.warning("Failed to load base user prompt: %s", e)
-                    final_user_prompt = ""
+            # ══════════════════════════════════════════════════════════════════════════
+            # LIGHTRAG DEFAULT BEHAVIOR (Restored)
+            # ══════════════════════════════════════════════════════════════════════════
+            # REMOVED: Custom user_prompt loading (base_user_prompt.md)
+            # REMOVED: Ontology context injection (build_query_context)
+            # REASON: These modifications fragmented hybrid retrieval and caused generic responses.
+            #
+            # Domain-specific knowledge is now applied only at extraction time:
+            # - Entity extraction prompts (prompts/extraction/)
+            # - 18-entity GovCon ontology (src/ontology/schema.py)
+            # - Semantic post-processing (8 algorithms)
+            #
+            # Users who need custom formatting can provide user_prompt in the request.
+            # ══════════════════════════════════════════════════════════════════════════
 
-            # Always append ontology context block - organically connects queries to entity processing
-            ontology_context = build_query_context(request.query).to_prompt_block()
-            if ontology_context.strip():
-                final_user_prompt += "\n\n---\n\nGovCon Query Context\n" + ontology_context
-
-            # Use RAG-Anything query entrypoint (leverages its VLM-enhanced path when available)
-            # RAGAnything.aquery builds a LightRAG QueryParam from kwargs internally.
+            # Use RAG-Anything query entrypoint with LightRAG defaults
+            # Only pass parameters that were explicitly provided in the request
             query_kwargs = {
-                "only_need_context": getattr(param, "only_need_context", False),
-                "response_type": getattr(param, "response_type", None),
                 "stream": stream_mode,
-                "top_k": getattr(param, "top_k", None),
-                "chunk_top_k": getattr(param, "chunk_top_k", None),
-                "max_entity_tokens": getattr(param, "max_entity_tokens", None),
-                "max_relation_tokens": getattr(param, "max_relation_tokens", None),
-                "max_total_tokens": getattr(param, "max_total_tokens", None),
-                "hl_keywords": getattr(param, "hl_keywords", None),
-                "ll_keywords": getattr(param, "ll_keywords", None),
-                "conversation_history": getattr(param, "conversation_history", None),
-                "history_turns": getattr(param, "history_turns", None),
-                "user_prompt": final_user_prompt,
-                "enable_rerank": getattr(param, "enable_rerank", None),
-                "include_references": getattr(param, "include_references", None),
-                # Prevent automatic VLM usage unless the user asks for image analysis.
-                # Avoids extra cost and avoids VLM path forcing only_need_prompt=True internally.
-                "vlm_enhanced": _should_enable_vlm(request.query),
             }
-            # Remove None values (QueryParam constructor doesn't accept Nones for some fields)
-            query_kwargs = {k: v for k, v in query_kwargs.items() if v is not None}
+
+            # Pass through user-provided parameters (preserve user control)
+            if getattr(param, "only_need_context", None) is not None:
+                query_kwargs["only_need_context"] = param.only_need_context
+            if getattr(param, "response_type", None) is not None:
+                query_kwargs["response_type"] = param.response_type
+            if getattr(param, "top_k", None) is not None:
+                query_kwargs["top_k"] = param.top_k
+            if getattr(param, "chunk_top_k", None) is not None:
+                query_kwargs["chunk_top_k"] = param.chunk_top_k
+            if getattr(param, "max_total_tokens", None) is not None:
+                query_kwargs["max_total_tokens"] = param.max_total_tokens
+            if getattr(param, "user_prompt", None) is not None:
+                query_kwargs["user_prompt"] = param.user_prompt
+            if getattr(param, "include_references", None) is not None:
+                query_kwargs["include_references"] = param.include_references
+            if getattr(param, "conversation_history", None) is not None:
+                query_kwargs["conversation_history"] = param.conversation_history
+            if getattr(param, "history_turns", None) is not None:
+                query_kwargs["history_turns"] = param.history_turns
+
+            # VLM: Only enable for explicit image/figure queries (avoids unnecessary cost)
+            if _should_enable_vlm(request.query):
+                query_kwargs["vlm_enhanced"] = True
 
             result = await rag_instance.aquery(request.query, mode=param.mode, **query_kwargs)
 

@@ -2,6 +2,20 @@
 Query-Time Ontology Context Builder
 ==================================
 
+⚠️ DEPRECATED: This module is no longer used in the query pipeline.
+
+As of December 2025, query-time context injection was removed to restore
+LightRAG's default query behavior. Domain knowledge is now applied only
+at extraction time via:
+- prompts/extraction/entity_extraction_prompt.md
+- prompts/extraction/entity_detection_rules.md
+- src/ontology/schema.py (18-entity GovCon ontology)
+
+This module is preserved for reference purposes only.
+See: https://github.com/HKUDS/LightRAG for default query behavior.
+
+Original Purpose:
+-----------------
 Goal: Inject a SMALL, targeted slice of the GovCon ontology into LightRAG query prompts
 without creating mega-prompts that harm performance.
 

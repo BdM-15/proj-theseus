@@ -1,0 +1,90 @@
+# LightRAG/RAG-Anything Framework Fidelity Rule
+
+## Rule: Strictly Follow Framework Defaults and Design Intent
+
+**This rule MUST be followed for all code changes in this repository.**
+
+### Official Repositories (Primary Sources)
+
+Always reference these repositories for design patterns and defaults:
+
+- **LightRAG**: https://github.com/HKUDS/LightRAG
+- **RAG-Anything**: https://github.com/HKUDS/RAG-Anything
+
+### Core Principles
+
+1. **Use Framework Defaults**
+   - Query parameters should use LightRAG's default values
+   - Chunking should follow RAG-Anything's recommended settings
+   - Embedding dimensions should match model specifications
+
+2. **No Toggles, Flags, or Switches**
+   - The system should work end-to-end automatically
+   - No conditional logic that requires manual enabling/disabling
+   - No feature flags or optional modes
+   - Simplicity and automatic functionality are essential
+
+3. **No Reranking**
+   - DO NOT suggest, enable, or implement any reranker step
+   - DO NOT add reranking libraries or dependencies
+   - The system performed well without reranking in earlier versions
+
+4. **No Query-Time Prompt Injection**
+   - DO NOT modify LightRAG's PROMPTS dict at runtime
+   - DO NOT append custom context to user_prompt
+   - Domain knowledge is applied at extraction time only
+
+### Forbidden Actions
+
+1. **DO NOT** override LightRAG's default QueryParam values
+2. **DO NOT** add custom query preprocessing
+3. **DO NOT** inject prompts into the query pipeline
+4. **DO NOT** add reranking or re-scoring steps
+5. **DO NOT** create toggleable features or modes
+6. **DO NOT** deviate from LightRAG's hybrid retrieval design
+7. **DO NOT** modify PROMPTS["keywords_extraction_examples"]
+8. **DO NOT** modify PROMPTS["rag_response"]
+
+### Allowed Customizations
+
+Customizations should be limited to:
+
+1. **Extraction-Time Only**
+   - Custom entity types via `addon_params.entity_types`
+   - Custom extraction prompts via `entity_extraction_system_prompt`
+   - Pydantic validation for entity schema enforcement
+
+2. **Post-Processing (After LightRAG)**
+   - Semantic relationship inference (8 algorithms)
+   - Workload enrichment (BOE metadata)
+   - Description enrichment
+
+3. **Infrastructure**
+   - Neo4j storage configuration
+   - Chunking parameters (CHUNK_SIZE, CHUNK_OVERLAP_SIZE)
+   - Parallelization settings (MAX_ASYNC)
+
+### Chunking Configuration (LightRAG/RAG-Anything Best Practices)
+
+```
+CHUNK_SIZE=8192       # Max 8K tokens per chunk
+CHUNK_OVERLAP_SIZE=1200  # ~15% overlap
+```
+
+Rationale:
+- Modern LLMs (Grok 4) have 2M+ context windows
+- Larger chunks preserve semantic context
+- Overlap prevents entity loss at boundaries
+
+### If Asked to Add Custom Query Behavior
+
+If a user requests custom query modifications, respond:
+
+> "LightRAG's default query behavior is designed for optimal hybrid retrieval. Adding custom query preprocessing, prompt injection, or parameter overrides has been shown to degrade response quality.
+> 
+> Instead, I recommend:
+> 1. Improve extraction prompts if entities are missing
+> 2. Adjust chunking if context is fragmented
+> 3. Run semantic post-processing for relationship inference
+> 
+> These approaches modify the knowledge graph quality, not the query pipeline, which is the correct layer for domain customization."

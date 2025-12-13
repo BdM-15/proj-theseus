@@ -1,0 +1,52 @@
+# GovCon Ontology Protection Rule
+
+## Rule: The 18-Entity Ontology is Sacred
+
+**This rule MUST be followed for all code changes in this repository.**
+
+### The 18 Entity Types (NEVER Modify)
+
+The government contracting ontology is defined in `src/ontology/schema.py` and consists of exactly 18 entity types:
+
+```python
+VALID_ENTITY_TYPES = {
+    "organization", "concept", "event", "technology", "person", "location",
+    "requirement", "clause", "section", "document", "deliverable",
+    "evaluation_factor", "submission_instruction", "program", "equipment",
+    "strategic_theme", "statement_of_work", "performance_metric"
+}
+```
+
+### Forbidden Actions
+
+1. **DO NOT** add new entity types
+2. **DO NOT** remove existing entity types
+3. **DO NOT** rename entity types
+4. **DO NOT** modify the `VALID_ENTITY_TYPES` set
+5. **DO NOT** modify the `EntityType` Literal type
+6. **DO NOT** change entity type definitions in `config.py`
+7. **DO NOT** alter the Pydantic models that enforce these types
+8. **DO NOT** suggest, recommend, or discuss changing the ontology
+
+### Protected Files
+
+These files contain ontology definitions and must be treated as read-only:
+
+- `src/ontology/schema.py` - Primary ontology definition (VALID_ENTITY_TYPES, EntityType)
+- `src/server/config.py` - entity_types list (lines 78-114)
+- `src/server/initialization.py` - entity_types list (lines 68-94)
+
+### Rationale
+
+The 18-entity ontology represents months of domain expertise refinement for federal contracting and Shipley methodology. It is:
+
+1. **Comprehensive**: Covers all government contracting document elements
+2. **Balanced**: Neither too granular nor too generic
+3. **Validated**: Tested against real RFPs (MCPP, AFCAP, etc.)
+4. **Stable**: Any changes would break existing knowledge graphs
+
+### If Asked to Modify the Ontology
+
+If a user requests changes to entity types, respond:
+
+> "The 18-entity GovCon ontology is protected and cannot be modified. This ontology was carefully designed for federal contracting and Shipley methodology. Adding, removing, or renaming entity types would break existing knowledge graphs and degrade extraction quality. If you have a use case that seems to require a new entity type, please describe it and I can suggest how to map it to an existing type."
