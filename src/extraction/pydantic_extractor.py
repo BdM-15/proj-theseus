@@ -146,6 +146,36 @@ Output the result strictly as a JSON object matching the ExtractionResult schema
         logger.info(f"Constructed system prompt with {len(full_prompt)} characters (~{len(full_prompt)//4} tokens)")
         return full_prompt
 
+    def _strip_markdown_json(self, content: str) -> str:
+        """
+        Strip markdown code blocks from JSON content.
+        
+        Despite using response_format=Pydantic, the xAI API sometimes wraps
+        complex schemas in ```json...``` blocks. This extracts the JSON.
+        """
+        if not content:
+            return content
+        
+        # Check if wrapped in markdown
+        content = content.strip()
+        if content.startswith("```"):
+            # Remove opening fence (```json or ```)
+            lines = content.split("\n", 1)
+            if len(lines) > 1:
+                content = lines[1]
+            # Remove closing fence
+            if content.rstrip().endswith("```"):
+                content = content.rstrip()[:-3].rstrip()
+        
+        # Final safety: find JSON boundaries
+        first_brace = content.find("{")
+        last_brace = content.rfind("}")
+        
+        if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+            return content[first_brace:last_brace + 1]
+        
+        return content
+
     async def extract(self, text: str, chunk_id: str = "unknown") -> ExtractionResult:
         """
         Extracts entities from the given text using native xAI SDK structured output.
@@ -246,10 +276,13 @@ Output the result strictly as a JSON object matching the ExtractionResult schema
                 response = await chat.sample()
                 
                 # Parse response content into Pydantic model
-                # The SDK should return JSON conforming to the schema
                 content = response.content if hasattr(response, 'content') else str(response)
                 
-                # If response_format worked correctly, content should be valid JSON
+                # FALLBACK: Strip markdown code blocks if xAI API returns wrapped JSON
+                # Despite response_format=Pydantic, complex schemas may still get wrapped
+                content = self._strip_markdown_json(content)
+                
+                # Parse and validate
                 result = ExtractionResult.model_validate_json(content)
                 
                 # Success! Track it for failure rate calculation
