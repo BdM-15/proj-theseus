@@ -303,7 +303,8 @@ Return JSON array with {len(batch)} objects (one per requirement above):
                     # Add to batch update list
                     property_updates.append({
                         'id': entity_id,  # Neo4j element ID from our index_to_entity lookup
-                        'properties': properties
+                        'properties': properties,
+                        'enriched_by': 'workload_analysis_v1',
                     })
                     batch_enriched += 1
                 

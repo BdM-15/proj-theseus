@@ -47,7 +47,24 @@ class Neo4jGraphIO:
                n.entity_id as entity_name,
                n.entity_type as entity_type,
                n.description as description,
-               n.source_id as source_id
+               n.source_id as source_id,
+               // Common typed fields (optional) - enables templated descriptions
+               n.criticality as criticality,
+               n.modal_verb as modal_verb,
+               n.req_type as req_type,
+               n.labor_drivers as labor_drivers,
+               n.material_needs as material_needs,
+               n.weight as weight,
+               n.importance as importance,
+               n.subfactors as subfactors,
+               n.page_limit as page_limit,
+               n.format_reqs as format_reqs,
+               n.volume as volume,
+               n.clause_number as clause_number,
+               n.regulation as regulation,
+               n.threshold as threshold,
+               n.measurement_method as measurement_method,
+               n.theme_type as theme_type
         """
         
         with self.driver.session(database=self.database) as session:
@@ -59,7 +76,23 @@ class Neo4jGraphIO:
                     'entity_name': record['entity_name'],
                     'entity_type': record['entity_type'],
                     'description': record['description'],
-                    'source_id': record['source_id']
+                    'source_id': record['source_id'],
+                    'criticality': record.get('criticality'),
+                    'modal_verb': record.get('modal_verb'),
+                    'req_type': record.get('req_type'),
+                    'labor_drivers': record.get('labor_drivers'),
+                    'material_needs': record.get('material_needs'),
+                    'weight': record.get('weight'),
+                    'importance': record.get('importance'),
+                    'subfactors': record.get('subfactors'),
+                    'page_limit': record.get('page_limit'),
+                    'format_reqs': record.get('format_reqs'),
+                    'volume': record.get('volume'),
+                    'clause_number': record.get('clause_number'),
+                    'regulation': record.get('regulation'),
+                    'threshold': record.get('threshold'),
+                    'measurement_method': record.get('measurement_method'),
+                    'theme_type': record.get('theme_type'),
                 })
             
             logger.info(f"  📊 Fetched {len(entities)} entities from Neo4j")
@@ -163,7 +196,7 @@ class Neo4jGraphIO:
         MATCH (n:`{self.workspace}`)
         WHERE elementId(n) = update.id
         SET n += update.properties,
-            n.enriched_by = 'workload_metadata_enrichment',
+            n.enriched_by = COALESCE(update.enriched_by, n.enriched_by),
             n.enriched_at = datetime()
         RETURN count(n) as updated_count
         """

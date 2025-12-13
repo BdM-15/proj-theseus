@@ -1,12 +1,18 @@
 """
 Government Contracting Processors
 
-NOTE: Custom processors (GovconMultimodalProcessor, GovconKGProcessor) have been
-removed as of Issue #42. The lightrag_llm_adapter now handles ALL entity extraction
-with the full 121K ontology prompt, eliminating the need for custom processors.
+Issue #46 Part C: OntologyTableProcessor registered for structured table extraction.
+Tables contain critical GovCon data (evaluation matrices, CDRLs, labor tables).
 
-RAG-Anything's default processors generate descriptions for multimodal content,
-which then flow through LightRAG's extraction pipeline → lightrag_llm_adapter.
+Architecture:
+- OntologyTableProcessor: Formats tables preserving structure for extraction
+- lightrag_llm_adapter: Still handles actual extraction with full ontology prompt
+- No duplicate extraction - processor formats, adapter extracts
+
+For text: lightrag_llm_adapter intercepts and uses full ontology prompt
+For tables: OntologyTableProcessor formats → lightrag_llm_adapter extracts
 """
 
-__all__ = []
+from src.processors.ontology_table_processor import OntologyTableProcessor
+
+__all__ = ["OntologyTableProcessor"]

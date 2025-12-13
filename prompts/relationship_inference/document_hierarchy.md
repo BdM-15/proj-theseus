@@ -24,15 +24,12 @@ Output relationship:
 }
 ```
 
-**Example of WRONG usage (causes validation failures):**
+**IMPORTANT: Do NOT use fabricated IDs in examples**
 
-```json
-{
-  "source_id": "annex_j02000000",  // ← WRONG: Fabricated ID, will be rejected!
-  "target_id": "section_j",        // ← WRONG: Fabricated ID, will be rejected!
-  ...
-}
-```
+Do not output IDs like `section_j`, `annex_j0200000_18`, `annex_001`, etc.
+Those are *fabricated identifiers* and will be rejected by validation.
+
+If you cannot find a valid `id` in the input list, **do not output that relationship**.
 
 ---
 
@@ -46,31 +43,37 @@ Output relationship:
 
 ---
 
-## Core Relationship Pattern## Core Relationship Pattern
+## Core Relationship Pattern
 
 ```
 
-DOCUMENT/CLAUSE/ANNEX --CHILD_OF--> DOCUMENT/CLAUSE/ANNEXANNEX --ATTACHMENT_OF--> SECTION
+DOCUMENT/CLAUSE/ANNEX --CHILD_OF--> DOCUMENT/CLAUSE/ANNEX
+ANNEX --ATTACHMENT_OF--> SECTION
 
 ```
 
 **Meaning**: This document/standard/clause is a subsection or part of a parent document**Meaning**: This annex/attachment belongs to this parent section
 
-**Examples**:**Example**:
+**Examples**:
 
 ````
 
-J-02000000-10 (Technical Requirements) --CHILD_OF--> J-02000000 (PWS)ANNEX "J-0200000-18 Performance Work Statement"
+J-02000000-10 (Technical Requirements) --CHILD_OF--> J-02000000 (PWS)
 
-NIST 800-171 3.1.1 (Access Control) --CHILD_OF--> NIST 800-171 Rev 2  --ATTACHMENT_OF-->
+NIST 800-171 3.1.1 (Access Control) --CHILD_OF--> NIST 800-171 Rev 2
 
-DFARS 252.204-7012(b)(2) --CHILD_OF--> DFARS 252.204-7012SECTION "Section J: List of Attachments"
+DFARS 252.204-7012(b)(2) --CHILD_OF--> DFARS 252.204-7012
 
 MIL-STD-882E Task 101 --CHILD_OF--> MIL-STD-882E```
 
 ```
 
 ---
+
+## ⚠️ CRITICAL: Example IDs in this document are NOT valid output IDs
+
+Any illustrative identifiers like `Section J`, `J-02000000-10`, etc. are *names*, not Neo4j/LightRAG `id` values.
+Your output must use ONLY the exact `id` strings provided in the input JSON list.
 
 ---
 

@@ -28,8 +28,192 @@ from datetime import datetime, timedelta
 from fastapi import UploadFile, File
 from fastapi.responses import JSONResponse
 from lightrag.api.config import global_args
+from lightrag.api.routers.query_routes import QueryRequest
+from lightrag.base import QueryParam
+
+from src.query.ontology_context import build_query_context
+from src.core.prompt_loader import load_prompt
 
 logger = logging.getLogger(__name__)
+
+def _should_enable_vlm(query: str) -> bool:
+    """
+    RAG-Anything auto-enables VLM when vision_model_func exists.
+    For GovCon workflows, default to text-only unless the user explicitly asks about images/figures.
+    """
+    q = (query or "").lower()
+    return any(k in q for k in ("image", "images", "figure", "figures", "chart", "charts", "diagram", "diagrams"))
+
+def _json_safe(obj):
+    """
+    Convert Neo4j and other non-JSON-serializable objects into JSON-safe primitives.
+    Primarily used for WebUI graph endpoints where Neo4j temporal types may appear.
+    """
+    # Neo4j temporal types (neo4j.time.DateTime / Date / Time / Duration)
+    try:
+        import neo4j  # noqa: F401
+        from neo4j.time import DateTime as Neo4jDateTime
+        from neo4j.time import Date as Neo4jDate
+        from neo4j.time import Time as Neo4jTime
+        from neo4j.time import Duration as Neo4jDuration
+
+        if isinstance(obj, Neo4jDateTime):
+            return obj.iso_format()
+        if isinstance(obj, Neo4jDate):
+            return obj.iso_format()
+        if isinstance(obj, Neo4jTime):
+            return obj.iso_format()
+        if isinstance(obj, Neo4jDuration):
+            # Duration doesn't have a universally standard ISO string everywhere;
+            # repr is stable enough for UI/debug and avoids 500s.
+            return str(obj)
+    except Exception:
+        # If neo4j isn't installed/available, just fall through.
+        pass
+
+    if isinstance(obj, dict):
+        return {str(k): _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple, set)):
+        return [_json_safe(v) for v in obj]
+
+    return obj
+
+
+def create_query_stream_endpoint(app, rag_instance) -> None:
+    """
+    Override LightRAG's /query/stream to route queries through RAG-Anything.
+
+    Important: This endpoint is intentionally *pass-through* for QueryParam values. We do
+    not perform automatic intent detection or parameter overrides here; users should adjust
+    retrieval/formatting manually via request parameters and/or user_prompt.
+    """
+
+    async def query_stream_override(request: QueryRequest):
+        try:
+            from fastapi.responses import StreamingResponse
+
+            stream_mode = request.stream if request.stream is not None else True
+            param: QueryParam = request.to_query_params(stream_mode)
+            logger.info(
+                "🔎 /query/stream request: mode=%s top_k=%s chunk_top_k=%s max_total_tokens=%s enable_rerank=%s response_type=%s include_references=%s",
+                getattr(param, "mode", None),
+                getattr(param, "top_k", None),
+                getattr(param, "chunk_top_k", None),
+                getattr(param, "max_total_tokens", None),
+                getattr(param, "enable_rerank", None),
+                getattr(param, "response_type", None),
+                getattr(param, "include_references", None),
+            )
+
+            # Compose user_prompt: base prompt + ontology context for organic GovCon guidance
+            # This keeps queries connected to our foundational entity extraction and processing
+            final_user_prompt = getattr(param, "user_prompt", None)
+            if final_user_prompt is None:
+                # Load the base prompt when none provided - keeps responses grounded and formatted
+                try:
+                    final_user_prompt = load_prompt("query/base_user_prompt")
+                except Exception as e:
+                    logger.warning("Failed to load base user prompt: %s", e)
+                    final_user_prompt = ""
+
+            # Always append ontology context block - organically connects queries to entity processing
+            ontology_context = build_query_context(request.query).to_prompt_block()
+            if ontology_context.strip():
+                final_user_prompt += "\n\n---\n\nGovCon Query Context\n" + ontology_context
+
+            # Use RAG-Anything query entrypoint (leverages its VLM-enhanced path when available)
+            # RAGAnything.aquery builds a LightRAG QueryParam from kwargs internally.
+            query_kwargs = {
+                "only_need_context": getattr(param, "only_need_context", False),
+                "response_type": getattr(param, "response_type", None),
+                "stream": stream_mode,
+                "top_k": getattr(param, "top_k", None),
+                "chunk_top_k": getattr(param, "chunk_top_k", None),
+                "max_entity_tokens": getattr(param, "max_entity_tokens", None),
+                "max_relation_tokens": getattr(param, "max_relation_tokens", None),
+                "max_total_tokens": getattr(param, "max_total_tokens", None),
+                "hl_keywords": getattr(param, "hl_keywords", None),
+                "ll_keywords": getattr(param, "ll_keywords", None),
+                "conversation_history": getattr(param, "conversation_history", None),
+                "history_turns": getattr(param, "history_turns", None),
+                "user_prompt": final_user_prompt,
+                "enable_rerank": getattr(param, "enable_rerank", None),
+                "include_references": getattr(param, "include_references", None),
+                # Prevent automatic VLM usage unless the user asks for image analysis.
+                # Avoids extra cost and avoids VLM path forcing only_need_prompt=True internally.
+                "vlm_enhanced": _should_enable_vlm(request.query),
+            }
+            # Remove None values (QueryParam constructor doesn't accept Nones for some fields)
+            query_kwargs = {k: v for k, v in query_kwargs.items() if v is not None}
+
+            result = await rag_instance.aquery(request.query, mode=param.mode, **query_kwargs)
+
+            async def stream_generator():
+                # LightRAG API expects references in first chunk, but RAG-Anything returns only text.
+                # We still emit an empty references list when requested so the client schema is stable;
+                # the model is instructed to include a '### References' section in the text output.
+                if request.include_references:
+                    yield f"{json.dumps({'references': []})}\n"
+
+                if hasattr(result, "__aiter__"):
+                    async for chunk in result:
+                        if chunk:
+                            yield f"{json.dumps({'response': chunk})}\n"
+                else:
+                    response_content = result or "No relevant context found for the query."
+                    yield f"{json.dumps({'response': response_content})}\n"
+
+            return StreamingResponse(
+                stream_generator(),
+                media_type="application/x-ndjson",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "Content-Type": "application/x-ndjson",
+                    "X-Accel-Buffering": "no",
+                },
+            )
+        except Exception as e:
+            logger.error(f"Query failed: {e}")
+            return JSONResponse({"error": str(e)}, status_code=500)
+
+    app.add_api_route(
+        "/query/stream",
+        query_stream_override,
+        methods=["POST"],
+    )
+
+
+def create_graphs_endpoint(app, rag_instance) -> None:
+    """
+    Override LightRAG's /graphs endpoint to avoid FastAPI serialization errors when using Neo4j storage.
+
+    LightRAG can return neo4j.time.DateTime (and other temporal types) in node/edge properties,
+    which FastAPI/Pydantic cannot serialize by default, causing a 500 on WebUI refresh.
+    """
+
+    async def graphs_override(
+        label: str,
+        max_depth: int = 3,
+        max_nodes: int = 1000,
+    ):
+        try:
+            # LightRAG server uses rag.get_knowledge_graph(node_label=..., ...)
+            result = await rag_instance.lightrag.get_knowledge_graph(
+                node_label=label,
+                max_depth=max_depth,
+                max_nodes=max_nodes,
+            )
+            return _json_safe(result)
+        except Exception as e:
+            logger.error("Graphs query failed: %s", e)
+            return JSONResponse({"error": str(e)}, status_code=500)
+
+    app.add_api_route(
+        "/graphs",
+        graphs_override,
+        methods=["GET"],
+    )
 
 # ============================================================================
 # BATCH PROCESSING STATE TRACKER
@@ -211,15 +395,32 @@ async def process_document_with_semantic_inference(
         # ============================================================================
         # Issue #42: RAG-Anything handles ALL content with unified extraction
         # - Text → LightRAG's text pipeline → lightrag_llm_adapter (Pydantic + ontology)
-        # - Multimodal → RAG-Anything default processors → same adapter path
+        # - Tables → OntologyTableProcessor → preserves structure → adapter extracts
+        # - Images/equations → default processors → adapter extracts
         # 
-        # The lightrag_llm_adapter intercepts ALL extraction calls, ensuring:
-        # - Full 121K ontology prompt for all content types
-        # - Pydantic validation via JsonExtractor
-        # - No duplicate extraction (removed GovconMultimodalProcessor)
+        # Issue #46 Part C: OntologyTableProcessor registered for tables
+        # - Preserves table structure (headers, rows, cells)
+        # - Detects table type (eval matrix, CDRL, labor, compliance)
+        # - Adds extraction hints for lightrag_llm_adapter
+        # - NO duplicate extraction - processor formats, adapter extracts
         # ============================================================================
         
         import os
+        
+        # Issue #46: Register OntologyTableProcessor for structured table extraction
+        # Tables contain critical GovCon data that benefits from structure preservation
+        try:
+            from src.processors import OntologyTableProcessor
+            
+            table_processor = OntologyTableProcessor(
+                lightrag=rag_instance.lightrag,
+                modal_caption_func=rag_instance.llm_model_func,
+                context_extractor=getattr(rag_instance, 'context_extractor', None)
+            )
+            rag_instance.modal_processors["table"] = table_processor
+            logger.info("📊 Registered OntologyTableProcessor for structured table extraction")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not register OntologyTableProcessor: {e} - using default")
         
         try:
             # Count content types for logging
@@ -232,11 +433,9 @@ async def process_document_with_semantic_inference(
             
             # RAG-Anything handles ALL content in one call:
             # - Text items → LightRAG's ainsert() → lightrag_llm_adapter → Pydantic extraction
-            # - Multimodal items → default processors → lightrag_llm_adapter → same path
+            # - Tables → OntologyTableProcessor → structured format → adapter extracts
+            # - Images/equations → default processors → adapter extracts
             # - Deduplication → LightRAG's merge_nodes_and_edges() (Stage 6)
-            # 
-            # All extraction goes through lightrag_llm_adapter which uses the full 121K
-            # ontology prompt, eliminating the need for custom multimodal processors.
             logger.info(f"🚀 Processing {len(filtered_content)} content items through RAG-Anything pipeline...")
             
             await rag_instance.insert_content_list(

@@ -276,10 +276,6 @@ class LightRAGExtractionAdapter:
         """Build a rich description from entity attributes."""
         parts = []
         
-        # Base description if available
-        if hasattr(entity, 'description') and entity.description:
-            parts.append(entity.description)
-        
         # Add specialized fields for different entity types
         if hasattr(entity, 'criticality') and entity.criticality:  # Requirement
             parts.append(f"[Criticality: {entity.criticality}]")
@@ -300,7 +296,14 @@ class LightRAGExtractionAdapter:
         if hasattr(entity, 'page_limit') and entity.page_limit:  # SubmissionInstruction
             parts.append(f"[Page Limit: {entity.page_limit}]")
         
-        return " ".join(parts) if parts else entity.entity_name
+        description = " ".join(parts) if parts else entity.entity_name
+
+        # Defense-in-depth: keep tuple field bounded to avoid oversized outputs/timeouts
+        description = re.sub(r"\s+", " ", str(description)).strip()
+        if len(description) > 400:
+            description = description[:400].rstrip()
+
+        return description
     
     def _get_relationship_endpoints(self, rel) -> tuple:
         """Extract source and target from relationship (handles different formats)."""
