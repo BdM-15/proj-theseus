@@ -51,7 +51,7 @@ class PydanticExtractor:
         # Retry count - data preservation is critical
         self.max_retries = int(os.getenv("LLM_MAX_RETRIES", "5"))
         # Max output tokens - prevents truncation on large entity extractions
-        self.max_output_tokens = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "32000"))
+        self.max_output_tokens = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "524288"))
         # Temperature from env (extraction-specific → global → default)
         self.temperature = float(os.getenv("EXTRACTION_LLM_TEMPERATURE", os.getenv("LLM_MODEL_TEMPERATURE", "0.1")))
         
