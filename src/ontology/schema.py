@@ -96,8 +96,20 @@ class BaseEntity(BaseModel):
     entity_type: EntityType = Field(..., description="The strict entity type from the government contracting ontology.")
     description: str = Field(
         default="",
-        description="Comprehensive semantic description including context, source location, and key details for retrieval."
+        description="Comprehensive semantic description including context, source location, and key details for retrieval.",
+        max_length=800,
     )
+
+    @field_validator("description", mode="before")
+    @classmethod
+    def clamp_description(cls, v):
+        """Clamp descriptions to keep JSON output bounded and reduce truncation risk."""
+        if v is None:
+            return ""
+        s = str(v).strip()
+        if len(s) <= 800:
+            return s
+        return s[:797] + "..."
 
     @model_validator(mode='before')
     @classmethod
@@ -373,6 +385,152 @@ class InferredRelationship(BaseModel):
             'reasoning': self.reasoning
         }
 
+
+class InferredRelationshipBatch(BaseModel):
+    """
+    Container for batch relationship inference LLM responses.
+    
+    Handles various LLM response formats:
+    - {"relationships": [...]}
+    - {"results": [...]}
+    - Direct array: [...]
+    """
+    relationships: List[InferredRelationship] = Field(default_factory=list)
+    
+    @model_validator(mode='before')
+    @classmethod
+    def handle_response_formats(cls, values):
+        """Normalize various LLM response formats to expected structure."""
+        # Handle direct array response
+        if isinstance(values, list):
+            return {'relationships': values}
+        
+        # Handle dict with alternative keys
+        if isinstance(values, dict):
+            # Try common alternative keys
+            for key in ['results', 'data', 'items']:
+                if key in values and 'relationships' not in values:
+                    values['relationships'] = values.pop(key)
+        
+        return values
+
+
+# ==========================================
+# Container for LLM Output
+# ==========================================
+
+class ExtractionResult(BaseModel):
+    """The root object expected from the LLM."""
+    entities: List[
+        Requirement | EvaluationFactor | SubmissionInstruction | 
+        StrategicTheme | Clause | PerformanceMetric | BaseEntity
+    ] = Field(..., description="List of all extracted entities.")
+    relationships: List[Relationship] = Field(default_factory=list, description="List of relationships between entities.")
+
+    @model_validator(mode='after')
+    def validate_relationships(self):
+        """
+        Ensure that every relationship points to a valid entity name.
+        Drops relationships that point to non-existent entities (Ghost Nodes).
+        """
+        # Create a set of all valid entity names (normalized)
+        valid_names = {e.entity_name.strip().lower() for e in self.entities if e.entity_name}
+        
+        valid_relationships = []
+        dropped_count = 0
+        
+        for rel in self.relationships:
+            # Now using entity objects instead of strings
+            source = rel.source_entity.entity_name.strip().lower()
+            target = rel.target_entity.entity_name.strip().lower()
+            
+            if source in valid_names and target in valid_names:
+                valid_relationships.append(rel)
+            else:
+                dropped_count += 1
+                # Optional: Log detailed warning if needed, but keep schema clean
+                # logger.warning(f"Dropping ghost relationship: {rel.source_entity.entity_name} -> {rel.target_entity.entity_name}")
+        
+        if dropped_count > 0:
+            # We can't easily log from inside a model validator without a logger instance, 
+            # but the dropped count will be reflected in the final list length.
+            pass
+            
+        self.relationships = valid_relationships
+        return self
+
+class InferredRelationshipBatch(BaseModel):
+    """
+    Container for batch relationship inference LLM responses.
+    
+    Handles various LLM response formats:
+    - {"relationships": [...]}
+    - {"results": [...]}
+    - Direct array: [...]
+    """
+    relationships: List[InferredRelationship] = Field(default_factory=list)
+    
+    @model_validator(mode='before')
+    @classmethod
+    def handle_response_formats(cls, values):
+        """Normalize various LLM response formats to expected structure."""
+        # Handle direct array response
+        if isinstance(values, list):
+            return {'relationships': values}
+        
+        # Handle dict with alternative keys
+        if isinstance(values, dict):
+            # Try common alternative keys
+            for key in ['results', 'data', 'items']:
+                if key in values and 'relationships' not in values:
+                    values['relationships'] = values.pop(key)
+        
+        return values
+
+
+# ==========================================
+# Container for LLM Output
+# ==========================================
+
+class ExtractionResult(BaseModel):
+    """The root object expected from the LLM."""
+    entities: List[
+        Requirement | EvaluationFactor | SubmissionInstruction | 
+        StrategicTheme | Clause | PerformanceMetric | BaseEntity
+    ] = Field(..., description="List of all extracted entities.")
+    relationships: List[Relationship] = Field(default_factory=list, description="List of relationships between entities.")
+
+    @model_validator(mode='after')
+    def validate_relationships(self):
+        """
+        Ensure that every relationship points to a valid entity name.
+        Drops relationships that point to non-existent entities (Ghost Nodes).
+        """
+        # Create a set of all valid entity names (normalized)
+        valid_names = {e.entity_name.strip().lower() for e in self.entities if e.entity_name}
+        
+        valid_relationships = []
+        dropped_count = 0
+        
+        for rel in self.relationships:
+            # Now using entity objects instead of strings
+            source = rel.source_entity.entity_name.strip().lower()
+            target = rel.target_entity.entity_name.strip().lower()
+            
+            if source in valid_names and target in valid_names:
+                valid_relationships.append(rel)
+            else:
+                dropped_count += 1
+                # Optional: Log detailed warning if needed, but keep schema clean
+                # logger.warning(f"Dropping ghost relationship: {rel.source_entity.entity_name} -> {rel.target_entity.entity_name}")
+        
+        if dropped_count > 0:
+            # We can't easily log from inside a model validator without a logger instance, 
+            # but the dropped count will be reflected in the final list length.
+            pass
+            
+        self.relationships = valid_relationships
+        return self
 
 class InferredRelationshipBatch(BaseModel):
     """

@@ -27,6 +27,16 @@ The description is essential for knowledge graph retrieval quality. Include:
 - **Key details**: Quantities, frequencies, constraints, relationships to other entities
 - **Domain context**: FAR/DFARS implications, UCF section relevance
 
+##  CRITICAL: DESCRIPTIONS MUST BE GROUNDED IN SOURCE TEXT
+
+**Your description MUST be supported by the provided chunk text.**
+
+- Do **NOT** invent facts, numbers, dates, names, requirements, or interpretations not present in the chunk.
+- Prefer reusing exact phrases from the chunk (especially for quantities, frequencies, and constraints).
+- If the chunk does not contain enough detail, write a shorter description that only reflects what is present.
+
+**Hard limit**: keep description concise (aim < 800 characters).
+
 **Keep descriptions concise but informative** (50-200 words typical):
 - `entity_name` (required)
 - `entity_type` (required)
