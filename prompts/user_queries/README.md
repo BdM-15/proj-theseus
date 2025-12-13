@@ -1,8 +1,16 @@
-# User Query Prompts - Phase 1 Implementation
+# User Query Prompts - Manual Templates (Auto Overrides Disabled)
 
-**Branch**: 010-query-prompts-integration  
-**Status**: ✅ Phase 1 Complete  
+**Branch**: 010-query-prompts-integration → Simplified 2025
+**Status**: ✅ Manual Use Only
 **Prompts**: 5 core capture intelligence templates
+
+---
+
+## Important: Auto Overrides Disabled
+
+**As of 2025 updates**, automatic query intent detection and parameter overrides have been **disabled** in `/query/stream`. All retrieval parameters (`top_k`, `chunk_top_k`, `mode`, etc.) now pass through exactly as manually set by the user.
+
+These prompt templates are now **manual tools only** - copy/paste them into the WebUI or API calls when you need specialized formatting. They do not automatically apply based on query content.
 
 ---
 

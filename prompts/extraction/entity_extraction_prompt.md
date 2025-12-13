@@ -17,6 +17,22 @@
 
 ## ⚠️ CRITICAL: PERFORMANCE_METRIC vs REQUIREMENT DISTINCTION
 
+## ⚠️ CRITICAL: NO DESCRIPTIONS DURING EXTRACTION (PERFORMANCE)
+
+**DO NOT include `entity_description` or `description` fields during extraction.**
+
+Descriptions will be generated in post-processing. Including them during extraction causes:
+- JSON output to exceed 100K+ characters on dense chunks
+- Timeouts and truncation errors
+- Failed extractions that lose all entities in the chunk
+
+**OMIT the `description` field entirely** - extract only:
+- `entity_name` (required)
+- `entity_type` (required)  
+- Type-specific metadata fields (modal_verb, weight, frequency, etc.)
+
+The examples below show descriptions for documentation purposes only - **do not output them**.
+
 **This is the #1 extraction error. Read carefully before extracting!**
 
 ### PERFORMANCE_METRIC = Measurable Standard (How performance is judged)
