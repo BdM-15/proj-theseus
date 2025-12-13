@@ -140,12 +140,51 @@ class Requirement(BaseEntity):
     # Workload specific fields (captured upfront!)
     labor_drivers: List[str] = Field(default_factory=list, description="Raw workload data (volumes, frequencies, shifts, quantities, customer counts) that drive staffing requirements. NOT staffing roles.")
     material_needs: List[str] = Field(default_factory=list, description="List of equipment, supplies, or facilities mentioned.")
+    
+    @field_validator('modal_verb', mode='before')
+    @classmethod
+    def normalize_modal_verb(cls, v: str) -> str:
+        """Normalize modal verbs to standard form (shall/must/should/may/will)."""
+        if not v:
+            return "shall"  # Default to mandatory if missing
+        v = str(v).lower().strip()
+        # Map common variations to standard forms
+        modal_map = {
+            "shall": "shall", "must": "must", "will": "will",
+            "should": "should", "may": "may",
+            # Common variations
+            "shall not": "shall", "must not": "must",
+            "is required to": "shall", "requires": "shall",
+            "is expected to": "should", "can": "may",
+        }
+        return modal_map.get(v, v)
 
 class EvaluationFactor(BaseEntity):
     entity_type: Literal["evaluation_factor"] = "evaluation_factor"
     weight: Optional[str] = Field(None, description="Numerical weight (e.g., '40%', '25 points').")
     importance: Optional[str] = Field(None, description="Relative importance (e.g., 'Most Important').")
     subfactors: List[str] = Field(default_factory=list, description="List of sub-criteria or subfactors.")
+    
+    @field_validator('weight', mode='before')
+    @classmethod
+    def normalize_weight(cls, v) -> Optional[str]:
+        """Extract and normalize weight values from various formats."""
+        if not v:
+            return None
+        v = str(v).strip()
+        # Already normalized
+        if v.endswith('%') or 'points' in v.lower() or 'pts' in v.lower():
+            return v
+        # Try to extract percentage from text like "weighted 40%" or "40 percent"
+        import re
+        pct_match = re.search(r'(\d+(?:\.\d+)?)\s*(?:%|percent)', v, re.IGNORECASE)
+        if pct_match:
+            return f"{pct_match.group(1)}%"
+        # Try to extract points from text like "25 points" or "worth 25pts"
+        pts_match = re.search(r'(\d+(?:\.\d+)?)\s*(?:points?|pts?)', v, re.IGNORECASE)
+        if pts_match:
+            return f"{pts_match.group(1)} points"
+        return v  # Return as-is if no pattern matched
 
 class SubmissionInstruction(BaseEntity):
     entity_type: Literal["submission_instruction"] = "submission_instruction"
@@ -161,6 +200,40 @@ class Clause(BaseEntity):
     entity_type: Literal["clause"] = "clause"
     clause_number: str = Field(..., description="The FAR/DFARS citation (e.g., 'FAR 52.212-1').")
     regulation: str = Field(..., description="FAR, DFARS, AFFARS, etc.")
+    
+    @field_validator('clause_number', mode='before')
+    @classmethod
+    def normalize_clause_number(cls, v: str) -> str:
+        """Normalize clause numbers to standard FAR/DFARS format."""
+        import re
+        if not v:
+            return v
+        v = str(v).strip()
+        # Ensure proper formatting: XX.XXX-X or XXX.XXX-X
+        # Remove spaces in citation (e.g., "52. 212 - 1" -> "52.212-1")
+        v = re.sub(r'\s*\.\s*', '.', v)
+        v = re.sub(r'\s*-\s*', '-', v)
+        # Extract just the number if it includes "FAR" prefix
+        num_match = re.search(r'(\d{2,3}\.\d{2,4}(?:-\d+)?)', v)
+        if num_match:
+            return num_match.group(1)
+        return v
+    
+    @field_validator('regulation', mode='before')
+    @classmethod
+    def normalize_regulation(cls, v: str) -> str:
+        """Normalize regulation name to standard acronym."""
+        if not v:
+            return "FAR"  # Default to FAR
+        v = str(v).upper().strip()
+        reg_map = {
+            "FAR": "FAR", "DFAR": "DFARS", "DFARS": "DFARS",
+            "AFFARS": "AFFARS", "AFFAR": "AFFARS",
+            "NMCARS": "NMCARS", "EFAR": "EFAR",
+            "FEDERAL ACQUISITION REGULATION": "FAR",
+            "DEFENSE FEDERAL ACQUISITION REGULATION SUPPLEMENT": "DFARS",
+        }
+        return reg_map.get(v, v)
 
 class PerformanceMetric(BaseEntity):
     entity_type: Literal["performance_metric"] = "performance_metric"
