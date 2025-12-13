@@ -1,4 +1,4 @@
-from typing import List, Optional, Literal, Dict
+from typing import List, Optional, Literal, Dict, Any
 from pydantic import BaseModel, Field, model_validator, field_validator
 from enum import Enum
 import logging
@@ -10,7 +10,17 @@ logger = logging.getLogger(__name__)
 # ==========================================
 
 CriticalityLevel = Literal["MANDATORY", "IMPORTANT", "OPTIONAL", "INFORMATIONAL"]
-RequirementType = Literal["FUNCTIONAL", "PERFORMANCE", "SECURITY", "TECHNICAL", "INTERFACE", "MANAGEMENT", "DESIGN", "QUALITY", "OTHER"]
+RequirementType = Literal[
+    "FUNCTIONAL",
+    "PERFORMANCE",
+    "SECURITY",
+    "TECHNICAL",
+    "INTERFACE",
+    "MANAGEMENT",
+    "DESIGN",
+    "QUALITY",
+    "OTHER",
+]
 ThemeType = Literal["CUSTOMER_HOT_BUTTON", "DISCRIMINATOR", "PROOF_POINT", "WIN_THEME"]
 
 
@@ -72,7 +82,9 @@ def normalize_boe_category(category: str, fallback: BOECategory = BOECategory.LA
     logger.warning(f"Unmapped BOE category '{category}' → defaulting to '{fallback.value}'. Consider adding to BOE_CATEGORY_MAPPING.")
     return fallback
 
-# 18 allowed entity types - this is the single source of truth
+# NOTE: These are the *LightRAG extraction* entity types for the current pipeline.
+# Keep this set small and stable to avoid graph noise and schema brittleness.
+# We intentionally allow schema evolution via optional fields rather than new types.
 VALID_ENTITY_TYPES = {
     "organization", "concept", "event", "technology", "person", "location",
     "requirement", "clause", "section", "document", "deliverable",
@@ -94,6 +106,20 @@ EntityType = Literal[
 class BaseEntity(BaseModel):
     entity_name: str = Field(..., description="The canonical name of the entity (Title Case).")
     entity_type: EntityType = Field(..., description="The strict entity type from the government contracting ontology.")
+    description: Optional[str] = Field(
+        None,
+        description="Short, evidence-based description grounded in the source text (no speculation).",
+    )
+    # Optional "capture intelligence" fields (Shipley-style). These keep the extraction ontology
+    # lightweight while still supporting capture/proposal workflows.
+    capture_tags: List[str] = Field(
+        default_factory=list,
+        description="Optional tags like 'Opportunity', 'Customer', 'Competitor', 'WinTheme', 'Risk', 'Compliance'.",
+    )
+    attributes: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Free-form, sparse attributes for non-breaking schema evolution (avoid nesting).",
+    )
 
     @model_validator(mode='before')
     @classmethod
@@ -130,9 +156,14 @@ class BaseEntity(BaseModel):
 
 class Requirement(BaseEntity):
     entity_type: Literal["requirement"] = "requirement"
-    criticality: CriticalityLevel = Field(..., description="MANDATORY (shall), IMPORTANT (should), OPTIONAL (may).")
-    modal_verb: str = Field(..., description="The exact verb used (shall, must, will, should, may).")
-    req_type: RequirementType = Field("OTHER", description="Functional classification of the requirement.")
+    # IMPORTANT: These fields are OPTIONAL to avoid schema-induced extraction dropouts.
+    # Downstream logic should treat them as best-effort signals.
+    criticality: Optional[CriticalityLevel] = Field(
+        None,
+        description="MANDATORY (shall/must), IMPORTANT (should), OPTIONAL (may), INFORMATIONAL.",
+    )
+    modal_verb: Optional[str] = Field(None, description="Modal verb if explicitly present (shall/must/should/may).")
+    req_type: Optional[RequirementType] = Field(None, description="Functional classification of the requirement.")
     # Workload specific fields (captured upfront!)
     labor_drivers: List[str] = Field(default_factory=list, description="Raw workload data (volumes, frequencies, shifts, quantities, customer counts) that drive staffing requirements. NOT staffing roles.")
     material_needs: List[str] = Field(default_factory=list, description="List of equipment, supplies, or facilities mentioned.")
@@ -151,16 +182,16 @@ class SubmissionInstruction(BaseEntity):
 
 class StrategicTheme(BaseEntity):
     entity_type: Literal["strategic_theme"] = "strategic_theme"
-    theme_type: ThemeType = Field(..., description="Classification of the strategic element.")
+    theme_type: Optional[ThemeType] = Field(None, description="Classification of the strategic element.")
 
 class Clause(BaseEntity):
     entity_type: Literal["clause"] = "clause"
-    clause_number: str = Field(..., description="The FAR/DFARS citation (e.g., 'FAR 52.212-1').")
-    regulation: str = Field(..., description="FAR, DFARS, AFFARS, etc.")
+    clause_number: Optional[str] = Field(None, description="The FAR/DFARS citation (e.g., 'FAR 52.212-1').")
+    regulation: Optional[str] = Field(None, description="FAR, DFARS, AFFARS, etc.")
 
 class PerformanceMetric(BaseEntity):
     entity_type: Literal["performance_metric"] = "performance_metric"
-    threshold: str = Field(..., description="The specific value/limit (e.g., '99.9%', '< 2 errors').")
+    threshold: Optional[str] = Field(None, description="The specific value/limit (e.g., '99.9%', '< 2 errors').")
     measurement_method: Optional[str] = Field(None, description="How the metric is calculated or inspected.")
 
 
@@ -232,9 +263,20 @@ class WorkloadEnrichmentResponse(BaseModel):
 # ==========================================
 
 class Relationship(BaseModel):
-    source_entity: BaseEntity = Field(..., description="Full source entity object with entity_name and entity_type.")
-    target_entity: BaseEntity = Field(..., description="Full target entity object with entity_name and entity_type.")
-    relationship_type: str = Field(..., description="Type of relationship (e.g., EVALUATED_BY, GUIDES, CHILD_OF, ATTACHMENT_OF, PRODUCES).")
+    """
+    Relationship extracted at chunk-time.
+
+    CRITICAL COMPATIBILITY NOTE:
+    - Prompt examples and real LLM outputs commonly use string endpoints:
+      {"source_entity": "Daily Equipment Cleaning", "target_entity": "...", ...}
+    - Requiring nested BaseEntity objects caused validation failures and fallback extraction,
+      leading to sparse graphs and generic answers.
+    """
+
+    source_entity: str = Field(..., description="Source entity name (string).")
+    target_entity: str = Field(..., description="Target entity name (string).")
+    relationship_type: str = Field(..., description="Relationship type (e.g., MEASURED_BY, GUIDES, EVALUATED_BY).")
+    description: Optional[str] = Field(None, description="Optional short description/evidence.")
 
 
 # ==========================================
@@ -341,31 +383,20 @@ class ExtractionResult(BaseModel):
     @model_validator(mode='after')
     def validate_relationships(self):
         """
-        Ensure that every relationship points to a valid entity name.
-        Drops relationships that point to non-existent entities (Ghost Nodes).
+        Minimal relationship cleanup.
+
+        We DO NOT drop cross-chunk relationships here. LightRAG merges entities across chunks,
+        and dropping "ghost" edges at extraction time drastically reduces connectivity and
+        hurts multi-hop retrieval.
         """
-        # Create a set of all valid entity names (normalized)
-        valid_names = {e.entity_name.strip().lower() for e in self.entities if e.entity_name}
-        
-        valid_relationships = []
-        dropped_count = 0
-        
+        cleaned: List[Relationship] = []
         for rel in self.relationships:
-            # Now using entity objects instead of strings
-            source = rel.source_entity.entity_name.strip().lower()
-            target = rel.target_entity.entity_name.strip().lower()
-            
-            if source in valid_names and target in valid_names:
-                valid_relationships.append(rel)
-            else:
-                dropped_count += 1
-                # Optional: Log detailed warning if needed, but keep schema clean
-                # logger.warning(f"Dropping ghost relationship: {rel.source_entity.entity_name} -> {rel.target_entity.entity_name}")
-        
-        if dropped_count > 0:
-            # We can't easily log from inside a model validator without a logger instance, 
-            # but the dropped count will be reflected in the final list length.
-            pass
-            
-        self.relationships = valid_relationships
+            if not rel.relationship_type or not rel.relationship_type.strip():
+                continue
+            if not rel.source_entity or not rel.source_entity.strip():
+                continue
+            if not rel.target_entity or not rel.target_entity.strip():
+                continue
+            cleaned.append(rel)
+        self.relationships = cleaned
         return self

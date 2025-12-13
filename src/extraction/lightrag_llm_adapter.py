@@ -248,22 +248,18 @@ class LightRAGExtractionAdapter:
         
         # Convert relationships
         for rel in result.relationships:
-            # Extract entity names and types from the embedded BaseEntity objects
-            source_name = rel.source_entity.entity_name if rel.source_entity else "UNKNOWN"
-            source_type = rel.source_entity.entity_type if rel.source_entity else "unknown"
-            target_name = rel.target_entity.entity_name if rel.target_entity else "UNKNOWN"
-            target_type = rel.target_entity.entity_type if rel.target_entity else "unknown"
-            
-            # Escape pipes
-            source_name = self._escape_pipes(source_name)
-            target_name = self._escape_pipes(target_name)
-            rel_type = self._escape_pipes(rel.relationship_type)
-            
-            # LightRAG expects: relation<|#|>source<|#|>target<|#|>keywords<|#|>description
-            # Map our rich schema to LightRAG's format:
-            # - keywords: relationship_type (e.g., "EVALUATED_BY", "GUIDES")
-            # - description: contextual description using entity types
-            description = f"{source_name} ({source_type}) {rel_type} {target_name} ({target_type})"
+            # Relationship endpoints are strings (schema-compatible with prompt examples).
+            source_name = self._escape_pipes(getattr(rel, "source_entity", "") or "UNKNOWN")
+            target_name = self._escape_pipes(getattr(rel, "target_entity", "") or "UNKNOWN")
+            rel_type = self._escape_pipes(getattr(rel, "relationship_type", "") or "RELATED_TO")
+
+            # Prefer LLM-provided description if present; otherwise synthesize.
+            rel_desc = getattr(rel, "description", None)
+            if rel_desc and str(rel_desc).strip():
+                description = self._escape_pipes(str(rel_desc).strip())
+            else:
+                description = f"{source_name} {rel_type} {target_name}"
+
             line = f"relation{TUPLE_DELIMITER}{source_name}{TUPLE_DELIMITER}{target_name}{TUPLE_DELIMITER}{rel_type}{TUPLE_DELIMITER}{description}"
             lines.append(line)
         
@@ -304,20 +300,20 @@ class LightRAGExtractionAdapter:
     
     def _get_relationship_endpoints(self, rel) -> tuple:
         """Extract source and target from relationship (handles different formats)."""
-        # New format with entity objects
-        if hasattr(rel, 'source_entity') and rel.source_entity:
-            source = rel.source_entity.entity_name
-        elif hasattr(rel, 'source_id'):
+        # Current schema: string endpoints (source_entity/target_entity).
+        # Backward-compatible: also supports object endpoints and *_id.
+        source = "UNKNOWN"
+        target = "UNKNOWN"
+
+        if hasattr(rel, "source_entity") and rel.source_entity:
+            source = rel.source_entity.entity_name if hasattr(rel.source_entity, "entity_name") else rel.source_entity
+        elif hasattr(rel, "source_id") and rel.source_id:
             source = rel.source_id
-        else:
-            source = "UNKNOWN"
-        
-        if hasattr(rel, 'target_entity') and rel.target_entity:
-            target = rel.target_entity.entity_name
-        elif hasattr(rel, 'target_id'):
+
+        if hasattr(rel, "target_entity") and rel.target_entity:
+            target = rel.target_entity.entity_name if hasattr(rel.target_entity, "entity_name") else rel.target_entity
+        elif hasattr(rel, "target_id") and rel.target_id:
             target = rel.target_id
-        else:
-            target = "UNKNOWN"
         
         return source, target
     

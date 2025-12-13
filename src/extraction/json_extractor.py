@@ -68,7 +68,14 @@ class JsonExtractor:
         1. Base JSON formatting instructions (grok_json_prompt.md)
         2. Entity Detection Rules (entity_detection_rules.md)
         3. Entity Extraction Prompt (entity_extraction_prompt.md)
-        4. Relationship inference rules (prompts/relationship_inference/*.md)
+        
+        IMPORTANT:
+        Relationship inference rules are intentionally NOT included here.
+        Those belong in post-processing (semantic_post_processor) where:
+        - The full KG is available (cross-chunk, cross-document reasoning)
+        - IDs are stable and resolvable
+        Including relationship inference rules during chunk-time extraction
+        bloats the system prompt and reduces recall/precision.
         """
         base_path = os.getcwd()
         prompts_dir = os.path.join(base_path, "prompts")
@@ -105,19 +112,6 @@ class JsonExtractor:
         else:
             logger.warning(f"Extraction prompt not found at {extraction_prompt_path}")
 
-        # 4. Relationship Inference Rules
-        inference_dir = os.path.join(prompts_dir, "relationship_inference")
-        inference_rules = []
-        if os.path.exists(inference_dir):
-            # Sort to ensure deterministic order
-            for filename in sorted(os.listdir(inference_dir)):
-                if filename.endswith(".md"):
-                    file_path = os.path.join(inference_dir, filename)
-                    with open(file_path, "r", encoding="utf-8") as f:
-                        inference_rules.append(f"--- RULE FROM {filename} ---\n{f.read()}")
-        
-        full_inference_text = "\n\n".join(inference_rules)
-
         # Combine everything
         full_prompt = f"""
 {json_instructions}
@@ -129,10 +123,6 @@ The following rules define how to identify and classify government contracting e
 # PART 2: ENTITY EXTRACTION INSTRUCTIONS & EXAMPLES
 The following instructions and examples demonstrate how to extract entities and metadata.
 {extraction_prompt}
-
-# PART 3: RELATIONSHIP INFERENCE RULES
-The following rules define how to infer relationships between entities.
-{full_inference_text}
 
 # FINAL INSTRUCTION
 Analyze the input text using the Domain Knowledge and Inference Rules provided above.
