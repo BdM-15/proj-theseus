@@ -27,9 +27,11 @@ This analysis documents the evolution of the GovCon Capture Vibe RAG pipeline fr
 ### Root Cause Summary
 
 1. **Over-engineering**: 18 entity types + 8 post-processing algorithms + strict Pydantic validation
-2. **Architectural duplication**: Custom code duplicating RAG-Anything/LightRAG internals
+2. **Architectural duplication**: Custom code duplicating RAG-Anything/LightRAG internals (parallelization, KG processing)
 3. **Token starvation**: Query overrides capped KG context tokens, dropping granular details
 4. **Prompt compression regression**: 23% token reduction traded quality for cost savings
+5. **Entity context loss**: Removal of `description` and `source_text` fields stripped semantic richness (Branch 023)
+6. **Silent data corruption**: Pipe delimiter escaping replaces `|` with space, corrupting entity names/descriptions
 
 ---
 
@@ -103,18 +105,58 @@ if item.get('type') == 'text':  # Only 421 text blocks, not 474
 
 ---
 
-### Branch 023: Verbatim Extraction Refactor ✅ GOOD
+### Branch 023: Verbatim Extraction Refactor ⚠️ MIXED - POSSIBLE DATA LOSS
 
 **Date**: November 2025  
 **Goal**: Fix xAI API truncation (Issue #6)  
 **Key Changes**:
-- `b182603`: Add `stream=False` to prevent truncation
-- `b56a924`: Switch to native xAI SDK (gRPC)
-- `97e992b`: Remove `source_text` field (KG is index to chunks)
+- `b182603`: Add `stream=False` to prevent truncation ✅ GOOD
+- `b56a924`: Switch to native xAI SDK (gRPC) ✅ GOOD
+- `97e992b`: **BREAKING CHANGE** - Remove `source_text` AND `description` fields ❌ PROBLEMATIC
 
-**Outcome**: Fixed critical API truncation bug ✅
+**The Data Loss Problem**:
 
-**Learning**: xAI SDK native gRPC is more reliable than REST with streaming.
+The commit `97e992b` removed critical fields from BaseEntity:
+
+```python
+# BEFORE (Branch 022):
+class BaseEntity(BaseModel):
+    entity_name: str
+    entity_type: EntityType
+    description: str = Field(..., description="Comprehensive description including context, values, and relationships.")
+    source_text: Optional[str] = Field(None, description="The exact snippet from the source text that generated this entity.")
+
+# AFTER (Branch 023):
+class BaseEntity(BaseModel):
+    entity_name: str  # ONLY these two fields remain
+    entity_type: EntityType
+```
+
+**Also removed** from `Relationship`:
+```python
+# REMOVED: description: str = Field(..., description="Explanation of the relationship.")
+```
+
+**Why This Matters**:
+1. **Entity names alone are often insufficient** - "Section C.3.2" means nothing without context
+2. **`description` contained semantic richness** - "24/7 help desk support requirement with Tier 1 and Tier 2 coverage"
+3. **`source_text` provided traceability** - The exact RFP text that generated the entity
+4. The justification "KG is index to chunks" assumes chunk retrieval always works - but it doesn't
+
+**The Compensating Hack** (`lightrag_llm_adapter.py`):
+```python
+def _build_entity_description(self, entity) -> str:
+    """Build a rich description from entity attributes."""
+    parts = []
+    # Only builds from criticality, modal_verb, weight, etc.
+    # MAX 400 CHARS TRUNCATION
+    if len(description) > 400:
+        description = description[:400].rstrip()
+```
+
+This "reconstructed description" is a poor substitute for the original comprehensive description.
+
+**Learning**: The xAI SDK fix was good, but removing `description` and `source_text` may have contributed to the "generic responses" problem by stripping semantic context from entities.
 
 ---
 
@@ -163,39 +205,80 @@ except ValidationError:
 
 ---
 
-### Branch 028: Parallel Chunk Extraction ✅ GOOD (Performance)
+### Branch 028: Parallel Chunk Extraction ❌ REDUNDANT DUPLICATION
 
 **Date**: December 2025  
 **Goal**: Parallelize chunk and multimodal extraction  
 **Key Commit**: `6035921`
 
-**Outcome**:
-- Significant processing time reduction
-- No quality regression
+**What Was Built** (custom parallelization):
+```python
+async def extract_with_semaphore(chunk_text, chunk_idx, json_extractor, semaphore, total_chunks):
+    """Custom parallel extraction with semaphore control."""
+    async with semaphore:
+        return await json_extractor.extract(chunk_text, chunk_id=f"chunk-{chunk_idx+1}")
 
-**Learning**: Parallelization at extraction level is safe and beneficial.
+async def extract_multimodal_with_semaphore(modal_item, item_idx, json_extractor, semaphore, total_items):
+    """Custom parallel multimodal processing."""
+    # ... 60+ lines of custom code
+```
+
+**THE PROBLEM**: LightRAG/RAG-Anything already have native parallelization!
+
+From `src/server/initialization.py`:
+```python
+# LightRAG uses asyncio.Semaphore(llm_model_max_async) in operate.py extract_entities()
+# RAGAnything uses asyncio.Semaphore(max_parallel_insert) for multimodal item processing
+
+global_args = {
+    "llm_model_max_async": max_async,      # Native LLM call concurrency
+    "max_parallel_insert": max_async,       # Native multimodal concurrency
+    "embedding_func_max_async": max_async,  # Native embedding concurrency
+}
+```
+
+**Evidence this was redundant** - Later removed in Issue #42:
+```python
+# NOTE: extract_with_semaphore() and extract_multimodal_with_semaphore() were removed
+# in Issue #42. The lightrag_llm_adapter now intercepts ALL LightRAG extraction calls,
+# providing unified Pydantic validation with the full 121K ontology prompt.
+# RAG-Anything's native parallelization handles concurrency.
+```
+
+**Learning**: Don't build custom parallelization when libraries already handle it. LightRAG's `ainsert()` and RAG-Anything's `insert_content_list()` already use async semaphores internally.
 
 ---
 
-### Branch 029: Semantic Post-Processing Optimization ✅ GOOD (Performance)
+### Branch 029: Semantic Post-Processing Optimization ⚠️ MIXED
 
 **Date**: December 2025  
 **Goal**: Parallelize 8 semantic algorithms (Issue #30)  
 **Key Commit**: `8706daf`
 
-**Results**:
+**Claimed Results**:
 - Post-processing: 20.3 min → 4.75 min (76.6% reduction)
-- Total pipeline: 30+ min → 15 min (50% reduction)
-- 3,111 relationships inferred
-- 100% requirement enrichment
+- 3,111 relationships inferred (vs 154 in Branch 022)
 
-**Phases Implemented**:
-1. Phase 1: Parallel execution (43% reduction)
-2. Phase 2: Algorithm-specific batching (+867 relationships)
-3. Phase 3A: Parallel enrichment (85% reduction)
-4. Phase 3B: Full algorithm parallelization (39% reduction)
+**THE CONCERN**: 3,111 relationships vs 154 in the "Perfect Run"
 
-**Learning**: Parallelization of post-processing is safe when algorithms are independent.
+Branch 022 had **154 inferred relationships** with **98%+ query quality**.
+Branch 029 has **3,111 inferred relationships** (20x more).
+
+**Questions Not Asked**:
+1. Are 3,000+ relationships better or just more noise?
+2. Does parallelizing 8 algorithms create race conditions or duplicate relationships?
+3. The "+867 relationships" from "Algorithm-Specific Batching" - are these quality or ghost nodes?
+
+**What May Be Correct**:
+- Parallelizing independent algorithms IS theoretically safe
+- The workload enrichment parallelization may be beneficial
+
+**What May Be Problematic**:
+- 20x more relationships suggests possible over-inference
+- Parallel LLM calls may have different results than sequential (non-determinism)
+- No quality validation against Branch 022's benchmark
+
+**Learning**: Performance gains mean nothing if quality degrades. The "Perfect Run" had 154 relationships with 98%+ quality - why do we need 3,111?
 
 ---
 
@@ -436,9 +519,67 @@ except json.JSONDecodeError as e:
 
 **What NOT to do**: Complex retries, exponential backoff, temperature adjustments.
 
+### ⚠️ CORRECTIONS TO ORIGINAL ASSESSMENT
+
+**Branch 028/029 (Parallelization)**: Originally marked as ✅ GOOD, but:
+- Custom parallelization duplicated LightRAG/RAG-Anything native features
+- Was later **removed** in Issue #42 as redundant
+- The native `llm_model_max_async`, `max_parallel_insert`, `embedding_func_max_async` settings already handle concurrency
+
+**Branch 023 (source_text removal)**: Originally marked as ✅ GOOD, but:
+- Removed `description` and `source_text` fields from BaseEntity
+- May have contributed to "generic responses" by stripping semantic context
+- The compensating `_build_entity_description()` is truncated to 400 chars
+
 ---
 
 ## Pitfalls & Failed Experiments
+
+### 0. ❌ CRITICAL: Pipe Delimiter Silently Drops Data (lightrag_llm_adapter.py)
+
+**The Silent Data Corruption**:
+
+The `lightrag_llm_adapter.py` converts Pydantic entities to LightRAG's pipe-delimited format. In doing so, it **silently destroys data**:
+
+```python
+def _escape_pipes(self, text: str) -> str:
+    """Escape pipe characters and clean text for pipe-delimited format."""
+    if not text:
+        return ""
+    # Replace pipe with space to avoid parsing issues
+    text = str(text).replace("|", " ").replace("<|", " ").replace("|>", " ")
+    # Also clean up any accidental delimiters
+    text = text.replace(TUPLE_DELIMITER, " ")
+    return text.strip()
+```
+
+**Impact Examples**:
+
+| Original Text | After Escape | Data Lost |
+|--------------|-------------|-----------|
+| `"FAR 52.212-1 | Commercial Items"` | `"FAR 52.212-1   Commercial Items"` | Alternative marker lost |
+| `"Option A | Option B | Option C"` | `"Option A   Option B   Option C"` | Structure lost |
+| `"24/7 | 365 days"` | `"24/7   365 days"` | Semantic separator lost |
+
+**Why This Matters**:
+- Government contracting documents use `|` frequently for alternatives and separators
+- This replacement happens **silently** with no logging
+- We don't know how much data has been corrupted
+
+**The Deeper Problem**:
+
+The pipe-delimited format is LightRAG's internal transport:
+```
+entity<|#|>name<|#|>type<|#|>description
+```
+
+By building a custom adapter that converts Pydantic → pipe format, we introduced a **lossy transformation layer** that doesn't exist when using LightRAG's native extraction.
+
+**Recommendation**: Either:
+1. Use LightRAG's native extraction (no pipe escaping needed)
+2. Or use a lossless encoding (Base64, JSON string escaping) instead of space replacement
+
+---
 
 ### 1. ❌ Duplicating RAG-Anything Internals (Branch 030)
 
@@ -525,6 +666,70 @@ if any(keyword in name.lower() for keyword in ['technical', 'management', 'price
 
 ---
 
+### 8. ❌ Removing Entity Description and Source Text (Branch 023)
+
+**What Was Removed** (commit `97e992b`):
+```python
+# REMOVED from BaseEntity:
+description: str = Field(..., description="Comprehensive description including context, values, and relationships.")
+source_text: Optional[str] = Field(None, description="The exact snippet from the source text that generated this entity.")
+
+# REMOVED from Relationship:
+description: str = Field(..., description="Explanation of the relationship.")
+```
+
+**The Justification Was Wrong**:
+> "The knowledge graph is an INDEX to chunks, not a text store"
+
+**Why This Caused Problems**:
+1. Entity names like "Section C.3.2" are meaningless without description
+2. The description contained workload drivers, frequencies, quantities - THE GRANULAR DETAILS
+3. Source text provided traceability to the original RFP text
+4. Retrieval quality depends on rich entity metadata, not just names
+
+**The Compensating Hack Doesn't Work**:
+```python
+def _build_entity_description(self, entity) -> str:
+    # Only builds from metadata fields (criticality, weight, etc.)
+    # Truncated to 400 chars
+    if len(description) > 400:
+        description = description[:400].rstrip()
+```
+
+This "reconstructed" description is a poor substitute for the original:
+- Only includes structured metadata, not semantic context
+- Truncated to 400 chars (original descriptions could be 2-3KB)
+- Missing the actual explanatory text that makes entities meaningful
+
+**Learning**: Don't optimize storage at the expense of retrieval quality. The ~2KB per entity "savings" destroyed semantic richness.
+
+---
+
+### 9. ❌ Custom Parallelization When Libraries Already Handle It (Branches 028/029)
+
+**What Was Built**:
+- `extract_with_semaphore()` - Custom text chunk parallelization
+- `extract_multimodal_with_semaphore()` - Custom multimodal parallelization
+
+**What LightRAG/RAG-Anything Already Provides**:
+```python
+# From lightrag/operate.py - NATIVE parallelization
+semaphore = asyncio.Semaphore(llm_model_max_async)
+
+# From RAGAnything - NATIVE multimodal parallelization
+semaphore = asyncio.Semaphore(max_parallel_insert)
+```
+
+**Evidence It Was Redundant** - Later removed:
+```python
+# NOTE: extract_with_semaphore() and extract_multimodal_with_semaphore() were removed
+# in Issue #42. RAG-Anything's native parallelization handles concurrency.
+```
+
+**Learning**: Read the library source code before reimplementing features. Both LightRAG and RAG-Anything have extensive async/await and semaphore patterns.
+
+---
+
 ## Recommendations for Reset
 
 ### Starting Point
@@ -581,6 +786,48 @@ if any(keyword in name.lower() for keyword in ['technical', 'management', 'price
 3. ❌ Optional Pydantic fields - Use required with defaults
 4. ❌ Complex retry logic - Simple skip-and-continue
 5. ❌ Redundant multimodal extraction - RAG-Anything handles it
+6. ❌ Custom parallelization (extract_with_semaphore) - Use native library settings
+7. ❌ Pipe delimiter escaping that replaces `|` with space - This is lossy
+
+### Critical Issues to Investigate Before Reset
+
+#### 1. Restore description and source_text Fields?
+
+Branch 022 (Perfect Run) had these fields in BaseEntity:
+```python
+description: str  # "Comprehensive description including context, values, and relationships"
+source_text: Optional[str]  # "The exact snippet from the source text"
+```
+
+**Question**: Did removing these fields cause the "generic responses" problem?
+
+**Action**: Compare query responses between:
+- Workspace with description/source_text (Branch 022)
+- Workspace without (Branch 023+)
+
+#### 2. Audit the Pipe Delimiter Data Loss
+
+Current code silently replaces `|` with space:
+```python
+text = str(text).replace("|", " ")  # Data loss!
+```
+
+**Action**: 
+- Grep RFPs for `|` usage patterns
+- Quantify how much data is being corrupted
+- Consider JSON string escaping instead
+
+#### 3. Validate 154 vs 3,111 Relationships
+
+Branch 022 had 154 inferred relationships with 98%+ quality.
+Branch 029+ has 3,111+ relationships.
+
+**Question**: Are 3,000 extra relationships improving or degrading retrieval?
+
+**Action**:
+- Run the same workload query against both
+- Compare response completeness and accuracy
+- More relationships ≠ better quality
 
 ### Configuration Anchors (Never Change)
 
@@ -658,7 +905,7 @@ Stage 7: Update doc_status                      ← LightRAG
 
 ---
 
-## Appendix: Branch Reference Table
+## Appendix: Branch Reference Table (CORRECTED)
 
 | Branch | Key Changes | Goal | Impact | Quality Effect |
 |--------|------------|------|--------|---------------|
@@ -666,11 +913,11 @@ Stage 7: Update doc_status                      ← LightRAG
 | 022a | Prompt compression | Token reduction | ⚠️ Not activated | N/A (preserved) |
 | 022b | Multimodal integration | Table/image entities | ✅ Positive | Maintained |
 | 022c | Code cleanup | Remove obsolete code | ✅ Positive | Maintained |
-| **023** | xAI SDK fix | Fix truncation | ✅ Positive | Fixed bug |
+| **023** | xAI SDK fix + **REMOVED description/source_text** | Fix truncation | ⚠️ **MIXED** | SDK fix good, field removal problematic |
 | **025** | Pydantic validation | Schema enforcement | ✅ Positive | Improved |
 | **027** | Query config, BOE | Optimization | ✅ Mostly positive | Improved |
-| **028** | Parallel extraction | Performance | ✅ Positive | Maintained |
-| **029** | Parallel post-proc | Performance | ✅ Positive | 76% faster |
+| **028** | Custom parallel extraction | Performance | ❌ **REDUNDANT** | Duplicated library features, later removed |
+| **029** | Parallel post-proc | Performance | ⚠️ **MIXED** | Faster, but 154→3,111 relationships (quality?) |
 | **030** | KG processor | Deduplication | ❌ **Problematic** | Duplication issues |
 | 031 | Neo4j driver fix | Bug fix | ✅ Positive | Fixed crash |
 | **032** | CDRL patterns | Algorithm 7 | ✅ Positive | Better matching |
@@ -679,6 +926,14 @@ Stage 7: Update doc_status                      ← LightRAG
 | 038 | Table analysis | Chunk format | ⚠️ Mixed | Back-and-forth |
 | **039** | Schema-driven prompts | Algorithm robustness | ✅ Positive | Fixed brittleness |
 | **040** | Query-time ontology | Fix generic responses | ⚠️ In progress | Fixing token caps |
+
+### Key Reassessments
+
+| Branch | Original Assessment | Corrected Assessment | Reason |
+|--------|-------------------|---------------------|--------|
+| 023 | ✅ Good | ⚠️ Mixed | Removed description/source_text fields |
+| 028 | ✅ Good | ❌ Redundant | Duplicated LightRAG's native parallelization |
+| 029 | ✅ Good | ⚠️ Mixed | 20x more relationships may be noise, not quality |
 
 ---
 
