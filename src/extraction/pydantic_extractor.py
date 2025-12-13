@@ -52,6 +52,8 @@ class PydanticExtractor:
         self.max_retries = int(os.getenv("LLM_MAX_RETRIES", "5"))
         # Max output tokens - prevents truncation on large entity extractions
         self.max_output_tokens = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "32000"))
+        # Temperature from env (extraction-specific → global → default)
+        self.temperature = float(os.getenv("EXTRACTION_LLM_TEMPERATURE", os.getenv("LLM_MODEL_TEMPERATURE", "0.1")))
         
         if not self.api_key:
             raise ValueError("LLM_BINDING_API_KEY or XAI_API_KEY not found in environment variables")
@@ -72,7 +74,7 @@ class PydanticExtractor:
         self.failed_chunks: List[dict] = []
         self._successful_extractions: int = 0  # For failure rate calculation
         
-        logger.info(f"Initialized PydanticExtractor: model={self.model}, max_retries={self.max_retries}, max_output_tokens={self.max_output_tokens}")
+        logger.info(f"Initialized PydanticExtractor: model={self.model}, temp={self.temperature}, max_retries={self.max_retries}, max_tokens={self.max_output_tokens}")
         
         self.system_prompt = self._load_full_system_prompt()
 
@@ -249,12 +251,13 @@ Output the result strictly as a JSON object matching the ExtractionResult schema
                     messages.append({"role": "user", "content": feedback})
                     logger.info(f"🔄 [{chunk_id}] Attempt {attempt} with {last_error_type} error feedback")
                 
-                # Use instructor's MD_JSON mode - auto-strips markdown code blocks
+                # Use instructor's native xAI provider with Pydantic validation
                 result = await self.client.chat.completions.create(
                     model=self.model,
                     response_model=ExtractionResult,
+                    max_retries=2,  # Instructor's internal retry for validation errors
                     messages=messages,
-                    temperature=0.0,  # Deterministic for structured output
+                    temperature=self.temperature,
                     max_tokens=self.max_output_tokens,
                 )
                 
