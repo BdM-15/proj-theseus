@@ -1,17 +1,17 @@
 """
-Entity extraction using Instructor library with xAI Grok.
+Pydantic Entity Extractor - Native xAI SDK structured output with Pydantic validation.
 
-Issue #6: Migrated from OpenAI SDK to Instructor for:
-- Native Pydantic validation (no manual JSON parsing)
-- Automatic retry with exponential backoff
-- Better error recovery on truncated responses
+Uses xAI SDK's native response_format parameter to pass Pydantic BaseModel directly,
+enabling true JSON schema enforcement at the API level (no markdown wrappers, no parsing).
 
 DESIGN PRINCIPLE: GRACEFUL TOLERANCE (2-3% error rate acceptable)
 - Retry aggressively (up to 5 attempts with backoffs)
-- Log failures clearly but continue processing (like table extraction tolerance)
+- Log failures clearly but continue processing
 - Track failed chunks for visibility and potential batch retry
 - Return empty result on failure to allow pipeline to continue
-- The orchestrator can check failed_chunks at end of processing
+
+Branch 041a: Uses xAI SDK's native Pydantic support instead of instructor library.
+The SDK's response_format parameter accepts type[pydantic.main.BaseModel] directly.
 """
 
 import os
@@ -20,8 +20,6 @@ import logging
 import asyncio
 from typing import Optional, Dict, Any, List
 
-import instructor
-from tenacity import retry, stop_after_attempt, wait_exponential, before_log, after_log
 from pydantic import ValidationError
 
 from src.ontology.schema import ExtractionResult
@@ -30,35 +28,42 @@ from src.utils.logging_config import log_graceful_failure
 logger = logging.getLogger(__name__)
 
 
-class JsonExtractor:
+class PydanticExtractor:
+    """
+    Entity extractor using xAI SDK's native Pydantic structured output support.
+    
+    The xAI SDK's chat.create() method accepts `response_format=PydanticModel`
+    which enforces JSON schema at the API level - no markdown wrapping, no parsing needed.
+    """
+    
     def __init__(self):
-        self.api_key = os.getenv("LLM_BINDING_API_KEY")
+        self.api_key = os.getenv("LLM_BINDING_API_KEY") or os.getenv("XAI_API_KEY")
         self.model = os.getenv("EXTRACTION_LLM_NAME", "grok-4-1-fast-non-reasoning")
-        # More aggressive retry count - data preservation is critical
+        # Retry count - data preservation is critical
         self.max_retries = int(os.getenv("LLM_MAX_RETRIES", "5"))
+        # Max output tokens - prevents truncation on large entity extractions
+        self.max_output_tokens = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "32000"))
         
-        if not self.api_key:
-            logger.warning("LLM_BINDING_API_KEY not found, checking XAI_API_KEY")
-            self.api_key = os.getenv("XAI_API_KEY")
-            
         if not self.api_key:
             raise ValueError("LLM_BINDING_API_KEY or XAI_API_KEY not found in environment variables")
 
-        # Set XAI_API_KEY for instructor's from_provider
+        # Set environment variable for xAI SDK
         os.environ["XAI_API_KEY"] = self.api_key
         
-        # Initialize instructor with xAI provider (handles retries, validation, etc.)
-        # async_client=True for async support
-        self.client = instructor.from_provider(
-            f"xai/{self.model}",
-            async_client=True
-        )
+        # Initialize xAI SDK client directly (NOT through instructor)
+        from xai_sdk.aio.client import Client as AsyncXAIClient
+        from xai_sdk import chat as xai_chat
+        
+        self.xai_client = AsyncXAIClient()
+        self._xai_chat = xai_chat  # For message helpers
+        
+        logger.info(f"✅ Using native xAI SDK with response_format=ExtractionResult (Pydantic)")
         
         # Track failed chunks for potential later recovery
         self.failed_chunks: List[dict] = []
         self._successful_extractions: int = 0  # For failure rate calculation
         
-        logger.info(f"Initialized Instructor client with xAI model: {self.model}, max_retries: {self.max_retries}")
+        logger.info(f"Initialized PydanticExtractor: model={self.model}, max_retries={self.max_retries}, max_output_tokens={self.max_output_tokens}")
         
         self.system_prompt = self._load_full_system_prompt()
 
@@ -136,14 +141,14 @@ The following rules define how to infer relationships between entities.
 
 # FINAL INSTRUCTION
 Analyze the input text using the Domain Knowledge and Inference Rules provided above.
-Output the result strictly as a JSON object matching the schema defined in the first section.
+Output the result strictly as a JSON object matching the ExtractionResult schema.
 """
         logger.info(f"Constructed system prompt with {len(full_prompt)} characters (~{len(full_prompt)//4} tokens)")
         return full_prompt
 
     async def extract(self, text: str, chunk_id: str = "unknown") -> ExtractionResult:
         """
-        Extracts entities from the given text using Instructor + xAI Grok.
+        Extracts entities from the given text using native xAI SDK structured output.
         
         Uses automatic retry with exponential backoff for resilience against
         API truncation/instability issues.
@@ -163,12 +168,16 @@ Output the result strictly as a JSON object matching the schema defined in the f
         token_count = 0
         try:
             # Log chunk size for debugging
-            import tiktoken
-            tokenizer = tiktoken.get_encoding("cl100k_base")
-            token_count = len(tokenizer.encode(text))
+            try:
+                import tiktoken
+                tokenizer = tiktoken.get_encoding("cl100k_base")
+                token_count = len(tokenizer.encode(text))
+            except Exception:
+                token_count = len(text) // 4  # Rough estimate
+            
             logger.info(f"📤 [{chunk_id}] Extraction request to {self.model} ({len(text)} chars, ~{token_count} tokens)")
             
-            # Use instructor with built-in retry mechanism
+            # Use xAI SDK with native Pydantic structured output
             result = await self._extract_with_retry(text, chunk_id)
             
             # Post-process: rescue entities with partial data
@@ -204,28 +213,44 @@ Output the result strictly as a JSON object matching the schema defined in the f
 
     async def _extract_with_retry(self, text: str, chunk_id: str = "unknown") -> ExtractionResult:
         """
-        Internal extraction method with manual retry logic.
+        Internal extraction method using xAI SDK's native Pydantic support.
         
-        Retries up to max_retries times with exponential backoff (5s, 15s, 45s, 135s delays)
-        on any exception (API errors, truncation, validation failures).
+        The xAI SDK's response_format parameter accepts a Pydantic BaseModel class directly,
+        which enforces JSON schema at the API level - the model MUST return valid JSON
+        matching the schema (no markdown wrappers, no parsing needed).
+        
+        Retries up to max_retries times with SHORT backoff (2s, 4s, 8s, 16s delays).
         """
         max_attempts = self.max_retries
         last_error = None
         
         for attempt in range(1, max_attempts + 1):
             try:
-                logger.info(f"🔄 [{chunk_id}] Extraction attempt {attempt}/{max_attempts}")
+                # Build messages using xAI SDK helpers
+                messages = [
+                    self._xai_chat.system(self.system_prompt),
+                    self._xai_chat.user(text)
+                ]
                 
-                result = await self.client.chat.completions.create(
+                # Create chat request with Pydantic model as response_format
+                # This is xAI SDK's NATIVE structured output - no instructor needed!
+                chat = self.xai_client.chat.create(
                     model=self.model,
-                    response_model=ExtractionResult,
-                    max_retries=2,  # Instructor's internal retry for validation errors
-                    messages=[
-                        {"role": "system", "content": self.system_prompt},
-                        {"role": "user", "content": text}
-                    ],
-                    temperature=0.1,
+                    messages=messages,
+                    temperature=0.0,  # Deterministic for structured output
+                    max_tokens=self.max_output_tokens,
+                    response_format=ExtractionResult,  # Pydantic model directly!
                 )
+                
+                # Get the response
+                response = await chat.sample()
+                
+                # Parse response content into Pydantic model
+                # The SDK should return JSON conforming to the schema
+                content = response.content if hasattr(response, 'content') else str(response)
+                
+                # If response_format worked correctly, content should be valid JSON
+                result = ExtractionResult.model_validate_json(content)
                 
                 # Success! Track it for failure rate calculation
                 self._successful_extractions += 1
@@ -233,12 +258,13 @@ Output the result strictly as a JSON object matching the schema defined in the f
                 
             except Exception as e:
                 last_error = e
-                logger.warning(f"⚠️ [{chunk_id}] Attempt {attempt}/{max_attempts} failed: {type(e).__name__}: {str(e)[:200]}")
+                error_preview = str(e)[:150].replace('\n', ' ')
+                logger.warning(f"⚠️ [{chunk_id}] Attempt {attempt}/{max_attempts} failed: {error_preview}")
                 
                 if attempt < max_attempts:
-                    # Exponential backoff: 5s, 15s, 45s, 135s
-                    delay = 5 * (3 ** (attempt - 1))
-                    logger.info(f"⏳ [{chunk_id}] Retrying in {delay} seconds...")
+                    # SHORT exponential backoff: 2s, 4s, 8s, 16s (not 5s, 15s, 45s, 135s!)
+                    delay = 2 * (2 ** (attempt - 1))
+                    logger.info(f"⏳ [{chunk_id}] Retrying in {delay}s...")
                     await asyncio.sleep(delay)
         
         # All attempts failed - raise to let extract() handle gracefully

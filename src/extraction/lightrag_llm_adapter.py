@@ -2,7 +2,7 @@
 LightRAG LLM Adapter - Bridges Pydantic validation with LightRAG's text extraction.
 
 This adapter intercepts entity extraction LLM calls and:
-1. Requests JSON structured output (using existing JsonExtractor)
+1. Requests JSON structured output (using existing PydanticExtractor)
 2. Validates with Pydantic (ExtractionResult schema)
 3. Converts to pipe-delimited format for LightRAG's parser
 4. Returns clean, validated data that LightRAG accepts
@@ -15,7 +15,7 @@ import logging
 import re
 from typing import Optional, Union, AsyncIterator
 
-from src.extraction.json_extractor import JsonExtractor
+from src.extraction.pydantic_extractor import PydanticExtractor
 from src.ontology.schema import ExtractionResult
 
 logger = logging.getLogger(__name__)
@@ -31,31 +31,31 @@ class LightRAGExtractionAdapter:
     
     When LightRAG calls the llm_model_func for entity extraction, this adapter:
     1. Detects extraction requests (vs queries, summaries, etc.)
-    2. Uses JsonExtractor with Pydantic validation
+    2. Uses PydanticExtractor with Pydantic validation
     3. Converts validated JSON → pipe-delimited format
     4. Returns to LightRAG's native parser
     """
     
-    def __init__(self, base_llm_func, json_extractor: Optional[JsonExtractor] = None):
+    def __init__(self, base_llm_func, pydantic_extractor: Optional[PydanticExtractor] = None):
         """
         Args:
             base_llm_func: The original LLM function for non-extraction calls
-            json_extractor: Optional JsonExtractor instance (creates one if not provided)
+            pydantic_extractor: Optional PydanticExtractor instance (creates one if not provided)
         """
         self.base_llm_func = base_llm_func
-        self._json_extractor = json_extractor  # Lazy init
+        self._pydantic_extractor = pydantic_extractor  # Lazy init
         self._extraction_count = 0
         self._passthrough_count = 0
         self._pydantic_success = 0
         self._pydantic_fallback = 0
         
     @property
-    def json_extractor(self) -> JsonExtractor:
-        """Lazy initialization of JsonExtractor."""
-        if self._json_extractor is None:
-            logger.info("🔧 Initializing JsonExtractor for Pydantic validation")
-            self._json_extractor = JsonExtractor()
-        return self._json_extractor
+    def pydantic_extractor(self) -> PydanticExtractor:
+        """Lazy initialization of PydanticExtractor."""
+        if self._pydantic_extractor is None:
+            logger.info("🔧 Initializing PydanticExtractor for Pydantic validation")
+            self._pydantic_extractor = PydanticExtractor()
+        return self._pydantic_extractor
     
     async def __call__(
         self,
@@ -134,9 +134,9 @@ class LightRAGExtractionAdapter:
                 logger.warning(f"[{chunk_id}] Text content too short or empty, using passthrough")
                 return await self._fallback_to_base(prompt, system_prompt, chunk_id, **kwargs)
             
-            # Use JsonExtractor for Pydantic-validated extraction
+            # Use PydanticExtractor for Pydantic-validated extraction
             logger.info(f"🎯 [{chunk_id}] Using Pydantic extraction ({len(text_content)} chars)")
-            result: ExtractionResult = await self.json_extractor.extract(
+            result: ExtractionResult = await self.pydantic_extractor.extract(
                 text_content, 
                 chunk_id=chunk_id
             )
@@ -363,8 +363,8 @@ class LightRAGExtractionAdapter:
             "pydantic_success_rate": f"{success_rate:.1f}%",
         }
         
-        if self._json_extractor:
-            stats["json_extractor_stats"] = self._json_extractor.get_extraction_stats()
+        if self._pydantic_extractor:
+            stats["pydantic_extractor_stats"] = self._pydantic_extractor.get_extraction_stats()
         
         return stats
 

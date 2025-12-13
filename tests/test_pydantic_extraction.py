@@ -9,7 +9,7 @@ sys.path.append(os.getcwd())
 # Load environment variables
 load_dotenv()
 
-from src.extraction.json_extractor import JsonExtractor
+from src.extraction.pydantic_extractor import PydanticExtractor
 
 SAMPLE_RFP_TEXT = """
 SECTION L - INSTRUCTIONS TO OFFERORS
@@ -38,9 +38,9 @@ The Contractor shall comply with FAR 52.204-21 and DFARS 252.204-7012.
 """
 
 async def test_extraction():
-    print("Initializing JsonExtractor...")
+    print("Initializing PydanticExtractor...")
     try:
-        extractor = JsonExtractor()
+        extractor = PydanticExtractor()
     except Exception as e:
         print(f"Failed to initialize extractor: {e}")
         return

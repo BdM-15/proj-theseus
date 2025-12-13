@@ -34,7 +34,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.extraction.json_extractor import JsonExtractor
+from src.extraction.pydantic_extractor import PydanticExtractor
 from src.ontology.schema import Requirement
 
 logging.basicConfig(
@@ -73,8 +73,8 @@ async def extract_with_config(use_compressed: bool) -> dict:
     # Set environment variable to control prompt loading
     os.environ["USE_COMPRESSED_PROMPTS"] = "true" if use_compressed else "false"
     
-    # Force fresh JsonExtractor to reload prompts
-    extractor = JsonExtractor()
+    # Force fresh PydanticExtractor to reload prompts
+    extractor = PydanticExtractor()
     
     # Load test document
     with open(TEST_DOCUMENT_PATH, "r", encoding="utf-8") as f:

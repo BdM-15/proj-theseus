@@ -371,6 +371,26 @@ You will return a single JSON object adhering to this exact structure:
 - DO NOT use string references like `"source_entity": "Factor 1"`.
 - Relationships do NOT have a description field.
 
-Do not include markdown formatting (```json).
-Do not include preamble text.
-Just the raw JSON string matching the schema.
+## ⚠️ CRITICAL OUTPUT FORMAT RULES
+
+**YOU MUST OUTPUT RAW JSON ONLY.**
+
+1. **NO MARKDOWN**: Do NOT wrap output in ```json or ``` code blocks
+2. **NO PREAMBLE**: Do NOT include explanations, notes, or commentary before/after JSON
+3. **PURE JSON**: Start with `{` and end with `}` - nothing else
+4. **VALID JSON**: Ensure all strings are properly escaped, no trailing commas
+
+**WRONG** (will cause parsing failure):
+```
+Here's the extraction:
+```json
+{"entities": [...]}
+```
+```
+
+**CORRECT** (raw JSON only):
+```
+{"entities": [...], "relationships": [...]}
+```
+
+Output the raw JSON object now, starting with `{`:
