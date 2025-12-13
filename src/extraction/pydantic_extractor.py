@@ -1,27 +1,29 @@
 """
 Pydantic Entity Extractor - Structured extraction using Instructor + xAI Grok.
 
-Uses instructor library with XAI_JSON mode for:
-- Native Pydantic validation (automatic schema enforcement)
-- JSON extraction with automatic retry on validation errors
-- Proper handling of xAI SDK structured outputs
+Uses instructor library with MD_JSON mode for:
+- Automatic markdown code block stripping (```json...```)
+- Native Pydantic validation with schema enforcement
+- Error feedback to LLM for self-correction on retry
 - Type-safe entity extraction matching ontology schema
 
 DESIGN PRINCIPLE: GRACEFUL TOLERANCE (2-3% error rate acceptable)
-- Retry aggressively (up to 5 attempts with backoffs)
-- Log failures clearly but continue processing
-- Track failed chunks for visibility and potential batch retry
+- Retry aggressively with error feedback to LLM
+- Differentiate JSON errors (truncation) vs validation errors (schema)
+- Feed specific error messages back to help LLM self-correct
 - Return empty result on failure to allow pipeline to continue
 
-Branch 041a: Uses instructor.from_xai() with XAI_JSON mode for reliable extraction.
+Branch 041a: Uses MD_JSON mode + error feedback pattern for reliable extraction.
 """
 
 import os
+import json
 import logging
 import asyncio
-from typing import List
+from typing import List, Optional
 
 import instructor
+from openai import AsyncOpenAI
 from pydantic import ValidationError
 
 from src.ontology.schema import ExtractionResult
@@ -32,12 +34,17 @@ logger = logging.getLogger(__name__)
 
 class PydanticExtractor:
     """
-    Entity extractor using Instructor library with xAI's XAI_JSON mode.
+    Entity extractor using Instructor library with MD_JSON mode.
     
-    Instructor handles:
-    - JSON schema enforcement at API level
-    - Automatic retry on validation errors
-    - Proper Pydantic model parsing
+    MD_JSON mode:
+    - Automatically extracts JSON from markdown code blocks (```json...```)
+    - Handles the wrapping that xAI sometimes returns despite instructions
+    - Provides Pydantic validation with clear error messages
+    
+    Error feedback pattern (from ML Mastery article):
+    - On validation failure, feed error message back to LLM
+    - LLM can self-correct based on specific validation issues
+    - Truncation errors get special handling (ask for fewer entities)
     """
     
     def __init__(self):
@@ -50,16 +57,16 @@ class PydanticExtractor:
         
         if not self.api_key:
             raise ValueError("LLM_BINDING_API_KEY or XAI_API_KEY not found in environment variables")
-
-        # Set environment variable for xAI SDK
-        os.environ["XAI_API_KEY"] = self.api_key
         
-        # Initialize instructor with xAI client using XAI_JSON mode
-        from xai_sdk.aio.client import Client as AsyncXAIClient
-        xai_client = AsyncXAIClient()
-        self.client = instructor.from_xai(xai_client, mode=instructor.Mode.XAI_JSON)
+        # Use OpenAI-compatible client with MD_JSON mode
+        # MD_JSON automatically extracts JSON from markdown code blocks
+        openai_client = AsyncOpenAI(
+            api_key=self.api_key,
+            base_url="https://api.x.ai/v1"
+        )
+        self.client = instructor.from_openai(openai_client, mode=instructor.Mode.MD_JSON)
         
-        logger.info(f"✅ Using instructor.from_xai() with XAI_JSON mode")
+        logger.info(f"✅ Using instructor MD_JSON mode (auto-strips markdown code blocks)")
         
         # Track failed chunks for potential later recovery
         self.failed_chunks: List[dict] = []
@@ -215,48 +222,137 @@ Output the result strictly as a JSON object matching the ExtractionResult schema
 
     async def _extract_with_retry(self, text: str, chunk_id: str = "unknown") -> ExtractionResult:
         """
-        Internal extraction method using instructor's native Pydantic validation.
+        Internal extraction method with ERROR FEEDBACK pattern.
         
-        Uses instructor's XAI_JSON mode for native JSON schema support.
+        Key improvement from ML Mastery article:
+        - On validation failure, feed error message back to LLM
+        - LLM can self-correct based on specific validation issues
+        - Differentiate between JSON errors (truncation) vs validation errors (schema)
+        
         Retries up to max_retries times with SHORT backoff (2s, 4s, 8s, 16s delays).
         """
         max_attempts = self.max_retries
-        last_error = None
+        last_error: Optional[str] = None
+        last_error_type: Optional[str] = None  # "json", "validation", or "other"
         
         for attempt in range(1, max_attempts + 1):
             try:
-                # Use instructor's native response_model parameter
-                # This handles JSON extraction and Pydantic validation automatically
+                # Build messages - include error feedback on retry
+                messages = [
+                    {"role": "system", "content": self.system_prompt},
+                    {"role": "user", "content": text}
+                ]
+                
+                # ERROR FEEDBACK: Include validation error from previous attempt
+                if last_error and attempt > 1:
+                    feedback = self._build_error_feedback(last_error, last_error_type)
+                    messages.append({"role": "user", "content": feedback})
+                    logger.info(f"🔄 [{chunk_id}] Attempt {attempt} with {last_error_type} error feedback")
+                
+                # Use instructor's MD_JSON mode - auto-strips markdown code blocks
                 result = await self.client.chat.completions.create(
                     model=self.model,
                     response_model=ExtractionResult,
-                    messages=[
-                        {"role": "system", "content": self.system_prompt},
-                        {"role": "user", "content": text}
-                    ],
+                    messages=messages,
                     temperature=0.0,  # Deterministic for structured output
                     max_tokens=self.max_output_tokens,
-                    max_retries=2,  # Instructor's internal retry for validation errors
                 )
                 
                 # Success! Track it for failure rate calculation
                 self._successful_extractions += 1
                 return result
                 
-            except Exception as e:
-                last_error = e
-                error_preview = str(e)[:150].replace('\n', ' ')
-                logger.warning(f"⚠️ [{chunk_id}] Attempt {attempt}/{max_attempts} failed: {error_preview}")
+            except json.JSONDecodeError as e:
+                # JSON structure problem - likely truncation or invalid syntax
+                last_error = str(e)
+                last_error_type = "json"
+                error_preview = last_error[:100].replace('\n', ' ')
+                logger.warning(f"⚠️ [{chunk_id}] Attempt {attempt}/{max_attempts} JSON error: {error_preview}")
                 
-                if attempt < max_attempts:
-                    # SHORT exponential backoff: 2s, 4s, 8s, 16s (not 5s, 15s, 45s, 135s!)
-                    delay = 2 * (2 ** (attempt - 1))
-                    logger.info(f"⏳ [{chunk_id}] Retrying in {delay}s...")
-                    await asyncio.sleep(delay)
+            except ValidationError as e:
+                # Pydantic validation error - schema mismatch
+                last_error = str(e)
+                last_error_type = "validation"
+                error_preview = last_error[:100].replace('\n', ' ')
+                logger.warning(f"⚠️ [{chunk_id}] Attempt {attempt}/{max_attempts} validation error: {error_preview}")
+                
+            except Exception as e:
+                # Other errors (network, rate limit, API errors, etc.)
+                error_str = str(e)
+                last_error = error_str
+                
+                # Check if it's actually a JSON/validation error wrapped in another exception
+                if "Invalid JSON" in error_str or "EOF" in error_str or "column" in error_str:
+                    last_error_type = "json"
+                elif "validation error" in error_str.lower():
+                    last_error_type = "validation"
+                else:
+                    last_error_type = "other"
+                    
+                error_preview = error_str[:100].replace('\n', ' ')
+                logger.warning(f"⚠️ [{chunk_id}] Attempt {attempt}/{max_attempts} {last_error_type} error: {error_preview}")
+            
+            # Backoff before retry
+            if attempt < max_attempts:
+                # SHORT exponential backoff: 2s, 4s, 8s, 16s
+                delay = 2 * (2 ** (attempt - 1))
+                logger.info(f"⏳ [{chunk_id}] Retrying in {delay}s...")
+                await asyncio.sleep(delay)
         
         # All attempts failed - raise to let extract() handle gracefully
         logger.error(f"❌ [{chunk_id}] All {max_attempts} attempts exhausted")
-        raise last_error
+        raise Exception(f"Extraction failed after {max_attempts} attempts: {last_error}")
+
+    def _build_error_feedback(self, error: str, error_type: Optional[str]) -> str:
+        """
+        Build targeted error feedback message for LLM self-correction.
+        
+        Pattern from ML Mastery article - specific feedback helps LLM fix issues.
+        Truncation errors get special handling to request fewer entities.
+        """
+        if error_type == "json":
+            # JSON structure error - often truncation
+            if "EOF" in error or "column" in error or "parsing" in error.lower():
+                return (
+                    "⚠️ CRITICAL: Your previous response was TRUNCATED (incomplete JSON).\n\n"
+                    "The JSON was cut off before completion. To fix this:\n"
+                    "1. Output FEWER entities (focus on the 15-20 MOST IMPORTANT ones)\n"
+                    "2. Use shorter descriptions (max 50 chars each)\n"
+                    "3. Skip relationships - just output entities\n"
+                    "4. Ensure JSON ends with proper closing: ]}\n\n"
+                    "Try again with a SHORTER, COMPLETE response:"
+                )
+            else:
+                return (
+                    f"⚠️ JSON SYNTAX ERROR: {error[:150]}\n\n"
+                    "Please output valid JSON only:\n"
+                    "- No markdown code blocks (no ```json)\n"
+                    "- Start with { end with }\n"
+                    "- Properly escape strings\n\n"
+                    "Try again:"
+                )
+        
+        elif error_type == "validation":
+            # Pydantic validation error - schema mismatch
+            return (
+                f"⚠️ SCHEMA VALIDATION ERROR:\n{error[:250]}\n\n"
+                "Please fix the schema issues:\n"
+                "- entity_type must be one of: requirement, clause, section, document, "
+                "deliverable, evaluation_factor, submission_instruction, statement_of_work, "
+                "performance_metric, strategic_theme, organization, program, equipment, "
+                "technology, concept, location, event, person\n"
+                "- All entities need entity_name and entity_type\n"
+                "- Relationships need source_entity and target_entity as objects\n\n"
+                "Try again with corrected JSON:"
+            )
+        
+        else:
+            # Generic error
+            return (
+                f"⚠️ PREVIOUS ATTEMPT FAILED: {error[:150]}\n\n"
+                "Please try again with valid JSON output.\n"
+                "Output fewer entities if needed to ensure complete response."
+            )
 
     def _rescue_partial_entities(self, result: ExtractionResult, chunk_id: str = "unknown") -> ExtractionResult:
         """
