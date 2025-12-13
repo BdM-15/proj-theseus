@@ -36,9 +36,6 @@ class JsonExtractor:
         self.model = os.getenv("EXTRACTION_LLM_NAME", "grok-4-fast-reasoning")
         # More aggressive retry count - data preservation is critical
         self.max_retries = int(os.getenv("LLM_MAX_RETRIES", "5"))
-        # Max output tokens - prevents truncation on large entity extractions
-        # Default 32K is safe; .env can set higher (e.g., 524288 for Grok's 2M context)
-        self.max_output_tokens = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "32000"))
         
         if not self.api_key:
             logger.warning("LLM_BINDING_API_KEY not found, checking XAI_API_KEY")
@@ -61,7 +58,7 @@ class JsonExtractor:
         self.failed_chunks: List[dict] = []
         self._successful_extractions: int = 0  # For failure rate calculation
         
-        logger.info(f"Initialized Instructor client with xAI model: {self.model}, max_retries: {self.max_retries}, max_output_tokens: {self.max_output_tokens}")
+        logger.info(f"Initialized Instructor client with xAI model: {self.model}, max_retries: {self.max_retries}")
         
         self.system_prompt = self._load_full_system_prompt()
 
@@ -228,7 +225,6 @@ Output the result strictly as a JSON object matching the schema defined in the f
                         {"role": "user", "content": text}
                     ],
                     temperature=0.1,
-                    max_tokens=self.max_output_tokens,  # Prevents truncation on large extractions
                 )
                 
                 # Success! Track it for failure rate calculation

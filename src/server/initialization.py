@@ -56,11 +56,6 @@ async def initialize_raganything():
     xai_base_url = os.getenv("LLM_BINDING_HOST", "https://api.x.ai/v1")
     openai_api_key = os.getenv("EMBEDDING_BINDING_API_KEY")
     working_dir = global_args.working_dir
-
-    # NOTE: LLM_TIMEOUT is now set in app.py BEFORE LightRAG imports.
-    # LightRAG reads LLM_TIMEOUT at class definition time (dataclass field default),
-    # so it must be set before import, not here. See app.py for the fix.
-    # Current setting: LLM_TIMEOUT=300 → Worker timeout ~600s
     
     # Government contracting entity types (17 specialized types)
     # Semantic-first detection: Content determines entity type, not section labels
@@ -269,76 +264,6 @@ async def initialize_raganything():
     from lightrag.prompt import PROMPTS
     PROMPTS["entity_extraction_examples"] = []  # Empty list = no examples injected
     logger.info("✅ Disabled LightRAG's fictional example entities (prevents ontology contamination)")
-
-    # ──────────────────────────────────────────────────────────────────────────────
-    # Query-Time Prompt Enhancement (Issue #46)
-    # ──────────────────────────────────────────────────────────────────────────────
-    # LightRAG WebUI relies on its internal PROMPTS; to ensure ontology guidance is
-    # always applied, we override the relevant keys while preserving stock structure.
-    try:
-        # Domain-specific keyword extraction examples (replaces generic trade/education examples)
-        #
-        # IMPORTANT: LightRAG expects this to be a *list of strings* and does:
-        #   examples = "\n".join(PROMPTS["keywords_extraction_examples"])
-        # If we store dicts here, query-time keyword extraction crashes with:
-        #   "sequence item 0: expected str instance, dict found"
-        PROMPTS["keywords_extraction_examples"] = [
-            (
-                "Query: Based on the proposal provide me a bulletized proposal outline with compliance checks and specifics on the content, address customer pain points, and identify solutioning opportunities.\n"
-                "High-level keywords: proposal outline, Section L, Section M, volumes, submission instructions, evaluation criteria, compliance\n"
-                "Low-level keywords: submission_instruction, page limit, volume, format requirements, oral presentation, evaluation_factor, weight, importance, deliverable, requirement, clause"
-            ),
-            (
-                "Query: What are the evaluation factors and their weights?\n"
-                "High-level keywords: Section M, evaluation criteria, source selection\n"
-                "Low-level keywords: evaluation_factor, subfactor, weight, importance, adjectival rating"
-            ),
-            (
-                "Query: What are the submission instructions and page limits?\n"
-                "High-level keywords: Section L, proposal instructions, submission requirements\n"
-                "Low-level keywords: submission_instruction, page limit, volume, font, margin, format requirements"
-            ),
-            (
-                "Query: List all CDRLs/deliverables and frequency.\n"
-                "High-level keywords: deliverables, CDRL, data requirements\n"
-                "Low-level keywords: deliverable, CDRL, DID, frequency, submission"
-            ),
-            (
-                "Query: Extract labor/workload requirements for the BOE.\n"
-                "High-level keywords: workload analysis, basis of estimate, staffing drivers\n"
-                "Low-level keywords: requirement, labor_drivers, FTE, shift coverage, boe_category, volume, frequency"
-            ),
-            (
-                "Query: What FAR/DFARS clauses apply?\n"
-                "High-level keywords: regulatory requirements, contract clauses\n"
-                "Low-level keywords: clause, FAR, DFARS, 52.212-4, 252.227-7014"
-            ),
-        ]
-        logger.info("✅ Overrode LightRAG keyword extraction examples with GovCon-specific examples")
-
-        # Preserve LightRAG's stock rag_response structure; append compact GovCon guidance.
-        rag_response = PROMPTS.get("rag_response")
-        if isinstance(rag_response, str) and "GovCon Ontology" not in rag_response:
-            PROMPTS["rag_response"] = (
-                rag_response
-                + "\n\n---\n\n"
-                + "Additional Instructions (GovCon Ontology)\n"
-                + "- Prefer answers grounded in UCF structure: Section L (instructions) maps to Section M (evaluation).\n"
-                + "- When relevant, classify extracted items into ontology entity types (e.g., requirement, evaluation_factor, deliverable, clause).\n"
-                + "- For workload/BOE queries: focus on raw workload drivers (volumes/frequencies/shifts), not invented staffing roles.\n"
-                + "- Use concise, source-only descriptions and cite the originating section/attachment when possible.\n"
-                + "- If the user asks for a proposal/proposal-outline response, format the answer as:\n"
-                + "  Volume I..IX headings, and under each:\n"
-                + "  • Compliance Checks\n"
-                + "  • Content Specifics\n"
-                + "  • Addressing Customer Pain Points\n"
-                + "  • Solutioning Opportunities for Award Favor\n"
-                + "  If a page limit/format requirement is not found in retrieved context, explicitly say \"Not found in retrieved context\" (do not guess).\n"
-            )
-            logger.info("✅ Appended GovCon ontology guidance to LightRAG rag_response prompt")
-
-    except Exception as e:
-        logger.warning(f"Query-time prompt enhancement unavailable: {e}")
     
     # ═══════════════════════════════════════════════════════════════════════════════
     # Startup Configuration Summary

@@ -41,12 +41,7 @@ import uvicorn
 # Import modular components (AFTER load_dotenv() so they see environment variables)
 from src.server.config import configure_raganything_args
 from src.server.initialization import initialize_raganything, get_rag_instance
-from src.server.routes import (
-    create_insert_endpoint,
-    create_documents_upload_endpoint,
-    create_query_stream_endpoint,
-    create_graphs_endpoint,
-)
+from src.server.routes import create_insert_endpoint, create_documents_upload_endpoint
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -89,21 +84,16 @@ async def main():
     for route in app.router.routes:
         # Skip the original /insert and /documents/upload POST endpoints
         if hasattr(route, 'path') and hasattr(route, 'methods') and 'POST' in route.methods:
-            if route.path in ['/insert', '/documents/upload', '/query/stream']:
+            if route.path in ['/insert', '/documents/upload']:
                 continue
-        # Skip the original /graphs endpoint (Neo4j temporal types can break JSON serialization)
-        if hasattr(route, "path") and route.path == "/graphs":
-            continue
         new_routes.append(route)
     app.router.routes = new_routes
     
     # Add our custom endpoints with RAG-Anything multimodal processing + semantic inference
     create_insert_endpoint(app, rag_instance)
     create_documents_upload_endpoint(app, rag_instance)
-    create_query_stream_endpoint(app, rag_instance)
-    create_graphs_endpoint(app, rag_instance)
     
-    logger.info(f"✅ Custom endpoints registered: /insert, /documents/upload, /query/stream")
+    logger.info(f"✅ Custom endpoints registered: /insert, /documents/upload (multimodal + semantic inference)")
     
     # Print startup summary with pipeline flow
     chunk_size = os.getenv("CHUNK_SIZE", "8192")

@@ -22,17 +22,13 @@ Usage:
     stats = await enhance_knowledge_graph(rag_storage_path, llm_func)
 """
 
-"""
-Keep this package import-light.
+from src.inference.neo4j_graph_io import (
+    Neo4jGraphIO,
+    group_entities_by_type,
+)
 
-Some environments (e.g., dev shells without optional deps installed) may not have
-the Neo4j driver available. Importing submodules like `semantic_post_processor`
-should not fail just because `neo4j` isn't installed until those features are used.
-"""
-
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from src.inference.neo4j_graph_io import Neo4jGraphIO, group_entities_by_type
-
-__all__ = []
+__all__ = [
+    # Neo4j Graph I/O exports
+    "Neo4jGraphIO",
+    "group_entities_by_type",
+]

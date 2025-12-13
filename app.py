@@ -29,24 +29,6 @@ import subprocess
 import time
 import os
 from pathlib import Path
-import logging
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# CRITICAL: Load .env and set LLM_TIMEOUT BEFORE any LightRAG imports!
-# LightRAG reads LLM_TIMEOUT at class definition time (dataclass field default).
-# If we import LightRAG first, the timeout is locked to 180s regardless of
-# what we set later. This caused "Worker execution timeout after 360s" errors.
-# ═══════════════════════════════════════════════════════════════════════════════
-from dotenv import load_dotenv
-load_dotenv()
-
-# Set LLM_TIMEOUT before LightRAG imports (default: 300s → worker timeout ~600s)
-# This prevents timeout failures on large RFP chunks during entity extraction.
-if not os.getenv("LLM_TIMEOUT"):
-    os.environ["LLM_TIMEOUT"] = "300"
-
-logger = logging.getLogger(__name__)
-
 
 # Import LightRAG and RAG-Anything from pip BEFORE adding src to path
 # This prevents any old fork from shadowing the pip package
