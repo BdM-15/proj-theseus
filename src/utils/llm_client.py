@@ -80,7 +80,7 @@ async def call_llm_async(
         ... )
     """
     if model is None:
-        model = os.getenv("LLM_MODEL", "grok-4-fast-reasoning")
+        model = os.getenv("LLM_MODEL", "grok-4-1-fast-reasoning")
     
     # Create AsyncOpenAI client with xAI endpoint
     client = AsyncOpenAI(
@@ -272,15 +272,15 @@ def get_llm_config() -> Dict[str, Any]:
         >>> config = get_llm_config()
         >>> print(config)
         {
-            'model': 'grok-4-fast-reasoning',
+            'model': 'grok-4-1-fast-reasoning',
             'api_host': 'https://api.x.ai/v1',
             'api_key_set': True,
             'max_async': 4
         }
     """
     return {
-        "model": os.getenv("LLM_MODEL", "grok-4-fast-reasoning"),
-        "extraction_model": os.getenv("EXTRACTION_LLM_NAME", "grok-4-fast-reasoning"),
+        "model": os.getenv("LLM_MODEL", "grok-4-1-fast-reasoning"),
+        "extraction_model": os.getenv("EXTRACTION_LLM_NAME", "grok-4-1-fast-non-reasoning"),
         "api_host": os.getenv("LLM_BINDING_HOST", "https://api.x.ai/v1"),
         "api_key_set": bool(os.getenv("LLM_BINDING_API_KEY")),
         "max_async": int(os.getenv("MAX_ASYNC", "4")),

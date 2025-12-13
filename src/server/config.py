@@ -61,7 +61,7 @@ def configure_raganything_args():
     
     # LLM Configuration - xAI Grok
     global_args.llm_binding = "openai"
-    global_args.llm_model_name = os.getenv("LLM_MODEL", "grok-4-fast-reasoning")
+    global_args.llm_model_name = os.getenv("LLM_MODEL", "grok-4-1-fast-reasoning")
     global_args.llm_binding_host = xai_base_url
     global_args.llm_api_key = xai_api_key
     
@@ -72,7 +72,7 @@ def configure_raganything_args():
     global_args.embedding_api_key = openai_api_key
     global_args.embedding_dim = int(os.getenv("EMBEDDING_DIM", "3072"))  # Environment-driven for flexibility
     
-    # Government contracting entity types (17 specialized types - consolidated for flexibility)
+    # Government contracting entity types (18 specialized types - consolidated for flexibility)
     # Semantic-first detection: Content determines entity type, not section labels
     # NOTE: LightRAG normalizes to lowercase internally - use lowercase for consistency
     global_args.entity_types = [

@@ -1,7 +1,7 @@
 # Entity Extraction Prompt
 
 **Purpose**: Extract government contracting entities and relationships from RFP documents  
-**Model**: xAI Grok-4-fast-reasoning (2M context window)  
+**Model**: xAI Grok-4-1-fast-non-reasoning (2M context window, optimized for structured extraction)  
 **Prompt Size**: ~5,593 tokens (0.28% of context window)  
 **Entity Types**: 18 specialized government contracting types  
 **Enhancements**:
@@ -10,14 +10,34 @@
 - 5 annotated RFP examples (Section L↔M, requirements, attachments, clauses, deliverables)
 - 8 decision rules for ambiguous cases (edge case handling)
 - Location-agnostic extraction (content over location)
-- **Efficient extraction** (entity_name + type-specific metadata - no text duplication)
-  **Last Updated**: November 26, 2025 (Branch 026 - Extraction Enhancements)
+- **Rich descriptions required** (entity_name + description + type-specific metadata)
+  **Last Updated**: December 13, 2025 (Branch 041 - Surgical Fix: Restore Descriptions)
 
 ---
 
 ## ⚠️ CRITICAL: PERFORMANCE_METRIC vs REQUIREMENT DISTINCTION
 
-**This is the #1 extraction error. Read carefully before extracting!**
+## ⚠️ CRITICAL: DESCRIPTIONS ARE REQUIRED
+
+**ALWAYS include a `description` field for every entity.**
+
+The description is essential for knowledge graph retrieval quality. Include:
+- **Semantic context**: What this entity represents and why it matters
+- **Source location**: Where in the document (e.g., "from Section C.3.2", "per PWS paragraph 4.1")
+- **Key details**: Quantities, frequencies, constraints, relationships to other entities
+- **Domain context**: FAR/DFARS implications, UCF section relevance
+
+**Keep descriptions concise but informative** (50-200 words typical):
+- `entity_name` (required)
+- `entity_type` (required)
+- `description` (required) - Comprehensive semantic context for retrieval
+- Type-specific metadata fields (modal_verb, weight, frequency, etc.)
+
+**Good description example**:
+> "24/7 Help Desk support requirement from PWS Section 3.2.1. Contractor shall provide Tier 1 and Tier 2 technical support with 15-minute response SLA. Relates to Performance Metric PM-3 (Response Time). Critical for Task Order 0001 staffing."
+
+**Bad description** (too short, no context):
+> "Help desk support"
 
 ### PERFORMANCE_METRIC = Measurable Standard (How performance is judged)
 

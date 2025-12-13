@@ -56,7 +56,7 @@ class TableExtractor:
     
     def __init__(self):
         self.api_key = os.getenv("LLM_BINDING_API_KEY") or os.getenv("XAI_API_KEY")
-        self.model = os.getenv("EXTRACTION_LLM_NAME", "grok-4-fast-reasoning")
+        self.model = os.getenv("EXTRACTION_LLM_NAME", "grok-4-1-fast-non-reasoning")
         self.max_retries = int(os.getenv("LLM_MAX_RETRIES", "5"))
         
         if not self.api_key:

@@ -3,17 +3,17 @@ RAG-Anything Server with LightRAG WebUI
 Multimodal RAG system for government contracting documents
 
 Architecture:
-- src/server/config.py: Configuration (16 entity types, API credentials, chunking)
-- src/server/initialization.py: RAGAnything initialization (custom prompts, LLM wrappers)
+- src/server/config.py: Configuration (18 entity types, API credentials, chunking)
+- src/server/initialization.py: RAGAnything initialization (dual LLM, custom prompts)
 - src/server/routes.py: FastAPI endpoints + semantic post-processing
 - This file: Main entry point + server orchestration
 
 Workflow:
 1. Document Upload → /insert endpoint → UCF detection
 2. Dual-Path Processing → Section-aware OR standard extraction
-3. LightRAG Extraction → 16 entity types + relationships
-4. Semantic Post-Processing → 5 LLM inference algorithms
-5. Knowledge Graph Updated → GraphML + kv_store files
+3. Entity Extraction → 18 custom types (extraction LLM: non-reasoning)
+4. Semantic Post-Processing → 8 LLM inference algorithms (reasoning LLM)
+5. Knowledge Graph Storage → Neo4j or local GraphML
 """
 
 # CRITICAL: Load .env BEFORE any imports that might import LightRAG
@@ -96,7 +96,7 @@ async def main():
     logger.info(f"✅ Custom endpoints registered: /insert, /documents/upload (multimodal + semantic inference)")
     
     # Print startup summary with pipeline flow
-    chunk_size = os.getenv("CHUNK_SIZE", "8192")
+    chunk_size = os.getenv("CHUNK_SIZE", "4096")
     graph_storage = global_args.graph_storage if hasattr(global_args, 'graph_storage') else "NetworkXStorage"
     
     # ANSI color codes
@@ -118,18 +118,18 @@ async def main():
     logger.info(f"{YELLOW}2.{RESET} {BOLD}LightRAG Chunking{RESET} {CYAN}({chunk_size} tokens, 15% overlap){RESET}")
     logger.info(f"   {CYAN}└─>{RESET} Multiple focused extraction passes (prevents attention decay)")
     logger.info("")
-    logger.info(f"{YELLOW}3.{RESET} {BOLD}Entity Extraction{RESET} {CYAN}(17 custom types){RESET}")
-    logger.info(f"   {CYAN}├─>{RESET} Custom extraction prompts (~2,605 lines)")
-    logger.info(f"   {CYAN}├─>{RESET} Grok-4-fast-reasoning LLM")
+    logger.info(f"{YELLOW}3.{RESET} {BOLD}Entity Extraction{RESET} {CYAN}(18 custom types){RESET}")
+    logger.info(f"   {CYAN}├─>{RESET} Custom extraction prompts (~4,000 lines)")
+    logger.info(f"   {CYAN}├─>{RESET} Dual LLM: {os.getenv('EXTRACTION_LLM_NAME', 'grok-4-1-fast-non-reasoning')} (extraction)")
     logger.info(f"   {CYAN}└─>{RESET} Semantic-first detection (UCF patterns)")
     logger.info("")
     logger.info(f"{YELLOW}4.{RESET} {BOLD}Relationship Extraction{RESET}")
     logger.info(f"   {CYAN}└─>{RESET} LightRAG automatic relationship inference")
     logger.info("")
     logger.info(f"{YELLOW}5.{RESET} {BOLD}Semantic Post-Processing{RESET} {GREEN}(Auto-triggered){RESET}")
-    logger.info(f"   {CYAN}├─>{RESET} Entity type correction")
-    logger.info(f"   {CYAN}├─>{RESET} LLM relationship inference (Section L↔M, Annex linkage)")
-    logger.info(f"   {CYAN}└─>{RESET} Metadata enrichment")
+    logger.info(f"   {CYAN}├─>{RESET} 8 LLM inference algorithms (~3,500 lines prompts)")
+    logger.info(f"   {CYAN}├─>{RESET} Relationship inference (Section L↔M, Annex linkage)")
+    logger.info(f"   {CYAN}└─>{RESET} Workload enrichment + description generation")
     logger.info("")
     logger.info(f"{YELLOW}6.{RESET} {BOLD}Knowledge Graph Storage{RESET} {CYAN}({graph_storage}){RESET}")
     if graph_storage == "Neo4JStorage":
@@ -154,8 +154,8 @@ async def main():
     logger.info(f"{YELLOW}Current Workspace:{RESET}  {BOLD}{os.getenv('WORKSPACE', 'default')}{RESET}")
     logger.info("")
     logger.info(f"{GREEN}▸ LLM Configuration:{RESET}")
-    logger.info(f"  {CYAN}Extraction:{RESET}       {os.getenv('EXTRACTION_LLM_NAME', 'grok-4-fast-reasoning')}")
-    logger.info(f"  {CYAN}Reasoning:{RESET}        {os.getenv('REASONING_LLM_NAME', 'grok-4-fast-reasoning')}")
+    logger.info(f"  {CYAN}Extraction:{RESET}       {os.getenv('EXTRACTION_LLM_NAME', 'grok-4-1-fast-non-reasoning')}")
+    logger.info(f"  {CYAN}Reasoning:{RESET}        {os.getenv('REASONING_LLM_NAME', 'grok-4-1-fast-reasoning')}")
     logger.info(f"  {CYAN}Embeddings:{RESET}       {os.getenv('EMBEDDING_MODEL', 'text-embedding-3-large')} ({os.getenv('EMBEDDING_DIM', '3072')}D)")
     logger.info(f"{CYAN}{'═' * 80}{RESET}")
     logger.info("")

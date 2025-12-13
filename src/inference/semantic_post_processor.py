@@ -1856,7 +1856,8 @@ async def _infer_relationships_multi_algorithm(
 
 async def _semantic_post_processor_neo4j(
     llm_model_name: str = None,
-    temperature: float = 0.1
+    temperature: float = 0.1,
+    rag_storage_path: str = "./rag_storage",
 ) -> Dict:
     """
     Neo4j-native semantic post-processing using Cypher queries.
@@ -1878,7 +1879,7 @@ async def _semantic_post_processor_neo4j(
         Dict with processing statistics
     """
     if llm_model_name is None:
-        llm_model_name = os.getenv("LLM_MODEL", "grok-4-fast-reasoning")
+        llm_model_name = os.getenv("REASONING_LLM_NAME", os.getenv("LLM_MODEL", "grok-4-1-fast-reasoning"))
     
     logger.info("🔧 Starting Neo4j semantic post-processing...")
     start_time = time.time()
@@ -1943,6 +1944,11 @@ async def _semantic_post_processor_neo4j(
         logger.info(f"  Enrichment rate:       {enrichment_rate:.1f}%")
         if category_distribution:
             logger.info(f"  BOE categories used:   {', '.join([f'{k}:{v}' for k,v in category_distribution.items() if v > 0])}")
+
+        # NOTE: Branch 041 removed description enrichment steps (4a, 4b)
+        # Descriptions are now extracted during entity extraction with smaller chunks.
+        # The 916-line description_enrichment.py was deleted as it was compensation
+        # for the upstream bug of removing descriptions from extraction.
         
         # Summary statistics
         processing_time = time.time() - start_time
@@ -2015,12 +2021,13 @@ async def enhance_knowledge_graph(
     logger.info("🧠 SEMANTIC POST-PROCESSING: LLM-Powered Graph Enhancement (Neo4j)")
     logger.info("=" * 80)
     
-    # Get LLM model from environment
-    llm_model = os.getenv("LLM_MODEL", "grok-4-fast-reasoning")
+    # Get LLM model from environment (use reasoning model for post-processing)
+    llm_model = os.getenv("REASONING_LLM_NAME", os.getenv("LLM_MODEL", "grok-4-1-fast-reasoning"))
     llm_temp = float(os.getenv("LLM_MODEL_TEMPERATURE", "0.1"))
     
     return await _semantic_post_processor_neo4j(
         llm_model_name=llm_model,
-        temperature=llm_temp
+        temperature=llm_temp,
+        rag_storage_path=rag_storage_path,
     )
 

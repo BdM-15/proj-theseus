@@ -73,7 +73,7 @@ inference/
     5. Work-deliverable linking (SOW → deliverables)
 
 server/
-  - Environment configuration (16 entity types)
+  - Environment configuration (18 entity types)
   - RAGAnything initialization
   - FastAPI endpoints
   - Semantic post-processing orchestration

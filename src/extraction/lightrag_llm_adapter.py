@@ -273,34 +273,53 @@ class LightRAGExtractionAdapter:
         return "\n".join(lines)
     
     def _build_entity_description(self, entity) -> str:
-        """Build a rich description from entity attributes."""
-        parts = []
+        """
+        Build description for LightRAG pipe format.
         
-        # Base description if available
-        if hasattr(entity, 'description') and entity.description:
-            parts.append(entity.description)
+        Priority: Use actual description field from extraction (Branch 041 fix).
+        Metadata tags are appended for additional context but description is primary.
+        """
+        # PRIMARY: Use the actual description from extraction
+        base_desc = ""
+        if hasattr(entity, 'description') and entity.description and entity.description.strip():
+            base_desc = entity.description.strip()
         
-        # Add specialized fields for different entity types
-        if hasattr(entity, 'criticality') and entity.criticality:  # Requirement
-            parts.append(f"[Criticality: {entity.criticality}]")
-            if hasattr(entity, 'modal_verb') and entity.modal_verb:
-                parts.append(f"[Modal: {entity.modal_verb}]")
+        # SECONDARY: Append critical metadata tags for retrieval
+        metadata_parts = []
         
-        if hasattr(entity, 'weight') and entity.weight:  # EvaluationFactor
-            parts.append(f"[Weight: {entity.weight}]")
-        elif hasattr(entity, 'importance') and entity.importance:
-            parts.append(f"[Importance: {entity.importance}]")
+        if hasattr(entity, 'criticality') and entity.criticality:
+            metadata_parts.append(f"[Criticality: {entity.criticality}]")
         
-        if hasattr(entity, 'clause_number') and entity.clause_number:  # Clause
-            parts.append(f"[{entity.clause_number}]")
+        if hasattr(entity, 'modal_verb') and entity.modal_verb:
+            metadata_parts.append(f"[Modal: {entity.modal_verb}]")
         
-        if hasattr(entity, 'threshold') and entity.threshold:  # PerformanceMetric
-            parts.append(f"[Threshold: {entity.threshold}]")
+        if hasattr(entity, 'weight') and entity.weight:
+            metadata_parts.append(f"[Weight: {entity.weight}]")
         
-        if hasattr(entity, 'page_limit') and entity.page_limit:  # SubmissionInstruction
-            parts.append(f"[Page Limit: {entity.page_limit}]")
+        if hasattr(entity, 'clause_number') and entity.clause_number:
+            metadata_parts.append(f"[Clause: {entity.clause_number}]")
         
-        return " ".join(parts) if parts else entity.entity_name
+        if hasattr(entity, 'threshold') and entity.threshold:
+            metadata_parts.append(f"[Threshold: {entity.threshold}]")
+        
+        if hasattr(entity, 'page_limit') and entity.page_limit:
+            metadata_parts.append(f"[Page Limit: {entity.page_limit}]")
+        
+        # Combine: description first, then metadata
+        if base_desc and metadata_parts:
+            description = f"{base_desc} {' '.join(metadata_parts)}"
+        elif base_desc:
+            description = base_desc
+        elif metadata_parts:
+            description = " ".join(metadata_parts)
+        else:
+            # Fallback to entity name only if no description or metadata
+            description = entity.entity_name
+        
+        # Clean whitespace (no length truncation - smaller chunks handle this)
+        description = re.sub(r"\s+", " ", str(description)).strip()
+        
+        return description
     
     def _get_relationship_endpoints(self, rel) -> tuple:
         """Extract source and target from relationship (handles different formats)."""

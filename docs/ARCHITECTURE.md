@@ -51,7 +51,7 @@ GovCon Capture Vibe is an **ontology-modified RAG system** for federal RFP analy
 
 - **RAG-Anything** (`raganything[all]`) - Multimodal PDF parsing via MinerU
 - **LightRAG** (`lightrag-hku`) - Knowledge graph construction + WebUI
-- **xAI Grok** - Cloud LLM (`grok-4-fast-reasoning`: 2M context, $5/M input)
+- **xAI Grok** - Cloud LLM (Dual: `grok-4-1-fast-non-reasoning` extraction, `grok-4-1-fast-reasoning` queries)
 - **OpenAI Embeddings** - text-embedding-3-large (3072-dim)
 - **Neo4j 5.25** - Primary graph storage with workspace isolation
 - **Instructor** - Pydantic-enforced LLM outputs with retry logic
@@ -64,8 +64,8 @@ GovCon Capture Vibe is an **ontology-modified RAG system** for federal RFP analy
 | **Graph Storage**      | Neo4j (primary)               | Workspace isolation, Cypher queries  |
 | **Extraction Quality** | 1,522 entities (425-page RFP) | Pydantic validation, 5x retry        |
 | **Privacy**            | Public RFPs → cloud           | Queries → 100% local                 |
-| **Chunk Size**         | 8,192 tokens                  | Optimized for comprehensive coverage |
-| **LLM Model**          | grok-4-fast-reasoning         | 2M context, deterministic (temp=0.1) |
+| **Chunk Size**         | 4,096 tokens                  | Optimized for extraction quality |
+| **LLM Model**          | grok-4-1-fast-* (dual)        | Extraction + Reasoning models |
 | **Multimodal**         | Tables, images, text          | MinerU parsing with ontology mapping |
 
 ---
@@ -84,8 +84,8 @@ RAG-Anything Multimodal Pipeline
     │   ├─ Image extraction (org charts, diagrams)
     │   └─ Layout analysis (headers, footers, captions)
     ↓
-Cloud Processing (xAI Grok-4)
-    ├─ LLM: grok-4-fast-reasoning (2M context, $5/M input)
+Cloud Processing (xAI Grok-4.1)
+    ├─ LLM: grok-4-1-fast-non-reasoning (extraction) + grok-4-1-fast-reasoning (queries)
     ├─ Embeddings: OpenAI text-embedding-3-large (3072-dim)
     ├─ Chunk size: 8,192 tokens with 1,200 token overlap (15%)
     ├─ Concurrency: 16 workers (MAX_ASYNC, prevents rate limit errors)
@@ -143,7 +143,9 @@ Query Processing (100% Local)
 # LLM Settings
 LLM_BINDING_API_KEY=xai-your-key-here
 LLM_BINDING_HOST=https://api.x.ai/v1
-LLM_MODEL=grok-4-fast-reasoning
+LLM_MODEL=grok-4-1-fast-reasoning
+EXTRACTION_LLM_NAME=grok-4-1-fast-non-reasoning
+REASONING_LLM_NAME=grok-4-1-fast-reasoning
 LLM_MODEL_TEMPERATURE=0.1
 
 # Embedding Settings
@@ -207,7 +209,7 @@ BATCH_TIMEOUT_SECONDS=30  # Wait before triggering post-processing
 **Rationale**:
 
 - ✅ **Immediate availability**: xAI Grok production-ready (vs 6-month fine-tuning)
-- ✅ **Large model capability**: grok-4-fast-reasoning with 2M context window
+- ✅ **Large model capability**: grok-4-1-fast-reasoning with 2M context window
 - ✅ **Privacy maintained**: Proprietary queries stay 100% local
 - ✅ **Minimal cost**: ~$0.85 per large RFP
 
@@ -250,7 +252,7 @@ class Entity(BaseModel):
 
 client = from_openai(OpenAI(base_url="https://api.x.ai/v1"))
 result = client.chat.completions.create(
-    model="grok-4-fast-reasoning",
+    model="grok-4-1-fast-non-reasoning",  # Extraction model
     response_model=ExtractionResult,
     max_retries=5,
     messages=[...]
@@ -503,7 +505,7 @@ VALID_RELATIONSHIPS = {
 
 - ✅ RAG-Anything integration (multimodal parsing via MinerU)
 - ✅ LightRAG WebUI (http://localhost:9621/)
-- ✅ xAI Grok cloud LLM (grok-4-fast-reasoning, 2M context)
+- ✅ xAI Grok cloud LLM (dual: extraction + reasoning, 2M context)
 - ✅ OpenAI embeddings (text-embedding-3-large, 3072-dim)
 - ✅ Neo4j primary storage with workspace isolation
 - ✅ Pydantic schema enforcement (Instructor library)
@@ -567,7 +569,7 @@ VALID_RELATIONSHIPS = {
 | **Entity Density**      | ~3.6 entities/page            | Comprehensive coverage                    |
 | **Chunk Size**          | 8,192 tokens                  | Optimized for extraction quality          |
 | **Storage**             | Neo4j (primary)               | Workspace-isolated, Cypher queries        |
-| **LLM Model**           | grok-4-fast-reasoning         | 2M context, temp=0.1 (deterministic)      |
+| **LLM Model**           | grok-4-1-fast-* (dual)        | 2M context, temp=0.0/0.1 extraction/query |
 | **Validation**          | Pydantic + 5x retry           | Zero malformed entities                   |
 
 ### **Quality Indicators**
@@ -651,7 +653,8 @@ VALID_RELATIONSHIPS = {
 **Cloud Services**:
 
 - **xAI Grok**: https://docs.x.ai
-  - grok-4-fast-reasoning: $5/M input, $15/M output tokens
+  - grok-4-1-fast-non-reasoning: Extraction (deterministic)
+  - grok-4-1-fast-reasoning: Queries (synthesis)
   - API: OpenAI-compatible (https://api.x.ai/v1)
 - **OpenAI Embeddings**: https://platform.openai.com/docs/guides/embeddings
   - text-embedding-3-large: 3072-dim, 8K token limit
