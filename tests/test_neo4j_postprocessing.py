@@ -16,6 +16,7 @@ import sys
 import asyncio
 import logging
 from pathlib import Path
+import pytest
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -34,6 +35,15 @@ logging.basicConfig(
     format='%(levelname)-8s | %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+def _enabled() -> bool:
+    # This suite requires live LLM credentials and (optionally) a running Neo4j instance.
+    return (os.getenv("RUN_NEO4J_TESTS", "") or "").strip().lower() in {"1", "true", "yes", "y"}
+
+
+if not _enabled():
+    pytest.skip("Set RUN_NEO4J_TESTS=true to run Neo4j post-processing integration tests", allow_module_level=True)
 
 
 async def test_llm_call():

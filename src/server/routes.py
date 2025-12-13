@@ -27,12 +27,13 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from fastapi import UploadFile, File
 from fastapi.responses import JSONResponse
-from lightrag.api.config import global_args
+from src.server.lightrag_global_args import global_args
 from lightrag.api.routers.query_routes import QueryRequest
 from lightrag.base import QueryParam
 
 from src.query.ontology_context import build_query_context
 from src.core.prompt_loader import load_prompt
+from src.ontology.ontology_mode import get_ontology_mode
 
 logger = logging.getLogger(__name__)
 
@@ -340,9 +341,9 @@ async def process_document_with_semantic_inference(
     
     Pipeline:
     1. RAG-Anything multimodal processing (MinerU parser)
-    2. LLM entity extraction (17 types with metadata)
-    3. LLM relationship inference (5 algorithms) - ALWAYS RUNS
-    4. Save complete knowledge graph
+    2. LightRAG entity + relation extraction (ontology-mode dependent)
+    3. Save extracted knowledge graph
+    4. Optional Neo4j semantic enhancement (batch-level; gated by env)
     
     Args:
         file_path: Path to document file
@@ -488,6 +489,23 @@ async def process_document_with_semantic_inference(
                     await _queue_tracker.mark_enhancement_running()
                     
                     try:
+                        enable_enhancement = os.getenv("ENABLE_BATCH_ENHANCEMENT", "false").lower() == "true"
+                        graph_storage = getattr(global_args, "graph_storage", "NetworkXStorage")
+                        if not enable_enhancement or graph_storage != "Neo4JStorage":
+                            logger.info(
+                                "⏭️  Skipping batch enhancement (ENABLE_BATCH_ENHANCEMENT=%s, graph_storage=%s, ontology_mode=%s)",
+                                enable_enhancement,
+                                graph_storage,
+                                get_ontology_mode(),
+                            )
+                            await _queue_tracker.reset_batch()
+                            return
+
+                        if not os.getenv("NEO4J_PASSWORD"):
+                            logger.warning("⏭️  Skipping enhancement: NEO4J_PASSWORD not set")
+                            await _queue_tracker.reset_batch()
+                            return
+
                         from src.inference.semantic_post_processor import enhance_knowledge_graph
                         
                         inference_result = await enhance_knowledge_graph(
@@ -562,7 +580,7 @@ def create_insert_endpoint(app, rag_instance):
             )
             
             logger.info(f"✅ Processing complete for {file.filename}")
-            logger.info(f"   Relationships inferred: {processing_result['relationships_inferred']}")
+            logger.info(f"   Relationships inferred: {processing_result.get('relationships_inferred', 0)}")
             
             # Clean up temp file
             os.unlink(file_path)
@@ -570,7 +588,7 @@ def create_insert_endpoint(app, rag_instance):
             return JSONResponse({
                 "status": "success",
                 "message": f"Document {file.filename} processed successfully",
-                "relationships_inferred": processing_result["relationships_inferred"],
+                "relationships_inferred": processing_result.get("relationships_inferred", 0),
                 "method": "RAG-Anything + LLM semantic inference (format-agnostic)"
             })
             
@@ -636,7 +654,7 @@ def create_documents_upload_endpoint(app, rag_instance):
             
             logger.info(f"✅ Processing complete for {file.filename}")
             if 'relationships_inferred' in processing_result:
-                logger.info(f"   Relationships inferred: {processing_result['relationships_inferred']}")
+                logger.info(f"   Relationships inferred: {processing_result.get('relationships_inferred', 0)}")
             
             # Clean up temp file
             os.unlink(file_path)

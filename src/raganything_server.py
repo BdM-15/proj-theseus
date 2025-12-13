@@ -35,7 +35,7 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 
 # Import LightRAG server
 from lightrag.api.lightrag_server import create_app
-from lightrag.api.config import global_args
+from src.server.lightrag_global_args import global_args
 import uvicorn
 
 # Import modular components (AFTER load_dotenv() so they see environment variables)

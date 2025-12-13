@@ -11,6 +11,7 @@ Keeps the /query/stream compliance override modular:
 from __future__ import annotations
 
 import logging
+import os
 from typing import Optional, Tuple
 
 from lightrag.base import QueryParam
@@ -18,6 +19,10 @@ from lightrag.base import QueryParam
 from src.core.prompt_loader import load_prompt
 
 logger = logging.getLogger(__name__)
+
+
+def _rerank_configured() -> bool:
+    return (os.getenv("RERANK_BINDING", "null") or "null").strip().lower() not in {"", "null", "none", "false", "0"}
 
 
 def is_exhaustive_compliance_query(query: str) -> bool:
@@ -136,20 +141,19 @@ def apply_compliance_override(param: QueryParam, query: str) -> Tuple[QueryParam
         # Even if user picked global, mix tends to recover page limits / copy matrices more reliably.
         param.mode = "mix"
 
-    # Rerank adds noise if no rerank model is configured (and spams warnings).
-    # For compliance checklists, prefer deterministic retrieval breadth.
-    param.enable_rerank = False
+    # Enable rerank only when configured. With rerank enabled, mix mode tends to improve precision.
+    param.enable_rerank = _rerank_configured()
 
-    # Increase recall for "ALL instructions" style queries.
-    param.chunk_top_k = max(getattr(param, "chunk_top_k", 0) or 0, 200)
-    param.top_k = max(getattr(param, "top_k", 0) or 0, 120)
+    # Increase recall for "ALL instructions" style queries, but avoid flooding the generator.
+    param.chunk_top_k = max(getattr(param, "chunk_top_k", 0) or 0, 80)
+    param.top_k = max(getattr(param, "top_k", 0) or 0, 60)
 
     # With description enrichment enabled, entity/relation context can grow large and crowd out the
     # text chunks that contain exact compliance requirements (page limits, CDs, etc.).
     # For exhaustive Section L checklists, prioritize chunk evidence over KG summaries.
     param.max_entity_tokens = min(getattr(param, "max_entity_tokens", 6000) or 6000, 2500)
     param.max_relation_tokens = min(getattr(param, "max_relation_tokens", 8000) or 8000, 3500)
-    param.max_total_tokens = max(getattr(param, "max_total_tokens", 0) or 0, 60000)
+    param.max_total_tokens = max(getattr(param, "max_total_tokens", 0) or 0, 45000)
     # Force Markdown-ish bullet behavior (LightRAG rag_response uses this label verbatim).
     param.response_type = "Markdown Bullet Points"
 

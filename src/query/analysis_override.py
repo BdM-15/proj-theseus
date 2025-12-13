@@ -13,6 +13,7 @@ win themes, evaluation-driven strategy) we want:
 from __future__ import annotations
 
 import logging
+import os
 from typing import Tuple
 
 from lightrag.base import QueryParam
@@ -20,6 +21,11 @@ from lightrag.base import QueryParam
 from src.core.prompt_loader import load_prompt
 
 logger = logging.getLogger(__name__)
+
+
+def _rerank_configured() -> bool:
+    # LightRAG upstream default is RERANK_BINDING="null"
+    return (os.getenv("RERANK_BINDING", "null") or "null").strip().lower() not in {"", "null", "none", "false", "0"}
 
 def is_evaluation_factors_query(query: str) -> bool:
     q = (query or "").lower()
@@ -64,15 +70,15 @@ def apply_pain_points_override(param: QueryParam, query: str) -> Tuple[QueryPara
     else:
         param.mode = "mix"
 
-    # Disable rerank unless user explicitly configured a model (avoids warning spam).
-    param.enable_rerank = False
+    # Enable rerank only when configured (LightRAG recommends mix mode with reranker enabled).
+    param.enable_rerank = _rerank_configured()
 
-    # Wider retrieval than default; still lower than compliance override.
-    param.chunk_top_k = max(getattr(param, "chunk_top_k", 0) or 0, 120)
-    param.top_k = max(getattr(param, "top_k", 0) or 0, 80)
+    # Wider retrieval than defaults, but avoid flooding the generator (quality > quantity).
+    param.chunk_top_k = max(getattr(param, "chunk_top_k", 0) or 0, 60)
+    param.top_k = max(getattr(param, "top_k", 0) or 0, 50)
 
     # More room for synthesis (quality > brevity).
-    param.max_total_tokens = max(getattr(param, "max_total_tokens", 0) or 0, 70000)
+    param.max_total_tokens = max(getattr(param, "max_total_tokens", 0) or 0, 40000)
 
     # Keep some KG context (pain points benefit from evaluation factor structure), but don't let it dominate.
     param.max_entity_tokens = min(getattr(param, "max_entity_tokens", 6000) or 6000, 4500)
@@ -123,13 +129,13 @@ def apply_evaluation_factors_override(param: QueryParam, query: str) -> Tuple[Qu
     profile = "evaluation_factors"
 
     param.include_references = True
-    param.enable_rerank = False
+    param.enable_rerank = _rerank_configured()
     param.mode = "mix" if param.mode != "bypass" else "mix"
 
-    # Pull more evidence than defaults; still not as huge as compliance.
-    param.chunk_top_k = max(getattr(param, "chunk_top_k", 0) or 0, 120)
-    param.top_k = max(getattr(param, "top_k", 0) or 0, 80)
-    param.max_total_tokens = max(getattr(param, "max_total_tokens", 0) or 0, 70000)
+    # Pull more evidence than defaults, but keep generation focused.
+    param.chunk_top_k = max(getattr(param, "chunk_top_k", 0) or 0, 60)
+    param.top_k = max(getattr(param, "top_k", 0) or 0, 50)
+    param.max_total_tokens = max(getattr(param, "max_total_tokens", 0) or 0, 40000)
 
     # Keep KG structure; evaluation factors usually live in a smaller slice of KG.
     param.max_entity_tokens = min(getattr(param, "max_entity_tokens", 6000) or 6000, 6000)

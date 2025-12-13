@@ -17,12 +17,17 @@ load_dotenv()
 
 # Now safe to import LightRAG and related modules
 import logging
-from lightrag.api.config import global_args
+from src.server.lightrag_global_args import global_args
 from lightrag.llm.openai import openai_complete_if_cache, openai_embed
 from lightrag.utils import EmbeddingFunc
 from raganything import RAGAnything, RAGAnythingConfig
 
 from src.core.prompt_loader import load_prompt
+from src.ontology.ontology_mode import (
+    get_entity_types,
+    get_extraction_prompt_names,
+    get_ontology_mode,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +40,8 @@ async def initialize_raganything():
     
     Configuration:
     - Parser: MinerU (multimodal - images, tables, equations)
-    - Entity Types: 18 government contracting types (semantic-first detection)
-    - LLM: xAI Grok-4-fast-reasoning (cloud processing, 2M context)
+    - Entity Types: ontology-mode dependent (default: simplified 10–15 core types)
+    - LLM: xAI Grok-4 (cloud processing; prefer non-reasoning for indexing per LightRAG guidance)
     - Embeddings: OpenAI text-embedding-3-large (3072-dim, 8192 token limit)
     - Chunking: 8K tokens (overlap: 1.2K) - Multiple focused extraction passes
     
@@ -62,36 +67,8 @@ async def initialize_raganything():
     # so it must be set before import, not here. See app.py for the fix.
     # Current setting: LLM_TIMEOUT=300 → Worker timeout ~600s
     
-    # Government contracting entity types (17 specialized types)
-    # Semantic-first detection: Content determines entity type, not section labels
-    # NOTE: LightRAG normalizes to lowercase internally - use lowercase for consistency
-    entity_types = [
-        # Core entities
-        "organization", "concept", "event", "technology", "person", "location",
-        
-        # Requirements (semantic detection with metadata: requirement_type, criticality_level)
-        "requirement",
-        
-        # Structural entities
-        "clause",                   # FAR/DFARS/AFFARS patterns, will cluster by parent section
-        "section",                  # Stores both structural_label + semantic_type
-        "document",                 # References: specs, standards, manuals, regulations, attachments, annexes
-        "deliverable",
-        
-        # Evaluation entities (semantic detection, may be embedded in non-standard sections)
-        "evaluation_factor",        # Scoring criteria (Section M content)
-        "submission_instruction",   # Format/page limits (Section L content, may be IN Section M)
-        
-        # Strategic entities (Capture planning patterns)
-        "strategic_theme",          # Win themes, hot buttons, discriminators, proof points
-        
-        # Work scope (Semantic detection regardless of location)
-        "statement_of_work",        # PWS/SOW/SOO content (may be Section C or attachment)
-        
-        # Programs and equipment
-        "program",                  # Major programs (MCPP II, Navy MBOS, etc.)
-        "equipment",                # Physical items (batteries, vehicles, tools)
-    ]
+    ontology_mode = get_ontology_mode()
+    entity_types = get_entity_types(ontology_mode)
     
     # MinerU configuration from environment variables
     parser = os.getenv("PARSER", "mineru")
@@ -122,7 +99,7 @@ async def initialize_raganything():
     # Define base LLM function (xAI Grok wrapper)
     async def base_llm_model_func(prompt, system_prompt=None, history_messages=[], **kwargs):
         return await openai_complete_if_cache(
-            os.getenv("LLM_MODEL", "grok-4-fast-reasoning"),
+            os.getenv("LLM_MODEL", "grok-4"),
             prompt,
             system_prompt=system_prompt,
             history_messages=history_messages,
@@ -131,10 +108,10 @@ async def initialize_raganything():
             **kwargs,
         )
     
-    # Wrap with Pydantic extraction adapter for entity validation
-    # Issue #43: Routes extraction calls through JsonExtractor + Pydantic schema
-    # Non-extraction calls (queries, summaries) pass through to base function
-    use_pydantic_extraction = os.getenv("USE_PYDANTIC_TEXT_EXTRACTION", "true").lower() == "true"
+    # Text extraction strategy:
+    # - Default OFF: LightRAG native extraction preserves rich, verbatim descriptions in entity tuples.
+    # - Optional ON: strict Pydantic adapter (legacy behavior, can be lossy for description/evidence).
+    use_pydantic_extraction = os.getenv("USE_PYDANTIC_TEXT_EXTRACTION", "false").lower() == "true"
     if use_pydantic_extraction:
         from src.extraction.lightrag_llm_adapter import create_extraction_adapter
         llm_model_func = create_extraction_adapter(base_llm_model_func)
@@ -147,7 +124,7 @@ async def initialize_raganything():
     async def vision_model_func(prompt, system_prompt=None, history_messages=[], image_data=None, messages=None, **kwargs):
         if messages:
             return await openai_complete_if_cache(
-                os.getenv("LLM_MODEL", "grok-4-fast-reasoning"), "", system_prompt=None, history_messages=[],
+                os.getenv("LLM_MODEL", "grok-4"), "", system_prompt=None, history_messages=[],
                 messages=messages, api_key=xai_api_key, base_url=xai_base_url, **kwargs
             )
         elif image_data:
@@ -163,7 +140,7 @@ async def initialize_raganything():
             if system_prompt:
                 messages.insert(0, {"role": "system", "content": system_prompt})
             return await openai_complete_if_cache(
-                os.getenv("LLM_MODEL", "grok-4-fast-reasoning"), "", system_prompt=None, history_messages=[],
+                os.getenv("LLM_MODEL", "grok-4"), "", system_prompt=None, history_messages=[],
                 messages=messages,
                 api_key=xai_api_key, base_url=xai_base_url, **kwargs
             )
@@ -199,14 +176,9 @@ async def initialize_raganything():
         func=safe_embed_func,
     )
     
-    # Load entity extraction prompts with clear separation of concerns
-    # Branch 009: Quality-first refactoring (extraction excellence → query excellence)
-    # Philosophy: Thorough extraction enables powerful queries (2M context window)
-    # Folder structure: prompts/extraction/ (ingestion-time) vs prompts/query/ (query-time)
-    entity_extraction_prompts = [
-        load_prompt("extraction/entity_extraction_prompt"),      # ~1,450 lines - WHAT to extract (rules, types, examples)
-        load_prompt("extraction/entity_detection_rules"),        # ~1,155 lines - HOW to detect (semantic signals, UCF)
-    ]
+    # Load extraction prompts based on ontology mode.
+    prompt_names = list(get_extraction_prompt_names(ontology_mode))
+    entity_extraction_prompts = [load_prompt(name) for name in prompt_names]
     custom_entity_extraction_prompt = "\n\n---\n\n".join(entity_extraction_prompts)
 
     # Initialize RAG-Anything with custom configuration
@@ -282,38 +254,67 @@ async def initialize_raganything():
         #   examples = "\n".join(PROMPTS["keywords_extraction_examples"])
         # If we store dicts here, query-time keyword extraction crashes with:
         #   "sequence item 0: expected str instance, dict found"
-        PROMPTS["keywords_extraction_examples"] = [
-            (
-                "Query: Based on the proposal provide me a bulletized proposal outline with compliance checks and specifics on the content, address customer pain points, and identify solutioning opportunities.\n"
-                "High-level keywords: proposal outline, Section L, Section M, volumes, submission instructions, evaluation criteria, compliance\n"
-                "Low-level keywords: submission_instruction, page limit, volume, format requirements, oral presentation, evaluation_factor, weight, importance, deliverable, requirement, clause"
-            ),
-            (
-                "Query: What are the evaluation factors and their weights?\n"
-                "High-level keywords: Section M, evaluation criteria, source selection\n"
-                "Low-level keywords: evaluation_factor, subfactor, weight, importance, adjectival rating"
-            ),
-            (
-                "Query: What are the submission instructions and page limits?\n"
-                "High-level keywords: Section L, proposal instructions, submission requirements\n"
-                "Low-level keywords: submission_instruction, page limit, volume, font, margin, format requirements"
-            ),
-            (
-                "Query: List all CDRLs/deliverables and frequency.\n"
-                "High-level keywords: deliverables, CDRL, data requirements\n"
-                "Low-level keywords: deliverable, CDRL, DID, frequency, submission"
-            ),
-            (
-                "Query: Extract labor/workload requirements for the BOE.\n"
-                "High-level keywords: workload analysis, basis of estimate, staffing drivers\n"
-                "Low-level keywords: requirement, labor_drivers, FTE, shift coverage, boe_category, volume, frequency"
-            ),
-            (
-                "Query: What FAR/DFARS clauses apply?\n"
-                "High-level keywords: regulatory requirements, contract clauses\n"
-                "Low-level keywords: clause, FAR, DFARS, 52.212-4, 252.227-7014"
-            ),
-        ]
+        if ontology_mode == "simplified":
+            PROMPTS["keywords_extraction_examples"] = [
+                (
+                    "Query: Provide a proposal outline with compliance checks and specifics, address customer pain points, and identify solutioning opportunities.\n"
+                    "High-level keywords: proposal outline, Section L, Section M, compliance, evaluation criteria\n"
+                    "Low-level keywords: compliance_item, evaluation_criterion, section, deliverable, rfp_requirement, win_theme, discriminator, risk"
+                ),
+                (
+                    "Query: What are the evaluation criteria and their weights?\n"
+                    "High-level keywords: Section M, evaluation criteria, source selection\n"
+                    "Low-level keywords: evaluation_criterion, weight, importance, subfactor, rating"
+                ),
+                (
+                    "Query: What are the submission instructions and page limits?\n"
+                    "High-level keywords: Section L, proposal instructions, submission requirements\n"
+                    "Low-level keywords: compliance_item, page limit, volume, font, margin, due date, delivery"
+                ),
+                (
+                    "Query: List all CDRLs/deliverables and frequency.\n"
+                    "High-level keywords: deliverables, CDRL, data requirements\n"
+                    "Low-level keywords: deliverable, frequency, schedule"
+                ),
+                (
+                    "Query: Extract workload drivers (volumes/frequencies/shifts) that drive staffing.\n"
+                    "High-level keywords: workload analysis, basis of estimate, staffing drivers\n"
+                    "Low-level keywords: rfp_requirement, work_scope, volume, frequency, hours, shift, 24/7"
+                ),
+            ]
+        else:
+            PROMPTS["keywords_extraction_examples"] = [
+                (
+                    "Query: Based on the proposal provide me a bulletized proposal outline with compliance checks and specifics on the content, address customer pain points, and identify solutioning opportunities.\n"
+                    "High-level keywords: proposal outline, Section L, Section M, volumes, submission instructions, evaluation criteria, compliance\n"
+                    "Low-level keywords: submission_instruction, page limit, volume, format requirements, oral presentation, evaluation_factor, weight, importance, deliverable, requirement, clause"
+                ),
+                (
+                    "Query: What are the evaluation factors and their weights?\n"
+                    "High-level keywords: Section M, evaluation criteria, source selection\n"
+                    "Low-level keywords: evaluation_factor, subfactor, weight, importance, adjectival rating"
+                ),
+                (
+                    "Query: What are the submission instructions and page limits?\n"
+                    "High-level keywords: Section L, proposal instructions, submission requirements\n"
+                    "Low-level keywords: submission_instruction, page limit, volume, font, margin, format requirements"
+                ),
+                (
+                    "Query: List all CDRLs/deliverables and frequency.\n"
+                    "High-level keywords: deliverables, CDRL, data requirements\n"
+                    "Low-level keywords: deliverable, CDRL, DID, frequency, submission"
+                ),
+                (
+                    "Query: Extract labor/workload requirements for the BOE.\n"
+                    "High-level keywords: workload analysis, basis of estimate, staffing drivers\n"
+                    "Low-level keywords: requirement, labor_drivers, FTE, shift coverage, boe_category, volume, frequency"
+                ),
+                (
+                    "Query: What FAR/DFARS clauses apply?\n"
+                    "High-level keywords: regulatory requirements, contract clauses\n"
+                    "Low-level keywords: clause, FAR, DFARS, 52.212-4, 252.227-7014"
+                ),
+            ]
         logger.info("✅ Overrode LightRAG keyword extraction examples with GovCon-specific examples")
 
         # Preserve LightRAG's stock rag_response structure; append compact GovCon guidance.
@@ -324,7 +325,11 @@ async def initialize_raganything():
                 + "\n\n---\n\n"
                 + "Additional Instructions (GovCon Ontology)\n"
                 + "- Prefer answers grounded in UCF structure: Section L (instructions) maps to Section M (evaluation).\n"
-                + "- When relevant, classify extracted items into ontology entity types (e.g., requirement, evaluation_factor, deliverable, clause).\n"
+                + (
+                    "- When relevant, classify items into the active ontology entity types (simplified or legacy).\n"
+                    if ontology_mode == "simplified"
+                    else "- When relevant, classify extracted items into ontology entity types (e.g., requirement, evaluation_factor, deliverable, clause).\n"
+                )
                 + "- For workload/BOE queries: focus on raw workload drivers (volumes/frequencies/shifts), not invented staffing roles.\n"
                 + "- Use concise, source-only descriptions and cite the originating section/attachment when possible.\n"
                 + "- If the user asks for a proposal/proposal-outline response, format the answer as:\n"
@@ -356,7 +361,7 @@ async def initialize_raganything():
     logger.info(f"{CYAN}{'═' * 80}{RESET}")
     logger.info(f"{BOLD}{MAGENTA}🎯 CONFIGURATION{RESET}")
     logger.info(f"{CYAN}{'═' * 80}{RESET}")
-    logger.info(f"{GREEN}Entity Types:{RESET} {BOLD}{len(entity_types)}{RESET} specialized (organization, requirement, evaluation_factor, etc.)")
+    logger.info(f"{GREEN}Ontology Mode:{RESET} {BOLD}{ontology_mode}{RESET} | Entity Types: {BOLD}{len(entity_types)}{RESET}")
     logger.info(f"{GREEN}Parser:{RESET} {BOLD}MinerU 2.6.4{RESET} | Device: {BOLD}{GREEN if device == 'cuda' else YELLOW}{device.upper()}{RESET} | Method: {parse_method.upper()}")
     logger.info(f"{GREEN}Parallelization:{RESET} {BOLD}{GREEN}{max_async}{RESET} concurrent (text chunks + multimodal items)")
     logger.info(f"{GREEN}Multimodal:{RESET} Images, Tables, Equations {BOLD}{GREEN}ENABLED{RESET}")

@@ -14,10 +14,12 @@ load_dotenv()
 
 # Now safe to import LightRAG
 import logging
-from lightrag.api.config import global_args
+from src.server.lightrag_global_args import global_args
 from lightrag.operate import chunking_by_token_size
 
 logger = logging.getLogger(__name__)
+from src.ontology.ontology_mode import get_entity_types, get_ontology_mode
+from src.core.chunking import chunking_by_ucf_then_tokens
 
 
 def configure_raganything_args():
@@ -61,7 +63,9 @@ def configure_raganything_args():
     
     # LLM Configuration - xAI Grok
     global_args.llm_binding = "openai"
-    global_args.llm_model_name = os.getenv("LLM_MODEL", "grok-4-fast-reasoning")
+    # LightRAG upstream guidance: avoid "reasoning" models for indexing; keep query model strong.
+    # This repo uses a single LLM binding for both paths, so default to Grok 4.
+    global_args.llm_model_name = os.getenv("LLM_MODEL", "grok-4")
     global_args.llm_binding_host = xai_base_url
     global_args.llm_api_key = xai_api_key
     
@@ -72,46 +76,10 @@ def configure_raganything_args():
     global_args.embedding_api_key = openai_api_key
     global_args.embedding_dim = int(os.getenv("EMBEDDING_DIM", "3072"))  # Environment-driven for flexibility
     
-    # Government contracting entity types (17 specialized types - consolidated for flexibility)
-    # Semantic-first detection: Content determines entity type, not section labels
-    # NOTE: LightRAG normalizes to lowercase internally - use lowercase for consistency
-    global_args.entity_types = [
-        # Core entities
-        "organization",
-        "concept",
-        "event",
-        "technology",
-        "person",
-        "location",
-        
-        # Requirements (semantic detection with metadata: requirement_type, criticality_level)
-        "requirement",
-        
-        # Structural entities
-        "clause",                   # FAR/DFARS/AFFARS patterns, will cluster by parent section
-        "section",                  # Stores both structural_label + semantic_type
-        "document",                 # References: specs, standards, manuals, regulations, attachments, annexes
-        "deliverable",
-        
-        # Hierarchical program entities
-        "program",                  # Major named programs/initiatives (MCPP II, Navy MBOS, DEIP)
-        
-        # Physical assets and equipment
-        "equipment",                # Physical assets: MHE, generators, batteries, GSE, CESE, watercraft, vehicles
-        
-        # Evaluation entities (semantic detection, may be embedded in non-standard sections)
-        "evaluation_factor",        # Scoring criteria (Section M content)
-        "submission_instruction",   # Format/page limits (Section L content, may be IN Section M)
-        
-        # Strategic entities (Capture planning patterns)
-        "strategic_theme",          # Win themes, hot buttons, discriminators, proof points
-        
-        # Work scope (Semantic detection regardless of location)
-        "statement_of_work",        # PWS/SOW/SOO content (may be Section C or attachment)
-        
-        # Performance standards (QASP, surveillance, metrics)
-        "performance_metric",       # Distinct from requirements: accuracy, frequency, response times
-    ]
+    # Ontology selection:
+    # - simplified (default): 10–15 broad types to reduce graph sparsity/noise and preserve detail in chunk evidence
+    # - legacy: existing GovCon types (kept for backwards compatibility)
+    global_args.entity_types = get_entity_types()
     
     # CRITICAL: Set addon_params with our entity types
     # LightRAG's extract_entities() reads from addon_params.entity_types, NOT global_args.entity_types
@@ -129,18 +97,28 @@ def configure_raganything_args():
     global_args.max_parallel_insert = max_async
     # llm_model_max_async and embedding_func_max_async are set via lightrag_kwargs in initialization.py
     
-    # Chunking configuration (optimized for focused extraction)
-    # CHUNK_SIZE: Document chunking for BOTH LLM entity extraction and embeddings
-    # - 8K chunks = multiple focused extraction passes = comprehensive coverage
-    # - Embeddings auto-truncate to model limits via EmbeddingFunc.max_token_size
-    # CRITICAL: No defaults - must be set in .env to avoid catastrophic extraction failures
-    global_args.chunking_func = chunking_by_token_size
-    chunk_size = os.getenv("CHUNK_SIZE")
-    chunk_overlap = os.getenv("CHUNK_OVERLAP_SIZE")
-    if not chunk_size or not chunk_overlap:
-        raise ValueError("CHUNK_SIZE and CHUNK_OVERLAP_SIZE must be set in .env - no safe defaults exist")
-    global_args.chunk_token_size = int(chunk_size)
-    global_args.chunk_overlap_token_size = int(chunk_overlap)
+    # Chunking configuration (LightRAG-compatible; bounded for embeddings)
+    # Constraints (per project requirement):
+    # - chunk_token_size <= 8192
+    # - overlap <= 1200 (~15%)
+    # Chunking strategy:
+    # - simplified mode: structure-aware split (UCF/attachments) then token chunking
+    # - legacy mode: standard token chunking
+    global_args.chunking_func = (
+        chunking_by_ucf_then_tokens if get_ontology_mode() == "simplified" else chunking_by_token_size
+    )
+    chunk_size = int(os.getenv("CHUNK_SIZE", "8192"))
+    chunk_overlap = int(os.getenv("CHUNK_OVERLAP_SIZE", "1200"))
+    if chunk_size > 8192:
+        logger.warning("CHUNK_SIZE=%s exceeds 8192; clamping to 8192", chunk_size)
+        chunk_size = 8192
+    if chunk_overlap > 1200:
+        logger.warning("CHUNK_OVERLAP_SIZE=%s exceeds 1200; clamping to 1200", chunk_overlap)
+        chunk_overlap = 1200
+    global_args.chunk_token_size = chunk_size
+    global_args.chunk_overlap_token_size = chunk_overlap
+
+    logger.info("Ontology mode: %s | entity_types=%d", get_ontology_mode(), len(global_args.entity_types))
     
     # Multimodal support
     global_args.enable_multimodal = True

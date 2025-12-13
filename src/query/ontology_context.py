@@ -22,7 +22,8 @@ from dataclasses import dataclass
 import re
 from typing import List, Optional
 
-from src.ontology.schema import BOECategory, VALID_ENTITY_TYPES
+from src.ontology.schema import BOECategory
+from src.ontology.ontology_mode import get_ontology_mode, get_valid_entity_types_set
 
 
 @dataclass(frozen=True)
@@ -74,8 +75,9 @@ def build_query_context(query: str) -> QueryContext:
     ucf_hint = _detect_ucf_hint(q)
     boe_hint = _detect_boe_hint(q, metadata_focus)
 
-    # Sanity: only emit valid ontology entity types
-    target_types = [t for t in target_types if t in VALID_ENTITY_TYPES]
+    # Sanity: only emit valid ontology entity types for the current mode
+    valid_types = get_valid_entity_types_set(get_ontology_mode())
+    target_types = [t for t in target_types if t in valid_types]
 
     return QueryContext(
         target_entity_types=target_types,
@@ -93,44 +95,56 @@ def _norm(text: str) -> str:
 
 def _detect_entity_types(q: str) -> List[str]:
     hits: List[str] = []
+    mode = get_ontology_mode()
 
     def add(t: str) -> None:
         if t not in hits:
             hits.append(t)
 
     # High-signal GovCon patterns
-    if any(k in q for k in ["evaluation factor", "evaluation criteria", "source selection", "scoring", "adjectival", "rating"]):
-        add("evaluation_factor")
-    if any(k in q for k in ["section l", "submission instruction", "page limit", "volume i", "volume ii", "font", "margin"]):
-        add("submission_instruction")
+    if any(k in q for k in ["evaluation factor", "evaluation factors", "evaluation criteria", "source selection", "scoring", "adjectival", "rating", "subfactor", "subfactors"]):
+        add("evaluation_criterion" if mode == "simplified" else "evaluation_factor")
+    if any(k in q for k in ["section l", "submission instruction", "submission instructions", "page limit", "page limits", "volume i", "volume ii", "font", "margin", "due date", "closing date"]):
+        add("compliance_item" if mode == "simplified" else "submission_instruction")
     if any(k in q for k in ["requirement", "shall", "must", "should", "may", "compliance", "shall provide"]):
-        add("requirement")
+        add("rfp_requirement" if mode == "simplified" else "requirement")
     if any(k in q for k in ["performance metric", "threshold", "aql", "qasp", "performance objective"]):
-        add("performance_metric")
+        # simplified mode keeps these as requirement evidence unless explicitly asked
+        add("rfp_requirement" if mode == "simplified" else "performance_metric")
     if any(k in q for k in ["cdrl", "deliverable", "did", "data item description", "monthly report", "status report"]):
         add("deliverable")
     if any(k in q for k in ["far", "dfars", "clause", "52.212", "252.2"]):
-        add("clause")
+        add("document" if mode == "simplified" else "clause")
     if any(k in q for k in ["pws", "sow", "statement of work", "task order", "tasks"]):
-        add("statement_of_work")
+        add("work_scope" if mode == "simplified" else "statement_of_work")
     if any(k in q for k in ["attachment", "exhibit", "document", "standard", "mil-std"]):
         add("document")
     if any(k in q for k in ["program", "contract vehicle", "idiq", "bpa", "gwac"]):
-        add("program")
+        add("opportunity" if mode == "simplified" else "program")
     if any(k in q for k in ["gfe", "cfe", "equipment", "vehicle", "laptop", "server"]):
-        add("equipment")
+        add("work_scope" if mode == "simplified" else "equipment")
     if any(k in q for k in ["win theme", "strategic theme", "hot button", "discriminator", "proof point"]):
-        add("strategic_theme")
-    if any(k in q for k in ["agency", "command", "navy", "air force", "army", "dhs", "va", "organization"]):
-        add("organization")
+        if "discriminator" in q or "proof point" in q:
+            add("discriminator" if mode == "simplified" else "strategic_theme")
+        else:
+            add("win_theme" if mode == "simplified" else "strategic_theme")
+    if any(k in q for k in ["agency", "command", "navy", "air force", "army", "dhs", "va", "organization", "customer"]):
+        add("customer" if mode == "simplified" else "organization")
     if any(k in q for k in ["location", "site", "base", "conus", "oconus"]):
-        add("location")
+        add("section" if mode == "simplified" else "location")
     if any(k in q for k in ["contracting officer", "cor", "key personnel", "program manager"]):
-        add("person")
+        add("customer" if mode == "simplified" else "person")
     if any(k in q for k in ["aws", "govcloud", "kubernetes", "zero trust", "splunk", "technology"]):
-        add("technology")
+        add("work_scope" if mode == "simplified" else "technology")
     if any(k in q for k in ["section", "ucf", "section m", "section c"]):
         add("section")
+    if mode == "simplified":
+        if any(k in q for k in ["risk", "concern", "weakness", "deficiency", "mitigation"]):
+            add("risk")
+        if any(k in q for k in ["pink team", "red team", "gold team", "capture", "bid/no-bid", "bid no bid", "pursuit decision"]):
+            add("shipley_phase")
+        if any(k in q for k in ["competitor", "incumbent", "incumbency", "incumbent contractor", "teammate", "partner"]):
+            add("competitor")
 
     return hits
 

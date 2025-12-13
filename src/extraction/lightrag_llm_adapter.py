@@ -281,6 +281,16 @@ class LightRAGExtractionAdapter:
             parts.append(f"[Criticality: {entity.criticality}]")
             if hasattr(entity, 'modal_verb') and entity.modal_verb:
                 parts.append(f"[Modal: {entity.modal_verb}]")
+            # Preserve workload granularity inside the tuple description when available.
+            # This mitigates "lossy description" issues when strict extraction is enabled.
+            if hasattr(entity, "labor_drivers") and entity.labor_drivers:
+                drivers = [str(x).strip() for x in (entity.labor_drivers or []) if str(x).strip()]
+                if drivers:
+                    parts.append("[Workload: " + "; ".join(drivers[:6]) + ("; …" if len(drivers) > 6 else "") + "]")
+            if hasattr(entity, "material_needs") and entity.material_needs:
+                mats = [str(x).strip() for x in (entity.material_needs or []) if str(x).strip()]
+                if mats:
+                    parts.append("[Materials: " + "; ".join(mats[:6]) + ("; …" if len(mats) > 6 else "") + "]")
         
         if hasattr(entity, 'weight') and entity.weight:  # EvaluationFactor
             parts.append(f"[Weight: {entity.weight}]")

@@ -50,6 +50,64 @@ BATCH_OVERLAP_ALGO3 = int(os.getenv("BATCH_OVERLAP_ALGORITHM_3", 20))
 BATCH_SIZE_ALGO4 = int(os.getenv("BATCH_SIZE_ALGORITHM_4", 50))
 
 
+# ---------------------------------------------------------------------------
+# Backwards-compatible helpers (tests/scripts expect these names)
+# ---------------------------------------------------------------------------
+async def _call_llm_async(prompt: str, model: str, temperature: float = 0.1, system_prompt: str | None = None) -> str:
+    """
+    Backwards-compatible alias used by older test scripts.
+
+    Delegates to `src.utils.llm_client.call_llm_async`.
+    """
+    return await call_llm_async(prompt=prompt, system_prompt=system_prompt, model=model, temperature=temperature)
+
+
+async def _infer_entity_type(entity_name: str, description: str, model: str, temperature: float = 0.1) -> str:
+    """
+    Lightweight entity type inference.
+
+    This exists primarily for older Neo4j post-processing test scripts. It prefers
+    heuristics and falls back to LLM only when explicitly enabled via env.
+    """
+    name = (entity_name or "").lower()
+    desc = (description or "").lower()
+
+    # Heuristics aligned to the legacy GovCon ontology set.
+    if any(k in name for k in ("section ", "appendix", "attachment", "exhibit")):
+        return "section"
+    if any(k in name for k in ("far ", "dfars ", "52.", "252.")) or "clause" in name:
+        return "clause"
+    if any(k in name for k in ("cdrl", "deliverable", "report", "plan")):
+        return "deliverable"
+    if "evaluation" in name or "subfactor" in name or "factor" in name:
+        return "evaluation_factor"
+    if "page" in desc and ("limit" in desc or "max" in desc):
+        return "submission_instruction"
+    if any(k in desc for k in ("shall", "must", "should", "may")):
+        return "requirement"
+    if "pws" in name or "sow" in name or "statement of work" in desc:
+        return "statement_of_work"
+    if any(k in name for k in ("navy", "air force", "army", "department", "agency")):
+        return "organization"
+
+    # Optional LLM fallback (disabled by default to keep tests import-safe/offline).
+    if (os.getenv("ENABLE_LLM_TYPE_INFERENCE", "false") or "false").lower() == "true":
+        allowed = ", ".join(ALLOWED_TYPES)
+        prompt = (
+            "Classify the entity into exactly one of these types:\n"
+            f"{allowed}\n\n"
+            f"Entity name: {entity_name}\n"
+            f"Description: {description}\n\n"
+            "Return only the type string."
+        )
+        resp = await _call_llm_async(prompt=prompt, model=model, temperature=temperature)
+        resp_clean = (resp or "").strip().lower()
+        if resp_clean in VALID_ENTITY_TYPES:
+            return resp_clean
+
+    return "concept"
+
+
 async def _infer_relationships_batch(entities: List[Dict], existing_rels: List[Dict], model: str, temperature: float) -> List[Dict]:
     """
     Infer missing relationships between entities using chunked batching with ID-based lookups.

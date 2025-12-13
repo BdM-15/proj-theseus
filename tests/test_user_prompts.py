@@ -4,6 +4,7 @@ Test suite for user query prompts (Branch 010 Phase 1)
 Tests specialized response formatting via user_prompt parameter.
 """
 
+import os
 import pytest
 import asyncio
 from pathlib import Path
@@ -112,7 +113,10 @@ class TestQueryParamIntegration:
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
+@pytest.mark.skipif(
+    (os.getenv("RUN_LIVE_QUERIES", "") or "").strip().lower() not in {"1", "true", "yes", "y"},
+    reason="Set RUN_LIVE_QUERIES=true to run live server integration tests",
+)
 class TestLiveQueries:
     """
     Integration tests requiring running server
