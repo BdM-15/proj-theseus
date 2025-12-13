@@ -274,36 +274,28 @@ class LightRAGExtractionAdapter:
     
     def _build_entity_description(self, entity) -> str:
         """Build a rich description from entity attributes."""
-        parts = []
-        
-        # Add specialized fields for different entity types
-        if hasattr(entity, 'criticality') and entity.criticality:  # Requirement
-            parts.append(f"[Criticality: {entity.criticality}]")
-            if hasattr(entity, 'modal_verb') and entity.modal_verb:
-                parts.append(f"[Modal: {entity.modal_verb}]")
-        
-        if hasattr(entity, 'weight') and entity.weight:  # EvaluationFactor
-            parts.append(f"[Weight: {entity.weight}]")
-        elif hasattr(entity, 'importance') and entity.importance:
-            parts.append(f"[Importance: {entity.importance}]")
-        
-        if hasattr(entity, 'clause_number') and entity.clause_number:  # Clause
-            parts.append(f"[{entity.clause_number}]")
-        
-        if hasattr(entity, 'threshold') and entity.threshold:  # PerformanceMetric
-            parts.append(f"[Threshold: {entity.threshold}]")
-        
-        if hasattr(entity, 'page_limit') and entity.page_limit:  # SubmissionInstruction
-            parts.append(f"[Page Limit: {entity.page_limit}]")
-        
-        description = " ".join(parts) if parts else entity.entity_name
+        # Primary source: the 'description' field from the entity
+        if hasattr(entity, 'description') and entity.description:
+            desc = entity.description
+        else:
+            desc = entity.entity_name
+
+        # Enriched source: Append metadata if available
+        if hasattr(entity, 'metadata') and entity.metadata:
+            meta_parts = []
+            for k, v in entity.metadata.items():
+                # Format as [Key: Value]
+                meta_parts.append(f"[{k}: {v}]")
+            
+            if meta_parts:
+                desc += " " + " ".join(meta_parts)
 
         # Defense-in-depth: keep tuple field bounded to avoid oversized outputs/timeouts
-        description = re.sub(r"\s+", " ", str(description)).strip()
-        if len(description) > 400:
-            description = description[:400].rstrip()
+        desc = re.sub(r"\s+", " ", str(desc)).strip()
+        if len(desc) > 400:
+            desc = desc[:400].rstrip()
 
-        return description
+        return desc
     
     def _get_relationship_endpoints(self, rel) -> tuple:
         """Extract source and target from relationship (handles different formats)."""

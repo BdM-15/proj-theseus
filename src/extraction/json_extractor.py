@@ -69,9 +69,10 @@ class JsonExtractor:
         """
         Constructs the full system prompt by combining:
         1. Base JSON formatting instructions (grok_json_prompt.md)
-        2. Entity Detection Rules (entity_detection_rules.md)
-        3. Entity Extraction Prompt (entity_extraction_prompt.md)
-        4. Relationship inference rules (prompts/relationship_inference/*.md)
+        2. Entity Extraction Prompt (entity_extraction_prompt.md)
+        
+        Note: Removed entity_detection_rules.md and relationship_inference rules 
+        to simplify the ontology and prevent conflict with the new 13-entity schema.
         """
         base_path = os.getcwd()
         prompts_dir = os.path.join(base_path, "prompts")
@@ -87,16 +88,7 @@ class JsonExtractor:
             logger.error(f"Base prompt not found at {json_prompt_path}")
             raise
 
-        # 2. Entity Detection Rules (The "Rules")
-        detection_rules_path = os.path.join(prompts_dir, "extraction", "entity_detection_rules.md")
-        detection_rules = ""
-        if os.path.exists(detection_rules_path):
-            with open(detection_rules_path, "r", encoding="utf-8") as f:
-                detection_rules = f.read()
-        else:
-            logger.warning(f"Detection rules not found at {detection_rules_path}")
-
-        # 3. Entity Extraction Prompt (The "Prompt" with examples)
+        # 2. Entity Extraction Prompt (The "Prompt" with examples)
         extraction_prompt_path = os.path.join(prompts_dir, "extraction", "entity_extraction_prompt.md")
         extraction_prompt = ""
         if os.path.exists(extraction_prompt_path):
@@ -108,38 +100,16 @@ class JsonExtractor:
         else:
             logger.warning(f"Extraction prompt not found at {extraction_prompt_path}")
 
-        # 4. Relationship Inference Rules
-        inference_dir = os.path.join(prompts_dir, "relationship_inference")
-        inference_rules = []
-        if os.path.exists(inference_dir):
-            # Sort to ensure deterministic order
-            for filename in sorted(os.listdir(inference_dir)):
-                if filename.endswith(".md"):
-                    file_path = os.path.join(inference_dir, filename)
-                    with open(file_path, "r", encoding="utf-8") as f:
-                        inference_rules.append(f"--- RULE FROM {filename} ---\n{f.read()}")
-        
-        full_inference_text = "\n\n".join(inference_rules)
-
         # Combine everything
         full_prompt = f"""
 {json_instructions}
 
-# PART 1: ENTITY DETECTION RULES
-The following rules define how to identify and classify government contracting entities.
-{detection_rules}
-
-# PART 2: ENTITY EXTRACTION INSTRUCTIONS & EXAMPLES
-The following instructions and examples demonstrate how to extract entities and metadata.
+# SYSTEM INSTRUCTIONS
 {extraction_prompt}
 
-# PART 3: RELATIONSHIP INFERENCE RULES
-The following rules define how to infer relationships between entities.
-{full_inference_text}
-
 # FINAL INSTRUCTION
-Analyze the input text using the Domain Knowledge and Inference Rules provided above.
-Output the result strictly as a JSON object matching the schema defined in the first section.
+Analyze the input text using the simplified ontology provided above.
+Output the result strictly as a JSON object matching the schema defined.
 """
         logger.info(f"Constructed system prompt with {len(full_prompt)} characters (~{len(full_prompt)//4} tokens)")
         return full_prompt
