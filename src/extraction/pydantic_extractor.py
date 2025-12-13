@@ -1,8 +1,11 @@
 """
-Pydantic Entity Extractor - Native xAI SDK structured output with Pydantic validation.
+Pydantic Entity Extractor - Structured extraction using Instructor + xAI Grok.
 
-Uses xAI SDK's native response_format parameter to pass Pydantic BaseModel directly,
-enabling true JSON schema enforcement at the API level (no markdown wrappers, no parsing).
+Uses instructor library with XAI_JSON mode for:
+- Native Pydantic validation (automatic schema enforcement)
+- JSON extraction with automatic retry on validation errors
+- Proper handling of xAI SDK structured outputs
+- Type-safe entity extraction matching ontology schema
 
 DESIGN PRINCIPLE: GRACEFUL TOLERANCE (2-3% error rate acceptable)
 - Retry aggressively (up to 5 attempts with backoffs)
@@ -10,16 +13,15 @@ DESIGN PRINCIPLE: GRACEFUL TOLERANCE (2-3% error rate acceptable)
 - Track failed chunks for visibility and potential batch retry
 - Return empty result on failure to allow pipeline to continue
 
-Branch 041a: Uses xAI SDK's native Pydantic support instead of instructor library.
-The SDK's response_format parameter accepts type[pydantic.main.BaseModel] directly.
+Branch 041a: Uses instructor.from_xai() with XAI_JSON mode for reliable extraction.
 """
 
 import os
-import json
 import logging
 import asyncio
-from typing import Optional, Dict, Any, List
+from typing import List
 
+import instructor
 from pydantic import ValidationError
 
 from src.ontology.schema import ExtractionResult
@@ -30,10 +32,12 @@ logger = logging.getLogger(__name__)
 
 class PydanticExtractor:
     """
-    Entity extractor using xAI SDK's native Pydantic structured output support.
+    Entity extractor using Instructor library with xAI's XAI_JSON mode.
     
-    The xAI SDK's chat.create() method accepts `response_format=PydanticModel`
-    which enforces JSON schema at the API level - no markdown wrapping, no parsing needed.
+    Instructor handles:
+    - JSON schema enforcement at API level
+    - Automatic retry on validation errors
+    - Proper Pydantic model parsing
     """
     
     def __init__(self):
@@ -50,14 +54,12 @@ class PydanticExtractor:
         # Set environment variable for xAI SDK
         os.environ["XAI_API_KEY"] = self.api_key
         
-        # Initialize xAI SDK client directly (NOT through instructor)
+        # Initialize instructor with xAI client using XAI_JSON mode
         from xai_sdk.aio.client import Client as AsyncXAIClient
-        from xai_sdk import chat as xai_chat
+        xai_client = AsyncXAIClient()
+        self.client = instructor.from_xai(xai_client, mode=instructor.Mode.XAI_JSON)
         
-        self.xai_client = AsyncXAIClient()
-        self._xai_chat = xai_chat  # For message helpers
-        
-        logger.info(f"✅ Using native xAI SDK with response_format=ExtractionResult (Pydantic)")
+        logger.info(f"✅ Using instructor.from_xai() with XAI_JSON mode")
         
         # Track failed chunks for potential later recovery
         self.failed_chunks: List[dict] = []
@@ -146,39 +148,9 @@ Output the result strictly as a JSON object matching the ExtractionResult schema
         logger.info(f"Constructed system prompt with {len(full_prompt)} characters (~{len(full_prompt)//4} tokens)")
         return full_prompt
 
-    def _strip_markdown_json(self, content: str) -> str:
-        """
-        Strip markdown code blocks from JSON content.
-        
-        Despite using response_format=Pydantic, the xAI API sometimes wraps
-        complex schemas in ```json...``` blocks. This extracts the JSON.
-        """
-        if not content:
-            return content
-        
-        # Check if wrapped in markdown
-        content = content.strip()
-        if content.startswith("```"):
-            # Remove opening fence (```json or ```)
-            lines = content.split("\n", 1)
-            if len(lines) > 1:
-                content = lines[1]
-            # Remove closing fence
-            if content.rstrip().endswith("```"):
-                content = content.rstrip()[:-3].rstrip()
-        
-        # Final safety: find JSON boundaries
-        first_brace = content.find("{")
-        last_brace = content.rfind("}")
-        
-        if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
-            return content[first_brace:last_brace + 1]
-        
-        return content
-
     async def extract(self, text: str, chunk_id: str = "unknown") -> ExtractionResult:
         """
-        Extracts entities from the given text using native xAI SDK structured output.
+        Extracts entities from the given text using Instructor + xAI Grok.
         
         Uses automatic retry with exponential backoff for resilience against
         API truncation/instability issues.
@@ -207,7 +179,7 @@ Output the result strictly as a JSON object matching the ExtractionResult schema
             
             logger.info(f"📤 [{chunk_id}] Extraction request to {self.model} ({len(text)} chars, ~{token_count} tokens)")
             
-            # Use xAI SDK with native Pydantic structured output
+            # Use instructor with built-in retry mechanism
             result = await self._extract_with_retry(text, chunk_id)
             
             # Post-process: rescue entities with partial data
@@ -243,12 +215,9 @@ Output the result strictly as a JSON object matching the ExtractionResult schema
 
     async def _extract_with_retry(self, text: str, chunk_id: str = "unknown") -> ExtractionResult:
         """
-        Internal extraction method using xAI SDK's native Pydantic support.
+        Internal extraction method using instructor's native Pydantic validation.
         
-        The xAI SDK's response_format parameter accepts a Pydantic BaseModel class directly,
-        which enforces JSON schema at the API level - the model MUST return valid JSON
-        matching the schema (no markdown wrappers, no parsing needed).
-        
+        Uses instructor's XAI_JSON mode for native JSON schema support.
         Retries up to max_retries times with SHORT backoff (2s, 4s, 8s, 16s delays).
         """
         max_attempts = self.max_retries
@@ -256,34 +225,19 @@ Output the result strictly as a JSON object matching the ExtractionResult schema
         
         for attempt in range(1, max_attempts + 1):
             try:
-                # Build messages using xAI SDK helpers
-                messages = [
-                    self._xai_chat.system(self.system_prompt),
-                    self._xai_chat.user(text)
-                ]
-                
-                # Create chat request with Pydantic model as response_format
-                # This is xAI SDK's NATIVE structured output - no instructor needed!
-                chat = self.xai_client.chat.create(
+                # Use instructor's native response_model parameter
+                # This handles JSON extraction and Pydantic validation automatically
+                result = await self.client.chat.completions.create(
                     model=self.model,
-                    messages=messages,
+                    response_model=ExtractionResult,
+                    messages=[
+                        {"role": "system", "content": self.system_prompt},
+                        {"role": "user", "content": text}
+                    ],
                     temperature=0.0,  # Deterministic for structured output
                     max_tokens=self.max_output_tokens,
-                    response_format=ExtractionResult,  # Pydantic model directly!
+                    max_retries=2,  # Instructor's internal retry for validation errors
                 )
-                
-                # Get the response
-                response = await chat.sample()
-                
-                # Parse response content into Pydantic model
-                content = response.content if hasattr(response, 'content') else str(response)
-                
-                # FALLBACK: Strip markdown code blocks if xAI API returns wrapped JSON
-                # Despite response_format=Pydantic, complex schemas may still get wrapped
-                content = self._strip_markdown_json(content)
-                
-                # Parse and validate
-                result = ExtractionResult.model_validate_json(content)
                 
                 # Success! Track it for failure rate calculation
                 self._successful_extractions += 1
@@ -369,8 +323,3 @@ Output the result strictly as a JSON object matching the ExtractionResult schema
         (perhaps with a different model or after API stabilizes).
         """
         return self.failed_chunks.copy()
-
-    # NOTE: extract_from_text() was removed in Issue #42
-    # The lightrag_llm_adapter now handles ALL extraction with the full 121K ontology prompt.
-    # Previously, extract_from_text() used a degraded 30-line inline prompt that bypassed
-    # the established ontology, causing inconsistent entity extraction for multimodal content.
