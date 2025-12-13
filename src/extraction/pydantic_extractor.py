@@ -1,8 +1,8 @@
 """
 Pydantic Entity Extractor - Structured extraction using Instructor + xAI Grok.
 
-Uses instructor library with MD_JSON mode for:
-- Automatic markdown code block stripping (```json...```)
+Uses instructor.from_provider("xai/{model}") for:
+- Native xAI API support (proven reliable in branch 040)
 - Native Pydantic validation with schema enforcement
 - Error feedback to LLM for self-correction on retry
 - Type-safe entity extraction matching ontology schema
@@ -13,7 +13,7 @@ DESIGN PRINCIPLE: GRACEFUL TOLERANCE (2-3% error rate acceptable)
 - Feed specific error messages back to help LLM self-correct
 - Return empty result on failure to allow pipeline to continue
 
-Branch 041a: Uses MD_JSON mode + error feedback pattern for reliable extraction.
+Branch 041a: Uses native xAI provider + error feedback pattern.
 """
 
 import os
@@ -23,7 +23,6 @@ import asyncio
 from typing import List, Optional
 
 import instructor
-from openai import AsyncOpenAI
 from pydantic import ValidationError
 
 from src.ontology.schema import ExtractionResult
@@ -34,17 +33,16 @@ logger = logging.getLogger(__name__)
 
 class PydanticExtractor:
     """
-    Entity extractor using Instructor library with MD_JSON mode.
+    Entity extractor using Instructor library with native xAI provider.
     
-    MD_JSON mode:
-    - Automatically extracts JSON from markdown code blocks (```json...```)
-    - Handles the wrapping that xAI sometimes returns despite instructions
-    - Provides Pydantic validation with clear error messages
+    Uses instructor.from_provider("xai/{model}") for:
+    - Native xAI API support (not OpenAI-compatible wrapper)
+    - Automatic Pydantic validation with schema enforcement
+    - Built-in retry logic for validation errors
     
-    Error feedback pattern (from ML Mastery article):
+    Error feedback pattern:
     - On validation failure, feed error message back to LLM
     - LLM can self-correct based on specific validation issues
-    - Truncation errors get special handling (ask for fewer entities)
     """
     
     def __init__(self):
@@ -58,15 +56,17 @@ class PydanticExtractor:
         if not self.api_key:
             raise ValueError("LLM_BINDING_API_KEY or XAI_API_KEY not found in environment variables")
         
-        # Use OpenAI-compatible client with MD_JSON mode
-        # MD_JSON automatically extracts JSON from markdown code blocks
-        openai_client = AsyncOpenAI(
-            api_key=self.api_key,
-            base_url="https://api.x.ai/v1"
-        )
-        self.client = instructor.from_openai(openai_client, mode=instructor.Mode.MD_JSON)
+        # Set XAI_API_KEY for instructor's from_provider
+        os.environ["XAI_API_KEY"] = self.api_key
         
-        logger.info(f"✅ Using instructor MD_JSON mode (auto-strips markdown code blocks)")
+        # Use instructor's native xAI provider (NOT OpenAI-compatible wrapper)
+        # This is what worked reliably in branch 040
+        self.client = instructor.from_provider(
+            f"xai/{self.model}",
+            async_client=True
+        )
+        
+        logger.info(f"✅ Using instructor.from_provider('xai/{self.model}')")
         
         # Track failed chunks for potential later recovery
         self.failed_chunks: List[dict] = []
