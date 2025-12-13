@@ -3,6 +3,11 @@ Test script to validate dual-pattern deliverable traceability (Algorithm 3)
 Tests both SATISFIED_BY and PRODUCES relationship types
 """
 
+import pytest
+
+# Neo4j-backed post-processing was intentionally removed to restore LightRAG defaults.
+pytest.skip("Neo4j post-processing removed; skip Neo4j-only deliverable traceability script.", allow_module_level=True)
+
 from neo4j import GraphDatabase
 import os
 from dotenv import load_dotenv

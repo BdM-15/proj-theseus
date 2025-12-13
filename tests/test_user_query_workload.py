@@ -9,6 +9,11 @@ This complements test_workload_query.py (Neo4j direct) by testing the
 LightRAG query path that end users will actually use.
 """
 
+import pytest
+
+# This script assumes a Neo4j-backed workspace; Neo4j storage was removed to restore LightRAG defaults.
+pytest.skip("Neo4j workspace assumptions removed; skip workload user query script.", allow_module_level=True)
+
 import asyncio
 import os
 from pathlib import Path

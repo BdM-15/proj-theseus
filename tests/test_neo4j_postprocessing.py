@@ -11,6 +11,11 @@ Usage:
     python tests/test_neo4j_postprocessing.py
 """
 
+import pytest
+
+# Neo4j-backed post-processing was intentionally removed to restore LightRAG defaults.
+pytest.skip("Neo4j pipeline removed; skip Neo4j post-processing tests.", allow_module_level=True)
+
 import os
 import sys
 import asyncio

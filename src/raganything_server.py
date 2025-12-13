@@ -44,8 +44,6 @@ from src.server.initialization import initialize_raganything, get_rag_instance
 from src.server.routes import (
     create_insert_endpoint,
     create_documents_upload_endpoint,
-    create_query_stream_endpoint,
-    create_graphs_endpoint,
 )
 
 # Set up logging
@@ -58,12 +56,10 @@ async def main():
     Architecture:
     - RAG-Anything: Document ingestion (MinerU multimodal parser)
     - LightRAG: WebUI + query endpoints (knowledge graph queries)
-    - Semantic Post-Processing: Automatic LLM-powered relationship inference
     
     Custom Features:
-    - /insert endpoint: Overrides default LightRAG for semantic enhancement
-    - Background monitor: Auto-detects WebUI uploads, triggers inference
-    - UCF detection: Section-aware extraction for federal RFPs
+    - /insert + /documents/upload: Route ingestion through RAG-Anything multimodal pipeline
+    - Query endpoints remain LightRAG defaults (no overrides)
     """
     # Initialization message moved to app.py for cleaner startup
     
@@ -89,25 +85,20 @@ async def main():
     for route in app.router.routes:
         # Skip the original /insert and /documents/upload POST endpoints
         if hasattr(route, 'path') and hasattr(route, 'methods') and 'POST' in route.methods:
-            if route.path in ['/insert', '/documents/upload', '/query/stream']:
+            if route.path in ['/insert', '/documents/upload']:
                 continue
-        # Skip the original /graphs endpoint (Neo4j temporal types can break JSON serialization)
-        if hasattr(route, "path") and route.path == "/graphs":
-            continue
         new_routes.append(route)
     app.router.routes = new_routes
     
-    # Add our custom endpoints with RAG-Anything multimodal processing + semantic inference
+    # Add our custom endpoints with RAG-Anything multimodal processing
     create_insert_endpoint(app, rag_instance)
     create_documents_upload_endpoint(app, rag_instance)
-    create_query_stream_endpoint(app, rag_instance)
-    create_graphs_endpoint(app, rag_instance)
     
-    logger.info(f"✅ Custom endpoints registered: /insert, /documents/upload, /query/stream")
+    logger.info("✅ Custom endpoints registered: /insert, /documents/upload")
     
     # Print startup summary with pipeline flow
     chunk_size = os.getenv("CHUNK_SIZE", "8192")
-    graph_storage = global_args.graph_storage if hasattr(global_args, 'graph_storage') else "NetworkXStorage"
+    graph_storage = getattr(global_args, "graph_storage", "NetworkXStorage")
     
     # ANSI color codes
     CYAN = '\033[96m'
@@ -128,7 +119,7 @@ async def main():
     logger.info(f"{YELLOW}2.{RESET} {BOLD}LightRAG Chunking{RESET} {CYAN}({chunk_size} tokens, 15% overlap){RESET}")
     logger.info(f"   {CYAN}└─>{RESET} Multiple focused extraction passes (prevents attention decay)")
     logger.info("")
-    logger.info(f"{YELLOW}3.{RESET} {BOLD}Entity Extraction{RESET} {CYAN}(17 custom types){RESET}")
+    logger.info(f"{YELLOW}3.{RESET} {BOLD}Entity Extraction{RESET} {CYAN}(18 ontology types){RESET}")
     logger.info(f"   {CYAN}├─>{RESET} Custom extraction prompts (~2,605 lines)")
     logger.info(f"   {CYAN}├─>{RESET} Grok-4-fast-reasoning LLM")
     logger.info(f"   {CYAN}└─>{RESET} Semantic-first detection (UCF patterns)")
@@ -136,18 +127,8 @@ async def main():
     logger.info(f"{YELLOW}4.{RESET} {BOLD}Relationship Extraction{RESET}")
     logger.info(f"   {CYAN}└─>{RESET} LightRAG automatic relationship inference")
     logger.info("")
-    logger.info(f"{YELLOW}5.{RESET} {BOLD}Semantic Post-Processing{RESET} {GREEN}(Auto-triggered){RESET}")
-    logger.info(f"   {CYAN}├─>{RESET} Entity type correction")
-    logger.info(f"   {CYAN}├─>{RESET} LLM relationship inference (Section L↔M, Annex linkage)")
-    logger.info(f"   {CYAN}└─>{RESET} Metadata enrichment")
-    logger.info("")
-    logger.info(f"{YELLOW}6.{RESET} {BOLD}Knowledge Graph Storage{RESET} {CYAN}({graph_storage}){RESET}")
-    if graph_storage == "Neo4JStorage":
-        logger.info(f"   {CYAN}├─>{RESET} Neo4j enterprise graph database")
-        logger.info(f"   {CYAN}├─>{RESET} Multi-workspace isolation")
-        logger.info(f"   {CYAN}└─>{RESET} APOC subgraph queries for cross-RFP intelligence")
-    else:
-        logger.info(f"   {CYAN}└─>{RESET} Local GraphML files")
+    logger.info(f"{YELLOW}5.{RESET} {BOLD}Knowledge Graph Storage{RESET} {CYAN}({graph_storage}){RESET}")
+    logger.info(f"   {CYAN}└─>{RESET} LightRAG default local storages (no Neo4j)")
     logger.info(f"{CYAN}{'═' * 80}{RESET}")
     logger.info("")
     
@@ -156,9 +137,6 @@ async def main():
     logger.info(f"{CYAN}{'═' * 80}{RESET}")
     logger.info(f"{GREEN}WebUI:{RESET}              {BLUE}http://{host}:{port}/webui{RESET}")
     logger.info(f"{GREEN}API Docs:{RESET}           {BLUE}http://{host}:{port}/docs{RESET}")
-    if graph_storage == "Neo4JStorage":
-        logger.info(f"{GREEN}Neo4j Browser:{RESET}      {BLUE}http://localhost:7474{RESET}")
-        logger.info(f"{GREEN}Neo4j Aura:{RESET}         {BLUE}https://console.neo4j.io{RESET} {YELLOW}(recommended){RESET}")
     logger.info("")
     logger.info(f"{YELLOW}Working Directory:{RESET}  {global_args.working_dir}")
     logger.info(f"{YELLOW}Current Workspace:{RESET}  {BOLD}{os.getenv('WORKSPACE', 'default')}{RESET}")

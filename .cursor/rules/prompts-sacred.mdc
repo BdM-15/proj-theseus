@@ -1,0 +1,15 @@
+# Prompt Protection (SACRED)
+
+## Non-negotiable rule
+
+All prompt files under `prompts/` contain critical business intelligence and must **never** be edited, rewritten, reformatted, or “improved”.
+
+### Prohibited changes
+
+- Do **not** modify any `.md` prompt in `prompts/`.
+- Do **not** override or monkeypatch vendor prompt templates at runtime.
+
+### Allowed work
+
+- You may **assess** prompts for risks (length, ambiguity, conflicting instructions) and recommend non-code operational fixes.
+- You may adjust **code/config** so the system uses the prompts correctly (without changing prompt text).

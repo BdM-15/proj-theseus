@@ -15,6 +15,11 @@ Usage:
     python tests/test_semantic_postprocessing_smoke.py
 """
 
+import pytest
+
+# Semantic post-processing was intentionally removed to restore LightRAG defaults.
+pytest.skip("Semantic post-processing removed; skip smoke test.", allow_module_level=True)
+
 import sys
 import inspect
 from pathlib import Path

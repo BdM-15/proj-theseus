@@ -1,0 +1,16 @@
+# Ontology Protection (SACRED)
+
+## Non-negotiable rule
+
+The **18-entity ontology** defined in `src/ontology/schema.py` is **sacred** and must **never** be modified.
+
+### Prohibited changes
+
+- Do **not** add, remove, rename, or reorder entity types.
+- Do **not** change entity fields, validators, enums, literals, or relationship models.
+- Do **not** change any logic that alters what constitutes a valid entity type.
+
+### If something seems wrong
+
+- Fix retrieval, chunking, query behavior, storage/indexing, or integration layers instead.
+- If an entity type appears missing at runtime, **fix configuration** to use the existing 18 types—do not change the ontology.

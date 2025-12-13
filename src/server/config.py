@@ -37,23 +37,8 @@ def configure_raganything_args():
     global_args.working_dir = working_dir
     global_args.input_dir = os.getenv("INPUT_DIR", "./inputs/uploaded")
     
-    # Graph Storage Configuration - Neo4j vs NetworkX
-    graph_storage_type = os.getenv("GRAPH_STORAGE", "NetworkXStorage")
-    if graph_storage_type == "Neo4JStorage":
-        from lightrag.kg.neo4j_impl import Neo4JStorage
-        
-        neo4j_config = {
-            "uri": os.getenv("NEO4J_URI", "neo4j://localhost:7687"),
-            "username": os.getenv("NEO4J_USERNAME", "neo4j"),
-            "password": os.getenv("NEO4J_PASSWORD"),
-            "database": os.getenv("NEO4J_DATABASE", "neo4j"),
-        }
-        
-        # Create Neo4j storage instance
-        global_args.graph_storage = "Neo4JStorage"  # Tell LightRAG to use Neo4j
-        global_args.neo4j_config = neo4j_config     # Pass Neo4j connection details
-    else:
-        global_args.graph_storage = "NetworkXStorage"
+    # Graph storage: keep LightRAG's default local storage (no Neo4j, no feature flags).
+    global_args.graph_storage = "NetworkXStorage"
     
     # Server configuration
     global_args.host = os.getenv("HOST", "localhost")
@@ -72,7 +57,7 @@ def configure_raganything_args():
     global_args.embedding_api_key = openai_api_key
     global_args.embedding_dim = int(os.getenv("EMBEDDING_DIM", "3072"))  # Environment-driven for flexibility
     
-    # Government contracting entity types (17 specialized types - consolidated for flexibility)
+    # Government contracting entity types (EXACTLY 18 ontology types)
     # Semantic-first detection: Content determines entity type, not section labels
     # NOTE: LightRAG normalizes to lowercase internally - use lowercase for consistency
     global_args.entity_types = [
@@ -125,22 +110,15 @@ def configure_raganything_args():
     # NOTE: These global_args settings are for LightRAG SERVER API only (not used by RAGAnything)
     # For RAGAnything: parallelization must be set via lightrag_kwargs in initialization.py
     # max_parallel_insert: controls concurrent document processing (file-level parallelism)
-    max_async = int(os.getenv("MAX_ASYNC", "16"))
-    global_args.max_parallel_insert = max_async
+    # Fixed concurrency (no feature flags).
+    global_args.max_parallel_insert = 16
     # llm_model_max_async and embedding_func_max_async are set via lightrag_kwargs in initialization.py
     
-    # Chunking configuration (optimized for focused extraction)
-    # CHUNK_SIZE: Document chunking for BOTH LLM entity extraction and embeddings
-    # - 8K chunks = multiple focused extraction passes = comprehensive coverage
-    # - Embeddings auto-truncate to model limits via EmbeddingFunc.max_token_size
-    # CRITICAL: No defaults - must be set in .env to avoid catastrophic extraction failures
+    # Chunking configuration
+    # Keep a single predictable default that matches modern long-context LLM workflows.
     global_args.chunking_func = chunking_by_token_size
-    chunk_size = os.getenv("CHUNK_SIZE")
-    chunk_overlap = os.getenv("CHUNK_OVERLAP_SIZE")
-    if not chunk_size or not chunk_overlap:
-        raise ValueError("CHUNK_SIZE and CHUNK_OVERLAP_SIZE must be set in .env - no safe defaults exist")
-    global_args.chunk_token_size = int(chunk_size)
-    global_args.chunk_overlap_token_size = int(chunk_overlap)
+    global_args.chunk_token_size = int(os.getenv("CHUNK_SIZE", "8192"))
+    global_args.chunk_overlap_token_size = int(os.getenv("CHUNK_OVERLAP_SIZE", "1200"))
     
     # Multimodal support
     global_args.enable_multimodal = True

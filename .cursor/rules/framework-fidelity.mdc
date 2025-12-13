@@ -1,0 +1,18 @@
+# Framework Fidelity (LightRAG + RAG-Anything)
+
+## Non-negotiable rules
+
+- All RAG behavior must follow **official LightRAG + RAG-Anything** design and defaults (HKUDS repositories).
+- **Do not add reranking** or any reranker step. Do not suggest it.
+- **No toggles/flags/optional modes** in our integration code. The system should work end-to-end out-of-the-box.
+
+## Integration guardrails
+
+- Keep LightRAG query routes and default query behavior intact (modes/params/prompts).
+- Only override ingestion endpoints when required to route parsing through RAG-Anything.
+- Avoid custom query-time prompt injection, keyword hacks, or parameter overrides.
+
+## Primary sources
+
+- LightRAG: `https://github.com/HKUDS/LightRAG`
+- RAG-Anything: `https://github.com/HKUDS/RAG-Anything`

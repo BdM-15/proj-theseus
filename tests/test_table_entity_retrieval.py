@@ -12,6 +12,11 @@ Usage:
     python tests/test_table_entity_retrieval.py
 """
 
+import pytest
+
+# Neo4j-backed storage/post-processing was intentionally removed to restore LightRAG defaults.
+pytest.skip("Neo4j pipeline removed; skip Neo4j-only table retrieval test.", allow_module_level=True)
+
 import asyncio
 import os
 import sys

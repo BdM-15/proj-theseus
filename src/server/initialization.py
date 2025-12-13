@@ -62,7 +62,7 @@ async def initialize_raganything():
     # so it must be set before import, not here. See app.py for the fix.
     # Current setting: LLM_TIMEOUT=300 → Worker timeout ~600s
     
-    # Government contracting entity types (17 specialized types)
+    # Government contracting entity types (EXACTLY 18 ontology types)
     # Semantic-first detection: Content determines entity type, not section labels
     # NOTE: LightRAG normalizes to lowercase internally - use lowercase for consistency
     entity_types = [
@@ -91,14 +91,17 @@ async def initialize_raganything():
         # Programs and equipment
         "program",                  # Major programs (MCPP II, Navy MBOS, etc.)
         "equipment",                # Physical items (batteries, vehicles, tools)
+
+        # Performance standards
+        "performance_metric",
     ]
     
-    # MinerU configuration from environment variables
-    parser = os.getenv("PARSER", "mineru")
-    parse_method = os.getenv("PARSE_METHOD", "auto")
-    enable_image = os.getenv("ENABLE_IMAGE_PROCESSING", "true").lower() == "true"
-    enable_table = os.getenv("ENABLE_TABLE_PROCESSING", "true").lower() == "true"
-    enable_equation = os.getenv("ENABLE_EQUATION_PROCESSING", "true").lower() == "true"
+    # MinerU configuration: fixed defaults (no feature flags).
+    parser = "mineru"
+    parse_method = "auto"
+    enable_image = True
+    enable_table = True
+    enable_equation = True
     device = os.getenv("MINERU_DEVICE_MODE", "auto")  # cuda, cpu, or auto (MinerU reads this directly)
     
     # CRITICAL: MinerU reads MINERU_DEVICE_MODE from environment, NOT from RAGAnythingConfig
@@ -131,17 +134,11 @@ async def initialize_raganything():
             **kwargs,
         )
     
-    # Wrap with Pydantic extraction adapter for entity validation
-    # Issue #43: Routes extraction calls through JsonExtractor + Pydantic schema
-    # Non-extraction calls (queries, summaries) pass through to base function
-    use_pydantic_extraction = os.getenv("USE_PYDANTIC_TEXT_EXTRACTION", "true").lower() == "true"
-    if use_pydantic_extraction:
-        from src.extraction.lightrag_llm_adapter import create_extraction_adapter
-        llm_model_func = create_extraction_adapter(base_llm_model_func)
-        logger.info("✅ Pydantic text extraction adapter ENABLED (USE_PYDANTIC_TEXT_EXTRACTION=true)")
-    else:
-        llm_model_func = base_llm_model_func
-        logger.info("⚠️ Pydantic text extraction adapter DISABLED - using LightRAG native extraction")
+    # Wrap with Pydantic extraction adapter for entity validation.
+    # This project treats schema-enforced extraction as mandatory (no feature flags).
+    from src.extraction.lightrag_llm_adapter import create_extraction_adapter
+    llm_model_func = create_extraction_adapter(base_llm_model_func)
+    logger.info("✅ Pydantic text extraction adapter enabled (schema-enforced extraction)")
     
     # Define vision function (multimodal Grok wrapper)
     async def vision_model_func(prompt, system_prompt=None, history_messages=[], image_data=None, messages=None, **kwargs):
@@ -213,13 +210,11 @@ async def initialize_raganything():
     # IMPORTANT: LightRAG reads chunk_token_size from environment at import time
     # Don't override via lightrag_kwargs - let it use CHUNK_SIZE from .env
     
-    # Parallelization: Controls concurrent chunk extraction within extract_entities()
-    # LightRAG uses asyncio.Semaphore(llm_model_max_async) in operate.py extract_entities()
-    # RAGAnything uses asyncio.Semaphore(max_parallel_insert) for multimodal item processing
-    # MUST be passed via lightrag_kwargs - setting global_args doesn't propagate to RAGAnything!
-    max_async = int(os.getenv("MAX_ASYNC", "16"))  # Default 16 workers for parallel extraction
+    # Parallelization: fixed, no runtime feature flags/toggles.
+    # (RAGAnything and LightRAG both accept *_max_async settings via lightrag_kwargs.)
+    max_async = 16
     
-    # Build lightrag_kwargs with Neo4j configuration if enabled
+    # Build lightrag_kwargs (keep within library-supported kwargs; avoid custom query overrides)
     lightrag_kwargs = {
         "addon_params": {
             "entity_types": entity_types,
@@ -239,12 +234,6 @@ async def initialize_raganything():
         # LightRAG reads these at dataclass field initialization time
     }
     
-    # Add Neo4j configuration if enabled (from config.py global_args setup)
-    # Note: Neo4j connection details come from environment variables (NEO4J_URI, etc.)
-    # LightRAG reads these automatically - we only need to specify graph_storage type
-    if hasattr(global_args, 'graph_storage') and global_args.graph_storage == "Neo4JStorage":
-        lightrag_kwargs["graph_storage"] = global_args.graph_storage
-    
     _rag_anything = RAGAnything(
         config=config,
         llm_model_func=llm_model_func,
@@ -261,84 +250,6 @@ async def initialize_raganything():
         error_msg = result.get("error", "Unknown error")
         logger.error(f"Failed to initialize LightRAG: {error_msg}")
         raise RuntimeError(f"LightRAG initialization failed: {error_msg}")
-    
-    # CRITICAL: Disable LightRAG's hardcoded fictional examples to prevent ontology contamination
-    # LightRAG always uses PROMPTS["entity_extraction_examples"] (does NOT check addon_params)
-    # These examples contain Alex/Taylor/Jordan with conflicting entity types (person, equipment)
-    # that contaminate our government contracting ontology (requirement, organization, etc.)
-    from lightrag.prompt import PROMPTS
-    PROMPTS["entity_extraction_examples"] = []  # Empty list = no examples injected
-    logger.info("✅ Disabled LightRAG's fictional example entities (prevents ontology contamination)")
-
-    # ──────────────────────────────────────────────────────────────────────────────
-    # Query-Time Prompt Enhancement (Issue #46)
-    # ──────────────────────────────────────────────────────────────────────────────
-    # LightRAG WebUI relies on its internal PROMPTS; to ensure ontology guidance is
-    # always applied, we override the relevant keys while preserving stock structure.
-    try:
-        # Domain-specific keyword extraction examples (replaces generic trade/education examples)
-        #
-        # IMPORTANT: LightRAG expects this to be a *list of strings* and does:
-        #   examples = "\n".join(PROMPTS["keywords_extraction_examples"])
-        # If we store dicts here, query-time keyword extraction crashes with:
-        #   "sequence item 0: expected str instance, dict found"
-        PROMPTS["keywords_extraction_examples"] = [
-            (
-                "Query: Based on the proposal provide me a bulletized proposal outline with compliance checks and specifics on the content, address customer pain points, and identify solutioning opportunities.\n"
-                "High-level keywords: proposal outline, Section L, Section M, volumes, submission instructions, evaluation criteria, compliance\n"
-                "Low-level keywords: submission_instruction, page limit, volume, format requirements, oral presentation, evaluation_factor, weight, importance, deliverable, requirement, clause"
-            ),
-            (
-                "Query: What are the evaluation factors and their weights?\n"
-                "High-level keywords: Section M, evaluation criteria, source selection\n"
-                "Low-level keywords: evaluation_factor, subfactor, weight, importance, adjectival rating"
-            ),
-            (
-                "Query: What are the submission instructions and page limits?\n"
-                "High-level keywords: Section L, proposal instructions, submission requirements\n"
-                "Low-level keywords: submission_instruction, page limit, volume, font, margin, format requirements"
-            ),
-            (
-                "Query: List all CDRLs/deliverables and frequency.\n"
-                "High-level keywords: deliverables, CDRL, data requirements\n"
-                "Low-level keywords: deliverable, CDRL, DID, frequency, submission"
-            ),
-            (
-                "Query: Extract labor/workload requirements for the BOE.\n"
-                "High-level keywords: workload analysis, basis of estimate, staffing drivers\n"
-                "Low-level keywords: requirement, labor_drivers, FTE, shift coverage, boe_category, volume, frequency"
-            ),
-            (
-                "Query: What FAR/DFARS clauses apply?\n"
-                "High-level keywords: regulatory requirements, contract clauses\n"
-                "Low-level keywords: clause, FAR, DFARS, 52.212-4, 252.227-7014"
-            ),
-        ]
-        logger.info("✅ Overrode LightRAG keyword extraction examples with GovCon-specific examples")
-
-        # Preserve LightRAG's stock rag_response structure; append compact GovCon guidance.
-        rag_response = PROMPTS.get("rag_response")
-        if isinstance(rag_response, str) and "GovCon Ontology" not in rag_response:
-            PROMPTS["rag_response"] = (
-                rag_response
-                + "\n\n---\n\n"
-                + "Additional Instructions (GovCon Ontology)\n"
-                + "- Prefer answers grounded in UCF structure: Section L (instructions) maps to Section M (evaluation).\n"
-                + "- When relevant, classify extracted items into ontology entity types (e.g., requirement, evaluation_factor, deliverable, clause).\n"
-                + "- For workload/BOE queries: focus on raw workload drivers (volumes/frequencies/shifts), not invented staffing roles.\n"
-                + "- Use concise, source-only descriptions and cite the originating section/attachment when possible.\n"
-                + "- If the user asks for a proposal/proposal-outline response, format the answer as:\n"
-                + "  Volume I..IX headings, and under each:\n"
-                + "  • Compliance Checks\n"
-                + "  • Content Specifics\n"
-                + "  • Addressing Customer Pain Points\n"
-                + "  • Solutioning Opportunities for Award Favor\n"
-                + "  If a page limit/format requirement is not found in retrieved context, explicitly say \"Not found in retrieved context\" (do not guess).\n"
-            )
-            logger.info("✅ Appended GovCon ontology guidance to LightRAG rag_response prompt")
-
-    except Exception as e:
-        logger.warning(f"Query-time prompt enhancement unavailable: {e}")
     
     # ═══════════════════════════════════════════════════════════════════════════════
     # Startup Configuration Summary
@@ -363,90 +274,7 @@ async def initialize_raganything():
     logger.info(f"{GREEN}Advanced:{RESET} Formula Recognition, Table Merge {BOLD}{GREEN}ENABLED{RESET} | Timeout: {YELLOW}600s{RESET}")
     logger.info(f"{CYAN}{'═' * 80}{RESET}")
     logger.info("")
-    
-    # ═══════════════════════════════════════════════════════════════════════════════
-    # COMPATIBILITY FIX: RAG-Anything 1.2.8 + LightRAG 1.4.9.3 doc_status schema
-    # ═══════════════════════════════════════════════════════════════════════════════
-    # Issue: RAG-Anything writes extra fields that LightRAG 1.4.9.3 doesn't support:
-    #        - 'multimodal_processed' (bool) - tracks multimodal processing completion
-    #        - 'multimodal_content' (list) - multimodal item metadata
-    #        - 'scheme_name' (str) - document scheme identifier
-    #
-    # RAG-Anything also uses 'handling' status (not in LightRAG's DocStatus enum)
-    #
-    # Solution: Wrap BOTH write (upsert) and read (get_by_id, get_docs_paginated) to
-    #           filter incompatible fields and normalize statuses
-    # ═══════════════════════════════════════════════════════════════════════════════
-    from lightrag.base import DocStatus
-    original_upsert = _rag_anything.lightrag.doc_status.upsert
-    original_get_by_id = _rag_anything.lightrag.doc_status.get_by_id
-    original_get_docs_paginated = _rag_anything.lightrag.doc_status.get_docs_paginated
-    
-    # Fields that RAG-Anything writes but LightRAG 1.4.9.3 DocProcessingStatus doesn't accept
-    INCOMPATIBLE_FIELDS = {'multimodal_processed', 'multimodal_content', 'scheme_name'}
-    
-    # Valid LightRAG statuses (from lightrag/base.py DocStatus enum)
-    VALID_STATUSES = {
-        DocStatus.PENDING.value,      # 'pending'
-        DocStatus.PROCESSING.value,   # 'processing'
-        DocStatus.PREPROCESSED.value, # 'multimodal_processed'
-        DocStatus.PROCESSED.value,    # 'processed'
-        DocStatus.FAILED.value,       # 'failed'
-    }
-    
-    def filter_doc_data(doc_data: dict) -> dict:
-        """Remove incompatible fields from doc_data"""
-        return {k: v for k, v in doc_data.items() if k not in INCOMPATIBLE_FIELDS}
-    
-    async def filtered_upsert(data: dict):
-        """Filter incompatible fields and normalize statuses for LightRAG 1.4.9.3"""
-        filtered_data = {}
-        for doc_id, doc_data in data.items():
-            # Create a copy without incompatible fields
-            filtered_doc_data = filter_doc_data(doc_data)
-            
-            # Normalize RAG-Anything statuses to LightRAG statuses
-            if 'status' in filtered_doc_data:
-                status = filtered_doc_data['status']
-                # Handle both string and enum values
-                status_value = status.value if hasattr(status, 'value') else status
-                
-                # Map RAG-Anything statuses to valid LightRAG statuses
-                if status_value == 'handling':
-                    filtered_doc_data['status'] = DocStatus.PROCESSING.value
-                elif status_value == 'ready':
-                    filtered_doc_data['status'] = DocStatus.PENDING.value
-                elif status_value not in VALID_STATUSES:
-                    logger.warning(f"Unknown status '{status_value}' for doc {doc_id}, mapping to PROCESSING")
-                    filtered_doc_data['status'] = DocStatus.PROCESSING.value
-            
-            filtered_data[doc_id] = filtered_doc_data
-        return await original_upsert(filtered_data)
-    
-    async def filtered_get_by_id(doc_id: str):
-        """Get doc_status with incompatible fields filtered"""
-        result = await original_get_by_id(doc_id)
-        if result and isinstance(result, dict):
-            return filter_doc_data(result)
-        return result
-    
-    async def filtered_get_docs_paginated(*args, **kwargs):
-        """Get paginated docs with incompatible fields filtered"""
-        result = await original_get_docs_paginated(*args, **kwargs)
-        if result and isinstance(result, tuple) and len(result) >= 2:
-            docs_with_ids, total_count = result[0], result[1]
-            # Filter each document's data
-            filtered_docs = []
-            for doc_id, doc_data in docs_with_ids:
-                filtered_docs.append((doc_id, filter_doc_data(doc_data)))
-            return (filtered_docs, total_count), *result[2:]
-        return result
-    
-    _rag_anything.lightrag.doc_status.upsert = filtered_upsert
-    _rag_anything.lightrag.doc_status.get_by_id = filtered_get_by_id
-    _rag_anything.lightrag.doc_status.get_docs_paginated = filtered_get_docs_paginated
-    # ═════════════════════════════════════════════════════════════════════════════
-    
+
     return _rag_anything
 
 

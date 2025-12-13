@@ -15,6 +15,11 @@ Expected Results:
 - Confidence scores showing extraction quality
 """
 
+import pytest
+
+# Neo4j-backed post-processing was intentionally removed to restore LightRAG defaults.
+pytest.skip("Neo4j post-processing removed; skip Neo4j-only workload query test.", allow_module_level=True)
+
 from neo4j import GraphDatabase
 import os
 from dotenv import load_dotenv
