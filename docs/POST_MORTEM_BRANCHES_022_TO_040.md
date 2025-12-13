@@ -413,7 +413,7 @@ Include ALL factors regardless of naming convention.
 
 ---
 
-### Branch 040: Issue #46 Query-Time Ontology ⚠️ IN PROGRESS
+### Branch 040: Issue #46 Query-Time Ontology ⚠️ MIXED - GOOD DIRECTION, INCOMPLETE
 
 **Date**: December 13, 2025  
 **Goal**: Fix generic responses missing granular details  
@@ -421,18 +421,56 @@ Include ALL factors regardless of naming convention.
 - `09e1497`/`e643a1b`: Query-time ontology + description enrichment + MinerU tables
 - `f27f8c3`: **CRITICAL FIX** - Remove artificial KG token caps
 
-**The Token Cap Problem**:
-```python
-# BROKEN: Query overrides capped tokens
-max_entity_tokens = min(max_entity_tokens, 2500)  # Dropped granular details
-max_relation_tokens = min(max_relation_tokens, 3500)
+**What Branch 040 Did RIGHT ✅**:
 
-# FIXED: Generous token budgets for Grok-4's 2M context
-max_entity_tokens = max(max_entity_tokens, 15000)
-max_relation_tokens = max(max_relation_tokens, 20000)
-```
+1. **Query-time ontology context** (`src/query/ontology_context.py`):
+   - Lightweight keyword detection to identify target entity types
+   - Injects small context hints (not mega-prompts)
+   - No additional LLM calls
+   ```python
+   def build_query_context(query: str) -> QueryContext:
+       # Detects: evaluation_factor, requirement, deliverable, etc.
+       # Returns ~1200 chars max context block
+   ```
 
-**Learning**: With Grok-4's 2M context window, don't artificially constrain KG context.
+2. **Query profile overrides** (`src/query/analysis_override.py`, `compliance_override.py`):
+   - Different retrieval profiles for different query types
+   - Evaluation factors, pain points, compliance checklists
+   - User prompt templates in `prompts/query/`
+
+3. **Description enrichment** (`src/inference/description_enrichment.py`):
+   - 916 lines of post-processing to enrich entity descriptions
+   - Attempts to compensate for missing `description` field
+
+4. **Token cap fix** (`f27f8c3`):
+   ```python
+   # BEFORE: Artificial caps dropped granular details
+   max_entity_tokens = min(max_entity_tokens, 2500)
+   
+   # AFTER: Generous budgets for Grok-4's 2M context
+   max_entity_tokens = max(max_entity_tokens, 15000)
+   ```
+
+**What Branch 040 Did NOT Solve ❌**:
+
+1. **The fundamental Pydantic-to-Pipe conversion issue** - Still converting validated Pydantic to lossy pipe format
+
+2. **The missing description/source_text fields** - Description enrichment is a band-aid, not a fix
+
+3. **The double-conversion architecture**:
+   ```
+   Grok → JSON → Pydantic → Pipe → LightRAG → Storage
+   ```
+   Each conversion is a potential data loss point.
+
+**Key Question Not Answered**:
+
+Should we:
+- **Option A**: Store Pydantic directly to Neo4j, bypass LightRAG entity storage?
+- **Option B**: Train LLM to output LightRAG's native pipe format, remove the adapter?
+- **Option C**: Keep the adapter but fix all the lossy conversions?
+
+**Learning**: Branch 040 improved query-time behavior (good) but didn't address extraction-time data loss (the root cause). The 916-line description enrichment is compensating for fields we removed in Branch 023.
 
 ---
 
@@ -535,49 +573,80 @@ except json.JSONDecodeError as e:
 
 ## Pitfalls & Failed Experiments
 
-### 0. ❌ CRITICAL: Pipe Delimiter Silently Drops Data (lightrag_llm_adapter.py)
+### 0. ❌ CRITICAL: The Pydantic-to-Pipe Conversion Problem
 
-**The Silent Data Corruption**:
+**The Architecture We Built** (post-Branch 023):
 
-The `lightrag_llm_adapter.py` converts Pydantic entities to LightRAG's pipe-delimited format. In doing so, it **silently destroys data**:
+```
+User Query → LightRAG calls LLM
+                    ↓
+         lightrag_llm_adapter intercepts
+                    ↓
+         JsonExtractor (Grok + Instructor)
+                    ↓
+         Pydantic ExtractionResult ← NATIVE STRUCTURED OUTPUT (GOOD!)
+                    ↓
+         _convert_to_pipe_format() ← LOSSY CONVERSION (BAD!)
+                    ↓
+         LightRAG parses pipe format
+                    ↓
+         Creates entities for storage
+```
+
+**The Good Part**: `JsonExtractor` uses **Grok's native structured output** via Instructor:
+```python
+result = await self.client.chat.completions.create(
+    model=self.model,
+    response_model=ExtractionResult,  # ← NATIVE STRUCTURED OUTPUT
+    ...
+)
+```
+
+This is excellent - we get validated Pydantic objects directly from Grok.
+
+**The Bad Part**: We then **throw away the rich Pydantic data** to create a lossy pipe-delimited string:
 
 ```python
-def _escape_pipes(self, text: str) -> str:
-    """Escape pipe characters and clean text for pipe-delimited format."""
-    if not text:
-        return ""
-    # Replace pipe with space to avoid parsing issues
-    text = str(text).replace("|", " ").replace("<|", " ").replace("|>", " ")
-    # Also clean up any accidental delimiters
-    text = text.replace(TUPLE_DELIMITER, " ")
-    return text.strip()
+def _convert_to_pipe_format(self, result: ExtractionResult, chunk_id: str) -> str:
+    # Only uses: entity_name, entity_type, and a reconstructed "description"
+    description = self._build_entity_description(entity)  # ← 400 char max!
+    description = self._escape_pipes(description)  # ← Replaces | with space
+    
+    line = f"entity<|#|>name<|#|>type<|#|>description"
 ```
 
-**Impact Examples**:
+**What Gets Lost**:
+1. **Full Pydantic metadata**: `labor_drivers`, `material_needs`, `weight`, `subfactors` - truncated to 400 chars
+2. **Entity descriptions were already removed** (Branch 023) - only metadata remains
+3. **Pipe characters replaced with spaces** - cosmetic but shows the fragility
 
-| Original Text | After Escape | Data Lost |
-|--------------|-------------|-----------|
-| `"FAR 52.212-1 | Commercial Items"` | `"FAR 52.212-1   Commercial Items"` | Alternative marker lost |
-| `"Option A | Option B | Option C"` | `"Option A   Option B   Option C"` | Structure lost |
-| `"24/7 | 365 days"` | `"24/7   365 days"` | Semantic separator lost |
+**The Fundamental Question**: Why convert to pipe format at all?
 
-**Why This Matters**:
-- Government contracting documents use `|` frequently for alternatives and separators
-- This replacement happens **silently** with no logging
-- We don't know how much data has been corrupted
+**Option A: Bypass LightRAG entity storage entirely**
+- Store Pydantic entities directly to Neo4j (we already have `neo4j_graph_io.py`)
+- Use LightRAG only for: chunking, embeddings, vector retrieval
+- Keep full Pydantic richness in storage
 
-**The Deeper Problem**:
+**Option B: Align prompts to LightRAG's native format**
+- Train LLM to output pipe-delimited format directly
+- No adapter needed
+- Use LightRAG's battle-tested parsing
+- Our prompts become the training ground
 
-The pipe-delimited format is LightRAG's internal transport:
+**Option C: Keep adapter but fix the conversion**
+- Don't truncate to 400 chars
+- Use proper JSON escaping instead of space replacement
+- Serialize full Pydantic metadata somehow
+
+**Recommendation**: 
+Option B is likely the cleanest. LightRAG's pipe format is simple:
 ```
-entity<|#|>name<|#|>type<|#|>description
+entity<|#|>Monthly Status Report<|#|>deliverable<|#|>CDRL A001 submitted monthly per contract schedule
 ```
 
-By building a custom adapter that converts Pydantic → pipe format, we introduced a **lossy transformation layer** that doesn't exist when using LightRAG's native extraction.
+Our 121K prompt should teach the LLM to output this format, not JSON that we then convert.
 
-**Recommendation**: Either:
-1. Use LightRAG's native extraction (no pipe escaping needed)
-2. Or use a lossless encoding (Base64, JSON string escaping) instead of space replacement
+**Note on `|` delimiter concern**: Government contracting documents don't frequently use `|` characters. The pipe delimiter issue is a LightRAG internal format concern, not a GovCon domain concern. The real issue is the **lossy double-conversion** (JSON → Pydantic → Pipe → LightRAG entities).
 
 ---
 
@@ -730,6 +799,95 @@ semaphore = asyncio.Semaphore(max_parallel_insert)
 
 ---
 
+## The Fundamental Architectural Decision
+
+Before any reset, this question must be answered:
+
+### How Should We Integrate Our Ontology with LightRAG?
+
+**Current State (Branches 023-040)**:
+```
+LightRAG calls LLM for extraction
+    → lightrag_llm_adapter intercepts
+    → JsonExtractor (Instructor + Grok native structured output)
+    → Pydantic ExtractionResult (GOOD - validated data!)
+    → _convert_to_pipe_format() (BAD - lossy conversion)
+    → LightRAG parses pipe format
+    → LightRAG stores entities (some data lost)
+```
+
+**The Options**:
+
+#### Option A: Use Pydantic, Bypass LightRAG Entity Storage
+
+```
+LightRAG calls LLM for extraction
+    → lightrag_llm_adapter intercepts
+    → JsonExtractor (Grok structured output)
+    → Pydantic ExtractionResult
+    → Store DIRECTLY to Neo4j (full Pydantic richness)
+    → Use LightRAG only for: chunking, embeddings, vector search
+```
+
+**Pros**: Full data preservation, Pydantic validation, native Grok structured output
+**Cons**: Two storage systems (Neo4j entities + LightRAG vectors), complex sync
+
+#### Option B: Align Prompts to LightRAG's Native Format
+
+```
+LightRAG calls LLM for extraction
+    → LLM outputs pipe-delimited format DIRECTLY
+    → LightRAG parses and stores (native flow)
+    → No adapter, no conversion
+```
+
+**Pros**: Simplest architecture, uses LightRAG as designed
+**Cons**: Lose Pydantic validation, lose Grok structured output benefits
+
+**Implementation**: Our 121K extraction prompt would train the LLM to output:
+```
+entity<|#|>Monthly Status Report<|#|>deliverable<|#|>CDRL A001 monthly submission with labor hours and accomplishments
+relation<|#|>Monthly Status Report<|#|>Contract Requirements<|#|>SATISFIES<|#|>Deliverable satisfies reporting requirement
+<|COMPLETE|>
+```
+
+#### Option C: Keep Adapter, Fix All Conversions
+
+```
+(Same as current, but fix:)
+    → Don't truncate descriptions to 400 chars
+    → Don't remove description/source_text fields
+    → Use proper escaping instead of space replacement
+    → Preserve full Pydantic metadata in pipe format somehow
+```
+
+**Pros**: Keep Pydantic validation benefits
+**Cons**: Complex, fighting against LightRAG's design
+
+### Recommendation
+
+**Option B is likely the right path**:
+
+1. LightRAG's pipe format is simple and proven
+2. Our 121K prompt already has comprehensive domain knowledge
+3. The prompt can teach Grok to output pipe format directly
+4. Removes all conversion layers and potential data loss
+5. Uses LightRAG as its authors intended
+
+**The Key Insight**: We've been using Pydantic as a crutch to validate LLM output, but:
+- Grok-4 with good prompts produces reliable output
+- LightRAG's native format works well when given good prompts
+- The conversion layer (Pydantic → Pipe) introduced more problems than it solved
+
+**Validation Test**: Process the same RFP with:
+1. Branch 022 (native LightRAG, no Pydantic adapter)
+2. Current Branch 040 (Pydantic adapter + all fixes)
+3. Compare workload query quality
+
+If Branch 022 produces better responses, the Pydantic adapter is hurting not helping.
+
+---
+
 ## Recommendations for Reset
 
 ### Starting Point
@@ -791,43 +949,68 @@ semaphore = asyncio.Semaphore(max_parallel_insert)
 
 ### Critical Issues to Investigate Before Reset
 
-#### 1. Restore description and source_text Fields?
+#### 1. Does the Pydantic Adapter Help or Hurt?
 
-Branch 022 (Perfect Run) had these fields in BaseEntity:
+**The Core Question**: Is our `lightrag_llm_adapter` + `JsonExtractor` producing better results than LightRAG's native extraction?
+
+**Test Protocol**:
+```bash
+# Test A: Branch 022 (native LightRAG, no adapter)
+git checkout cb204fd
+# Process MCPP RFP
+# Run workload query
+# Record response quality (98%+ was the baseline)
+
+# Test B: Current (with adapter)
+git checkout main
+# Process same RFP
+# Run same query
+# Compare
+```
+
+**If Branch 022 wins**: The Pydantic adapter is hurting, not helping. Consider Option B (align prompts to native format).
+
+**If Current wins**: The adapter is valuable, but fix the conversion issues.
+
+#### 2. Restore description and source_text Fields?
+
+Branch 022 had these fields:
 ```python
 description: str  # "Comprehensive description including context, values, and relationships"
 source_text: Optional[str]  # "The exact snippet from the source text"
 ```
 
-**Question**: Did removing these fields cause the "generic responses" problem?
+**Question**: Did removing these (Branch 023) cause "generic responses"?
 
-**Action**: Compare query responses between:
-- Workspace with description/source_text (Branch 022)
-- Workspace without (Branch 023+)
-
-#### 2. Audit the Pipe Delimiter Data Loss
-
-Current code silently replaces `|` with space:
-```python
-text = str(text).replace("|", " ")  # Data loss!
+**Note**: If we choose Option B (native LightRAG format), descriptions are part of the pipe format:
 ```
-
-**Action**: 
-- Grep RFPs for `|` usage patterns
-- Quantify how much data is being corrupted
-- Consider JSON string escaping instead
+entity<|#|>name<|#|>type<|#|>DESCRIPTION_GOES_HERE
+```
+The description was never meant to be removed - it's integral to LightRAG's format.
 
 #### 3. Validate 154 vs 3,111 Relationships
 
-Branch 022 had 154 inferred relationships with 98%+ quality.
-Branch 029+ has 3,111+ relationships.
+Branch 022: 154 inferred relationships → 98%+ quality
+Branch 029+: 3,111+ relationships → unknown quality
 
 **Question**: Are 3,000 extra relationships improving or degrading retrieval?
 
-**Action**:
-- Run the same workload query against both
-- Compare response completeness and accuracy
-- More relationships ≠ better quality
+**Test**: Run identical queries, compare response completeness.
+
+#### 4. Is the 121K Prompt the Problem or Solution?
+
+Current prompt is 121K chars (~30K tokens). Two possibilities:
+
+**Scenario A**: Prompt is excellent, but conversion layer loses the benefits
+- Solution: Align prompt to output LightRAG's native format
+
+**Scenario B**: Prompt is too complex, causing LLM confusion
+- Solution: Simplify prompt, rely more on Grok's inherent capabilities
+
+**Test**: Compare extraction quality with:
+- Full 121K prompt
+- LightRAG's default 2K prompt
+- Something in between (~20K focused prompt)
 
 ### Configuration Anchors (Never Change)
 
