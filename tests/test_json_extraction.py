@@ -74,7 +74,10 @@ async def test_extraction():
             
         print("\n--- Relationships ---")
         for rel in result.relationships:
-            print(f"[{rel.relationship_type}] {rel.source_entity.entity_name} -> {rel.target_entity.entity_name}")
+            # Relationship endpoints are strings in the current extraction schema.
+            print(f"[{rel.relationship_type}] {rel.source_entity} -> {rel.target_entity}")
+            if getattr(rel, "description", None):
+                print(f"   {rel.description}")
             print("")
             
     except Exception as e:

@@ -57,36 +57,43 @@ async def initialize_raganything():
     openai_api_key = os.getenv("EMBEDDING_BINDING_API_KEY")
     working_dir = global_args.working_dir
     
-    # Government contracting entity types (17 specialized types)
-    # Semantic-first detection: Content determines entity type, not section labels
-    # NOTE: LightRAG normalizes to lowercase internally - use lowercase for consistency
-    entity_types = [
-        # Core entities
-        "organization", "concept", "event", "technology", "person", "location",
-        
-        # Requirements (semantic detection with metadata: requirement_type, criticality_level)
-        "requirement",
-        
-        # Structural entities
-        "clause",                   # FAR/DFARS/AFFARS patterns, will cluster by parent section
-        "section",                  # Stores both structural_label + semantic_type
-        "document",                 # References: specs, standards, manuals, regulations, attachments, annexes
-        "deliverable",
-        
-        # Evaluation entities (semantic detection, may be embedded in non-standard sections)
-        "evaluation_factor",        # Scoring criteria (Section M content)
-        "submission_instruction",   # Format/page limits (Section L content, may be IN Section M)
-        
-        # Strategic entities (Capture planning patterns)
-        "strategic_theme",          # Win themes, hot buttons, discriminators, proof points
-        
-        # Work scope (Semantic detection regardless of location)
-        "statement_of_work",        # PWS/SOW/SOO content (may be Section C or attachment)
-        
-        # Programs and equipment
-        "program",                  # Major programs (MCPP II, Navy MBOS, etc.)
-        "equipment",                # Physical items (batteries, vehicles, tools)
-    ]
+    # Ontology profile selection (must match server/config.py).
+    ontology_profile = os.getenv("ONTOLOGY_PROFILE", "govcon_full").strip().lower()
+
+    if ontology_profile == "capture_light":
+        entity_types = [
+            "organization",
+            "requirement",
+            "deliverable",
+            "evaluation_factor",
+            "submission_instruction",
+            "clause",
+            "section",
+            "document",
+            "strategic_theme",
+            "performance_metric",
+            "statement_of_work",
+        ]
+    else:
+        entity_types = [
+            "organization",
+            "concept",
+            "event",
+            "technology",
+            "person",
+            "location",
+            "requirement",
+            "clause",
+            "section",
+            "document",
+            "deliverable",
+            "evaluation_factor",
+            "submission_instruction",
+            "strategic_theme",
+            "statement_of_work",
+            "program",
+            "equipment",
+        ]
     
     # MinerU configuration from environment variables
     parser = os.getenv("PARSER", "mineru")
@@ -129,7 +136,9 @@ async def initialize_raganything():
     # Wrap with Pydantic extraction adapter for entity validation
     # Issue #43: Routes extraction calls through JsonExtractor + Pydantic schema
     # Non-extraction calls (queries, summaries) pass through to base function
-    use_pydantic_extraction = os.getenv("USE_PYDANTIC_TEXT_EXTRACTION", "true").lower() == "true"
+    # Default OFF: strict schema interception materially reduced recall and graph connectivity.
+    # You can re-enable if/when the schema + prompts are proven stable in your environment.
+    use_pydantic_extraction = os.getenv("USE_PYDANTIC_TEXT_EXTRACTION", "false").lower() == "true"
     if use_pydantic_extraction:
         from src.extraction.lightrag_llm_adapter import create_extraction_adapter
         llm_model_func = create_extraction_adapter(base_llm_model_func)
