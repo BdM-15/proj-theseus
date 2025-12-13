@@ -1300,13 +1300,39 @@ if entity_type not in VALID_ENTITY_TYPES:
 
 ## LightRAG/RAGAnything Alignment
 
-### Official LightRAG Best Practices
+### Official LightRAG Best Practices (December 2025)
 
-From LightRAG repository:
-- Query modes: `hybrid` recommended (combines local + global)
+From LightRAG repository README:
+
+**LLM Configuration:**
+- **Minimum**: 32 billion parameters
+- **Context**: at least 32KB, 64KB recommended
+- **Extraction**: Non-reasoning models (per official guidance)
+- **Query**: Stronger models than extraction
+- **Embedding**: `BAAI/bge-m3` or `text-embedding-3-large` (we use the latter)
+- **Reranker**: `BAAI/bge-reranker-v2-m3` or Jina (optional)
+
+**Query Configuration:**
+- `mode="hybrid"` - recommended (combines local + global)
 - `top_k=60` - entities/relationships to retrieve
 - `chunk_top_k=20` - text chunks for context
 - `enable_rerank=True` - better precision
+
+**LLM Provider Support:**
+LightRAG uses OpenAI-compatible API interface (`lightrag/llm/openai.py`). 
+xAI Grok is OpenAI-compatible via `base_url="https://api.x.ai/v1"`.
+
+### RAG-Anything Model Usage (from README examples)
+
+RAG-Anything examples use:
+- `gpt-4o-mini` for LLM model function
+- `gpt-4o` for vision model function
+- `text-embedding-3-large` for embeddings
+
+**Our Adaptation:**
+- `grok-4-fast-reasoning` for LLM (via xAI SDK with Instructor)
+- `grok-4-fast-reasoning` for vision (same model with multimodal support)
+- `text-embedding-3-large` for embeddings (OpenAI API)
 
 ### Official RAG-Anything 7-Stage Pipeline
 
@@ -1501,15 +1527,49 @@ Branch 023 removed descriptions to prevent truncation. The correct fix was to re
 
 ## MODEL SELECTION: Grok 4 vs Grok 4-1, Reasoning vs Non-Reasoning
 
+### Grok 4-1 Official Release Information (November 19, 2025)
+
+**From xAI/GitHub sources and third-party integrations (December 2025 web search):**
+
+| Model Name | Type | Context Window | Features |
+|------------|------|---------------|----------|
+| `grok-4-1-fast` | Reasoning (primary) | 2M tokens | Multimodal, function calling, JSON mode |
+| `grok-4-1-fast-reasoning` | Reasoning (alias) | 2M tokens | Same as above |
+| `grok-4-1-fast-non-reasoning` | Non-reasoning | 2M tokens | Faster, cheaper, less nuanced |
+| `grok-code-fast-1` | Code-optimized | 2M tokens | Tool calling optimized |
+
+**Key Improvements in Grok 4-1:**
+- **Optimized for agentic tool calling** - Better function calling performance
+- **2M context window maintained** - Same as Grok 4
+- **Multimodal support** - Image understanding capabilities
+- **Automatic prompt caching** - Server-side caching for cost efficiency
+- **Intelligence scores** (from third-party evaluation):
+  - Reasoning variant: 15/20 (Strong general models)
+  - Non-reasoning variant: 13/20 (Balanced assistants)
+
+**Naming Conventions:**
+- Native xAI API: `grok-4-1-fast`, `grok-4-1-fast-non-reasoning`
+- OpenRouter: `x-ai/grok-4.1-fast` (dot notation)
+
+**Our current pyproject.toml:** `xai-sdk>=1.4.0` (latest is 1.5.0 as of Dec 2025)
+
+---
+
 ### What LightRAG Recommends
 
-From LightRAG's official documentation:
-> "It is not recommended to choose reasoning models during the document indexing stage."
-> "During the query stage, it is recommended to choose models with stronger capabilities than those used in the indexing stage."
+From LightRAG's official README (December 2025):
+
+> **"LLM Selection:**
+> - It is recommended to use an LLM with at least 32 billion parameters.
+> - The context length should be at least 32KB, with 64KB being recommended.
+> - **It is not recommended to choose reasoning models during the document indexing stage.**
+> - During the query stage, it is recommended to choose models with stronger capabilities than those used in the indexing stage."
 
 This suggests:
-- **Extraction**: Non-reasoning (faster, cheaper)
-- **Query**: Reasoning (better synthesis)
+- **Extraction (indexing)**: Non-reasoning (faster, cheaper, sufficient for simple extraction)
+- **Query**: Reasoning (better synthesis and analysis)
+
+**LightRAG's assumption**: Generic entity types (person, location, organization) with default prompts (~2K tokens).
 
 ### What We Actually Tried
 
@@ -1548,20 +1608,28 @@ Our use case requires:
 - 121K prompt with domain expertise
 - Complex government contracting relationships
 
-### What About Grok 4-1?
+### Grok 4-1 vs Grok 4: What's New?
 
-**Grok 4-1** is xAI's newer model. From our Perfect Run documentation:
-```
-Model History:
-- ❌ Started with grok-4-1-fast-reasoning (typo?)
-- ❌ Tested grok-beta (too experimental)
-- ✅ Locked in: grok-4-fast-reasoning (perfect run model)
-```
+**Based on web search (December 2025):**
 
-**What we DON'T know with certainty**:
-1. Whether `grok-4-1` is significantly better than `grok-4`
-2. Whether `grok-4-1-non-reasoning` can handle our 121K prompt
-3. xAI's official model naming conventions and capabilities
+| Aspect | Grok 4 | Grok 4-1 | Notes |
+|--------|--------|----------|-------|
+| **Context window** | 2M tokens | 2M tokens | Same |
+| **Agentic tool calling** | Supported | **Optimized** | 4-1 is specifically tuned for this |
+| **Prompt caching** | Unknown | **Built-in** | Server-side automatic caching |
+| **Multimodal** | Yes | Yes | No change |
+| **Non-reasoning variant** | `grok-4-fast-non-reasoning` | `grok-4-1-fast-non-reasoning` | Both available |
+| **Release date** | Earlier 2025 | **November 19, 2025** | Confirmed |
+
+**What we now KNOW with certainty**:
+1. Grok 4-1 exists and was released November 19, 2025
+2. Model names: `grok-4-1-fast`, `grok-4-1-fast-reasoning` (alias), `grok-4-1-fast-non-reasoning`
+3. 2M context window maintained
+4. Optimized for agentic tool calling
+
+**What still needs testing**:
+1. Whether `grok-4-1` produces better extraction quality than `grok-4`
+2. Whether `grok-4-1-non-reasoning` can handle our 121K prompt (grok-4 version failed)
 
 **What we SHOULD test**:
 
@@ -1601,27 +1669,112 @@ Model History:
 - Don't infer implicit relationships
 - May struggle with nuanced classification
 
-**Test protocol** to determine if non-reasoning works:
+---
+
+### Comprehensive Test Protocol
+
+**Before switching models, test empirically against Branch 022 baseline:**
+
+#### Test 1: Grok 4-1 Reasoning (Upgrade Test)
 
 ```bash
-# Test 1: Same RFP, non-reasoning extraction
-EXTRACTION_LLM_NAME=grok-4-1-non-reasoning
-# Process RFP
-# Compare: Entity count, relationship count, entity type distribution
+# Upgrade both extraction and query to Grok 4-1
+EXTRACTION_LLM_NAME=grok-4-1-fast-reasoning
+REASONING_LLM_NAME=grok-4-1-fast-reasoning
 
-# Test 2: Workload query quality
-# Run standard workload driver query
-# Compare against Branch 022 98%+ baseline
+# Process: MCPP DRAFT RFP (same as Branch 022)
+# Measure: Entity count, relationship count, entity type distribution
+# Baseline: 368 entities, 154 relationships (Branch 022)
 ```
 
-**If Test 1 shows <90% of baseline entity count**: Non-reasoning cannot handle our prompt.
-**If Test 2 shows <90% query quality**: Stick with reasoning for extraction.
+**Success criteria**: ≥95% of baseline metrics
 
-### Summary
+#### Test 2: Grok 4-1 Non-Reasoning Extraction (LightRAG-Style Split)
+
+```bash
+# LightRAG recommended approach
+EXTRACTION_LLM_NAME=grok-4-1-fast-non-reasoning
+REASONING_LLM_NAME=grok-4-1-fast-reasoning
+
+# Process: Same RFP
+# Measure: Entity count, relationship count, entity type distribution
+```
+
+**Success criteria**:
+- Entity count ≥90% of baseline (≥331 entities)
+- Workload query quality ≥90% of baseline
+- Correct entity type distribution (no massive shifts)
+
+#### Test 3: Workload Query Quality
+
+```bash
+# Run standard workload driver query
+# Query: "Identify all workload drivers and their BOE categories"
+
+# Compare responses between:
+# A. Branch 022 (grok-4-fast-reasoning) - BASELINE
+# B. Test 1 (grok-4-1-fast-reasoning)
+# C. Test 2 (grok-4-1-fast-non-reasoning extraction)
+```
+
+**Quality metrics**:
+- Granular detail retention (frequencies, quantities, constraints)
+- Correct categorization (Labor vs Materials vs ODCs)
+- Narrative flow and analytical depth (not just structured data)
+
+---
+
+### Test Matrix
+
+| Configuration | Extraction Model | Query Model | Expected Outcome |
+|--------------|-----------------|-------------|------------------|
+| **Baseline (Branch 022)** | grok-4-fast-reasoning | grok-4-fast-reasoning | 98%+ quality (PROVEN) |
+| **Upgrade (Test 1)** | grok-4-1-fast-reasoning | grok-4-1-fast-reasoning | Unknown - test needed |
+| **LightRAG-style (Test 2)** | grok-4-1-fast-non-reasoning | grok-4-1-fast-reasoning | Previously failed with grok-4, may work with 4-1 |
+| **Code-optimized (Test 3)** | grok-code-fast-1 | grok-4-1-fast-reasoning | Unknown - potentially good for structured extraction |
+
+---
+
+### SDK Update Consideration
+
+**Current**: `xai-sdk>=1.4.0`  
+**Latest**: `xai-sdk==1.5.0` (December 5, 2025)
+
+**1.5.0 additions**:
+- Inline citations support
+- Collections API updates
+- Verbose streaming option
+
+**Recommendation**: Update to 1.5.0 for latest features:
+```bash
+uv add xai-sdk==1.5.0
+```
+
+---
+
+### Decision Tree
+
+```
+START: Is quality the top priority?
+  ├── YES → Keep grok-4-fast-reasoning for both (SAFE CHOICE)
+  │         └── Optionally test grok-4-1-fast-reasoning upgrade
+  │
+  └── NO (cost matters more) → Test grok-4-1-fast-non-reasoning for extraction
+            ├── If quality ≥90% → Use LightRAG-style split
+            └── If quality <90% → Keep unified reasoning model
+```
+
+---
+
+### Summary (Updated with Web Search Findings)
 
 | Question | Answer | Certainty |
 |----------|--------|-----------|
-| Can we use non-reasoning for extraction? | **Tried and failed** (Branch 011) | HIGH |
+| Can we use non-reasoning for extraction? | **Tried and failed with Grok 4** (Branch 011) | HIGH |
 | Is Grok 4-1 better than Grok 4? | **Unknown - needs testing** | LOW |
 | Should we split extraction/query models? | **Only if non-reasoning works for our prompt** | MEDIUM |
 | What's the safe choice? | **Unified grok-4-fast-reasoning** (Branch 022 proven) | HIGH |
+| Grok 4-1 release date? | **November 19, 2025** | HIGH |
+| Grok 4-1 context window? | **2M tokens** (same as Grok 4) | HIGH |
+| Grok 4-1 key improvement? | **Optimized for agentic tool calling** | HIGH |
+| xAI SDK latest version? | **1.5.0** (December 5, 2025) | HIGH |
