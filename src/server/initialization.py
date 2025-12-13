@@ -184,7 +184,7 @@ async def initialize_raganything():
         )
     
     # Wrap extraction function with Pydantic adapter for entity validation
-    # Issue #43: Routes extraction calls through JsonExtractor + Pydantic schema
+    # Issue #43: Routes extraction calls through PydanticExtractor + schema validation
     # Non-extraction calls pass through to base extraction function
     use_pydantic_extraction = os.getenv("USE_PYDANTIC_TEXT_EXTRACTION", "true").lower() == "true"
     if use_pydantic_extraction:

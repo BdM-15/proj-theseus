@@ -215,7 +215,7 @@ async def process_document_with_semantic_inference(
         # 
         # The lightrag_llm_adapter intercepts ALL extraction calls, ensuring:
         # - Full 121K ontology prompt for all content types
-        # - Pydantic validation via JsonExtractor
+        # - Pydantic validation via PydanticExtractor
         # - No duplicate extraction (removed GovconMultimodalProcessor)
         # ============================================================================
         
