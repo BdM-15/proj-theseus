@@ -240,7 +240,7 @@ class TableEntityTester:
             prompt, system_prompt=None, history_messages=[], **kwargs
         ) -> str:
             return await openai_complete_if_cache(
-                "grok-4-fast-reasoning",
+                "grok-4-1-fast-reasoning",
                 prompt,
                 system_prompt=system_prompt,
                 history_messages=history_messages,

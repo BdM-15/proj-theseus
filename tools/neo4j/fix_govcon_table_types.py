@@ -82,7 +82,7 @@ async def retype_with_llm(entity_name: str, description: str) -> str:
     
     os.environ["XAI_API_KEY"] = os.getenv("LLM_BINDING_API_KEY") or os.getenv("XAI_API_KEY")
     
-    client = instructor.from_provider("xai/grok-4-fast-reasoning", async_client=True)
+    client = instructor.from_provider("xai/grok-4-1-fast-reasoning", async_client=True)
     
     class EntityTypeResult(BaseModel):
         entity_type: str
@@ -110,7 +110,7 @@ Return the single most appropriate entity type."""
 
     try:
         result = await client.chat.completions.create(
-            model="grok-4-fast-reasoning",
+            model="grok-4-1-fast-reasoning",
             response_model=EntityTypeResult,
             messages=[
                 {"role": "system", "content": "You classify government contracting entities. Return exactly one allowed type."},

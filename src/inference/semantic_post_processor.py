@@ -1879,7 +1879,7 @@ async def _semantic_post_processor_neo4j(
         Dict with processing statistics
     """
     if llm_model_name is None:
-        llm_model_name = os.getenv("LLM_MODEL", "grok-4-fast-reasoning")
+        llm_model_name = os.getenv("REASONING_LLM_NAME", os.getenv("LLM_MODEL", "grok-4-1-fast-reasoning"))
     
     logger.info("🔧 Starting Neo4j semantic post-processing...")
     start_time = time.time()
@@ -2021,8 +2021,8 @@ async def enhance_knowledge_graph(
     logger.info("🧠 SEMANTIC POST-PROCESSING: LLM-Powered Graph Enhancement (Neo4j)")
     logger.info("=" * 80)
     
-    # Get LLM model from environment
-    llm_model = os.getenv("LLM_MODEL", "grok-4-fast-reasoning")
+    # Get LLM model from environment (use reasoning model for post-processing)
+    llm_model = os.getenv("REASONING_LLM_NAME", os.getenv("LLM_MODEL", "grok-4-1-fast-reasoning"))
     llm_temp = float(os.getenv("LLM_MODEL_TEMPERATURE", "0.1"))
     
     return await _semantic_post_processor_neo4j(

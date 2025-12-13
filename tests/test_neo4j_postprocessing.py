@@ -45,7 +45,7 @@ async def test_llm_call():
     try:
         response = await _call_llm_async(
             prompt="What is 2+2? Answer with just the number.",
-            model=os.getenv("LLM_MODEL", "grok-4-fast-reasoning"),
+            model=os.getenv("LLM_MODEL", "grok-4-1-fast-reasoning"),
             temperature=0.1
         )
         logger.info(f"✅ LLM Response: {response.strip()}")
@@ -74,7 +74,7 @@ async def test_entity_type_inference():
             entity_type = await _infer_entity_type(
                 entity_name=entity_name,
                 description=description,
-                model=os.getenv("LLM_MODEL", "grok-4-fast-reasoning"),
+                model=os.getenv("LLM_MODEL", "grok-4-1-fast-reasoning"),
                 temperature=0.1
             )
             logger.info(f"  ✅ Inferred type: {entity_type}")
@@ -118,7 +118,7 @@ async def test_relationship_inference():
         relationships = await _infer_relationships_batch(
             entities=test_entities,
             existing_rels=[],
-            model=os.getenv("LLM_MODEL", "grok-4-fast-reasoning"),
+            model=os.getenv("LLM_MODEL", "grok-4-1-fast-reasoning"),
             temperature=0.1
         )
         
@@ -187,7 +187,7 @@ async def test_full_postprocessing():
         logger.info(f"  Running post-processing on {len(entities)} existing entities...")
         
         result = await _semantic_post_processor_neo4j(
-            llm_model_name=os.getenv("LLM_MODEL", "grok-4-fast-reasoning"),
+            llm_model_name=os.getenv("LLM_MODEL", "grok-4-1-fast-reasoning"),
             temperature=0.1
         )
         
