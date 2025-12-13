@@ -1496,3 +1496,132 @@ The Pydantic adapter was never the problem. **The missing `description` field wa
 Branch 023 removed descriptions to prevent truncation. The correct fix was to reduce chunk size, not remove descriptions. We've been building compensating mechanisms (adapter description reconstruction, 916-line enrichment post-processing) ever since.
 
 **Reset to Branch 022, restore descriptions, reduce chunk size by 50%, use native parallelization.**
+
+---
+
+## MODEL SELECTION: Grok 4 vs Grok 4-1, Reasoning vs Non-Reasoning
+
+### What LightRAG Recommends
+
+From LightRAG's official documentation:
+> "It is not recommended to choose reasoning models during the document indexing stage."
+> "During the query stage, it is recommended to choose models with stronger capabilities than those used in the indexing stage."
+
+This suggests:
+- **Extraction**: Non-reasoning (faster, cheaper)
+- **Query**: Reasoning (better synthesis)
+
+### What We Actually Tried
+
+**Branch 011** implemented dual-LLM split (documented in `docs/future_features/dual_llm_integration/DUAL_LLM_FIX.md`):
+```bash
+EXTRACTION_LLM_NAME=grok-4-fast-non-reasoning
+REASONING_LLM_NAME=grok-4-fast-reasoning
+```
+
+**Result**: It failed for our use case.
+
+From the documentation:
+> "Non-reasoning model struggles with nuanced government contracting entity relationships"
+> "Deep domain knowledge requires reasoning capabilities even during extraction"
+
+**We reverted to unified reasoning model**:
+```bash
+EXTRACTION_LLM_NAME=grok-4-fast-reasoning
+REASONING_LLM_NAME=grok-4-fast-reasoning
+```
+
+### Why Non-Reasoning Failed For Us
+
+1. **Our extraction prompt is 121K chars** (~30K tokens) of domain knowledge
+2. **Entity relationships are nuanced** (Section L ↔ M mapping, FAR clause implications)
+3. **Non-reasoning models follow instructions literally** - they don't infer implicit relationships
+4. **Our ontology requires reasoning** to correctly classify entities (e.g., PERFORMANCE_METRIC vs REQUIREMENT distinction)
+
+LightRAG's recommendation assumes:
+- Simple entity types (person, location, organization)
+- Default prompts (~2K tokens)
+- Generic document structures
+
+Our use case requires:
+- 18 specialized entity types
+- 121K prompt with domain expertise
+- Complex government contracting relationships
+
+### What About Grok 4-1?
+
+**Grok 4-1** is xAI's newer model. From our Perfect Run documentation:
+```
+Model History:
+- ❌ Started with grok-4-1-fast-reasoning (typo?)
+- ❌ Tested grok-beta (too experimental)
+- ✅ Locked in: grok-4-fast-reasoning (perfect run model)
+```
+
+**What we DON'T know with certainty**:
+1. Whether `grok-4-1` is significantly better than `grok-4`
+2. Whether `grok-4-1-non-reasoning` can handle our 121K prompt
+3. xAI's official model naming conventions and capabilities
+
+**What we SHOULD test**:
+
+| Configuration | Extraction Model | Query Model | Test Needed |
+|--------------|-----------------|-------------|-------------|
+| **Current** | grok-4-fast-reasoning | grok-4-fast-reasoning | Baseline |
+| **LightRAG-style** | grok-4-1-non-reasoning | grok-4-1-fast-reasoning | Full test |
+| **Hybrid** | grok-4-1-fast-reasoning | grok-4-1-fast-reasoning | Upgrade test |
+
+### Recommendation: Test Before Committing
+
+**Before switching models, test empirically:**
+
+1. **Test grok-4-1-non-reasoning for extraction**:
+   - Process the same RFP used for Branch 022 perfect run
+   - Compare entity count, relationship count, workload query quality
+   - If entity count drops significantly, non-reasoning can't handle our prompt
+
+2. **Test grok-4-1-fast-reasoning for both**:
+   - Compare against grok-4-fast-reasoning baseline
+   - If better, upgrade both extraction and query
+
+3. **Only split extraction/query models IF**:
+   - Non-reasoning produces equivalent extraction quality
+   - Cost savings justify the additional complexity
+
+### Key Question: Can Non-Reasoning Handle 121K Prompt?
+
+**The fundamental issue**: Our extraction prompt is 121K chars with:
+- 18 entity type definitions with examples
+- Complex decision trees (PERFORMANCE_METRIC vs REQUIREMENT)
+- Relationship inference rules
+- Government contracting domain knowledge
+
+**Non-reasoning models**:
+- Follow instructions literally
+- Don't infer implicit relationships
+- May struggle with nuanced classification
+
+**Test protocol** to determine if non-reasoning works:
+
+```bash
+# Test 1: Same RFP, non-reasoning extraction
+EXTRACTION_LLM_NAME=grok-4-1-non-reasoning
+# Process RFP
+# Compare: Entity count, relationship count, entity type distribution
+
+# Test 2: Workload query quality
+# Run standard workload driver query
+# Compare against Branch 022 98%+ baseline
+```
+
+**If Test 1 shows <90% of baseline entity count**: Non-reasoning cannot handle our prompt.
+**If Test 2 shows <90% query quality**: Stick with reasoning for extraction.
+
+### Summary
+
+| Question | Answer | Certainty |
+|----------|--------|-----------|
+| Can we use non-reasoning for extraction? | **Tried and failed** (Branch 011) | HIGH |
+| Is Grok 4-1 better than Grok 4? | **Unknown - needs testing** | LOW |
+| Should we split extraction/query models? | **Only if non-reasoning works for our prompt** | MEDIUM |
+| What's the safe choice? | **Unified grok-4-fast-reasoning** (Branch 022 proven) | HIGH |
