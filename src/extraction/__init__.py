@@ -4,4 +4,3 @@ from .pydantic_extractor import PydanticExtractor
 from .lightrag_llm_adapter import LightRAGExtractionAdapter, create_extraction_adapter
 
 __all__ = ["PydanticExtractor", "LightRAGExtractionAdapter", "create_extraction_adapter"]
-
