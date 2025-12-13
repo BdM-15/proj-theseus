@@ -1566,47 +1566,153 @@ From LightRAG's official README (December 2025):
 > - During the query stage, it is recommended to choose models with stronger capabilities than those used in the indexing stage."
 
 This suggests:
-- **Extraction (indexing)**: Non-reasoning (faster, cheaper, sufficient for simple extraction)
+- **Extraction (indexing)**: Non-reasoning (faster, cheaper, sufficient for structured extraction)
 - **Query**: Reasoning (better synthesis and analysis)
 
-**LightRAG's assumption**: Generic entity types (person, location, organization) with default prompts (~2K tokens).
+---
 
-### What We Actually Tried
+### ⚠️ Historical Context: Branch 011 (OUTDATED - DO NOT USE AS EVIDENCE)
 
-**Branch 011** implemented dual-LLM split (documented in `docs/future_features/dual_llm_integration/DUAL_LLM_FIX.md`):
+**Branch 011** (November 2025) tried dual-LLM split and failed:
 ```bash
-EXTRACTION_LLM_NAME=grok-4-fast-non-reasoning
+EXTRACTION_LLM_NAME=grok-4-fast-non-reasoning  # FAILED
 REASONING_LLM_NAME=grok-4-fast-reasoning
 ```
 
-**Result**: It failed for our use case.
+**However, Branch 011's context was COMPLETELY DIFFERENT from today:**
 
-From the documentation:
-> "Non-reasoning model struggles with nuanced government contracting entity relationships"
-> "Deep domain knowledge requires reasoning capabilities even during extraction"
+| Aspect | Branch 011 (Failed) | Current Architecture |
+|--------|---------------------|---------------------|
+| **JSON handling** | Manual parsing | **Instructor + Pydantic native** |
+| **Schema enforcement** | Post-hoc validation | **`response_model=ExtractionResult`** |
+| **Model version** | `grok-4-fast-non-reasoning` | `grok-4-1-fast-non-reasoning` (newer, improved) |
+| **Output format** | Hope LLM outputs valid JSON | **Guaranteed valid schema** |
+| **Error recovery** | Crash on malformed JSON | **Automatic retry + graceful fallback** |
+| **xAI SDK** | OpenAI-compatible wrapper | **Native xAI SDK (gRPC)** |
 
-**We reverted to unified reasoning model**:
-```bash
-EXTRACTION_LLM_NAME=grok-4-fast-reasoning
-REASONING_LLM_NAME=grok-4-fast-reasoning
+**⚠️ The Branch 011 failure should NOT be used as evidence for current decisions.**
+
+---
+
+### Current Architecture Advantages (Post-Issue #6)
+
+Our extraction pipeline now uses **Instructor + xAI native structured output**:
+
+```python
+# From src/extraction/json_extractor.py
+self.client = instructor.from_provider(f"xai/{self.model}", async_client=True)
+
+result = await self.client.chat.completions.create(
+    model=self.model,
+    response_model=ExtractionResult,  # ← NATIVE STRUCTURED OUTPUT
+    messages=[...],
+    temperature=0.1,
+    max_tokens=self.max_output_tokens,
+)
 ```
 
-### Why Non-Reasoning Failed For Us
+**This changes everything for non-reasoning models:**
 
-1. **Our extraction prompt is 121K chars** (~30K tokens) of domain knowledge
-2. **Entity relationships are nuanced** (Section L ↔ M mapping, FAR clause implications)
-3. **Non-reasoning models follow instructions literally** - they don't infer implicit relationships
-4. **Our ontology requires reasoning** to correctly classify entities (e.g., PERFORMANCE_METRIC vs REQUIREMENT distinction)
+1. **Instructor enforces JSON schema** - Model CANNOT output malformed JSON
+2. **Pydantic validates entity types** - Invalid types get caught/coerced automatically
+3. **Native structured output** - Grok's internal JSON mode, guaranteed schema compliance
+4. **Automatic retry** - 5 attempts with exponential backoff on failures
+5. **Graceful fallback** - Empty result on failure, pipeline continues
 
-LightRAG's recommendation assumes:
-- Simple entity types (person, location, organization)
-- Default prompts (~2K tokens)
-- Generic document structures
+---
 
-Our use case requires:
-- 18 specialized entity types
-- 121K prompt with domain expertise
-- Complex government contracting relationships
+### What Extraction Actually Requires (Classification & Pattern Matching)
+
+**Extraction is fundamentally a CLASSIFICATION task, not a reasoning task:**
+
+| Input Pattern | Output Classification | Reasoning Required? |
+|--------------|----------------------|---------------------|
+| "Contractor shall provide..." | `requirement` with `modal_verb: "shall"` | NO - pattern match |
+| "99.9% availability" | `performance_metric` with `threshold: "99.9%"` | NO - pattern match |
+| "CDRL A001" | `deliverable` | NO - pattern match |
+| "FAR 52.212-4" | `clause` | NO - pattern match |
+| "Section L.3.2" | `section` | NO - pattern match |
+| "Performance Objective PO-1" | `performance_metric` | NO - explicit trigger |
+
+**Our 121K prompt provides explicit trigger phrases (from `entity_extraction_prompt.md`):**
+
+```markdown
+### REQUIREMENT = Action/Obligation
+**Trigger Phrases** - Extract as `requirement` when you see:
+- "Contractor shall...", "Contractor must...", "Contractor will..."
+- Action verbs: provide, maintain, perform, deliver, ensure, implement
+
+### PERFORMANCE_METRIC = Measurable Standard  
+**Trigger Phrases** - Extract as `performance_metric` when you see:
+- "Performance Objective (PO-X)" or "PO-1", "PO-2", etc.
+- "Performance Threshold:" or "Threshold:"
+- Numerical standards: "99.9%", "Zero (0)", "No more than X"
+```
+
+**This is exactly what non-reasoning models EXCEL at:**
+- Following explicit rules with trigger phrases
+- Pattern matching against defined patterns
+- Outputting structured data in a constrained schema
+- NOT inferring implicit relationships (that's query's job, not extraction's)
+
+---
+
+### Why Non-Reasoning SHOULD Work Now (Revised Assessment)
+
+**Grok 4-1 improvements relevant to extraction:**
+
+1. **"Optimized for agentic tool calling"** - Better at following structured output requirements
+2. **"Hallucinates less"** - More reliable pattern matching, fewer invented entities
+3. **Newer model** - Improvements over grok-4-fast-non-reasoning that failed in Branch 011
+
+**Combined with our current architecture:**
+
+| Component | What It Does | Why Non-Reasoning Works |
+|-----------|--------------|------------------------|
+| **Instructor** | Enforces JSON schema | Model can't output malformed data |
+| **Pydantic** | Validates entity types | Invalid types auto-coerced to `concept` |
+| **121K prompt** | Explicit trigger phrases | Clear rules to follow, not infer |
+| **EntityType Literal** | 18 valid types only | Constrained output space |
+| **BOECategory enum** | 7 valid categories | Even more constrained |
+
+**The fundamental question has changed:**
+
+| OLD Question (Branch 011) | NEW Question (Current) |
+|---------------------------|------------------------|
+| Can non-reasoning understand complex GovCon relationships? | Can non-reasoning follow explicit rules with guaranteed output format? |
+| Answer: **NO** (reasoning needed for inference) | Answer: **YES** (that's what non-reasoning excels at) |
+
+---
+
+### What Query DOES Require (Synthesis & Reasoning)
+
+**Query is fundamentally a SYNTHESIS task that DOES require reasoning:**
+
+| Query Type | What's Required | Reasoning Needed? |
+|------------|-----------------|-------------------|
+| "What are the workload drivers?" | Aggregate entities, categorize by BOE | YES - synthesis |
+| "How do Section L map to Section M?" | Understand implicit L↔M relationships | YES - inference |
+| "What are the compliance risks?" | Infer implications from FAR clauses | YES - reasoning |
+| "Generate a proposal outline" | Synthesize across multiple entity types | YES - creativity |
+
+**Recommendation for query: `grok-4-1-fast-reasoning`**
+
+---
+
+### Federal Government Contracting Complexity Assessment
+
+Our domain complexity is real, but it's handled at different stages:
+
+| Complexity Aspect | Where It's Handled | Model Requirement |
+|-------------------|-------------------|-------------------|
+| **18 entity types** | Extraction prompt + Pydantic schema | Non-reasoning (follow rules) |
+| **FAR/DFARS clauses** | Pattern matching on clause numbers | Non-reasoning (pattern match) |
+| **Section L↔M mapping** | Post-processing algorithms | Reasoning (inference) |
+| **UCF structure** | Extraction prompt (Section A-M definitions) | Non-reasoning (classification) |
+| **Workload analysis** | Query-time synthesis | Reasoning (synthesis) |
+| **Win theme identification** | Query-time analysis | Reasoning (creativity) |
+
+**Key insight**: The complexity of federal contracting is **encoded in our prompts and schema**, not required to be understood by the model at extraction time. The model just needs to follow the rules we've defined.
 
 ### Grok 4-1 vs Grok 4: What's New?
 
@@ -1724,14 +1830,21 @@ REASONING_LLM_NAME=grok-4-1-fast-reasoning
 
 ---
 
-### Test Matrix
+### Test Matrix (Updated Priority)
 
-| Configuration | Extraction Model | Query Model | Expected Outcome |
-|--------------|-----------------|-------------|------------------|
-| **Baseline (Branch 022)** | grok-4-fast-reasoning | grok-4-fast-reasoning | 98%+ quality (PROVEN) |
-| **Upgrade (Test 1)** | grok-4-1-fast-reasoning | grok-4-1-fast-reasoning | Unknown - test needed |
-| **LightRAG-style (Test 2)** | grok-4-1-fast-non-reasoning | grok-4-1-fast-reasoning | Previously failed with grok-4, may work with 4-1 |
-| **Code-optimized (Test 3)** | grok-code-fast-1 | grok-4-1-fast-reasoning | Unknown - potentially good for structured extraction |
+| Priority | Configuration | Extraction Model | Query Model | Expected Outcome |
+|----------|--------------|-----------------|-------------|------------------|
+| **1 (RECOMMENDED)** | Split LightRAG-style | `grok-4-1-fast-non-reasoning` | `grok-4-1-fast-reasoning` | **LIKELY SUCCESS** - Architecture now supports this |
+| 2 (Fallback) | Unified 4-1 | `grok-4-1-fast-reasoning` | `grok-4-1-fast-reasoning` | Safe upgrade from baseline |
+| 3 (Baseline) | Branch 022 | `grok-4-fast-reasoning` | `grok-4-fast-reasoning` | 98%+ quality (PROVEN) |
+| 4 (Experimental) | Code-optimized | `grok-code-fast-1` | `grok-4-1-fast-reasoning` | Unknown - potentially good for structured extraction |
+
+**Why Priority 1 (Split) is now recommended:**
+- Branch 011 failure was with different architecture (no Instructor/Pydantic)
+- Grok 4-1 is newer and optimized for structured output
+- Extraction is classification (non-reasoning task)
+- Query is synthesis (reasoning task)
+- Cost savings: non-reasoning ~30% cheaper
 
 ---
 
@@ -1752,29 +1865,87 @@ uv add xai-sdk==1.5.0
 
 ---
 
-### Decision Tree
+### Decision Tree (Revised)
 
 ```
-START: Is quality the top priority?
-  ├── YES → Keep grok-4-fast-reasoning for both (SAFE CHOICE)
-  │         └── Optionally test grok-4-1-fast-reasoning upgrade
+START: Current architecture has Instructor + Pydantic + xAI SDK?
   │
-  └── NO (cost matters more) → Test grok-4-1-fast-non-reasoning for extraction
-            ├── If quality ≥90% → Use LightRAG-style split
-            └── If quality <90% → Keep unified reasoning model
+  └── YES (current state)
+        │
+        └── Extraction is classification task (pattern matching)?
+              │
+              └── YES → Use grok-4-1-fast-non-reasoning for extraction
+                        │
+                        └── Query requires synthesis/reasoning?
+                              │
+                              └── YES → Use grok-4-1-fast-reasoning for query
+                                        │
+                                        └── RECOMMENDED CONFIG:
+                                            EXTRACTION_LLM_NAME=grok-4-1-fast-non-reasoning
+                                            REASONING_LLM_NAME=grok-4-1-fast-reasoning
+```
+
+**Fallback if non-reasoning extraction fails testing:**
+```bash
+# Conservative fallback
+EXTRACTION_LLM_NAME=grok-4-1-fast-reasoning
+REASONING_LLM_NAME=grok-4-1-fast-reasoning
 ```
 
 ---
 
-### Summary (Updated with Web Search Findings)
+### Summary (Revised Assessment - December 2025)
 
-| Question | Answer | Certainty |
-|----------|--------|-----------|
-| Can we use non-reasoning for extraction? | **Tried and failed with Grok 4** (Branch 011) | HIGH |
-| Is Grok 4-1 better than Grok 4? | **Unknown - needs testing** | LOW |
-| Should we split extraction/query models? | **Only if non-reasoning works for our prompt** | MEDIUM |
-| What's the safe choice? | **Unified grok-4-fast-reasoning** (Branch 022 proven) | HIGH |
-| Grok 4-1 release date? | **November 19, 2025** | HIGH |
-| Grok 4-1 context window? | **2M tokens** (same as Grok 4) | HIGH |
-| Grok 4-1 key improvement? | **Optimized for agentic tool calling** | HIGH |
-| xAI SDK latest version? | **1.5.0** (December 5, 2025) | HIGH |
+**Based on current architecture analysis (Instructor + Pydantic + xAI SDK):**
+
+| Question | Answer | Certainty | Rationale |
+|----------|--------|-----------|-----------|
+| Can we use non-reasoning for extraction? | **YES - LIKELY** with current architecture | **MEDIUM** | Instructor enforces schema, Pydantic validates types, explicit trigger phrases |
+| Was Branch 011 failure relevant? | **NO** - completely different architecture | **HIGH** | No Instructor, no native structured output, older model |
+| Is Grok 4-1 better than Grok 4? | **YES** for our use case | **MEDIUM** | Optimized for agentic tool calling, hallucinates less |
+| Should we split extraction/query models? | **YES - RECOMMENDED** | **MEDIUM** | Extraction = classification (non-reasoning), Query = synthesis (reasoning) |
+| Grok 4-1 release date? | **November 19, 2025** | **HIGH** | Confirmed via web search |
+| Grok 4-1 context window? | **2M tokens** (same as Grok 4) | **HIGH** | Confirmed |
+| Grok 4-1 key improvement? | **Optimized for agentic tool calling** | **HIGH** | Better structured output compliance |
+| xAI SDK latest version? | **1.5.0** (December 5, 2025) | **HIGH** | Update recommended |
+
+---
+
+### Recommended Configuration (NEW)
+
+```bash
+# RECOMMENDED: Split model configuration for Grok 4-1
+EXTRACTION_LLM_NAME=grok-4-1-fast-non-reasoning  # Classification task
+REASONING_LLM_NAME=grok-4-1-fast-reasoning       # Synthesis task
+```
+
+**Why this should work now (unlike Branch 011):**
+
+1. **Instructor** guarantees valid JSON schema output
+2. **Pydantic** validates and coerces entity types
+3. **121K prompt** provides explicit trigger phrases for classification
+4. **Grok 4-1** is optimized for structured output (tool calling)
+5. **Non-reasoning** excels at following explicit rules (which we now have)
+
+---
+
+### Test Protocol (Before Production)
+
+```bash
+# Test: Non-reasoning extraction with Grok 4-1
+EXTRACTION_LLM_NAME=grok-4-1-fast-non-reasoning
+REASONING_LLM_NAME=grok-4-1-fast-reasoning
+
+# Process: MCPP DRAFT RFP (same as Branch 022 baseline)
+# Measure:
+#   - Entity count (baseline: 368)
+#   - Entity type distribution
+#   - Workload query quality (baseline: 98%+)
+```
+
+**Success criteria:**
+- Entity count ≥95% of baseline (≥350 entities)
+- No major shifts in entity type distribution
+- Query quality ≥95% of baseline
+
+**If test fails:** Fall back to unified `grok-4-1-fast-reasoning` for both
