@@ -1,5 +1,5 @@
 from typing import List, Optional, Literal
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, field_validator
 import logging
 
 logger = logging.getLogger(__name__)
@@ -132,6 +132,91 @@ class Relationship(BaseModel):
 
 # ==========================================
 # Container for LLM Output
+# ==========================================
+
+# ==========================================
+# Pydantic Models for Post-Processing (Branch 040)
+# ==========================================
+
+class InferredRelationship(BaseModel):
+    """
+    Pydantic model for LLM-inferred relationships in semantic post-processing.
+    
+    Validates relationship structure and prevents common LLM errors:
+    - Self-loops (source_id == target_id)
+    - Missing required fields
+    - Invalid confidence scores
+    
+    Pattern: Graceful degradation - validate one-by-one, drop bad ones, keep batch.
+    """
+    source_id: str = Field(..., min_length=1, description="Entity ID of source node")
+    target_id: str = Field(..., min_length=1, description="Entity ID of target node")
+    relationship_type: str = Field(..., min_length=1, description="Relationship type (e.g., EVALUATED_BY, GUIDES)")
+    confidence: float = Field(default=0.7, ge=0.0, le=1.0, description="Confidence score 0.0-1.0")
+    reasoning: str = Field(default="", description="LLM explanation for this relationship")
+    
+    @field_validator('relationship_type')
+    @classmethod
+    def normalize_relationship_type(cls, v: str) -> str:
+        """Normalize relationship type to uppercase for consistency."""
+        return v.strip().upper()
+    
+    @field_validator('reasoning')
+    @classmethod
+    def clean_reasoning(cls, v: str) -> str:
+        """Remove markdown formatting from reasoning."""
+        cleaned = v.strip()
+        cleaned = cleaned.replace('**', '').replace('__', '').replace('*', '')
+        return cleaned[:500] if len(cleaned) > 500 else cleaned  # Truncate long reasoning
+    
+    @model_validator(mode='after')
+    def check_no_self_loop(self):
+        """Prevent self-referential relationships."""
+        if self.source_id == self.target_id:
+            raise ValueError(f"Self-loop detected: {self.source_id} -> {self.target_id}")
+        return self
+    
+    def to_dict(self) -> dict:
+        """Convert to dict for Neo4j insertion."""
+        return {
+            'source_id': self.source_id,
+            'target_id': self.target_id,
+            'relationship_type': self.relationship_type,
+            'confidence': self.confidence,
+            'reasoning': self.reasoning
+        }
+
+
+class InferredRelationshipBatch(BaseModel):
+    """
+    Container for batch relationship inference LLM responses.
+    
+    Handles various LLM response formats:
+    - {"relationships": [...]}
+    - {"results": [...]}
+    - Direct array: [...]
+    """
+    relationships: List[InferredRelationship] = Field(default_factory=list)
+    
+    @model_validator(mode='before')
+    @classmethod
+    def handle_response_formats(cls, values):
+        """Normalize various LLM response formats to expected structure."""
+        # Handle direct array response
+        if isinstance(values, list):
+            return {'relationships': values}
+        
+        # Handle dict with alternative keys
+        if isinstance(values, dict):
+            for key in ['results', 'data', 'items']:
+                if key in values and 'relationships' not in values:
+                    values['relationships'] = values.pop(key)
+        
+        return values
+
+
+# ==========================================
+# Container for LLM Extraction Output
 # ==========================================
 
 class ExtractionResult(BaseModel):

@@ -2,19 +2,19 @@
 Semantic Post-Processing for Government Contracting RFPs
 ========================================================
 
-Coordinates all LLM-powered enhancements to the extracted knowledge graph:
+Neo4j-native LLM-powered enhancements to the extracted knowledge graph:
 
-1. **Entity Type Correction**: Fix UNKNOWN/forbidden entity types
-2. **Relationship Inference**: Infer missing semantic relationships
+1. **Relationship Inference**: Infer missing semantic relationships using 8 algorithms
+2. **Workload Enrichment**: Add BOE metadata to requirements
 
-This replaces the confusing "Phase 6" and "Phase 7" terminology with
-clear, operation-based naming.
+Entity type enforcement is handled at extraction time via Pydantic schema
+validation in src/ontology/schema.py - no post-processing correction needed.
 
 Usage:
     from src.inference.semantic_post_processor import enhance_knowledge_graph
     
     stats = await enhance_knowledge_graph(
-        graphml_path="path/to/graph.graphml",
+        rag_storage_path="path/to/rag_storage",
         llm_func=my_llm_function
     )
 """
@@ -22,14 +22,20 @@ Usage:
 import logging
 import time
 import asyncio
+import json
+import re
 from typing import Dict, Callable, Awaitable, List
 from pathlib import Path
 import os
 
+from pydantic import ValidationError
+
 from src.inference.graph_io import parse_graphml, save_enhanced_graphml
 from src.inference.neo4j_graph_io import Neo4jGraphIO, group_entities_by_type
 from src.inference.entity_operations import ALLOWED_TYPES, FORBIDDEN_TYPES
+from src.ontology.schema import VALID_ENTITY_TYPES, InferredRelationship, InferredRelationshipBatch
 from src.utils.llm_client import call_llm_async
+from src.utils.llm_parsing import extract_json_from_response
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +115,88 @@ def _heuristic_table_type_mapping(entity: Dict) -> str:
 # With Pydantic validation in extraction, LLM-based entity type correction is no longer needed.
 # Invalid types are caught and coerced during extraction, not post-hoc.
 # This saves LLM API costs and processing time.
+
+
+async def _parse_and_validate_relationship_batch(
+    response: str,
+    id_to_entity: Dict,
+    context: str
+) -> List[Dict]:
+    """
+    Parse LLM response and validate relationships with Pydantic (Branch 040 pattern).
+    
+    Shared helper for all relationship inference algorithms.
+    Validates relationships ONE-BY-ONE to gracefully filter self-loops and bad data.
+    
+    Args:
+        response: Raw LLM response text
+        id_to_entity: Dict mapping entity IDs to entity objects
+        context: Context string for logging (e.g., "Algorithm 1 Batch 2")
+        
+    Returns:
+        List of valid relationship dicts ready for Neo4j insertion
+    """
+    try:
+        # Step 1: Extract JSON from response (handles markdown code blocks, etc.)
+        response_json = extract_json_from_response(response, allow_array=True)
+        
+        # Step 2: Normalize to list of relationship dicts
+        if isinstance(response_json, dict):
+            # Handle {"relationships": [...]} or {"results": [...]} format
+            relationships_data = response_json.get('relationships') or response_json.get('results') or []
+        elif isinstance(response_json, list):
+            relationships_data = response_json
+        else:
+            logger.warning(f"    ⚠️ {context}: Unexpected JSON type {type(response_json)}")
+            return []
+        
+        # Step 3: Validate relationships ONE-BY-ONE (graceful partial validation)
+        valid_rels = []
+        filtered_count = 0
+        self_loop_count = 0
+        hallucination_count = 0
+        
+        for idx, rel_data in enumerate(relationships_data):
+            try:
+                # Validate with Pydantic (catches self-loops, normalizes fields)
+                rel = InferredRelationship.model_validate(rel_data)
+                
+                # Verify entity IDs exist in graph
+                if rel.source_id not in id_to_entity:
+                    logger.debug(f"    {context}: Unknown source_id '{rel.source_id}'")
+                    hallucination_count += 1
+                    continue
+                if rel.target_id not in id_to_entity:
+                    logger.debug(f"    {context}: Unknown target_id '{rel.target_id}'")
+                    hallucination_count += 1
+                    continue
+                
+                # Convert to dict for Neo4j insertion
+                valid_rels.append(rel.to_dict())
+                
+            except ValidationError as ve:
+                # Pydantic caught a validation error (self-loop, missing field, etc.)
+                filtered_count += 1
+                if 'Self-loop' in str(ve):
+                    self_loop_count += 1
+                logger.debug(f"    {context}: Validation error for relationship {idx}: {ve}")
+                continue
+            except Exception as e:
+                filtered_count += 1
+                logger.debug(f"    {context}: Unexpected error for relationship {idx}: {e}")
+                continue
+        
+        # Log summary
+        total = len(relationships_data)
+        if filtered_count > 0 or hallucination_count > 0:
+            logger.info(f"    {context}: {len(valid_rels)}/{total} valid "
+                       f"(filtered: {filtered_count}, hallucinated: {hallucination_count}, self-loops: {self_loop_count})")
+        
+        return valid_rels
+        
+    except Exception as e:
+        logger.error(f"    ❌ {context}: Failed to parse response: {e}")
+        return []
 
 
 async def _infer_relationships_batch(entities: List[Dict], existing_rels: List[Dict], model: str, temperature: float) -> List[Dict]:
@@ -265,9 +353,9 @@ async def _load_prompt_template(prompt_filename: str) -> str:
 
 def _validate_relationships(rels: List[Dict], id_to_entity: Dict, algorithm_name: str) -> List[Dict]:
     """
-    Validate and filter relationships to ensure required fields are present.
+    Validate relationships using Pydantic models (Branch 040 pattern).
     
-    Trust LLM semantic quality like LightRAG does - no confidence required.
+    Graceful degradation: Validates ONE-BY-ONE, drops bad ones, keeps batch.
     
     Args:
         rels: List of relationship dicts from LLM
@@ -278,30 +366,43 @@ def _validate_relationships(rels: List[Dict], id_to_entity: Dict, algorithm_name
         List of valid relationships with required fields only
     """
     valid_rels = []
-    for rel in rels:
-        if (rel.get('source_id') in id_to_entity and 
-            rel.get('target_id') in id_to_entity and 
-            rel.get('relationship_type')):
-            # Include only required fields - trust LLM inference quality
-            valid_rel = {
-                'source_id': rel['source_id'],
-                'target_id': rel['target_id'],
-                'relationship_type': rel['relationship_type'],
-                'reasoning': rel.get('reasoning', '')
-            }
-            valid_rels.append(valid_rel)
-        else:
-            missing = []
-            if not rel.get('source_id') or rel.get('source_id') not in id_to_entity:
-                missing.append('source_id')
-            if not rel.get('target_id') or rel.get('target_id') not in id_to_entity:
-                missing.append('target_id')
-            if not rel.get('relationship_type'):
-                missing.append('relationship_type')
-            logger.warning(f"    ⚠️ {algorithm_name}: Skipping malformed relationship (missing: {', '.join(missing)})")
+    filtered_count = 0
+    self_loop_count = 0
+    hallucination_count = 0
     
-    if len(rels) > len(valid_rels):
-        logger.warning(f"    ⚠️ {algorithm_name}: Filtered out {len(rels) - len(valid_rels)} of {len(rels)} relationships")
+    for rel in rels:
+        try:
+            # Validate with Pydantic (catches self-loops, normalizes fields)
+            validated = InferredRelationship.model_validate(rel)
+            
+            # Verify entity IDs exist in graph
+            if validated.source_id not in id_to_entity:
+                hallucination_count += 1
+                continue
+            if validated.target_id not in id_to_entity:
+                hallucination_count += 1
+                continue
+            
+            # Convert to dict for Neo4j insertion
+            valid_rels.append(validated.to_dict())
+            
+        except ValidationError as ve:
+            # Pydantic caught a validation error (self-loop, missing field, etc.)
+            filtered_count += 1
+            if 'Self-loop' in str(ve):
+                self_loop_count += 1
+            logger.debug(f"    {algorithm_name}: Pydantic validation failed - {ve}")
+            continue
+        except Exception as e:
+            filtered_count += 1
+            logger.debug(f"    {algorithm_name}: Unexpected error - {e}")
+            continue
+    
+    # Log summary if any were filtered
+    total = len(rels)
+    if filtered_count > 0 or hallucination_count > 0:
+        logger.info(f"    {algorithm_name}: {len(valid_rels)}/{total} valid "
+                   f"(filtered: {filtered_count}, hallucinated: {hallucination_count}, self-loops: {self_loop_count})")
     
     return valid_rels
 
