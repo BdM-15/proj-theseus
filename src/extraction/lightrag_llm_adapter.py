@@ -7,11 +7,10 @@ This adapter intercepts entity extraction LLM calls and:
 3. Converts to pipe-delimited format for LightRAG's parser
 4. Returns clean, validated data that LightRAG accepts
 
-The pipe-delimiter is just a transport format - all actual validation happens via Pydantic.
+NO FALLBACK: If Pydantic validation fails, the chunk is skipped.
+We either get validated data or nothing - no half measures.
 
-Architecture:
-- Layer 1: Domain knowledge in LightRAG's prompt (safety net for fallback)
-- Layer 2: This adapter for Pydantic validation (primary path)
+The pipe-delimiter is just a transport format - all actual validation happens via Pydantic.
 """
 import logging
 import re
@@ -49,7 +48,7 @@ class LightRAGExtractionAdapter:
         self._extraction_count = 0
         self._passthrough_count = 0
         self._pydantic_success = 0
-        self._pydantic_fallback = 0
+        self._pydantic_failed = 0
         
     @property
     def json_extractor(self) -> JsonExtractor:
@@ -134,8 +133,9 @@ class LightRAGExtractionAdapter:
             text_content = self._extract_text_content(system_prompt)
             
             if not text_content or len(text_content.strip()) < 50:
-                logger.warning(f"[{chunk_id}] Text content too short or empty, using fallback")
-                return await self._fallback_to_base(prompt, system_prompt, chunk_id, **kwargs)
+                logger.warning(f"[{chunk_id}] Text content too short or empty - skipping chunk")
+                self._pydantic_failed += 1
+                return self._empty_result()
             
             # Use JsonExtractor for Pydantic-validated extraction
             logger.info(f"🎯 [{chunk_id}] Using Pydantic extraction ({len(text_content)} chars)")
@@ -143,8 +143,9 @@ class LightRAGExtractionAdapter:
             
             # Check if we got meaningful results
             if not result.entities:
-                logger.warning(f"[{chunk_id}] Pydantic extraction returned 0 entities, using fallback")
-                return await self._fallback_to_base(prompt, system_prompt, chunk_id, **kwargs)
+                logger.warning(f"[{chunk_id}] Pydantic extraction returned 0 entities - skipping chunk")
+                self._pydantic_failed += 1
+                return self._empty_result()
             
             # Convert validated result to pipe-delimited format
             pipe_output = self._convert_to_pipe_format(result, chunk_id)
@@ -158,25 +159,13 @@ class LightRAGExtractionAdapter:
             return pipe_output
             
         except Exception as e:
-            logger.warning(f"⚠️ [{chunk_id}] Pydantic extraction failed ({type(e).__name__}), using fallback: {str(e)[:100]}")
-            return await self._fallback_to_base(prompt, system_prompt, chunk_id, **kwargs)
+            logger.error(f"❌ [{chunk_id}] Pydantic extraction FAILED ({type(e).__name__}): {str(e)[:200]}")
+            self._pydantic_failed += 1
+            return self._empty_result()
     
-    async def _fallback_to_base(
-        self,
-        prompt: str,
-        system_prompt: str,
-        chunk_id: str,
-        **kwargs
-    ) -> str:
-        """Fallback to LightRAG's native extraction on Pydantic failure."""
-        self._pydantic_fallback += 1
-        logger.info(f"🔄 [{chunk_id}] Falling back to LightRAG native extraction (with Layer 1 domain knowledge)")
-        return await self.base_llm_func(
-            prompt,
-            system_prompt=system_prompt,
-            history_messages=[],
-            **kwargs
-        )
+    def _empty_result(self) -> str:
+        """Return empty result in LightRAG's expected format - no fallback, just skip."""
+        return COMPLETION_DELIMITER
     
     def _extract_text_content(self, system_prompt: str) -> Optional[str]:
         """
@@ -322,14 +311,14 @@ class LightRAGExtractionAdapter:
     
     def get_stats(self) -> dict:
         """Get adapter statistics."""
-        total = self._pydantic_success + self._pydantic_fallback
+        total = self._pydantic_success + self._pydantic_failed
         success_rate = (self._pydantic_success / total * 100) if total > 0 else 0
         
         return {
             "extraction_calls": self._extraction_count,
             "passthrough_calls": self._passthrough_count,
             "pydantic_success": self._pydantic_success,
-            "pydantic_fallback": self._pydantic_fallback,
+            "pydantic_failed": self._pydantic_failed,
             "pydantic_success_rate": f"{success_rate:.1f}%",
         }
 

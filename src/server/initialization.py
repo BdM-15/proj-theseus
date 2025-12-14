@@ -107,19 +107,19 @@ async def initialize_raganything():
         )
     
     # ═══════════════════════════════════════════════════════════════════════════════
-    # LAYER 2: Pydantic Extraction Adapter
+    # Pydantic Extraction Adapter - NO FALLBACK
     # ═══════════════════════════════════════════════════════════════════════════════
     # Wraps extraction calls to use our full 150KB ontology prompts + Pydantic validation.
-    # Falls back to Layer 1 (domain-enhanced LightRAG) on failure.
+    # If validation fails, chunk is SKIPPED - no half measures.
     use_pydantic_extraction = os.getenv("USE_PYDANTIC_EXTRACTION", "true").lower() == "true"
     
     if use_pydantic_extraction:
         from src.extraction.lightrag_llm_adapter import create_extraction_adapter
         llm_model_func = create_extraction_adapter(base_llm_model_func)
-        logger.info("✅ Layer 2 ENABLED: Pydantic extraction adapter (full ontology prompts)")
+        logger.info("✅ Pydantic extraction adapter ENABLED (validated data or skip)")
     else:
         llm_model_func = base_llm_model_func
-        logger.info("⚠️ Layer 2 DISABLED: Using Layer 1 only (domain-enhanced LightRAG)")
+        logger.info("⚠️ Pydantic extraction adapter DISABLED")
     
     # Define vision function (multimodal Grok wrapper)
     async def vision_model_func(prompt, system_prompt=None, history_messages=[], image_data=None, messages=None, **kwargs):
