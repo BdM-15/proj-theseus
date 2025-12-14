@@ -33,6 +33,7 @@ from pydantic import ValidationError
 from src.inference.graph_io import parse_graphml, save_enhanced_graphml
 from src.inference.neo4j_graph_io import Neo4jGraphIO, group_entities_by_type
 from src.inference.entity_operations import ALLOWED_TYPES, FORBIDDEN_TYPES
+from src.inference.algorithms import run_all_algorithms_parallel
 from src.ontology.schema import VALID_ENTITY_TYPES, InferredRelationship, InferredRelationshipBatch
 from src.utils.llm_client import call_llm_async
 from src.utils.llm_parsing import extract_json_from_response
@@ -556,538 +557,9 @@ If no relationships found, return []."""
         return []
 
 
-# ============================================================================
-# ALGORITHM WRAPPER FUNCTIONS (for parallel execution via asyncio.gather)
-# ============================================================================
+# NOTE: Algorithm functions moved to src/inference/algorithms/ modules
+# Orchestrated by run_all_algorithms_parallel() from src.inference.algorithms
 
-def _algorithm_7_heuristic(entities: List[Dict], entities_by_type: Dict) -> List[Dict]:
-    """
-    ALGORITHM 7: Heuristic Pattern Matching (CDRL/DID cross-refs)
-    
-    Detects explicit CDRL, DID, DD Form 1423, and Exhibit/Annex references.
-    Non-async (no LLM calls - instant regex-based).
-    
-    Returns:
-        List of relationship dicts with REFERENCES edges
-    """
-    deliverables = entities_by_type.get('deliverable', [])
-    heuristic_rels = []
-    seen_pairs = set()
-    
-    for entity in entities:
-        desc = (entity.get('description') or '').lower()
-        name = (entity.get('entity_name') or '').lower()
-        content = f"{desc} {name}"
-        
-        # Pattern: CDRL cross-reference (e.g., "CDRL A001", "CDRL A002")
-        cdrl_pattern = r'cdrl\s+[a-z]?\d{3,4}'
-        matches = re.findall(cdrl_pattern, content)
-        
-        for match in matches:
-            cdrl_id = match.replace(' ', '').upper()
-            for deliv in deliverables:
-                deliv_name = (deliv.get('entity_name') or '').upper()
-                deliv_desc = (deliv.get('description') or '').upper()
-                
-                if cdrl_id in deliv_name or cdrl_id in deliv_desc:
-                    pair = (entity['id'], deliv['id'])
-                    if pair not in seen_pairs:
-                        seen_pairs.add(pair)
-                        heuristic_rels.append({
-                            'source_id': entity['id'],
-                            'target_id': deliv['id'],
-                            'relationship_type': 'REFERENCES',
-                            'confidence': 0.95,
-                            'reasoning': f"Heuristic: Explicit CDRL cross-reference '{match}'"
-                        })
-                    break
-    
-    return heuristic_rels
-
-
-async def _infer_relationships_multi_algorithm(
-    entities: List[Dict],
-    existing_rels: List[Dict],
-    neo4j_io,
-    model: str,
-    temperature: float
-) -> List[Dict]:
-    """
-    Multi-algorithm relationship inference with PARALLEL EXECUTION (Branch 040).
-    
-    8 Algorithms execute concurrently:
-    1. Instruction-Evaluation Linking
-    2. Evaluation Hierarchy & Metrics
-    3. Requirement-Evaluation Mapping (batched)
-    4. Deliverable Tracing (batched)
-    5. Document Hierarchy
-    6. Semantic Concept Linking
-    7. Heuristic Pattern Matching (instant, no LLM)
-    8. Orphan Pattern Resolution
-    
-    Phase 3B Optimization: 5.1 min → 2 min (60% reduction)
-    All algorithms run concurrently, limited by semaphore (MAX_ASYNC).
-    
-    Args:
-        entities: All entities to analyze
-        existing_rels: Existing relationships
-        neo4j_io: Neo4jGraphIO instance for querying orphans
-        model: LLM model name
-        temperature: LLM temperature
-        
-    Returns:
-        List of inferred relationships
-    """
-    all_relationships = []
-    
-    # Build entity lookups (using IDs for precision)
-    id_to_entity = {e['id']: e for e in entities}
-    entities_by_type = {}
-    for e in entities:
-        entity_type = e.get('entity_type', 'unknown')
-        entities_by_type.setdefault(entity_type, []).append(e)
-    
-    # Load system prompt
-    system_prompt = await _load_prompt_template("system_prompt.md")
-    
-    # Create semaphore for rate limiting (Branch 040 pattern)
-    semaphore = asyncio.Semaphore(MAX_CONCURRENT_LLM_CALLS)
-    
-    # ALGORITHM 1: Instruction-Evaluation Linking (Submission Instructions → Evaluation Factors)
-    # Content-based agnostic search: find instruction-like entities regardless of type
-    
-    # Traditional submission_instruction entities (UCF Section L)
-    instructions = entities_by_type.get('instruction', []) + entities_by_type.get('submission_instruction', [])
-    
-    # Agnostic: Deliverables with submission requirements (Task Orders, CDRLs)
-    deliverables_with_instructions = [
-        e for e in entities_by_type.get('deliverable', [])
-        if any(term in (str(e.get('description', '')) + str(e.get('entity_name', ''))).lower() 
-               for term in ['submit', 'provide', 'page', 'format', 'volume', 'shall include', 
-                           'maximum', 'minimum', 'font', 'address', 'respond'])
-    ]
-    
-    # Agnostic: Requirements with submission verbs (embedded instructions)
-    requirements_with_instructions = [
-        e for e in entities_by_type.get('requirement', [])
-        if e.get('modal_verb') in ['shall', 'must'] and 
-           any(term in str(e.get('entity_name', '')).lower() 
-               for term in ['submit', 'provide', 'proposal', 'response', 'volume', 
-                           'page limit', 'format', 'electronic', 'hard copy'])
-    ]
-    
-    # Combine all instruction sources
-    all_instruction_entities = instructions + deliverables_with_instructions + requirements_with_instructions
-    
-    eval_factors = entities_by_type.get('evaluation_factor', [])
-    
-    if all_instruction_entities and eval_factors:
-        logger.info(f"\n  [Algorithm 1/8] Instruction-Evaluation Linking: {len(all_instruction_entities)} instruction entities × {len(eval_factors)} eval factors")
-        logger.info(f"      Sources: {len(instructions)} submission_instruction, {len(deliverables_with_instructions)} deliverables, {len(requirements_with_instructions)} requirements")
-        
-        prompt_instructions = await _load_prompt_template("instruction_evaluation_linking.md")
-        
-        inst_json = json.dumps([{
-            'id': i['id'],
-            'name': i['entity_name'],
-            'type': i.get('entity_type'),
-            'description': i.get('description', '')[:5000]
-        } for i in all_instruction_entities], indent=2)
-        
-        factors_json = json.dumps([{
-            'id': f['id'],
-            'name': f['entity_name'],
-            'type': f.get('entity_type'),
-            'description': f.get('description', '')[:5000]
-        } for f in eval_factors], indent=2)
-        
-        prompt = f"""{prompt_instructions}
-
-SUBMISSION INSTRUCTIONS (and instruction-like entities):
-{inst_json}
-
-EVALUATION CRITERIA/FACTORS:
-{factors_json}
-
-Apply the inference patterns from the instructions above. Use entity IDs from 'id' field.
-Return ONLY valid JSON array:
-[
-  {{"source_id": "instruction_id", "target_id": "factor_id", "relationship_type": "GUIDES", "confidence": 0.7-0.95, "reasoning": "pattern explanation"}}
-]
-"""
-        
-        try:
-            response = await call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
-            rels = json.loads(response.strip())
-            valid_rels = _validate_relationships(rels, id_to_entity, "Algorithm 1")
-            all_relationships.extend(valid_rels)
-            logger.info(f"    → Found {len(valid_rels)} instruction-evaluation relationships")
-        except Exception as e:
-            logger.error(f"    ❌ Algorithm 1 failed: {e}")
-    
-    # ALGORITHM 2: Evaluation Hierarchy & Metrics (Structure evaluation framework)
-    if eval_factors:
-        logger.info(f"\n  [Algorithm 2/8] Evaluation Hierarchy: {len(eval_factors)} evaluation entities")
-        
-        prompt_instructions = await _load_prompt_template("evaluation_hierarchy.md")
-        
-        # Build entity JSON with IDs
-        factors_json = json.dumps([{
-            'id': f['id'],
-            'name': f['entity_name'],
-            'type': f.get('entity_type'),
-            'description': f.get('description', '')[:5000]
-        } for f in eval_factors], indent=2)
-        
-        prompt = f"""{prompt_instructions}
-
-EVALUATION_FACTOR_ENTITIES:
-{factors_json}
-
-Apply the hierarchy inference patterns from the instructions above. Use entity IDs from 'id' field (NOT names).
-Return ONLY valid JSON array:
-[
-  {{"source_id": "parent_id", "target_id": "child_id", "relationship_type": "HAS_SUBFACTOR|HAS_RATING_SCALE|MEASURED_BY|HAS_THRESHOLD|EVALUATED_USING|DEFINES_SCALE", "confidence": 0.75-0.95, "reasoning": "pattern explanation"}}
-]
-"""
-        
-        try:
-            response = await call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
-            rels = json.loads(response.strip())
-            valid_rels = _validate_relationships(rels, id_to_entity, "Algorithm 2")
-            all_relationships.extend(valid_rels)
-            logger.info(f"    → Found {len(valid_rels)} evaluation hierarchy relationships")
-        except Exception as e:
-            logger.error(f"    ❌ Algorithm 2 failed: {e}")
-    
-    # ALGORITHM 3: Requirement-Evaluation Mapping (Requirements → Main Evaluation Factors ONLY)
-    requirements = entities_by_type.get('requirement', [])
-    
-    # Filter to MAIN evaluation factors only (exclude rating scales, metrics, thresholds)
-    # STRICT FILTERING (Branch 014/015): Aligned with validation - explicit main patterns only
-    def is_main_evaluation_factor(entity):
-        """
-        Identify main evaluation factors vs supporting entities.
-        
-        CRITICAL: Government RFPs have 3-8 main factors BUT 40-100+ total eval factor entities.
-        70-90% are supporting entities (rating scales, metrics, processes, tables).
-        ONLY link main factors/subfactors to requirements for accurate coverage metrics.
-        
-        Returns:
-            True if main factor/subfactor (linkable), False if supporting entity
-        """
-        # CRITICAL: Neo4j can return None for null values, so use 'or' to ensure string
-        name_lower = (entity.get('entity_name') or '').lower()
-        
-        # STRICT KEEP: Explicit main factor patterns only
-        main_factor_patterns = [
-            'factor a', 'factor b', 'factor c', 'factor d', 'factor e', 'factor f',
-            'factor 1', 'factor 2', 'factor 3', 'factor 4', 'factor 5', 'factor 6',
-            'subfactor',
-            'technical factor', 'price factor', 'cost factor', 'management factor',
-            'tomp', 'past performance', 'small business',
-            'mission essential', 'quality control plan'
-        ]
-        
-        # Check for methodology subfactors (conditional)
-        if 'methodology' in name_lower and any(x in name_lower for x in ['management', 'technical', 'navy', 'usmc', 'army']):
-            main_factor_patterns.append('methodology')
-        
-        # CRITICAL: Must match at least ONE main factor pattern (default EXCLUDE)
-        has_main_pattern = any(pattern in name_lower for pattern in main_factor_patterns)
-        if not has_main_pattern:
-            return False
-        
-        # EXCLUDE: Even if main pattern matched, exclude supporting entities
-        
-        # Rating scale values
-        rating_values = ['outstanding', 'good', 'acceptable', 'marginal', 'unacceptable',
-                        'satisfactory', 'unsatisfactory', 'pass', 'fail',
-                        'substantial confidence', 'limited confidence', 'neutral confidence',
-                        'very relevant', 'relevant', 'somewhat relevant', 'not relevant']
-        if any(rating in name_lower for rating in rating_values):
-            return False
-        
-        # Generic processes/analyses
-        generic_processes = ['analysis', 'assessment', 'government evaluation', 'interviews',
-                           'realism', 'reasonableness', 'completeness', 'adjectival']
-        if any(term in name_lower for term in generic_processes):
-            return False
-        
-        # Metrics/indices
-        if any(indicator in name_lower for indicator in ['%', 'cei', 'sei', 'kpi', 'index', 'cost effectiveness']):
-            return False
-        
-        # Tables/outlines
-        if '(table)' in name_lower or 'table' in name_lower or 'outline' in name_lower:
-            return False
-        
-        # Volume references
-        if 'volume' in name_lower and any(x in name_lower for x in ['i', 'ii', 'iii', 'iv', 'v']):
-            return False
-        
-        # PASSED: Has main pattern AND not excluded = TRUE MAIN FACTOR
-        return True
-    
-    main_eval_factors = [f for f in eval_factors if is_main_evaluation_factor(f)]
-    
-    if requirements and main_eval_factors:
-        logger.info(f"\n  [Algorithm 3/8] Requirement-Evaluation Mapping: {len(requirements)} requirements × {len(main_eval_factors)} main factors (filtered from {len(eval_factors)} total)")
-        
-        prompt_instructions = await _load_prompt_template("requirement_evaluation.md")
-        
-        # Build entity JSON with IDs
-        # ENHANCEMENT (Branch 015): Include full descriptions for semantic matching
-        # Evaluation factor descriptions contain topic keywords (e.g., "evaluating management, staffing, quality")
-        # This enables matching generic factor labels (Factor A, Factor B) to requirement content
-        reqs_json = json.dumps([{
-            'id': r['id'],
-            'name': r['entity_name'],
-            'type': r.get('entity_type'),
-            'description': r.get('description', '')[:5000]  # Increased from 200 to capture full semantic context
-        } for r in requirements], indent=2)
-        
-        factors_json = json.dumps([{
-            'id': f['id'],
-            'name': f['entity_name'],
-            'type': f.get('entity_type'),
-            'description': f.get('description', '')[:5000]  # Increased from 200 to capture evaluation criteria/topics
-        } for f in main_eval_factors], indent=2)
-        
-        prompt = f"""{prompt_instructions}
-
-REQUIREMENTS:
-{reqs_json}
-
-EVALUATION_FACTORS:
-{factors_json}
-
-CRITICAL INSTRUCTION - Use factor descriptions for semantic matching:
-- Factor names may be generic (Factor A, Factor B, Factor 1, etc.)
-- Factor descriptions contain evaluation criteria and topics (e.g., "evaluating management approach, staffing methodology")
-- Match requirement CONTENT to factor DESCRIPTION topics, not just factor names
-- Example: "Factor A" with description "evaluating management methodology" matches requirements about management/staffing
-
-Apply the inference patterns from the instructions above. Use entity IDs from 'id' field (NOT names).
-Focus ONLY on main evaluation factors (Factor 1, Factor 2, Subfactors). Exclude rating scales, metrics, and thresholds.
-Return ONLY valid JSON array:
-[
-  {{"source_id": "requirement_id", "target_id": "factor_id", "relationship_type": "EVALUATED_BY", "confidence": 0.7-0.95, "reasoning": "pattern explanation"}}
-]
-"""
-        
-        try:
-            response = await call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
-            rels = json.loads(response.strip())
-            # Validate IDs exist
-            valid_rels = []
-            for rel in rels:
-                if rel.get('source_id') in id_to_entity and rel.get('target_id') in id_to_entity:
-                    valid_rels.append(rel)
-                else:
-                    logger.warning(f"  Invalid IDs in relationship: {rel}")
-            all_relationships.extend(valid_rels)
-            logger.info(f"    → Found {len(valid_rels)} requirement→main-factor relationships")
-        except Exception as e:
-            logger.error(f"    ❌ Algorithm 3 failed: {e}")
-    
-    # ALGORITHM 4: Deliverable Traceability (Dual-Pattern: Requirements + Work Statements)
-    requirements = entities_by_type.get('requirement', [])
-    work_statements = entities_by_type.get('statement_of_work', []) + entities_by_type.get('pws', []) + entities_by_type.get('soo', [])
-    deliverables = entities_by_type.get('deliverable', [])
-    
-    if deliverables and (requirements or work_statements):
-        logger.info(f"\n  [Algorithm 4/8] Deliverable Traceability: {len(requirements)} requirements + {len(work_statements)} work statements × {len(deliverables)} deliverables")
-        
-        prompt_instructions = await _load_prompt_template("deliverable_traceability.md")
-        
-        # Pattern 1: Requirement → Deliverable (PRIMARY - captures CDRL/clause/eval deliverables)
-        pattern1_rels = []
-        if requirements:
-            reqs_json = json.dumps([{
-                'id': r['id'],
-                'name': r['entity_name'],
-                'type': r.get('entity_type'),
-                'description': r.get('description', '')[:5000]
-            } for r in requirements], indent=2)
-            
-            deliv_json = json.dumps([{
-                'id': d['id'],
-                'name': d['entity_name'],
-                'type': d.get('entity_type'),
-                'description': d.get('description', '')[:5000]
-            } for d in deliverables], indent=2)
-            
-            prompt = f"""{prompt_instructions}
-
-Apply PATTERN 1 (Requirement → Deliverable) detection rules.
-
-REQUIREMENTS:
-{reqs_json}
-
-DELIVERABLES:
-{deliv_json}
-
-Use entity IDs from 'id' field. Focus on evidence relationships (deliverables that prove/document requirement compliance).
-Return ONLY valid JSON array:
-[
-  {{"source_id": "requirement_id", "target_id": "deliverable_id", "relationship_type": "SATISFIED_BY", "confidence": 0.50-0.95, "reasoning": "evidence relationship explanation"}}
-]
-"""
-            
-            try:
-                response = await call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
-                rels = json.loads(response.strip())
-                pattern1_rels = _validate_relationships(rels, id_to_entity, "Algorithm 4 Pattern 1")
-                logger.info(f"    → Pattern 1 (Requirement→Deliverable): {len(pattern1_rels)} relationships")
-            except Exception as e:
-                logger.error(f"    ❌ Pattern 1 failed: {e}")
-        
-        # Pattern 2: Work Statement → Deliverable (SECONDARY - captures explicit SOW references)
-        pattern2_rels = []
-        if work_statements:
-            work_json = json.dumps([{
-                'id': w['id'],
-                'name': w['entity_name'],
-                'type': w.get('entity_type'),
-                'description': w.get('description', '')[:5000]
-            } for w in work_statements], indent=2)
-            
-            deliv_json = json.dumps([{
-                'id': d['id'],
-                'name': d['entity_name'],
-                'type': d.get('entity_type'),
-                'description': d.get('description', '')[:5000]
-            } for d in deliverables], indent=2)
-            
-            prompt = f"""{prompt_instructions}
-
-Apply PATTERN 2 (Work Statement → Deliverable) detection rules.
-
-WORK_STATEMENTS:
-{work_json}
-
-DELIVERABLES:
-{deliv_json}
-
-Use entity IDs from 'id' field. Focus on explicit CDRL references and work-product relationships.
-Return ONLY valid JSON array:
-[
-  {{"source_id": "work_statement_id", "target_id": "deliverable_id", "relationship_type": "PRODUCES", "confidence": 0.50-0.96, "reasoning": "explicit reference or work-product explanation"}}
-]
-"""
-            
-            try:
-                response = await call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
-                rels = json.loads(response.strip())
-                pattern2_rels = _validate_relationships(rels, id_to_entity, "Algorithm 4 Pattern 2")
-                logger.info(f"    → Pattern 2 (WorkStatement→Deliverable): {len(pattern2_rels)} relationships")
-            except Exception as e:
-                logger.error(f"    ❌ Pattern 2 failed: {e}")
-        
-        # Combine both patterns (no deduplication - different relationship types serve different purposes)
-        all_relationships.extend(pattern1_rels)
-        all_relationships.extend(pattern2_rels)
-        logger.info(f"    → Total Deliverable Traceability: {len(pattern1_rels) + len(pattern2_rels)} relationships (Pattern 1: {len(pattern1_rels)}, Pattern 2: {len(pattern2_rels)})")
-    
-    # ALGORITHM 5: Document Hierarchy (comprehensive - attachments, sections, clauses, standards)
-    documents = [e for e in entities if e.get('entity_type') in ['document', 'section', 'attachment', 'annex', 'amendment', 'clause', 'standard', 'specification', 'regulation', 'exhibit']]
-    
-    if len(documents) > 1:
-        logger.info(f"\n  [Algorithm 5/8] Document Hierarchy (All Document Types): {len(documents)} document entities")
-        
-        prompt_instructions = await _load_prompt_template("document_hierarchy.md")
-        
-        docs_json = json.dumps([{
-            'id': d['id'],
-            'name': d['entity_name'],
-            'type': d.get('entity_type'),
-            'description': d.get('description', '')[:5000]
-        } for d in documents], indent=2)
-        
-        prompt = f"""{prompt_instructions}
-
-DOCUMENTS (all types - attachments, sections, annexes, clauses, standards):
-{docs_json}
-
-Apply the inference patterns from the instructions above to identify ALL document relationships.
-Use entity IDs from 'id' field.
-Return ONLY valid JSON array:
-[
-  {{"source_id": "child_id", "target_id": "parent_id", "relationship_type": "CHILD_OF|ATTACHMENT_OF", "confidence": 0.7-1.0, "reasoning": "pattern explanation"}}
-]
-"""
-        
-        try:
-            response = await call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
-            rels = json.loads(response.strip())
-            valid_rels = _validate_relationships(rels, id_to_entity, "Algorithm 5")
-            all_relationships.extend(valid_rels)
-            logger.info(f"    → Found {len(valid_rels)} document hierarchy relationships")
-        except Exception as e:
-            logger.error(f"    ❌ Algorithm 5 failed: {e}")
-    
-    # ALGORITHM 6: Semantic Concept Linking
-    concepts = entities_by_type.get('concept', [])[:50]  # Limit to 50 concepts
-    strategic_themes = entities_by_type.get('strategic_theme', [])
-    
-    if (concepts or strategic_themes) and eval_factors:
-        concept_pool = concepts + strategic_themes
-        logger.info(f"\n  [Algorithm 6/8] Semantic Concept Linking: {len(concept_pool)} concepts/themes")
-        
-        prompt_instructions = await _load_prompt_template("semantic_concept_linking.md")
-        
-        # Build mixed entity pool (concepts + high-value entities)
-        high_value_entities = requirements[:30] + deliverables[:20] + eval_factors[:20]
-        
-        prompt_json = json.dumps([{
-            'id': e['id'],
-            'name': e['entity_name'],
-            'type': e.get('entity_type'),
-            'description': e.get('description', '')[:5000]
-        } for e in concept_pool + high_value_entities], indent=2)
-        
-        prompt = f"""{prompt_instructions}
-
-ENTITIES:
-{prompt_json}
-
-Apply the semantic inference algorithms from the instructions above.
-Use entity IDs from 'id' field.
-Return ONLY valid JSON array:
-[
-  {{"source_id": "concept_id", "target_id": "entity_id", "relationship_type": "INFORMS|IMPACTS|DETERMINES|GUIDES|ADDRESSED_BY|RELATED_TO", "confidence": 0.6-0.9, "reasoning": "semantic connection"}}
-]
-"""
-        
-        try:
-            response = await call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
-            rels = json.loads(response.strip())
-            valid_rels = _validate_relationships(rels, id_to_entity, "Algorithm 5")
-            all_relationships.extend(valid_rels)
-            logger.info(f"    → Found {len(valid_rels)} semantic concept relationships")
-        except Exception as e:
-            logger.error(f"    ❌ Algorithm 6 failed: {e}")
-    
-    # =========================================================================
-    # ALGORITHM 7: Heuristic Pattern Matching (CDRL cross-refs) - INSTANT
-    # =========================================================================
-    logger.info(f"\n  [Algorithm 7/8] Heuristic CDRL Pattern Matching")
-    heuristic_rels = _algorithm_7_heuristic(entities, entities_by_type)
-    all_relationships.extend(heuristic_rels)
-    logger.info(f"    → Found {len(heuristic_rels)} heuristic relationships")
-    
-    # =========================================================================
-    # ALGORITHM 8: Orphan Pattern Resolution
-    # =========================================================================
-    logger.info(f"\n  [Algorithm 8/8] Orphan Pattern Resolution")
-    orphan_rels = await _resolve_orphan_patterns(entities, id_to_entity, neo4j_io, model=model, temperature=temperature)
-    all_relationships.extend(orphan_rels)
-    logger.info(f"    → Found {len(orphan_rels)} orphan pattern relationships")
-    
-    # Summary
-    logger.info(f"\n  ✅ Total relationships from all algorithms: {len(all_relationships)}")
-    return all_relationships
 
 
 async def _semantic_post_processor_neo4j(
@@ -1125,6 +597,11 @@ async def _semantic_post_processor_neo4j(
         logger.info("\n📥 Step 1: Loading knowledge graph from Neo4j...")
         entities = neo4j_io.get_all_entities()
         relationships = neo4j_io.get_all_relationships()
+        
+        # Capture initial counts from main processing (before post-processing)
+        initial_entity_count = len(entities)
+        initial_rel_count = len(relationships)
+        logger.info(f"  📊 Main Processing Results: {initial_entity_count} entities, {initial_rel_count} relationships")
         
         if not entities:
             logger.warning("⚠️  No entities found in Neo4j workspace")
@@ -1202,11 +679,17 @@ async def _semantic_post_processor_neo4j(
         else:
             logger.info("\n✅ No entity type corrections needed (Pydantic validation working)")
         
-        # Step 3: Infer missing relationships
-        logger.info("\n🔗 Step 3: Inferring missing relationships with multi-algorithm approach...")
-        new_relationships = await _infer_relationships_multi_algorithm(
+        # Step 3: Infer missing relationships using PARALLEL modular algorithms
+        logger.info("\n🔗 Step 3: Inferring relationships with PARALLEL algorithm execution...")
+        
+        # Build lookups for algorithm orchestrator
+        entities_by_type = grouped  # Already built from step 2
+        id_to_entity = {e['id']: e for e in entities}
+        
+        new_relationships = await run_all_algorithms_parallel(
             entities=entities,
-            existing_rels=relationships,
+            entities_by_type=entities_by_type,
+            id_to_entity=id_to_entity,
             neo4j_io=neo4j_io,
             model=llm_model_name,
             temperature=temperature
@@ -1226,7 +709,7 @@ async def _semantic_post_processor_neo4j(
         workload_stats = await enrich_workload_metadata(
             neo4j_io=neo4j_io,
             llm_func=call_llm_async,
-            batch_size=50,
+            batch_size=50,  # Keep 50 - graceful per-item handling saves costs
             model=llm_model_name,
             temperature=temperature
         )
@@ -1254,9 +737,27 @@ async def _semantic_post_processor_neo4j(
         
         # Get updated counts
         type_counts = neo4j_io.get_entity_count_by_type()
-        logger.info("\n📊 Entity Type Distribution:")
-        for entity_type, count in sorted(type_counts.items(), key=lambda x: x[1], reverse=True)[:10]:
+        rel_counts = neo4j_io.get_relationship_count_by_type()
+        
+        final_entity_count = sum(type_counts.values())
+        final_relationship_count = sum(rel_counts.values())
+        
+        logger.info("\n📊 Entity Type Distribution (ALL 18 types):")
+        # Show all types, sorted by count
+        for entity_type, count in sorted(type_counts.items(), key=lambda x: x[1], reverse=True):
             logger.info(f"  {entity_type:30s}: {count:4d}")
+        
+        # Show summary counts
+        logger.info("\n" + "="*60)
+        logger.info("📈 FINAL COUNTS:")
+        logger.info("="*60)
+        logger.info(f"  Main Processing Entities:      {initial_entity_count}")
+        logger.info(f"  Main Processing Relationships: {initial_rel_count}")
+        logger.info(f"  Post-Processing Added Rels:    {relationships_inferred}")
+        logger.info(f"  ─────────────────────────────────────")
+        logger.info(f"  Final Entity Count:            {final_entity_count}")
+        logger.info(f"  Final Relationship Count:      {final_relationship_count}")
+        logger.info("="*60)
         
         return {
             "status": "success",

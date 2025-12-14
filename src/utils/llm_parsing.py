@@ -40,6 +40,76 @@ def clean_markdown_code_blocks(response: str) -> str:
     return cleaned.strip()
 
 
+def _repair_truncated_json_array(text: str) -> Optional[List]:
+    """
+    Attempt to repair a truncated JSON array by extracting complete objects.
+    
+    LLM output often gets truncated mid-array. This function:
+    1. Finds each complete {...} object using brace counting
+    2. Handles arbitrarily nested objects (unlike regex)
+    3. Returns list of successfully parsed objects
+    
+    Args:
+        text: Raw text containing JSON array (possibly truncated)
+    
+    Returns:
+        List of parsed dict objects, or None if nothing salvageable
+    """
+    salvaged = []
+    i = 0
+    
+    while i < len(text):
+        # Find the start of a JSON object
+        start = text.find('{', i)
+        if start == -1:
+            break
+        
+        # Use brace counting to find the complete object
+        brace_count = 0
+        in_string = False
+        escape_next = False
+        end = start
+        
+        for j in range(start, len(text)):
+            char = text[j]
+            
+            if escape_next:
+                escape_next = False
+                continue
+            
+            if char == '\\' and in_string:
+                escape_next = True
+                continue
+                
+            if char == '"' and not escape_next:
+                in_string = not in_string
+                continue
+            
+            if not in_string:
+                if char == '{':
+                    brace_count += 1
+                elif char == '}':
+                    brace_count -= 1
+                    if brace_count == 0:
+                        end = j
+                        break
+        
+        # If we found a complete object (braces balanced)
+        if brace_count == 0 and end > start:
+            obj_text = text[start:end + 1]
+            try:
+                obj = json.loads(obj_text)
+                salvaged.append(obj)
+            except json.JSONDecodeError:
+                pass  # Skip malformed objects
+            i = end + 1
+        else:
+            # Incomplete object, move past this opening brace
+            i = start + 1
+    
+    return salvaged if salvaged else None
+
+
 def extract_json_from_response(response: str, allow_array: bool = True) -> Union[Dict, List]:
     """
     Extract JSON from LLM response with robust parsing.
@@ -98,7 +168,15 @@ def extract_json_from_response(response: str, allow_array: bool = True) -> Union
             except json.JSONDecodeError:
                 pass
     
-    # Step 5: All parsing attempts failed
+    # Step 5: Try to repair truncated JSON arrays (LLM output truncation)
+    # If response starts with '[' and has valid-looking objects, try to salvage
+    if allow_array and cleaned.strip().startswith('['):
+        salvaged = _repair_truncated_json_array(cleaned)
+        if salvaged:
+            logger.warning(f"Salvaged {len(salvaged)} items from truncated JSON array")
+            return salvaged
+    
+    # Step 6: All parsing attempts failed
     logger.error(
         f"Failed to extract JSON from LLM response. "
         f"Length: {len(response)} chars, "

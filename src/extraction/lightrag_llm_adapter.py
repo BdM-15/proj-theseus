@@ -124,7 +124,9 @@ class LightRAGExtractionAdapter:
             Pipe-delimited string that LightRAG's parser expects
         """
         self._extraction_count += 1
-        chunk_id = kwargs.get('chunk_id', f"text-chunk-{self._extraction_count}")
+        
+        # Use provided chunk_id or generate simple counter-based ID
+        chunk_id = kwargs.get('chunk_id') or f"chunk-{self._extraction_count}"
         
         try:
             # CRITICAL: LightRAG puts the text content in the SYSTEM prompt, not the user prompt!
@@ -139,7 +141,7 @@ class LightRAGExtractionAdapter:
             
             # Use JsonExtractor for Pydantic-validated extraction
             logger.info(f"🎯 [{chunk_id}] Using Pydantic extraction ({len(text_content)} chars)")
-            result: ExtractionResult = await self.json_extractor.extract(text_content)
+            result: ExtractionResult = await self.json_extractor.extract(text_content, chunk_id=chunk_id)
             
             # Check if we got meaningful results
             if not result.entities:

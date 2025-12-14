@@ -1,4 +1,5 @@
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Dict
+from enum import Enum
 from pydantic import BaseModel, Field, model_validator, field_validator
 import logging
 
@@ -25,6 +26,54 @@ VALID_ENTITY_TYPES = {
     "evaluation_factor", "submission_instruction", "program", "equipment",
     "strategic_theme", "statement_of_work", "performance_metric"
 }
+
+
+# ==========================================
+# BOE Category Enum (Workload Enrichment)
+# ==========================================
+
+class BOECategory(str, Enum):
+    """
+    Standard Basis of Estimate (BOE) categories for workload enrichment.
+    These are the ONLY valid values for workload_categories.
+    """
+    LABOR = "Labor"
+    MATERIALS = "Materials"
+    ODCS = "ODCs"
+    QA = "QA"
+    LOGISTICS = "Logistics"
+    LIFECYCLE = "Lifecycle"
+    COMPLIANCE = "Compliance"
+
+
+# Mapping of common LLM-generated invalid categories to valid BOE categories
+BOE_CATEGORY_MAPPING: Dict[str, BOECategory] = {
+    "security": BOECategory.COMPLIANCE,
+    "base access": BOECategory.COMPLIANCE,
+}
+
+
+def normalize_boe_category(category: str, fallback: BOECategory = BOECategory.LABOR) -> BOECategory:
+    """
+    Normalize a category string to a valid BOECategory.
+    
+    GRACEFUL HANDLING: Never returns None - always maps to a valid category.
+    Unknown categories are mapped to fallback (default: Labor) and logged as WARNING.
+    """
+    category_lower = category.lower().strip()
+    
+    # Check if it's already a valid category
+    for boe_cat in BOECategory:
+        if boe_cat.value.lower() == category_lower:
+            return boe_cat
+    
+    # Try mapping from common invalid values
+    if category_lower in BOE_CATEGORY_MAPPING:
+        return BOE_CATEGORY_MAPPING[category_lower]
+    
+    # GRACEFUL FALLBACK: Log warning and use fallback category
+    logger.warning(f"Unmapped BOE category '{category}' -> defaulting to '{fallback.value}'")
+    return fallback
 
 # ==========================================
 # Base Entity Model
@@ -212,6 +261,68 @@ class InferredRelationshipBatch(BaseModel):
                 if key in values and 'relationships' not in values:
                     values['relationships'] = values.pop(key)
         
+        return values
+
+
+# ==========================================
+# Workload Enrichment Models (Branch 040)
+# ==========================================
+
+class WorkloadEnrichmentItem(BaseModel):
+    """
+    Pydantic model for validating workload enrichment LLM responses.
+    Enforces BOE category constraints at parse time with graceful fallback.
+    """
+    entity_index: int = Field(..., description="Index of the entity in the batch.")
+    has_workload_metric: bool = Field(True, description="Whether this requirement has workload implications.")
+    workload_categories: List[str] = Field(default_factory=list, description="Raw categories from LLM.")
+    validated_categories: List[BOECategory] = Field(default_factory=list, description="Validated BOE categories.")
+    boe_relevance: Dict[str, float] = Field(default_factory=dict, description="Confidence scores per BOE category.")
+    labor_drivers: List[str] = Field(default_factory=list, description="Labor-specific details.")
+    material_needs: List[str] = Field(default_factory=list, description="Material-specific details.")
+    complexity_score: int = Field(default=5, ge=1, le=10, description="Complexity 1-10.")
+    complexity_rationale: str = Field(default="", description="Complexity explanation.")
+    effort_estimate: str = Field(default="", description="Effort description.")
+    
+    @field_validator('workload_categories', mode='before')
+    @classmethod
+    def normalize_categories_input(cls, v):
+        """Accept any input format for workload_categories."""
+        if v is None:
+            return []
+        if isinstance(v, str):
+            return [v]
+        return list(v)
+    
+    @model_validator(mode='after')
+    def validate_and_map_categories(self):
+        """Normalize raw workload_categories to validated BOE categories."""
+        validated = []
+        for cat in self.workload_categories:
+            normalized = normalize_boe_category(cat)
+            if normalized not in validated:
+                validated.append(normalized)
+        self.validated_categories = validated
+        return self
+    
+    def get_category_values(self) -> List[str]:
+        """Return validated category values as strings."""
+        return [cat.value for cat in self.validated_categories]
+
+
+class WorkloadEnrichmentResponse(BaseModel):
+    """Container for batch workload enrichment LLM responses."""
+    requirements: List[WorkloadEnrichmentItem] = Field(default_factory=list)
+    
+    @model_validator(mode='before')
+    @classmethod
+    def handle_response_formats(cls, values):
+        """Handle various LLM response formats."""
+        if isinstance(values, list):
+            return {'requirements': values}
+        if isinstance(values, dict):
+            if 'requirements' not in values and 'entities' in values:
+                values['requirements'] = values.pop('entities')
         return values
 
 
