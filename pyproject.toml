@@ -22,6 +22,9 @@ dependencies = [
     # xAI SDK for native Grok integration (updated to 1.5.0)
     "xai-sdk>=1.5.0",
     
+    # Instructor for Pydantic-validated LLM extraction with automatic retry
+    "instructor>=1.3.2",
+    
     # Server framework
     "fastapi>=0.118.0",
     "uvicorn>=0.37.0",

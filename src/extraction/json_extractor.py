@@ -1,34 +1,60 @@
+"""
+Entity extraction using Instructor library with xAI Grok.
+
+DESIGN PRINCIPLE: GRACEFUL TOLERANCE with AGGRESSIVE RETRY
+- Retry up to max_retries (default 5) with exponential backoff
+- Log failures clearly but continue processing
+- Track failed chunks for visibility
+- Return empty result ONLY after all retries exhausted
+- The orchestrator can check failed_chunks at end of processing
+"""
 import os
 import json
 import logging
-from typing import Optional, Dict, Any
-from openai import AsyncOpenAI
+import asyncio
+import re
+from typing import Optional, Dict, Any, List
+
+import instructor
+from pydantic import ValidationError
+
 from src.ontology.schema import ExtractionResult
 from src.utils.logging_config import log_graceful_failure
 
 logger = logging.getLogger(__name__)
 
+
 class JsonExtractor:
     def __init__(self):
         self.api_key = os.getenv("LLM_BINDING_API_KEY")
-        self.base_url = os.getenv("LLM_BINDING_HOST", "https://api.x.ai/v1")
         self.model = os.getenv("EXTRACTION_LLM_NAME", "grok-4-fast-reasoning")
+        # Aggressive retry count - data preservation is critical
+        self.max_retries = int(os.getenv("LLM_MAX_RETRIES", "5"))
+        # Max output tokens - prevents truncation on large entity extractions
         self.max_output_tokens = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "32000"))
-        
-        if not self.api_key:
-            # Fallback for development/testing if env var not set, though it should be
-            logger.warning("LLM_BINDING_API_KEY not found, checking xai-api-key")
-            self.api_key = os.getenv("xai-api-key")
-            
-        if not self.api_key:
-             raise ValueError("LLM_BINDING_API_KEY not found in environment variables")
 
-        self.client = AsyncOpenAI(
-            api_key=self.api_key,
-            base_url=self.base_url,
-            timeout=120.0
+        if not self.api_key:
+            self.api_key = os.getenv("XAI_API_KEY")
+
+        if not self.api_key:
+            raise ValueError("LLM_BINDING_API_KEY or XAI_API_KEY not found in environment variables")
+
+        # Set XAI_API_KEY for instructor's from_provider
+        os.environ["XAI_API_KEY"] = self.api_key
+
+        # Initialize instructor with xAI provider (handles validation, etc.)
+        # async_client=True for async support
+        self.client = instructor.from_provider(
+            f"xai/{self.model}",
+            async_client=True
         )
-        
+
+        # Track failed chunks for potential later recovery
+        self.failed_chunks: List[dict] = []
+        self._successful_extractions: int = 0
+
+        logger.info(f"Initialized Instructor client with xAI model: {self.model}, max_retries: {self.max_retries}")
+
         self.system_prompt = self._load_full_system_prompt()
 
     def _load_full_system_prompt(self) -> str:
@@ -47,7 +73,7 @@ class JsonExtractor:
         # Check if compressed prompts should be used (default: False for safety)
         use_compressed = os.getenv("USE_COMPRESSED_PROMPTS", "false").lower() == "true"
         suffix = "_COMPRESSED.txt" if use_compressed else ".md"
-        logger.info(f"Loading {'COMPRESSED' if use_compressed else 'ORIGINAL'} prompts (89% token reduction enabled={use_compressed})")
+        logger.info(f"Loading {'COMPRESSED' if use_compressed else 'ORIGINAL'} prompts")
         
         # 1. Base JSON Instructions
         json_prompt_filename = "grok_json_prompt_COMPRESSED.txt" if use_compressed else "grok_json_prompt.md"
@@ -76,7 +102,7 @@ class JsonExtractor:
         if os.path.exists(extraction_prompt_path):
             with open(extraction_prompt_path, "r", encoding="utf-8") as f:
                 extraction_prompt = f.read()
-                # Strip the "Real Data" section if it exists at the end (only in original .md files)
+                # Strip the "Real Data" section if it exists at the end
                 if not use_compressed and "---Real Data---" in extraction_prompt:
                     extraction_prompt = extraction_prompt.split("---Real Data---")[0]
         else:
@@ -86,7 +112,6 @@ class JsonExtractor:
         inference_dir = os.path.join(prompts_dir, "relationship_inference")
         inference_rules = []
         if os.path.exists(inference_dir):
-            # Sort to ensure deterministic order
             for filename in sorted(os.listdir(inference_dir)):
                 if filename.endswith(".md"):
                     file_path = os.path.join(inference_dir, filename)
@@ -118,244 +143,162 @@ Output the result strictly as a JSON object matching the schema defined in the f
         logger.info(f"Constructed system prompt with {len(full_prompt)} characters (~{len(full_prompt)//4} tokens)")
         return full_prompt
 
-    async def extract(self, text: str) -> ExtractionResult:
+    async def extract(self, text: str, chunk_id: str = "unknown") -> ExtractionResult:
         """
-        Extracts entities from the given text using Grok 4 in JSON mode.
-        Returns empty result on malformed JSON to allow graceful continuation.
+        Extracts entities from the given text using Instructor + xAI Grok.
+        
+        Uses manual retry with exponential backoff for resilience against
+        API truncation/instability issues.
+        
+        GRACEFUL TOLERANCE: On failure after ALL retries, logs error and returns
+        empty result. Failed chunks are tracked in self.failed_chunks for
+        visibility.
+        
+        Args:
+            text: The text chunk to extract entities from
+            chunk_id: Identifier for logging/tracking
+        
+        Returns:
+            ExtractionResult with validated entities and relationships
         """
         try:
-            # Log chunk size for debugging
             import tiktoken
             tokenizer = tiktoken.get_encoding("cl100k_base")
             token_count = len(tokenizer.encode(text))
-            logger.info(f"Sending extraction request to {self.model} (Length: {len(text)} chars, ~{token_count} tokens)")
-            
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": self.system_prompt},
-                    {"role": "user", "content": text}
-                ],
-                response_format={"type": "json_object"},
-                temperature=0.1,
-                max_tokens=self.max_output_tokens
-            )
-            
-            content = response.choices[0].message.content
-            if not content:
-                raise ValueError("Empty response from LLM")
+            logger.info(f"📤 [{chunk_id}] Extraction request to {self.model} ({len(text)} chars, ~{token_count} tokens)")
 
-            # Parse JSON with error handling for malformed responses
+            # Use retry mechanism
+            result = await self._extract_with_retry(text, chunk_id)
+
+            # Post-process: rescue entities with partial data
+            result = self._rescue_partial_entities(result, chunk_id)
+
+            self._successful_extractions += 1
+            logger.info(f"✅ [{chunk_id}] Extracted {len(result.entities)} entities, {len(result.relationships)} relationships")
+            return result
+
+        except Exception as e:
+            # Track failed chunk for visibility
+            self.failed_chunks.append({
+                "chunk_id": chunk_id,
+                "text_preview": text[:200] + "..." if len(text) > 200 else text,
+                "error": str(e),
+                "error_type": type(e).__name__
+            })
+
+            # Calculate failure rate for visibility
+            total_attempts = len(self.failed_chunks) + self._successful_extractions
+            failure_rate = len(self.failed_chunks) / max(total_attempts, 1) * 100
+
+            log_graceful_failure(
+                logger,
+                "Entity extraction",
+                e,
+                context=f"[{chunk_id}] after {self.max_retries} retries",
+                failure_rate=f"{failure_rate:.1f}%"
+            )
+
+            # Return empty result - ONLY after all retries exhausted
+            return ExtractionResult(entities=[], relationships=[])
+
+    async def _extract_with_retry(self, text: str, chunk_id: str = "unknown") -> ExtractionResult:
+        """
+        Internal extraction method with manual retry logic.
+        
+        Retries up to max_retries times with exponential backoff (5s, 15s, 45s, 135s delays)
+        on any exception (API errors, truncation, validation failures).
+        """
+        max_attempts = self.max_retries
+        last_error = None
+
+        for attempt in range(1, max_attempts + 1):
             try:
-                data = json.loads(content)
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse JSON response: {e}")
-                logger.error(f"Response preview (first 500 chars): {content[:500]}")
-                
-                # Try to extract JSON from markdown code blocks if present
-                if "```json" in content:
-                    logger.info("Attempting to extract JSON from markdown code block...")
-                    import re
-                    json_match = re.search(r'```json\s*(.*?)\s*```', content, re.DOTALL)
-                    if json_match:
-                        content = json_match.group(1)
-                        data = json.loads(content)
-                    else:
-                        logger.warning(f"⚠️ Malformed JSON - skipping chunk and continuing")
-                        return ExtractionResult(entities=[], relationships=[])
-                else:
-                    logger.warning(f"⚠️ Malformed JSON - skipping chunk and continuing")
-                    return ExtractionResult(entities=[], relationships=[])
-            
-            # Pre-validate and clean relationships before Pydantic validation
-            # Handle both old format (strings) and new format (entity objects)
-            if "relationships" in data:
-                cleaned_relationships = []
-                for i, rel in enumerate(data["relationships"]):
-                    # Handle both string and dict formats for backwards compatibility
-                    source = rel.get("source_entity") if isinstance(rel, dict) else None
-                    target = rel.get("target_entity") if isinstance(rel, dict) else None
-                    
-                    # Skip if not a dict at all
-                    if not isinstance(rel, dict):
-                        logger.warning(f"⚠️ Relationship #{i} is not a dict, skipping: {rel}")
-                        continue
-                    
-                    # Convert string format to dict format if needed
-                    if isinstance(source, str):
-                        source = {"entity_name": source, "entity_type": "unknown"}
-                        rel["source_entity"] = source
-                    if isinstance(target, str):
-                        target = {"entity_name": target, "entity_type": "unknown"}
-                        rel["target_entity"] = target
-                    
-                    # Validate we have entity objects now
-                    if not isinstance(source, dict) or not source.get("entity_name"):
-                        logger.warning(f"⚠️ Relationship #{i} missing valid 'source_entity', skipping: {rel}")
-                        continue
-                    if not isinstance(target, dict) or not target.get("entity_name"):
-                        logger.warning(f"⚠️ Relationship #{i} missing valid 'target_entity', skipping: {rel}")
-                        continue
-                    if not rel.get("relationship_type"):
-                        logger.warning(f"⚠️ Relationship #{i} missing 'relationship_type', skipping: {rel}")
-                        continue
-                    
-                    cleaned_relationships.append(rel)
-                
-                skipped_count = len(data["relationships"]) - len(cleaned_relationships)
-                if skipped_count > 0:
-                    logger.warning(f"⚠️ Skipped {skipped_count} malformed relationships (total: {len(data['relationships'])})")
-                
-                data["relationships"] = cleaned_relationships
-            
-            # Validate against Pydantic Schema
-            # This ensures the output strictly adheres to our ontology
-            result = ExtractionResult(**data)
-            
-            # CRITICAL: Rescue entities with partial data instead of dropping them
-            # We want to capture ALL potential intelligence, even if imperfect.
-            valid_entities = []
-            for e in result.entities:
-                # Case 1: Both missing -> Try to rescue from source_text
-                if (not e.entity_name or not e.entity_name.strip()) and \
-                   (not e.description or not e.description.strip()):
-                    
-                    if e.source_text and e.source_text.strip():
-                        # Rescue using source_text
-                        snippet = e.source_text[:50].strip() + "..." if len(e.source_text) > 50 else e.source_text
-                        e.entity_name = f"[{e.entity_type.upper()}] {snippet}"
-                        e.description = e.source_text
-                        logger.info(f"🔧 Rescued entity using source_text: '{e.entity_name}'")
-                    else:
-                        # Truly empty (no name, desc, or source_text) -> Garbage
-                        logger.warning(f"⚠️ Dropping empty entity (no name, desc, or source_text): {e}")
-                        continue
+                logger.info(f"🔄 [{chunk_id}] Extraction attempt {attempt}/{max_attempts}")
 
-                # Case 2: Missing Name -> Rescue using Description
-                if not e.entity_name or not e.entity_name.strip():
-                    # Create a descriptive name from the description
-                    desc_snippet = e.description[:50].strip() + "..." if len(e.description) > 50 else e.description
-                    e.entity_name = f"[{e.entity_type.upper()}] {desc_snippet}"
-                    logger.info(f"🔧 Rescued entity with missing name: Set to '{e.entity_name}'")
+                result = await self.client.chat.completions.create(
+                    model=self.model,
+                    response_model=ExtractionResult,
+                    max_retries=2,  # Instructor's internal retry for validation errors
+                    messages=[
+                        {"role": "system", "content": self.system_prompt},
+                        {"role": "user", "content": text}
+                    ],
+                    temperature=0.1,
+                    max_tokens=self.max_output_tokens
+                )
 
-                # Case 3: Missing Description -> Rescue using Name
-                if not e.description or not e.description.strip():
-                    e.description = e.entity_name
-                    logger.info(f"🔧 Rescued entity with missing description: Set to '{e.description}'")
+                return result
 
-                valid_entities.append(e)
-            
-            result.entities = valid_entities
-            
-            logger.info(f"Successfully extracted {len(result.entities)} entities")
-            return result
-            
-        except Exception as e:
-            logger.error(f"❌ Unexpected error during extraction: {e}")
-            logger.error(f"Returning empty result to allow processing to continue")
-            return ExtractionResult(entities=[], relationships=[])
+            except Exception as e:
+                last_error = e
+                logger.warning(f"⚠️ [{chunk_id}] Attempt {attempt}/{max_attempts} failed: {type(e).__name__}: {str(e)[:200]}")
 
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse JSON response: {e}")
-            logger.debug(f"Raw content: {content}")
-            raise
-        except Exception as e:
-            logger.error(f"Extraction failed: {str(e)}")
-            raise
-    
-    async def extract_from_text(self, text: str, chunk_id: str) -> ExtractionResult:
+                if attempt < max_attempts:
+                    # Exponential backoff: 5s, 15s, 45s, 135s
+                    delay = 5 * (3 ** (attempt - 1))
+                    logger.info(f"⏳ [{chunk_id}] Retrying in {delay} seconds...")
+                    await asyncio.sleep(delay)
+
+        # All attempts failed - raise to let extract() handle gracefully
+        logger.error(f"❌ [{chunk_id}] All {max_attempts} attempts exhausted")
+        raise last_error
+
+    def _rescue_partial_entities(self, result: ExtractionResult, chunk_id: str = "unknown") -> ExtractionResult:
         """
-        Extract entities from arbitrary text using govcon ontology.
-        
-        Used by modal processors (tables, images) to analyze converted descriptions.
-        This method applies the SAME ontology extraction as text processing,
-        ensuring consistent entity types and relationships.
-        
-        Args:
-            text: Text to extract entities from (e.g., table description)
-            chunk_id: Identifier for provenance tracking (e.g., "table-page42-idx15")
-        
-        Returns:
-            ExtractionResult with entities and relationships
+        Rescue entities with partial data instead of dropping them.
+        We want to capture ALL potential intelligence, even if imperfect.
         """
-        user_prompt = f"""Extract entities and relationships from this government contracting content.
+        valid_entities = []
+        
+        for e in result.entities:
+            # Case 1: Both name and description missing -> Skip (truly garbage)
+            if (not e.entity_name or not e.entity_name.strip()) and \
+               (not e.description or not e.description.strip()):
+                logger.warning(f"⚠️ [{chunk_id}] Dropping empty entity (no name or desc)")
+                continue
 
-SOURCE: {chunk_id}
+            # Case 2: Missing Name -> Rescue using Description
+            if not e.entity_name or not e.entity_name.strip():
+                desc_snippet = e.description[:50].strip() + "..." if len(e.description) > 50 else e.description
+                e.entity_name = f"[{e.entity_type.upper()}] {desc_snippet}"
+                logger.info(f"🔧 [{chunk_id}] Rescued entity with missing name: '{e.entity_name}'")
 
-CONTENT:
-{text}
+            # Case 3: Missing Description -> Rescue using Name
+            if not e.description or not e.description.strip():
+                e.description = e.entity_name
+                logger.info(f"🔧 [{chunk_id}] Rescued entity with missing description")
 
-Extract all relevant entities following the government contracting ontology:
-- Requirements (with criticality: MANDATORY/IMPORTANT/OPTIONAL)
-- Performance metrics (with thresholds and measurement methods)
-- Evaluation factors (with weights and subfactors)
-- Deliverables (with formats and due dates)
-- Strategic themes (customer hot buttons, discriminators, proof points)
-- Other entity types as appropriate
+            valid_entities.append(e)
+        
+        result.entities = valid_entities
+        return result
 
-Return structured JSON using the ExtractionResult schema."""
+    def get_extraction_stats(self) -> dict:
+        """Get extraction statistics for monitoring."""
+        total = len(self.failed_chunks) + self._successful_extractions
+        failure_rate = len(self.failed_chunks) / max(total, 1) * 100
 
-        try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": self.system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                temperature=0.1
-            )
-            
-            content = response.choices[0].message.content
-            
-            # Parse JSON (with markdown extraction if needed)
-            if "```json" in content:
-                import re
-                json_match = re.search(r'```json\s*(.*?)\s*```', content, re.DOTALL)
-                if json_match:
-                    content = json_match.group(1)
-            
-            data = json.loads(content)
-            
-            # Clean relationships (same as extract_entities_and_relationships)
-            if "relationships" in data:
-                cleaned_relationships = []
-                for i, rel in enumerate(data["relationships"]):
-                    source = rel.get("source_entity") if isinstance(rel, dict) else None
-                    target = rel.get("target_entity") if isinstance(rel, dict) else None
-                    
-                    if not isinstance(rel, dict):
-                        continue
-                    
-                    # Convert string format to dict format if needed
-                    if isinstance(source, str):
-                        source = {"entity_name": source, "entity_type": "unknown"}
-                        rel["source_entity"] = source
-                    if isinstance(target, str):
-                        target = {"entity_name": target, "entity_type": "unknown"}
-                        rel["target_entity"] = target
-                    
-                    # Validate
-                    if not isinstance(source, dict) or not source.get("entity_name"):
-                        continue
-                    if not isinstance(target, dict) or not target.get("entity_name"):
-                        continue
-                    if not rel.get("relationship_type"):
-                        continue
-                    
-                    cleaned_relationships.append(rel)
-                
-                data["relationships"] = cleaned_relationships
-            
-            # Validate against Pydantic schema
-            result = ExtractionResult(**data)
-            
-            logger.info(
-                f"📝 Extracted from text ({chunk_id}): "
-                f"{len(result.entities)} entities, {len(result.relationships)} relationships"
-            )
-            
-            return result
-            
-        except Exception as e:
-            log_graceful_failure(logger, "Entity extraction", e, chunk_id)
-            return ExtractionResult(entities=[], relationships=[])
+        return {
+            "successful_extractions": self._successful_extractions,
+            "failed_extractions": len(self.failed_chunks),
+            "total_attempts": total,
+            "failure_rate_percent": round(failure_rate, 2),
+            "acceptable": failure_rate <= 3.0,  # 3% tolerance threshold
+            "failed_chunks": [
+                {
+                    "chunk_id": fc["chunk_id"],
+                    "error_type": fc["error_type"],
+                    "error": fc["error"][:100]
+                }
+                for fc in self.failed_chunks
+            ]
+        }
+
+    def get_failed_chunks_for_retry(self) -> List[dict]:
+        """
+        Get full text of failed chunks for potential batch retry.
+        
+        Use this at end of processing to attempt re-extraction of failed chunks
+        (perhaps with a different model or after API stabilizes).
+        """
+        return self.failed_chunks.copy()
