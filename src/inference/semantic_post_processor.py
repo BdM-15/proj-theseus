@@ -100,85 +100,15 @@ def _heuristic_table_type_mapping(entity: Dict) -> str:
     if any(kw in content for kw in ['price', 'cost', 'clin', 'labor rate', 'fee']):
         return 'concept'
     
-    # Can't determine - return None to trigger LLM inference
-    return None
+    # Can't determine heuristically - default to 'concept' (no LLM fallback)
+    # With Pydantic validation in extraction, we don't need LLM post-processing
+    return 'concept'
 
 
-async def _infer_entity_type(entity_name: str, description: str, model: str, temperature: float, semaphore: asyncio.Semaphore = None) -> str:
-    """Infer correct entity type for a single entity (with optional rate limiting)"""
-    allowed_types_str = ", ".join(ALLOWED_TYPES)
-    
-    prompt = f"""You are a government contracting expert. Classify this entity into ONE of these types:
-{allowed_types_str}
-
-Entity Name: {entity_name}
-Description: {description or 'No description'}
-
-Return ONLY the entity type (lowercase with underscores). No explanation."""
-    
-    try:
-        # Use semaphore if provided for rate limiting
-        if semaphore:
-            async with semaphore:
-                response = await call_llm_async(prompt, model=model, temperature=temperature)
-        else:
-            response = await call_llm_async(prompt, model=model, temperature=temperature)
-        
-        new_type = response.strip().lower()
-        
-        # Validate it's an allowed type
-        if new_type in ALLOWED_TYPES:
-            return new_type
-        else:
-            logger.warning(f"  LLM returned invalid type '{new_type}' for {entity_name}, using 'concept'")
-            return "concept"
-    except Exception as e:
-        logger.error(f"  Error inferring type for {entity_name}: {e}")
-        return "concept"  # Default fallback
-
-
-async def _infer_entity_types_parallel(entities: List[Dict], model: str, temperature: float) -> List[Dict]:
-    """
-    Infer entity types in parallel with rate limiting (Branch 040 pattern).
-    
-    Uses asyncio.Semaphore to limit concurrent LLM calls based on MAX_ASYNC env var.
-    
-    Args:
-        entities: List of entities needing type inference
-        model: LLM model name
-        temperature: LLM temperature
-    
-    Returns:
-        List of entity updates with {id, new_entity_type}
-    """
-    semaphore = asyncio.Semaphore(MAX_CONCURRENT_LLM_CALLS)
-    
-    async def infer_single(entity: Dict) -> Dict:
-        new_type = await _infer_entity_type(
-            entity_name=entity['entity_name'],
-            description=entity.get('description', ''),
-            model=model,
-            temperature=temperature,
-            semaphore=semaphore
-        )
-        return {'id': entity['id'], 'new_entity_type': new_type, 'old_type': entity.get('entity_type')}
-    
-    # Run all inferences in parallel (semaphore limits concurrency)
-    logger.info(f"    Running parallel type inference ({MAX_CONCURRENT_LLM_CALLS} concurrent)...")
-    tasks = [infer_single(e) for e in entities]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-    
-    # Filter successful results
-    updates = []
-    for i, result in enumerate(results):
-        if isinstance(result, Exception):
-            logger.error(f"    Entity type inference failed for {entities[i]['entity_name']}: {result}")
-            # Use concept as fallback
-            updates.append({'id': entities[i]['id'], 'new_entity_type': 'concept'})
-        elif result['new_entity_type'] and result['new_entity_type'].lower() != (result.get('old_type') or '').lower():
-            updates.append({'id': result['id'], 'new_entity_type': result['new_entity_type']})
-    
-    return updates
+# NOTE: _infer_entity_type and _infer_entity_types_parallel REMOVED
+# With Pydantic validation in extraction, LLM-based entity type correction is no longer needed.
+# Invalid types are caught and coerced during extraction, not post-hoc.
+# This saves LLM API costs and processing time.
 
 
 async def _infer_relationships_batch(entities: List[Dict], existing_rels: List[Dict], model: str, temperature: float) -> List[Dict]:
@@ -1068,23 +998,21 @@ async def _semantic_post_processor_neo4j(
                 "processing_time": 0
             }
         
-        # Step 2: Correct entity types (PARALLEL - Branch 040 pattern)
-        # Step 2: Entity Type Correction
-        # Sources of invalid types:
-        # - "table" from RAG-Anything's TableModalProcessor (hardcoded)
-        # - "other" from LightRAG fallback (now fixed to use "concept" in initialization.py)
-        # - "unknown" from extraction failures
-        # - Hash-prefixed types (#requirement) from LightRAG internal markers
-        logger.info("\n🔧 Step 2: Entity type correction...")
+        # Step 2: Lightweight Entity Type Cleanup (NO LLM INFERENCE)
+        # ========================================================================
+        # With Pydantic validation in extraction, most invalid types are already handled.
+        # This step ONLY handles:
+        # 1. "table" from RAG-Anything's multimodal processors (bypasses our adapter)
+        # 2. Hash-prefixed types (#requirement) from LightRAG internal markers
+        # 
+        # NO LLM calls needed - all corrections are heuristic/deterministic.
+        # ========================================================================
+        logger.info("\n🔧 Step 2: Lightweight entity type cleanup (no LLM - Pydantic handles extraction)...")
         entity_updates = []
         grouped = group_entities_by_type(entities)
         
-        # Normalize FORBIDDEN_TYPES to lowercase for case-insensitive matching
-        forbidden_types_lower = [t.lower() for t in FORBIDDEN_TYPES]
-        
-        # Collect entities needing LLM inference vs heuristic mapping
-        entities_needing_inference = []
-        heuristic_mapped = 0
+        table_mapped = 0
+        hash_cleaned = 0
         
         for entity_type, entity_group in grouped.items():
             entity_type_clean = entity_type.lower()
@@ -1094,10 +1022,10 @@ async def _semantic_post_processor_neo4j(
             if has_hash_prefix:
                 entity_type_clean = entity_type_clean[1:]
             
-            # SPECIAL CASE: "table" entities from RAG-Anything
-            # These are multimodal table extractions - map based on content
+            # CASE 1: "table" entities from RAG-Anything multimodal processors
+            # These bypass our Pydantic adapter - map based on content heuristically
             if entity_type_clean == 'table':
-                logger.info(f"  📊 Processing {len(entity_group)} table entities (from RAG-Anything multimodal)...")
+                logger.info(f"  📊 Processing {len(entity_group)} table entities (from RAG-Anything)...")
                 for entity in entity_group:
                     mapped_type = _heuristic_table_type_mapping(entity)
                     if mapped_type:
@@ -1105,57 +1033,36 @@ async def _semantic_post_processor_neo4j(
                             'id': entity['id'],
                             'new_entity_type': mapped_type
                         })
-                        heuristic_mapped += 1
-                    else:
-                        # Can't determine type heuristically, need LLM
-                        entities_needing_inference.append(entity)
+                        table_mapped += 1
+                    # If can't map, leave as 'concept' (safe default)
+                    # NO LLM fallback - extraction should have handled this
                 continue
             
-            # Process entities that need correction:
-            # 1. UNKNOWN types (always need LLM inference)
-            # 2. Forbidden types (need retyping to allowed types)
-            # 3. Hash-prefixed types (corrupted, need cleaning)
-            needs_correction = (
-                entity_type_clean == 'unknown' or
-                entity_type_clean == 'other' or  # Legacy "Other" from old LightRAG runs
-                entity_type_clean in forbidden_types_lower or
-                has_hash_prefix
-            )
-            
-            if needs_correction:
-                logger.info(f"  ⚠️ Found {len(entity_group)} '{entity_type}' entities needing correction")
-                
+            # CASE 2: Hash-prefixed types (#requirement) - just clean the prefix
+            if has_hash_prefix and entity_type_clean in [t.lower() for t in ALLOWED_TYPES]:
+                logger.info(f"  🔧 Cleaning {len(entity_group)} '{entity_type}' → '{entity_type_clean}'")
                 for entity in entity_group:
-                    # For hash-prefixed allowed types, just remove prefix without LLM call
-                    if has_hash_prefix and entity_type_clean in ALLOWED_TYPES:
-                        entity_updates.append({
-                            'id': entity['id'],
-                            'new_entity_type': entity_type_clean  # Use cleaned type (no LLM needed)
-                        })
-                    else:
-                        # Queue for parallel LLM inference
-                        entities_needing_inference.append(entity)
+                    entity_updates.append({
+                        'id': entity['id'],
+                        'new_entity_type': entity_type_clean
+                    })
+                    hash_cleaned += 1
+            
+            # NOTE: "unknown", "other", and other invalid types are NOT corrected here.
+            # With Pydantic validation, these should be rare. If they exist, they indicate
+            # an extraction problem that should be fixed at the source, not post-hoc.
         
-        if heuristic_mapped > 0:
-            logger.info(f"  ✅ Heuristically mapped {heuristic_mapped} table entities")
-        
-        # Run parallel LLM inference for entities that need it
-        if entities_needing_inference:
-            logger.info(f"  Running parallel LLM type inference for {len(entities_needing_inference)} entities...")
-            inferred_updates = await _infer_entity_types_parallel(
-                entities=entities_needing_inference,
-                model=llm_model_name,
-                temperature=temperature
-            )
-            entity_updates.extend(inferred_updates)
-            logger.info(f"  ✅ LLM inference complete: {len(inferred_updates)} types inferred")
+        if table_mapped > 0:
+            logger.info(f"  ✅ Heuristically mapped {table_mapped} table entities")
+        if hash_cleaned > 0:
+            logger.info(f"  ✅ Cleaned {hash_cleaned} hash-prefixed entity types")
         
         entities_corrected = 0
         if entity_updates:
             logger.info(f"\n💾 Updating {len(entity_updates)} entity types in Neo4j...")
             entities_corrected = neo4j_io.update_entity_types(entity_updates)
         else:
-            logger.info("\n✅ No entity type corrections needed")
+            logger.info("\n✅ No entity type corrections needed (Pydantic validation working)")
         
         # Step 3: Infer missing relationships
         logger.info("\n🔗 Step 3: Inferring missing relationships with multi-algorithm approach...")
