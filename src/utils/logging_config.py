@@ -173,7 +173,7 @@ def setup_logging(
     root_logger.addHandler(processing_handler)
     
     # CRITICAL: LightRAG's logger has propagate=False, so we must add our handler directly
-    # This captures "Chunk X of N extracted" messages from lightrag.operate
+    # This captures "Chunk X of N extracted" messages from lightrag.operate (Branch 040 pattern)
     lightrag_logger = logging.getLogger("lightrag")
     lightrag_logger.addHandler(processing_handler)
     

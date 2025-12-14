@@ -28,6 +28,12 @@ import sys
 import subprocess
 import time
 import os
+
+# Fix Windows console encoding for Unicode characters
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 from pathlib import Path
 
 # Import LightRAG and RAG-Anything from pip BEFORE adding src to path
@@ -207,20 +213,6 @@ if __name__ == "__main__":
     
     print(f"""
 {CYAN}{'═' * 65}{RESET}
-  {YELLOW}██████╗ ██████╗  ██████╗      ██╗███████╗ ██████╗████████╗{RESET}
-  {YELLOW}██╔══██╗██╔══██╗██╔═══██╗     ██║██╔════╝██╔════╝╚══██╔══╝{RESET}
-  {YELLOW}██████╔╝██████╔╝██║   ██║     ██║█████╗  ██║        ██║{RESET}
-  {YELLOW}██╔═══╝ ██╔══██╗██║   ██║██   ██║██╔══╝  ██║        ██║{RESET}
-  {YELLOW}██║     ██║  ██║╚██████╔╝╚██████╔╝███████╗╚██████╗   ██║{RESET}
-  {YELLOW}╚═╝     ╚═╝  ╚═╝ ╚═════╝  ╚═════╝ ╚══════╝ ╚═════╝   ╚═╝{RESET}
-
-  {YELLOW}████████╗██╗  ██╗███████╗███████╗███████╗██╗   ██╗███████╗{RESET}
-  {YELLOW}╚══██╔══╝██║  ██║██╔════╝██╔════╝██╔════╝██║   ██║██╔════╝{RESET}
-  {YELLOW}   ██║   ███████║█████╗  ███████╗█████╗  ██║   ██║███████╗{RESET}
-  {YELLOW}   ██║   ██╔══██║██╔══╝  ╚════██║██╔══╝  ██║   ██║╚════██║{RESET}
-  {YELLOW}   ██║   ██║  ██║███████╗███████║███████╗╚██████╔╝███████║{RESET}
-  {YELLOW}   ╚═╝   ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝ ╚═════╝ ╚══════╝{RESET}
-
   {MAGENTA}Government Contracting Intelligence Platform{RESET}
   {DIM}Ontology-Based RAG for Federal RFP Analysis{RESET}
 {CYAN}{'═' * 65}{RESET}

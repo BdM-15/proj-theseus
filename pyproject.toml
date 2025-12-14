@@ -16,49 +16,16 @@ dependencies = [
     # - Full-text search improvements (CJK analyzer support)
     "lightrag-hku>=1.4.9.7",
     
-    # ============================================================================
-    # xAI SDK Integration (Issue #6 - Pydantic validation with Instructor)
-    # ============================================================================
-    # Native xAI Grok support via SDK (NOT OpenAI-compatible wrapper)
-    "xai-sdk>=1.4.0",
+    # Cloud LLM access (xAI Grok via OpenAI-compatible API)
+    "openai>=1.0.0",
+
+    # xAI SDK for native Grok integration (updated to 1.5.0)
+    "xai-sdk>=1.5.0",
     
-    # Instructor library for automatic Pydantic validation + retries
-    # Wraps xAI SDK to enforce schema compliance on LLM outputs
-    "instructor>=1.13.0",
+    # Instructor for Pydantic-validated LLM extraction with automatic retry
+    "instructor>=1.3.2",
     
-    # OpenAI SDK still needed for embeddings (text-embedding-3-large)
-    "openai>=2.8.0",
-    
-    # ============================================================================
-    # CRITICAL: Explicit Dependencies (prevent uv sync disasters)
-    # ============================================================================
-    # These packages are NOT transitive dependencies of raganything[all]
-    # Must be explicitly listed to survive "uv sync --reinstall"
-    
-    # Neo4j graph database driver (REQUIRED for knowledge graph storage)
-    "neo4j>=6.0.3",
-    
-    # Excel file support (REQUIRED for .xlsx RFP documents)
-    "openpyxl>=3.1.5",
-    
-    # Video processing (REQUIRED by mineru for multimedia RFPs)
-    "av>=16.0.1",
-    
-    # CLI framework (REQUIRED by some processing scripts)
-    "typer-slim>=0.20.0",
-    
-    # Async file I/O (REQUIRED for document upload handling)
-    "aiofiles>=25.1.0",
-    
-    # Image processing (REQUIRED by mineru for diagrams/charts)
-    "pillow>=12.0.0",
-    
-    # Document parsing (REQUIRED - specific version for Office conversion)
-    "mineru>=2.6.4",
-    
-    # ============================================================================
-    # Server Framework
-    # ============================================================================
+    # Server framework
     "fastapi>=0.118.0",
     "uvicorn>=0.37.0",
     
@@ -71,19 +38,20 @@ dependencies = [
     # ============================================================================
     # GPU Acceleration for MinerU (CRITICAL for performance)
     # ============================================================================
-    # PyTorch with CUDA 12.8 support for RTX 4060 Laptop GPU
+    # PyTorch with CUDA 12.4+ support (compatible with CUDA 12.8 drivers)
     # MUST be installed from PyTorch index for GPU acceleration:
-    #   uv pip install torch==2.9.0+cu128 torchvision==0.24.0+cu128 --index-url https://download.pytorch.org/whl/cu128
+    #   uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
     # 
-    # WARNING: Running "uv sync" will downgrade to CPU-only versions!
-    # After any sync, ALWAYS reinstall CUDA versions manually.
+    # Without CUDA-enabled PyTorch, MinerU falls back to CPU-only processing:
+    #   - CPU-only: ~5-10 minutes for 425-page RFP (SLOW)
+    #   - GPU-accelerated: ~30-60 seconds for same document (2-10x faster)
     # 
     # Verify GPU is enabled after installation:
     #   python -c "import torch; print('CUDA:', torch.cuda.is_available())"
     # 
-    # Performance impact:
-    #   - CPU-only: ~5-10 minutes for 425-page RFP (SLOW)
-    #   - GPU-accelerated: ~30-60 seconds for same document (2-10x faster)
+    # Note: PyPI only distributes CPU-only PyTorch by default. The torch/torchvision
+    # dependencies in raganything[all] will install CPU versions. You MUST manually
+    # reinstall with --index-url flag for GPU support.
     # ============================================================================
 ]
 

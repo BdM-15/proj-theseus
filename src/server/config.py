@@ -145,4 +145,13 @@ def configure_raganything_args():
     # Multimodal support
     global_args.enable_multimodal = True
     
+    # Parallelization settings (Branch 040 pattern)
+    # MAX_ASYNC controls concurrent LLM calls for extraction and processing
+    max_async = int(os.getenv("MAX_ASYNC", "8"))
+    global_args.max_async = max_async
+    global_args.embedding_func_max_async = max_async
+    global_args.max_parallel_insert = max_async
+    
+    logger.info(f"  Parallelization: max_async={max_async}, max_parallel_insert={max_async}")
+    
     # Configuration complete - detailed startup logging happens in initialization.py

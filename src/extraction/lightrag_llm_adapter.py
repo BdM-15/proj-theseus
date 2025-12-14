@@ -7,9 +7,10 @@ This adapter intercepts entity extraction LLM calls and:
 3. Converts to pipe-delimited format for LightRAG's parser
 4. Returns clean, validated data that LightRAG accepts
 
-The pipe-delimiter is just a transport format - all actual validation happens via Pydantic.
+NO FALLBACK: If Pydantic validation fails, the chunk is skipped.
+We either get validated data or nothing - no half measures.
 
-Issue #43: Pydantic validation for text extraction
+The pipe-delimiter is just a transport format - all actual validation happens via Pydantic.
 """
 import logging
 import re
@@ -47,7 +48,7 @@ class LightRAGExtractionAdapter:
         self._extraction_count = 0
         self._passthrough_count = 0
         self._pydantic_success = 0
-        self._pydantic_fallback = 0
+        self._pydantic_failed = 0
         
     @property
     def json_extractor(self) -> JsonExtractor:
@@ -103,6 +104,7 @@ class LightRAGExtractionAdapter:
             "extracting entities and relationships",
             "Entity_types:",
             TUPLE_DELIMITER,  # <|#|>
+            "Government Contracting Domain Knowledge",  # Our Layer 1 injection
         ]
         
         # Must have at least 2 markers to be confident it's extraction
@@ -122,7 +124,9 @@ class LightRAGExtractionAdapter:
             Pipe-delimited string that LightRAG's parser expects
         """
         self._extraction_count += 1
-        chunk_id = kwargs.get('chunk_id', f"text-chunk-{self._extraction_count}")
+        
+        # Use provided chunk_id or generate simple counter-based ID
+        chunk_id = kwargs.get('chunk_id') or f"chunk-{self._extraction_count}"
         
         try:
             # CRITICAL: LightRAG puts the text content in the SYSTEM prompt, not the user prompt!
@@ -131,20 +135,19 @@ class LightRAGExtractionAdapter:
             text_content = self._extract_text_content(system_prompt)
             
             if not text_content or len(text_content.strip()) < 50:
-                logger.warning(f"[{chunk_id}] Text content too short or empty, using passthrough")
-                return await self._fallback_to_base(prompt, system_prompt, chunk_id, **kwargs)
+                logger.warning(f"[{chunk_id}] Text content too short or empty - skipping chunk")
+                self._pydantic_failed += 1
+                return self._empty_result()
             
             # Use JsonExtractor for Pydantic-validated extraction
             logger.info(f"🎯 [{chunk_id}] Using Pydantic extraction ({len(text_content)} chars)")
-            result: ExtractionResult = await self.json_extractor.extract(
-                text_content, 
-                chunk_id=chunk_id
-            )
+            result: ExtractionResult = await self.json_extractor.extract(text_content, chunk_id=chunk_id)
             
             # Check if we got meaningful results
             if not result.entities:
-                logger.warning(f"[{chunk_id}] Pydantic extraction returned 0 entities, using passthrough")
-                return await self._fallback_to_base(prompt, system_prompt, chunk_id, **kwargs)
+                logger.warning(f"[{chunk_id}] Pydantic extraction returned 0 entities - skipping chunk")
+                self._pydantic_failed += 1
+                return self._empty_result()
             
             # Convert validated result to pipe-delimited format
             pipe_output = self._convert_to_pipe_format(result, chunk_id)
@@ -158,25 +161,13 @@ class LightRAGExtractionAdapter:
             return pipe_output
             
         except Exception as e:
-            logger.warning(f"⚠️ [{chunk_id}] Pydantic extraction failed ({type(e).__name__}), using passthrough: {str(e)[:100]}")
-            return await self._fallback_to_base(prompt, system_prompt, chunk_id, **kwargs)
+            logger.error(f"❌ [{chunk_id}] Pydantic extraction FAILED ({type(e).__name__}): {str(e)[:200]}")
+            self._pydantic_failed += 1
+            return self._empty_result()
     
-    async def _fallback_to_base(
-        self,
-        prompt: str,
-        system_prompt: str,
-        chunk_id: str,
-        **kwargs
-    ) -> str:
-        """Fallback to LightRAG's native extraction on Pydantic failure."""
-        self._pydantic_fallback += 1
-        logger.info(f"🔄 [{chunk_id}] Falling back to LightRAG native extraction")
-        return await self.base_llm_func(
-            prompt,
-            system_prompt=system_prompt,
-            history_messages=[],
-            **kwargs
-        )
+    def _empty_result(self) -> str:
+        """Return empty result in LightRAG's expected format - no fallback, just skip."""
+        return COMPLETION_DELIMITER
     
     def _extract_text_content(self, system_prompt: str) -> Optional[str]:
         """
@@ -229,42 +220,46 @@ class LightRAGExtractionAdapter:
         Convert Pydantic ExtractionResult to LightRAG's pipe-delimited format.
         
         Entity format: entity<|#|>name<|#|>type<|#|>description
-        Relation format: relation<|#|>source<|#|>target<|#|>keywords<|#|>description<|#|>weight
+        Relation format: relation<|#|>source<|#|>target<|#|>keywords<|#|>description
         """
         lines = []
         
         # Convert entities
         for entity in result.entities:
-            # Build description from entity attributes
-            description = self._build_entity_description(entity)
+            # Use the entity's description field (required in our schema)
+            description = entity.description if hasattr(entity, 'description') and entity.description else ""
+            
+            # Add specialized metadata for rich entity types
+            metadata = self._build_entity_metadata(entity)
+            if metadata:
+                description = f"{metadata} {description}"
             
             # Escape any pipe characters in fields
             name = self._escape_pipes(entity.entity_name)
             entity_type = self._escape_pipes(entity.entity_type)
             description = self._escape_pipes(description)
             
+            # Truncate description if too long
+            if len(description) > 2000:
+                description = description[:2000] + "..."
+            
             line = f"entity{TUPLE_DELIMITER}{name}{TUPLE_DELIMITER}{entity_type}{TUPLE_DELIMITER}{description}"
             lines.append(line)
         
         # Convert relationships
         for rel in result.relationships:
-            # Extract entity names and types from the embedded BaseEntity objects
+            # Extract entity names from the embedded BaseEntity objects
             source_name = rel.source_entity.entity_name if rel.source_entity else "UNKNOWN"
-            source_type = rel.source_entity.entity_type if rel.source_entity else "unknown"
             target_name = rel.target_entity.entity_name if rel.target_entity else "UNKNOWN"
-            target_type = rel.target_entity.entity_type if rel.target_entity else "unknown"
             
             # Escape pipes
             source_name = self._escape_pipes(source_name)
             target_name = self._escape_pipes(target_name)
             rel_type = self._escape_pipes(rel.relationship_type)
+            rel_desc = self._escape_pipes(rel.description) if rel.description else ""
             
             # LightRAG expects: relation<|#|>source<|#|>target<|#|>keywords<|#|>description
-            # Map our rich schema to LightRAG's format:
-            # - keywords: relationship_type (e.g., "EVALUATED_BY", "GUIDES")
-            # - description: contextual description using entity types
-            description = f"{source_name} ({source_type}) {rel_type} {target_name} ({target_type})"
-            line = f"relation{TUPLE_DELIMITER}{source_name}{TUPLE_DELIMITER}{target_name}{TUPLE_DELIMITER}{rel_type}{TUPLE_DELIMITER}{description}"
+            line = f"relation{TUPLE_DELIMITER}{source_name}{TUPLE_DELIMITER}{target_name}{TUPLE_DELIMITER}{rel_type}{TUPLE_DELIMITER}{rel_desc}"
             lines.append(line)
         
         # Add completion delimiter
@@ -272,73 +267,37 @@ class LightRAGExtractionAdapter:
         
         return "\n".join(lines)
     
-    def _build_entity_description(self, entity) -> str:
-        """
-        Build description for LightRAG pipe format.
+    def _build_entity_metadata(self, entity) -> str:
+        """Build metadata string from specialized entity attributes."""
+        parts = []
         
-        Priority: Use actual description field from extraction (Branch 041 fix).
-        Metadata tags are appended for additional context but description is primary.
-        """
-        # PRIMARY: Use the actual description from extraction
-        base_desc = ""
-        if hasattr(entity, 'description') and entity.description and entity.description.strip():
-            base_desc = entity.description.strip()
-        
-        # SECONDARY: Append critical metadata tags for retrieval
-        metadata_parts = []
-        
+        # Requirement metadata
         if hasattr(entity, 'criticality') and entity.criticality:
-            metadata_parts.append(f"[Criticality: {entity.criticality}]")
-        
+            parts.append(f"[Criticality: {entity.criticality}]")
         if hasattr(entity, 'modal_verb') and entity.modal_verb:
-            metadata_parts.append(f"[Modal: {entity.modal_verb}]")
+            parts.append(f"[Modal: {entity.modal_verb}]")
+        if hasattr(entity, 'labor_drivers') and entity.labor_drivers:
+            parts.append(f"[Workload: {', '.join(entity.labor_drivers[:3])}]")
         
+        # EvaluationFactor metadata
         if hasattr(entity, 'weight') and entity.weight:
-            metadata_parts.append(f"[Weight: {entity.weight}]")
+            parts.append(f"[Weight: {entity.weight}]")
+        if hasattr(entity, 'importance') and entity.importance:
+            parts.append(f"[Importance: {entity.importance}]")
         
+        # Clause metadata
         if hasattr(entity, 'clause_number') and entity.clause_number:
-            metadata_parts.append(f"[Clause: {entity.clause_number}]")
+            parts.append(f"[{entity.clause_number}]")
         
+        # PerformanceMetric metadata
         if hasattr(entity, 'threshold') and entity.threshold:
-            metadata_parts.append(f"[Threshold: {entity.threshold}]")
+            parts.append(f"[Threshold: {entity.threshold}]")
         
+        # SubmissionInstruction metadata
         if hasattr(entity, 'page_limit') and entity.page_limit:
-            metadata_parts.append(f"[Page Limit: {entity.page_limit}]")
+            parts.append(f"[Page Limit: {entity.page_limit}]")
         
-        # Combine: description first, then metadata
-        if base_desc and metadata_parts:
-            description = f"{base_desc} {' '.join(metadata_parts)}"
-        elif base_desc:
-            description = base_desc
-        elif metadata_parts:
-            description = " ".join(metadata_parts)
-        else:
-            # Fallback to entity name only if no description or metadata
-            description = entity.entity_name
-        
-        # Clean whitespace (no length truncation - smaller chunks handle this)
-        description = re.sub(r"\s+", " ", str(description)).strip()
-        
-        return description
-    
-    def _get_relationship_endpoints(self, rel) -> tuple:
-        """Extract source and target from relationship (handles different formats)."""
-        # New format with entity objects
-        if hasattr(rel, 'source_entity') and rel.source_entity:
-            source = rel.source_entity.entity_name
-        elif hasattr(rel, 'source_id'):
-            source = rel.source_id
-        else:
-            source = "UNKNOWN"
-        
-        if hasattr(rel, 'target_entity') and rel.target_entity:
-            target = rel.target_entity.entity_name
-        elif hasattr(rel, 'target_id'):
-            target = rel.target_id
-        else:
-            target = "UNKNOWN"
-        
-        return source, target
+        return " ".join(parts)
     
     def _escape_pipes(self, text: str) -> str:
         """Escape pipe characters and clean text for pipe-delimited format."""
@@ -348,35 +307,32 @@ class LightRAGExtractionAdapter:
         text = str(text).replace("|", " ").replace("<|", " ").replace("|>", " ")
         # Also clean up any accidental delimiters
         text = text.replace(TUPLE_DELIMITER, " ")
-        return text.strip()
+        # Normalize whitespace
+        text = re.sub(r"\s+", " ", text).strip()
+        return text
     
     def get_stats(self) -> dict:
         """Get adapter statistics."""
-        total = self._pydantic_success + self._pydantic_fallback
+        total = self._pydantic_success + self._pydantic_failed
         success_rate = (self._pydantic_success / total * 100) if total > 0 else 0
         
-        stats = {
+        return {
             "extraction_calls": self._extraction_count,
             "passthrough_calls": self._passthrough_count,
             "pydantic_success": self._pydantic_success,
-            "pydantic_fallback": self._pydantic_fallback,
+            "pydantic_failed": self._pydantic_failed,
             "pydantic_success_rate": f"{success_rate:.1f}%",
         }
-        
-        if self._json_extractor:
-            stats["json_extractor_stats"] = self._json_extractor.get_extraction_stats()
-        
-        return stats
 
 
 def create_extraction_adapter(base_llm_func) -> LightRAGExtractionAdapter:
     """
     Factory function to create an extraction adapter.
     
-    Usage in config.py:
+    Usage in initialization.py:
         from src.extraction.lightrag_llm_adapter import create_extraction_adapter
         
-        base_llm_func = create_llm_model_func()
+        base_llm_func = create_base_llm_func()
         llm_model_func = create_extraction_adapter(base_llm_func)
     """
     logger.info("🔌 Creating LightRAG extraction adapter with Pydantic validation")

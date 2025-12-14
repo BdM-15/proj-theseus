@@ -1,27 +1,21 @@
 """
 Entity extraction using Instructor library with xAI Grok.
 
-Issue #6: Migrated from OpenAI SDK to Instructor for:
-- Native Pydantic validation (no manual JSON parsing)
-- Automatic retry with exponential backoff
-- Better error recovery on truncated responses
-
-DESIGN PRINCIPLE: GRACEFUL TOLERANCE (2-3% error rate acceptable)
-- Retry aggressively (up to 5 attempts with backoffs)
-- Log failures clearly but continue processing (like table extraction tolerance)
-- Track failed chunks for visibility and potential batch retry
-- Return empty result on failure to allow pipeline to continue
+DESIGN PRINCIPLE: GRACEFUL TOLERANCE with AGGRESSIVE RETRY
+- Retry up to max_retries (default 5) with exponential backoff
+- Log failures clearly but continue processing
+- Track failed chunks for visibility
+- Return empty result ONLY after all retries exhausted
 - The orchestrator can check failed_chunks at end of processing
 """
-
 import os
 import json
 import logging
 import asyncio
+import re
 from typing import Optional, Dict, Any, List
 
 import instructor
-from tenacity import retry, stop_after_attempt, wait_exponential, before_log, after_log
 from pydantic import ValidationError
 
 from src.ontology.schema import ExtractionResult
@@ -33,33 +27,34 @@ logger = logging.getLogger(__name__)
 class JsonExtractor:
     def __init__(self):
         self.api_key = os.getenv("LLM_BINDING_API_KEY")
-        self.model = os.getenv("EXTRACTION_LLM_NAME", "grok-4-1-fast-non-reasoning")
-        # More aggressive retry count - data preservation is critical
+        self.model = os.getenv("EXTRACTION_LLM_NAME", "grok-4-fast-reasoning")
+        # Aggressive retry count - data preservation is critical
         self.max_retries = int(os.getenv("LLM_MAX_RETRIES", "5"))
-        
+        # Max output tokens - prevents truncation on large entity extractions
+        self.max_output_tokens = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "32000"))
+
         if not self.api_key:
-            logger.warning("LLM_BINDING_API_KEY not found, checking XAI_API_KEY")
             self.api_key = os.getenv("XAI_API_KEY")
-            
+
         if not self.api_key:
             raise ValueError("LLM_BINDING_API_KEY or XAI_API_KEY not found in environment variables")
 
         # Set XAI_API_KEY for instructor's from_provider
         os.environ["XAI_API_KEY"] = self.api_key
-        
-        # Initialize instructor with xAI provider (handles retries, validation, etc.)
+
+        # Initialize instructor with xAI provider (handles validation, etc.)
         # async_client=True for async support
         self.client = instructor.from_provider(
             f"xai/{self.model}",
             async_client=True
         )
-        
+
         # Track failed chunks for potential later recovery
         self.failed_chunks: List[dict] = []
-        self._successful_extractions: int = 0  # For failure rate calculation
-        
+        self._successful_extractions: int = 0
+
         logger.info(f"Initialized Instructor client with xAI model: {self.model}, max_retries: {self.max_retries}")
-        
+
         self.system_prompt = self._load_full_system_prompt()
 
     def _load_full_system_prompt(self) -> str:
@@ -69,14 +64,20 @@ class JsonExtractor:
         2. Entity Detection Rules (entity_detection_rules.md)
         3. Entity Extraction Prompt (entity_extraction_prompt.md)
         4. Relationship inference rules (prompts/relationship_inference/*.md)
+        
+        Supports compressed prompts via USE_COMPRESSED_PROMPTS env var for 89% token reduction.
         """
         base_path = os.getcwd()
         prompts_dir = os.path.join(base_path, "prompts")
         
-        logger.info(f"Loading original prompts from {prompts_dir}")
+        # Check if compressed prompts should be used (default: False for safety)
+        use_compressed = os.getenv("USE_COMPRESSED_PROMPTS", "false").lower() == "true"
+        suffix = "_COMPRESSED.txt" if use_compressed else ".md"
+        logger.info(f"Loading {'COMPRESSED' if use_compressed else 'ORIGINAL'} prompts")
         
         # 1. Base JSON Instructions
-        json_prompt_path = os.path.join(prompts_dir, "extraction", "grok_json_prompt.md")
+        json_prompt_filename = "grok_json_prompt_COMPRESSED.txt" if use_compressed else "grok_json_prompt.md"
+        json_prompt_path = os.path.join(prompts_dir, "extraction", json_prompt_filename)
         try:
             with open(json_prompt_path, "r", encoding="utf-8") as f:
                 json_instructions = f.read()
@@ -85,7 +86,8 @@ class JsonExtractor:
             raise
 
         # 2. Entity Detection Rules (The "Rules")
-        detection_rules_path = os.path.join(prompts_dir, "extraction", "entity_detection_rules.md")
+        detection_rules_filename = "entity_detection_rules_COMPRESSED.txt" if use_compressed else "entity_detection_rules.md"
+        detection_rules_path = os.path.join(prompts_dir, "extraction", detection_rules_filename)
         detection_rules = ""
         if os.path.exists(detection_rules_path):
             with open(detection_rules_path, "r", encoding="utf-8") as f:
@@ -94,13 +96,14 @@ class JsonExtractor:
             logger.warning(f"Detection rules not found at {detection_rules_path}")
 
         # 3. Entity Extraction Prompt (The "Prompt" with examples)
-        extraction_prompt_path = os.path.join(prompts_dir, "extraction", "entity_extraction_prompt.md")
+        extraction_prompt_filename = "entity_extraction_prompt_COMPRESSED.txt" if use_compressed else "entity_extraction_prompt.md"
+        extraction_prompt_path = os.path.join(prompts_dir, "extraction", extraction_prompt_filename)
         extraction_prompt = ""
         if os.path.exists(extraction_prompt_path):
             with open(extraction_prompt_path, "r", encoding="utf-8") as f:
                 extraction_prompt = f.read()
                 # Strip the "Real Data" section if it exists at the end
-                if "---Real Data---" in extraction_prompt:
+                if not use_compressed and "---Real Data---" in extraction_prompt:
                     extraction_prompt = extraction_prompt.split("---Real Data---")[0]
         else:
             logger.warning(f"Extraction prompt not found at {extraction_prompt_path}")
@@ -109,7 +112,6 @@ class JsonExtractor:
         inference_dir = os.path.join(prompts_dir, "relationship_inference")
         inference_rules = []
         if os.path.exists(inference_dir):
-            # Sort to ensure deterministic order
             for filename in sorted(os.listdir(inference_dir)):
                 if filename.endswith(".md"):
                     file_path = os.path.join(inference_dir, filename)
@@ -145,61 +147,58 @@ Output the result strictly as a JSON object matching the schema defined in the f
         """
         Extracts entities from the given text using Instructor + xAI Grok.
         
-        Uses automatic retry with exponential backoff for resilience against
+        Uses manual retry with exponential backoff for resilience against
         API truncation/instability issues.
         
-        GRACEFUL TOLERANCE: On failure after retries, logs warning and returns
+        GRACEFUL TOLERANCE: On failure after ALL retries, logs error and returns
         empty result. Failed chunks are tracked in self.failed_chunks for
-        visibility and potential batch retry. This allows 2-3% error tolerance
-        like our table extraction pipeline.
+        visibility.
         
         Args:
             text: The text chunk to extract entities from
-            chunk_id: Identifier for logging/tracking (e.g., "chunk-0", "page-5")
+            chunk_id: Identifier for logging/tracking
         
         Returns:
-            ExtractionResult with entities/relationships, or empty result on failure
+            ExtractionResult with validated entities and relationships
         """
-        token_count = 0
         try:
-            # Log chunk size for debugging
             import tiktoken
             tokenizer = tiktoken.get_encoding("cl100k_base")
             token_count = len(tokenizer.encode(text))
             logger.info(f"📤 [{chunk_id}] Extraction request to {self.model} ({len(text)} chars, ~{token_count} tokens)")
-            
-            # Use instructor with built-in retry mechanism
+
+            # Use retry mechanism
             result = await self._extract_with_retry(text, chunk_id)
-            
+
             # Post-process: rescue entities with partial data
             result = self._rescue_partial_entities(result, chunk_id)
-            
+
+            self._successful_extractions += 1
             logger.info(f"✅ [{chunk_id}] Extracted {len(result.entities)} entities, {len(result.relationships)} relationships")
             return result
-            
+
         except Exception as e:
-            # GRACEFUL FAILURE: Log, track, and continue (like table extraction tolerance)
+            # Track failed chunk for visibility
             self.failed_chunks.append({
                 "chunk_id": chunk_id,
-                "text": text,
-                "text_length": len(text),
-                "token_count": token_count,
+                "text_preview": text[:200] + "..." if len(text) > 200 else text,
                 "error": str(e),
                 "error_type": type(e).__name__
             })
-            
+
             # Calculate failure rate for visibility
             total_attempts = len(self.failed_chunks) + self._successful_extractions
             failure_rate = len(self.failed_chunks) / max(total_attempts, 1) * 100
-            
+
             log_graceful_failure(
-                logger, 
-                "Entity extraction", 
-                e, 
-                f"{chunk_id}, {len(text)} chars, failure rate: {failure_rate:.1f}%"
+                logger,
+                "Entity extraction",
+                e,
+                context=f"[{chunk_id}] after {self.max_retries} retries",
+                failure_rate=f"{failure_rate:.1f}%"
             )
-            
-            # Return empty result - pipeline continues (2-3% tolerance acceptable)
+
+            # Return empty result - ONLY after all retries exhausted
             return ExtractionResult(entities=[], relationships=[])
 
     async def _extract_with_retry(self, text: str, chunk_id: str = "unknown") -> ExtractionResult:
@@ -211,11 +210,11 @@ Output the result strictly as a JSON object matching the schema defined in the f
         """
         max_attempts = self.max_retries
         last_error = None
-        
+
         for attempt in range(1, max_attempts + 1):
             try:
                 logger.info(f"🔄 [{chunk_id}] Extraction attempt {attempt}/{max_attempts}")
-                
+
                 result = await self.client.chat.completions.create(
                     model=self.model,
                     response_model=ExtractionResult,
@@ -225,22 +224,21 @@ Output the result strictly as a JSON object matching the schema defined in the f
                         {"role": "user", "content": text}
                     ],
                     temperature=0.1,
+                    max_tokens=self.max_output_tokens
                 )
-                
-                # Success! Track it for failure rate calculation
-                self._successful_extractions += 1
+
                 return result
-                
+
             except Exception as e:
                 last_error = e
                 logger.warning(f"⚠️ [{chunk_id}] Attempt {attempt}/{max_attempts} failed: {type(e).__name__}: {str(e)[:200]}")
-                
+
                 if attempt < max_attempts:
                     # Exponential backoff: 5s, 15s, 45s, 135s
                     delay = 5 * (3 ** (attempt - 1))
                     logger.info(f"⏳ [{chunk_id}] Retrying in {delay} seconds...")
                     await asyncio.sleep(delay)
-        
+
         # All attempts failed - raise to let extract() handle gracefully
         logger.error(f"❌ [{chunk_id}] All {max_attempts} attempts exhausted")
         raise last_error
@@ -251,39 +249,35 @@ Output the result strictly as a JSON object matching the schema defined in the f
         We want to capture ALL potential intelligence, even if imperfect.
         """
         valid_entities = []
-        rescued_count = 0
-        dropped_count = 0
         
         for e in result.entities:
-            # Validate entity has required fields (entity_name and entity_type)
-            if not e.entity_name or not e.entity_name.strip():
-                dropped_count += 1
-                logger.debug(f"⚠️ [{chunk_id}] Dropping entity with missing name")
+            # Case 1: Both name and description missing -> Skip (truly garbage)
+            if (not e.entity_name or not e.entity_name.strip()) and \
+               (not e.description or not e.description.strip()):
+                logger.warning(f"⚠️ [{chunk_id}] Dropping empty entity (no name or desc)")
                 continue
 
-            if not e.entity_type or not e.entity_type.strip():
-                dropped_count += 1
-                logger.debug(f"⚠️ [{chunk_id}] Dropping entity with missing type: {e.entity_name}")
-                continue
+            # Case 2: Missing Name -> Rescue using Description
+            if not e.entity_name or not e.entity_name.strip():
+                desc_snippet = e.description[:50].strip() + "..." if len(e.description) > 50 else e.description
+                e.entity_name = f"[{e.entity_type.upper()}] {desc_snippet}"
+                logger.info(f"🔧 [{chunk_id}] Rescued entity with missing name: '{e.entity_name}'")
+
+            # Case 3: Missing Description -> Rescue using Name
+            if not e.description or not e.description.strip():
+                e.description = e.entity_name
+                logger.info(f"🔧 [{chunk_id}] Rescued entity with missing description")
 
             valid_entities.append(e)
-        
-        if rescued_count > 0 or dropped_count > 0:
-            logger.info(f"🔧 [{chunk_id}] Entity rescue: {rescued_count} rescued, {dropped_count} dropped (unrecoverable)")
         
         result.entities = valid_entities
         return result
 
     def get_extraction_stats(self) -> dict:
-        """
-        Get extraction statistics for monitoring and reporting.
-        
-        Returns:
-            dict with success count, failure count, failure rate, and failed chunk details
-        """
-        total = self._successful_extractions + len(self.failed_chunks)
+        """Get extraction statistics for monitoring."""
+        total = len(self.failed_chunks) + self._successful_extractions
         failure_rate = len(self.failed_chunks) / max(total, 1) * 100
-        
+
         return {
             "successful_extractions": self._successful_extractions,
             "failed_extractions": len(self.failed_chunks),
@@ -293,10 +287,8 @@ Output the result strictly as a JSON object matching the schema defined in the f
             "failed_chunks": [
                 {
                     "chunk_id": fc["chunk_id"],
-                    "text_length": fc["text_length"],
-                    "token_count": fc["token_count"],
                     "error_type": fc["error_type"],
-                    "error": fc["error"][:200]  # Truncate error message
+                    "error": fc["error"][:100]
                 }
                 for fc in self.failed_chunks
             ]
@@ -310,8 +302,3 @@ Output the result strictly as a JSON object matching the schema defined in the f
         (perhaps with a different model or after API stabilizes).
         """
         return self.failed_chunks.copy()
-
-    # NOTE: extract_from_text() was removed in Issue #42
-    # The lightrag_llm_adapter now handles ALL extraction with the full 121K ontology prompt.
-    # Previously, extract_from_text() used a degraded 30-line inline prompt that bypassed
-    # the established ontology, causing inconsistent entity extraction for multimodal content.

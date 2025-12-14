@@ -1,6 +1,6 @@
 from typing import List, Optional, Literal, Dict
-from pydantic import BaseModel, Field, model_validator, field_validator
 from enum import Enum
+from pydantic import BaseModel, Field, model_validator, field_validator
 import logging
 
 logger = logging.getLogger(__name__)
@@ -12,7 +12,25 @@ logger = logging.getLogger(__name__)
 CriticalityLevel = Literal["MANDATORY", "IMPORTANT", "OPTIONAL", "INFORMATIONAL"]
 RequirementType = Literal["FUNCTIONAL", "PERFORMANCE", "SECURITY", "TECHNICAL", "INTERFACE", "MANAGEMENT", "DESIGN", "QUALITY", "OTHER"]
 ThemeType = Literal["CUSTOMER_HOT_BUTTON", "DISCRIMINATOR", "PROOF_POINT", "WIN_THEME"]
+EntityType = Literal[
+    "organization", "concept", "event", "technology", "person", "location",
+    "requirement", "clause", "section", "document", "deliverable",
+    "evaluation_factor", "submission_instruction", "program", "equipment",
+    "strategic_theme", "statement_of_work", "performance_metric"
+]
 
+# Set for fast validation lookups (Branch 040 pattern)
+VALID_ENTITY_TYPES = {
+    "organization", "concept", "event", "technology", "person", "location",
+    "requirement", "clause", "section", "document", "deliverable",
+    "evaluation_factor", "submission_instruction", "program", "equipment",
+    "strategic_theme", "statement_of_work", "performance_metric"
+}
+
+
+# ==========================================
+# BOE Category Enum (Workload Enrichment)
+# ==========================================
 
 class BOECategory(str, Enum):
     """
@@ -29,13 +47,7 @@ class BOECategory(str, Enum):
 
 
 # Mapping of common LLM-generated invalid categories to valid BOE categories
-# NOTE: Keep this MINIMAL - prefer improving the prompt over adding mappings.
-# Warnings for unmapped categories guide prompt engineering efforts.
 BOE_CATEGORY_MAPPING: Dict[str, BOECategory] = {
-    # These are observed production issues from initial runs (Nov 2025)
-    # Future iterations should fix these at the prompt level, not here
-    
-    # Security-related → Compliance (common LLM mistake)
     "security": BOECategory.COMPLIANCE,
     "base access": BOECategory.COMPLIANCE,
 }
@@ -46,17 +58,8 @@ def normalize_boe_category(category: str, fallback: BOECategory = BOECategory.LA
     Normalize a category string to a valid BOECategory.
     
     GRACEFUL HANDLING: Never returns None - always maps to a valid category.
-    Unknown categories are mapped to fallback (default: Labor) and logged as WARNING
-    so they can be added to BOE_CATEGORY_MAPPING in future iterations.
-    
-    Args:
-        category: Raw category string from LLM
-        fallback: Default BOE category for unmapped values (default: Labor)
-    
-    Returns:
-        BOECategory: Always returns a valid category (never None)
+    Unknown categories are mapped to fallback (default: Labor) and logged as WARNING.
     """
-    # First try exact match (case-insensitive)
     category_lower = category.lower().strip()
     
     # Check if it's already a valid category
@@ -69,23 +72,8 @@ def normalize_boe_category(category: str, fallback: BOECategory = BOECategory.LA
         return BOE_CATEGORY_MAPPING[category_lower]
     
     # GRACEFUL FALLBACK: Log warning and use fallback category
-    logger.warning(f"Unmapped BOE category '{category}' → defaulting to '{fallback.value}'. Consider adding to BOE_CATEGORY_MAPPING.")
+    logger.warning(f"Unmapped BOE category '{category}' -> defaulting to '{fallback.value}'")
     return fallback
-
-# 18 allowed entity types - this is the single source of truth
-VALID_ENTITY_TYPES = {
-    "organization", "concept", "event", "technology", "person", "location",
-    "requirement", "clause", "section", "document", "deliverable",
-    "evaluation_factor", "submission_instruction", "program", "equipment",
-    "strategic_theme", "statement_of_work", "performance_metric"
-}
-
-EntityType = Literal[
-    "organization", "concept", "event", "technology", "person", "location",
-    "requirement", "clause", "section", "document", "deliverable",
-    "evaluation_factor", "submission_instruction", "program", "equipment",
-    "strategic_theme", "statement_of_work", "performance_metric"
-]
 
 # ==========================================
 # Base Entity Model
@@ -94,26 +82,40 @@ EntityType = Literal[
 class BaseEntity(BaseModel):
     entity_name: str = Field(..., description="The canonical name of the entity (Title Case).")
     entity_type: EntityType = Field(..., description="The strict entity type from the government contracting ontology.")
-    description: str = Field(
-        default="",
-        description="Comprehensive semantic description including context, source location, and key details for retrieval."
-    )
+    description: str = Field(..., description="Comprehensive description including context, values, and relationships.")
 
     @model_validator(mode='before')
     @classmethod
     def validate_entity_type(cls, values):
         """
-        Validate entity_type BEFORE Pydantic parsing to catch invalid types early.
-        Coerces invalid types to 'concept' instead of silently accepting them.
+        Validate entity_type BEFORE Pydantic parsing.
+        
+        NOTE: This validator only runs for our Pydantic-based extraction (JsonExtractor).
+        It does NOT run for entities from LightRAG/RAG-Anything's native extraction.
+        
+        For invalid types:
+        - Logs a clear warning (helps identify prompt issues)
+        - Normalizes case (Organization → organization)
+        - Does NOT silently coerce - let post-processing handle legitimate type mapping
         """
         if isinstance(values, dict):
             entity_type = values.get('entity_type', '')
-            if entity_type and entity_type not in VALID_ENTITY_TYPES:
-                entity_name = values.get('entity_name', 'unknown')
-                logger.warning(
-                    f"⚠️ Invalid entity_type '{entity_type}' for '{entity_name}' - coercing to 'concept'"
-                )
-                values['entity_type'] = 'concept'
+            if entity_type:
+                entity_type_lower = entity_type.lower()
+                
+                if entity_type_lower not in VALID_ENTITY_TYPES:
+                    entity_name = values.get('entity_name', 'unknown')
+                    # Log clearly - this helps identify prompt issues
+                    logger.warning(
+                        f"⚠️ Invalid entity_type '{entity_type}' for '{entity_name}' "
+                        f"(valid types: {', '.join(sorted(VALID_ENTITY_TYPES)[:5])}...)"
+                    )
+                    # For Pydantic extraction, use 'concept' as intelligent fallback
+                    # This is acceptable here because our prompts explicitly guide the LLM
+                    values['entity_type'] = 'concept'
+                elif entity_type != entity_type_lower:
+                    # Just normalize case
+                    values['entity_type'] = entity_type_lower
         return values
 
     @model_validator(mode='after')
@@ -167,82 +169,22 @@ class PerformanceMetric(BaseEntity):
     threshold: str = Field(..., description="The specific value/limit (e.g., '99.9%', '< 2 errors').")
     measurement_method: Optional[str] = Field(None, description="How the metric is calculated or inspected.")
 
-
-# ==========================================
-# Workload Enrichment Model (for LLM response parsing)
-# ==========================================
-
-class WorkloadEnrichmentItem(BaseModel):
-    """
-    Pydantic model for validating workload enrichment LLM responses.
-    Enforces BOE category constraints at parse time.
-    """
-    entity_index: int = Field(..., description="Index of the entity in the batch.")
-    has_workload_metric: bool = Field(True, description="Whether this requirement has workload implications.")
-    workload_categories: List[str] = Field(default_factory=list, description="Raw categories from LLM (validated in validator).")
-    validated_categories: List[BOECategory] = Field(default_factory=list, description="Validated BOE categories after normalization.")
-    boe_relevance: Dict[str, float] = Field(default_factory=dict, description="Confidence scores per BOE category (0.0-1.0).")
-    estimated_volume: Optional[str] = Field(None, description="Volume descriptor (e.g., 'daily', 'monthly').")
-    complexity: Optional[str] = Field(None, description="Complexity level (High/Medium/Low).")
-    
-    @field_validator('workload_categories', mode='before')
-    @classmethod
-    def normalize_categories(cls, v):
-        """Accept any input format for workload_categories."""
-        if v is None:
-            return []
-        if isinstance(v, str):
-            return [v]
-        return list(v)
-    
-    @model_validator(mode='after')
-    def validate_and_map_categories(self):
-        """
-        Normalize raw workload_categories to validated BOE categories.
-        Uses graceful fallback - ALL categories are mapped (no data loss).
-        Invalid categories default to Labor and generate a WARNING log.
-        """
-        validated = []
-        for cat in self.workload_categories:
-            normalized = normalize_boe_category(cat)  # Always returns valid category
-            if normalized not in validated:
-                validated.append(normalized)
-        
-        self.validated_categories = validated
-        return self
-    
-    def get_category_values(self) -> List[str]:
-        """Return validated categories as string values for Neo4j storage."""
-        return [cat.value for cat in self.validated_categories]
-
-
-class WorkloadEnrichmentResponse(BaseModel):
-    """Container for batch workload enrichment LLM response."""
-    requirements: List[WorkloadEnrichmentItem] = Field(default_factory=list)
-    
-    @model_validator(mode='before')
-    @classmethod
-    def handle_response_formats(cls, values):
-        """Handle various LLM response formats."""
-        if isinstance(values, dict):
-            # Handle case where requirements is nested
-            if 'requirements' not in values and 'entities' in values:
-                values['requirements'] = values.pop('entities')
-        return values
-
-
 # ==========================================
 # Relationship Model
 # ==========================================
 
 class Relationship(BaseModel):
-    source_entity: BaseEntity = Field(..., description="Full source entity object with entity_name and entity_type.")
-    target_entity: BaseEntity = Field(..., description="Full target entity object with entity_name and entity_type.")
+    source_entity: BaseEntity = Field(..., description="Full source entity object with entity_name, entity_type, and description.")
+    target_entity: BaseEntity = Field(..., description="Full target entity object with entity_name, entity_type, and description.")
     relationship_type: str = Field(..., description="Type of relationship (e.g., EVALUATED_BY, GUIDES, CHILD_OF, ATTACHMENT_OF, PRODUCES).")
-
+    description: str = Field(..., description="Explanation of the relationship.")
 
 # ==========================================
-# Inferred Relationship Model (Post-Processing)
+# Container for LLM Output
+# ==========================================
+
+# ==========================================
+# Pydantic Models for Post-Processing (Branch 040)
 # ==========================================
 
 class InferredRelationship(BaseModel):
@@ -253,9 +195,8 @@ class InferredRelationship(BaseModel):
     - Self-loops (source_id == target_id)
     - Missing required fields
     - Invalid confidence scores
-    - Malformed reasoning text
     
-    Pattern: Follows WorkloadEnrichmentItem proven approach (100% success rate).
+    Pattern: Graceful degradation - validate one-by-one, drop bad ones, keep batch.
     """
     source_id: str = Field(..., min_length=1, description="Entity ID of source node")
     target_id: str = Field(..., min_length=1, description="Entity ID of target node")
@@ -272,26 +213,20 @@ class InferredRelationship(BaseModel):
     @field_validator('reasoning')
     @classmethod
     def clean_reasoning(cls, v: str) -> str:
-        """Remove markdown formatting and excessive whitespace from reasoning."""
+        """Remove markdown formatting from reasoning."""
         cleaned = v.strip()
-        # Remove markdown bold/italics
-        cleaned = cleaned.replace('**', '').replace('__', '').replace('*', '').replace('_', '')
-        # Collapse multiple spaces
-        cleaned = ' '.join(cleaned.split())
-        return cleaned
+        cleaned = cleaned.replace('**', '').replace('__', '').replace('*', '')
+        return cleaned[:500] if len(cleaned) > 500 else cleaned  # Truncate long reasoning
     
     @model_validator(mode='after')
-    def prevent_self_loops(self):
-        """Prevent self-referential relationships (source == target)."""
+    def check_no_self_loop(self):
+        """Prevent self-referential relationships."""
         if self.source_id == self.target_id:
-            raise ValueError(
-                f"Self-loop detected: {self.source_id} cannot reference itself. "
-                f"Relationship type: {self.relationship_type}"
-            )
+            raise ValueError(f"Self-loop detected: {self.source_id} -> {self.target_id}")
         return self
     
     def to_dict(self) -> dict:
-        """Convert to dict format for backward compatibility with existing code."""
+        """Convert to dict for Neo4j insertion."""
         return {
             'source_id': self.source_id,
             'target_id': self.target_id,
@@ -322,7 +257,6 @@ class InferredRelationshipBatch(BaseModel):
         
         # Handle dict with alternative keys
         if isinstance(values, dict):
-            # Try common alternative keys
             for key in ['results', 'data', 'items']:
                 if key in values and 'relationships' not in values:
                     values['relationships'] = values.pop(key)
@@ -331,7 +265,69 @@ class InferredRelationshipBatch(BaseModel):
 
 
 # ==========================================
-# Container for LLM Output
+# Workload Enrichment Models (Branch 040)
+# ==========================================
+
+class WorkloadEnrichmentItem(BaseModel):
+    """
+    Pydantic model for validating workload enrichment LLM responses.
+    Enforces BOE category constraints at parse time with graceful fallback.
+    """
+    entity_index: int = Field(..., description="Index of the entity in the batch.")
+    has_workload_metric: bool = Field(True, description="Whether this requirement has workload implications.")
+    workload_categories: List[str] = Field(default_factory=list, description="Raw categories from LLM.")
+    validated_categories: List[BOECategory] = Field(default_factory=list, description="Validated BOE categories.")
+    boe_relevance: Dict[str, float] = Field(default_factory=dict, description="Confidence scores per BOE category.")
+    labor_drivers: List[str] = Field(default_factory=list, description="Labor-specific details.")
+    material_needs: List[str] = Field(default_factory=list, description="Material-specific details.")
+    complexity_score: int = Field(default=5, ge=1, le=10, description="Complexity 1-10.")
+    complexity_rationale: str = Field(default="", description="Complexity explanation.")
+    effort_estimate: str = Field(default="", description="Effort description.")
+    
+    @field_validator('workload_categories', mode='before')
+    @classmethod
+    def normalize_categories_input(cls, v):
+        """Accept any input format for workload_categories."""
+        if v is None:
+            return []
+        if isinstance(v, str):
+            return [v]
+        return list(v)
+    
+    @model_validator(mode='after')
+    def validate_and_map_categories(self):
+        """Normalize raw workload_categories to validated BOE categories."""
+        validated = []
+        for cat in self.workload_categories:
+            normalized = normalize_boe_category(cat)
+            if normalized not in validated:
+                validated.append(normalized)
+        self.validated_categories = validated
+        return self
+    
+    def get_category_values(self) -> List[str]:
+        """Return validated category values as strings."""
+        return [cat.value for cat in self.validated_categories]
+
+
+class WorkloadEnrichmentResponse(BaseModel):
+    """Container for batch workload enrichment LLM responses."""
+    requirements: List[WorkloadEnrichmentItem] = Field(default_factory=list)
+    
+    @model_validator(mode='before')
+    @classmethod
+    def handle_response_formats(cls, values):
+        """Handle various LLM response formats."""
+        if isinstance(values, list):
+            return {'requirements': values}
+        if isinstance(values, dict):
+            if 'requirements' not in values and 'entities' in values:
+                values['requirements'] = values.pop('entities')
+        return values
+
+
+# ==========================================
+# Container for LLM Extraction Output
 # ==========================================
 
 class ExtractionResult(BaseModel):

@@ -29,6 +29,8 @@ from fastapi import UploadFile, File
 from fastapi.responses import JSONResponse
 from lightrag.api.config import global_args
 
+# Note: inference imports removed - using RAG-Anything native pipeline (Branch 039/040)
+# Post-processing handled by semantic_post_processor.enhance_knowledge_graph
 logger = logging.getLogger(__name__)
 
 # ============================================================================
@@ -136,11 +138,6 @@ class DocumentQueueTracker:
 # Global queue tracker instance
 _queue_tracker = DocumentQueueTracker()
 
-# NOTE: extract_with_semaphore() and extract_multimodal_with_semaphore() were removed
-# in Issue #42. The lightrag_llm_adapter now intercepts ALL LightRAG extraction calls,
-# providing unified Pydantic validation with the full 121K ontology prompt.
-# RAG-Anything's native parallelization handles concurrency.
-
 
 async def process_document_with_semantic_inference(
     file_path: str,
@@ -206,71 +203,50 @@ async def process_document_with_semantic_inference(
         if discarded_count > 0:
             logger.info(f"🚫 Filtered {discarded_count} discarded content blocks (keeping {filtered_count}/{original_count} legitimate items)")
         
-        # ============================================================================
-        # RAG-ANYTHING PIPELINE WITH GOVCON ONTOLOGY
-        # ============================================================================
-        # Issue #42: RAG-Anything handles ALL content with unified extraction
-        # - Text → LightRAG's text pipeline → lightrag_llm_adapter (Pydantic + ontology)
-        # - Multimodal → RAG-Anything default processors → same adapter path
-        # 
-        # The lightrag_llm_adapter intercepts ALL extraction calls, ensuring:
-        # - Full 121K ontology prompt for all content types
-        # - Pydantic validation via JsonExtractor
-        # - No duplicate extraction (removed GovconMultimodalProcessor)
-        # ============================================================================
+        # ========================================================================
+        # Branch 039/040 Lesson: Use RAG-Anything's native end-to-end pipeline
+        # - NO custom processors needed
+        # - Ontology injected through addon_params in initialization.py
+        # - RAG-Anything handles all multimodal processing internally
+        # - LightRAG handles chunking, extraction, parallelization natively
+        # ========================================================================
+        logger.info("🚀 Using RAG-Anything native end-to-end pipeline (Branch 039/040 approach)")
+        logger.info("   Ontology: 18 govcon entity types injected via addon_params")
+        logger.info("   Parallelization: Native LightRAG (llm_model_max_async from config)")
         
-        import os
+        # Get workspace from environment
+        workspace = os.getenv("WORKSPACE", "default")
+        output_dir = os.path.join(global_args.working_dir, workspace)
         
-        try:
-            # Count content types for logging
-            text_count = sum(1 for item in filtered_content if item.get('type') == 'text')
-            table_count = sum(1 for item in filtered_content if item.get('type') == 'table')
-            image_count = sum(1 for item in filtered_content if item.get('type') == 'image')
-            equation_count = sum(1 for item in filtered_content if item.get('type') == 'equation')
-            
-            logger.info(f"📊 Content breakdown: {text_count} text, {table_count} tables, {image_count} images, {equation_count} equations")
-            
-            # RAG-Anything handles ALL content in one call:
-            # - Text items → LightRAG's ainsert() → lightrag_llm_adapter → Pydantic extraction
-            # - Multimodal items → default processors → lightrag_llm_adapter → same path
-            # - Deduplication → LightRAG's merge_nodes_and_edges() (Stage 6)
-            # 
-            # All extraction goes through lightrag_llm_adapter which uses the full 121K
-            # ontology prompt, eliminating the need for custom multimodal processors.
-            logger.info(f"🚀 Processing {len(filtered_content)} content items through RAG-Anything pipeline...")
-            
-            await rag_instance.insert_content_list(
-                content_list=filtered_content,
-                file_path=file_name,  # Clean filename for citations
-                doc_id=doc_id
-            )
-            
-            logger.info("✅ RAG-Anything pipeline complete (unified extraction via lightrag_llm_adapter)")
-            
-            # Log queue status
-            stats = await _queue_tracker.get_stats()
-            if _queue_tracker.last_completion_time:
-                time_since = (datetime.now() - _queue_tracker.last_completion_time).total_seconds()
-                logger.info(f"⏭️  Document added to batch | Queue: {stats['processing']} processing, {stats['completed']} completed | {time_since:.0f}s since last completion (timeout: {_queue_tracker.batch_timeout_seconds}s)")
-            else:
-                logger.info(f"⏭️  Document added to batch | Queue: {stats['processing']} processing, {stats['completed']} completed")
-            
-            return {
-                "status": "success",
-                "content_processed": {
-                    "text": text_count,
-                    "tables": table_count,
-                    "images": image_count,
-                    "equations": equation_count
-                },
-                "message": "✅ Document processed. Enhancement will run automatically when batch completes."
-            }
-            
-        except Exception as e:
-            logger.error(f"❌ RAG-Anything pipeline failed: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
-            return {"error": str(e)}
+        # Use RAG-Anything's native insert_content_list for ALL storage types
+        # This method handles:
+        # - Text chunking with configured CHUNK_SIZE/CHUNK_OVERLAP
+        # - Entity extraction with our ontology (via addon_params)
+        # - Multimodal content (tables/images/equations) via built-in processors
+        # - Native parallelization (llm_model_max_async)
+        # - Storage to Neo4j or NetworkX based on config
+        await rag_instance.insert_content_list(
+            content_list=filtered_content,
+            file_path=file_path,
+            doc_id=doc_id
+        )
+        
+        logger.info("✅ RAG-Anything processing complete")
+        
+        # Log queue status
+        stats = await _queue_tracker.get_stats()
+        if _queue_tracker.last_completion_time:
+            time_since = (datetime.now() - _queue_tracker.last_completion_time).total_seconds()
+            logger.info(f"⏭️  Document added to batch | Queue: {stats['processing']} processing, {stats['completed']} completed | {time_since:.0f}s since last completion (timeout: {_queue_tracker.batch_timeout_seconds}s)")
+        else:
+            logger.info(f"⏭️  Document added to batch | Queue: {stats['processing']} processing, {stats['completed']} completed")
+        
+        return {
+            "status": "success",
+            "relationships_inferred": 0,
+            "method": "native_rag_anything",
+            "message": "✅ Document processed via RAG-Anything native pipeline."
+        }
     
     finally:
         # CRITICAL: Always mark document as completed, even on error
@@ -356,10 +332,8 @@ def create_insert_endpoint(app, rag_instance):
             logger.info(f"📄 Processing {file.filename} via /insert endpoint")
             
             # Integrated processing: Entity extraction + relationship inference in one pipeline
-            # NOTE: Pass safe_filename (not file_path) as the stored reference
-            # The temp path is only for reading the file - citations should use the clean filename
             processing_result = await process_document_with_semantic_inference(
-                file_path, safe_filename, rag_instance, rag_instance.llm_model_func
+                file_path, file.filename, rag_instance, rag_instance.llm_model_func
             )
             
             logger.info(f"✅ Processing complete for {file.filename}")
@@ -429,10 +403,8 @@ def create_documents_upload_endpoint(app, rag_instance):
             logger.info(f"📄 Processing {file.filename} via WebUI /documents/upload endpoint")
             
             # Integrated processing: Entity extraction + relationship inference in one pipeline
-            # NOTE: Pass safe_filename (not file_path) as the stored reference
-            # The temp path is only for reading the file - citations should use the clean filename
             processing_result = await process_document_with_semantic_inference(
-                file_path, safe_filename, rag_instance, rag_instance.llm_model_func
+                file_path, file.filename, rag_instance, rag_instance.llm_model_func
             )
             
             logger.info(f"✅ Processing complete for {file.filename}")

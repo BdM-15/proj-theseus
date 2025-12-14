@@ -1,4 +1,4 @@
-"""
+﻿"""
 Workload Enrichment for Government Contracting Requirements
 ============================================================
 
@@ -33,7 +33,7 @@ import os
 import logging
 import asyncio
 import json
-from typing import Dict, List, Callable, Awaitable
+from typing import Dict, List, Callable, Awaitable, Optional
 from pathlib import Path
 from pydantic import ValidationError
 
@@ -47,6 +47,43 @@ from src.ontology.schema import (
 from src.utils.llm_parsing import extract_json_from_response
 
 logger = logging.getLogger(__name__)
+
+# Retry configuration
+MAX_RETRIES = 3
+RETRY_DELAY_BASE = 2  # seconds
+# Default max tokens for workload enrichment responses
+DEFAULT_MAX_TOKENS = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "32000"))
+
+
+async def _call_with_retry(
+    llm_func: Callable,
+    prompt: str,
+    model: str,
+    temperature: float,
+    batch_num: int,
+    max_tokens: int = None
+) -> Optional[str]:
+    """Call LLM with retry logic for transient failures."""
+    if max_tokens is None:
+        max_tokens = DEFAULT_MAX_TOKENS
+        
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            response = await llm_func(prompt, model=model, temperature=temperature, max_tokens=max_tokens)
+            # Basic validation - response should be substantial
+            if response and len(response) > 100:
+                return response
+            else:
+                logger.warning(f"  Batch {batch_num}: Attempt {attempt}/{MAX_RETRIES} - Response too short ({len(response) if response else 0} chars)")
+        except Exception as e:
+            logger.warning(f"  Batch {batch_num}: Attempt {attempt}/{MAX_RETRIES} failed: {str(e)[:100]}")
+        
+        if attempt < MAX_RETRIES:
+            delay = RETRY_DELAY_BASE ** attempt
+            logger.info(f"  Batch {batch_num}: Retrying in {delay}s...")
+            await asyncio.sleep(delay)
+    
+    return None  # All retries exhausted
 
 # Standard BOE categories (now imported from schema, kept here for reference)
 BOE_CATEGORIES = [cat.value for cat in BOECategory]
@@ -66,7 +103,7 @@ async def enrich_workload_metadata(
     - Parallel worker processing (5 concurrent batches)
     - Shared chunk cache to avoid redundant loading
     - Semaphore-based concurrency control
-    - Expected: 14 min → 2.8 min (80% reduction)
+    - Expected: 14 min ΓåÆ 2.8 min (80% reduction)
     
     Args:
         neo4j_io: Neo4j graph I/O handler
@@ -79,9 +116,9 @@ async def enrich_workload_metadata(
         Dict with enrichment statistics
     """
     if model is None:
-        model = os.getenv("REASONING_LLM_NAME", os.getenv("LLM_MODEL", "grok-4-1-fast-reasoning"))
+        model = os.getenv("LLM_MODEL", "grok-4-fast-reasoning")
     
-    logger.info("🏗️ Starting workload enrichment...")
+    logger.info("🔧 Starting workload enrichment...")
     
     # Load enrichment prompt (shared across all workers)
     prompt_path = Path("prompts/relationship_inference/workload_enrichment.md")
@@ -122,10 +159,8 @@ async def enrich_workload_metadata(
         return {"requirements_enriched": 0, "category_distribution": {}}
     
     # PHASE 3A: Parallel batch processing with semaphore control
-    # Get max concurrent workers from env (default 5)
-    max_workers = int(os.getenv("MAX_ASYNC", "4"))  # Reuse existing MAX_ASYNC setting
-    if max_workers < 1:
-        max_workers = 4
+    # Use moderate parallelization for workload enrichment
+    max_workers = min(int(os.getenv("MAX_ASYNC", "8")), 8)  # Cap at 8 for workload enrichment
     
     # Prepare all batches upfront
     batches = []
@@ -239,35 +274,60 @@ Return JSON array with {len(batch)} objects (one per requirement above):
 ]
 """
             
-            # Call LLM
+            # Call LLM with retry
             batch_enriched = 0
             try:
-                response = await llm_func(prompt, model=model, temperature=temperature)
+                response = await _call_with_retry(llm_func, prompt, model, temperature, batch_num)
                 
-                # Parse JSON response using centralized utility
+                if not response:
+                    logger.error(f"  Batch {batch_num}: All {MAX_RETRIES} retries exhausted")
+                    return 0
+                
+                # Parse JSON response using centralized utility (Branch 040 approach)
                 raw_data = extract_json_from_response(response)
                 
-                # Normalize to list format
+                # Normalize to list format (handle various LLM wrapper formats)
                 if not isinstance(raw_data, list):
-                    if isinstance(raw_data, dict) and 'requirements' in raw_data:
-                        raw_data = raw_data['requirements']
-                    else:
+                    if isinstance(raw_data, dict):
+                        # Try common wrapper keys
+                        for key in ['requirements', 'results', 'data', 'items', 'enrichments', 'workload_analysis']:
+                            if key in raw_data and isinstance(raw_data[key], list):
+                                logger.info(f"  Batch {batch_num}: Unwrapped array from '{key}' key")
+                                raw_data = raw_data[key]
+                                break
+                        # If still dict, find any list value
+                        if isinstance(raw_data, dict):
+                            for key, value in raw_data.items():
+                                if isinstance(value, list) and len(value) > 0:
+                                    logger.info(f"  Batch {batch_num}: Found array under '{key}' key")
+                                    raw_data = value
+                                    break
+                    if not isinstance(raw_data, list):
                         logger.error(f"  Batch {batch_num}: LLM returned non-array response: {type(raw_data)}")
                         return 0
                 
                 # Update Neo4j with enrichment data using Pydantic validation
                 for raw_enrichment in raw_data:
+                    # Skip non-dict items (LLM sometimes returns strings in array)
+                    if not isinstance(raw_enrichment, dict):
+                        logger.debug(f"  Batch {batch_num}: Skipping non-dict item: {type(raw_enrichment).__name__}")
+                        continue
+                    
                     # Validate with Pydantic model
                     try:
                         enrichment = WorkloadEnrichmentItem.model_validate(raw_enrichment)
                     except ValidationError as ve:
                         logger.warning(f"  Batch {batch_num}: Pydantic validation error: {ve}")
-                        # Try to salvage what we can
-                        enrichment = WorkloadEnrichmentItem(
-                            entity_index=raw_enrichment.get('entity_index', 0),
-                            has_workload_metric=raw_enrichment.get('has_workload_metric', True),
-                            workload_categories=raw_enrichment.get('workload_categories', [])
-                        )
+                        # Try to salvage what we can (Branch 040 pattern)
+                        try:
+                            enrichment = WorkloadEnrichmentItem(
+                                entity_index=raw_enrichment.get('entity_index', 0),
+                                has_workload_metric=raw_enrichment.get('has_workload_metric', True),
+                                workload_categories=raw_enrichment.get('workload_categories', [])
+                            )
+                        except Exception:
+                            logger.debug(f"  Batch {batch_num}: Could not salvage item, skipping")
+                            continue
                     
                     entity_index = enrichment.entity_index
                     
@@ -303,24 +363,26 @@ Return JSON array with {len(batch)} objects (one per requirement above):
                     # Add to batch update list
                     property_updates.append({
                         'id': entity_id,  # Neo4j element ID from our index_to_entity lookup
-                        'properties': properties
+                        'properties': properties,
+                        'enriched_by': 'workload_analysis_v1',
                     })
                     batch_enriched += 1
                 
                 # Batch update all entities in Neo4j
                 if property_updates:
                     neo4j_io.update_entity_properties(property_updates)
-                
-                logger.info(f"    ✓ Enriched {len(raw_data)} requirements")
             
             except json.JSONDecodeError as e:
-                logger.error(f"  Batch {batch_num}: Failed to parse LLM response as JSON: {e}")
-                logger.debug(f"  Response: {response[:500]}")
-                return 0
+                logger.warning(f"  Batch {batch_num}: JSON decode error (should have been handled): {e}")
             
             except Exception as e:
-                logger.error(f"  Batch {batch_num}: Error processing: {e}")
-                return 0
+                logger.error(f"  Batch {batch_num}: Error during processing: {e}")
+            
+            # Log what we accomplished (even if partial)
+            if batch_enriched > 0:
+                logger.info(f"    ✅ Batch {batch_num}: Enriched {batch_enriched}/{len(batch)} requirements")
+            else:
+                logger.warning(f"    ⚠️ Batch {batch_num}: No requirements enriched (0/{len(batch)})")
             
             return batch_enriched
     
@@ -336,7 +398,7 @@ Return JSON array with {len(batch)} objects (one per requirement above):
             enriched_count += result
     
     # Summary
-    logger.info(f"✓ Workload enrichment complete: {enriched_count}/{total_requirements} requirements")
+    logger.info(f"✅ Workload enrichment complete: {enriched_count}/{total_requirements} requirements")
     logger.info(f"  BOE category distribution: {dict(category_distribution)}")
     
     return {

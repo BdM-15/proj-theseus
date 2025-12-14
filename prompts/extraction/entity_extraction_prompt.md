@@ -3177,6 +3177,117 @@ Algorithm: Extract section number from requirement source, map section to factor
 
 ---
 
+## ⚠️ CRITICAL: RELATIONSHIP EXTRACTION DURING MAIN PROCESSING
+
+**IMPORTANT ENHANCEMENT**: This prompt has been updated to leverage MinerU's improved table-to-text capabilities and extract relationships directly during main processing to reduce post-processing dependency.
+
+### Leveraging MinerU Table-to-Text Capabilities
+
+MinerU now converts tables to structured text, making relationship extraction from tables much easier:
+
+**Table Processing Guidelines:**
+- **Evaluation Matrices** (Section M): Extract relationships between factors and their evaluation criteria
+- **CDRL Schedules** (Section J): Extract relationships between deliverables and their requirements
+- **Requirements Tables** (Section C): Extract relationships between requirements and their specifications
+- **Cross-Reference Tables**: Extract Section L ↔ M mappings directly from table structures
+
+**When processing MinerU-converted table text:**
+- Look for structured data that indicates relationships
+- Extract relationships immediately rather than deferring to post-processing
+- Use table column/row relationships to infer connections
+
+### Enhanced Relationship Extraction During Main Processing
+
+**EXTRACT RELATIONSHIPS DIRECTLY IN `ExtractionResult`** during main processing. The schema supports `relationships: List[Relationship]` - **USE IT**.
+
+**Priority Relationship Types to Extract During Main Processing:**
+
+1. **Section L ↔ M Mapping** (Submission Instructions → Evaluation Factors):
+   ```json
+   {
+     "source_entity": {
+       "entity_name": "Technical Volume Submission",
+       "entity_type": "submission_instruction",
+       "description": "Technical proposal volume addressing Factors 1-3"
+     },
+     "target_entity": {
+       "entity_name": "Factor 1 Technical Approach",
+       "entity_type": "evaluation_factor",
+       "description": "Evaluating technical solution approach"
+     },
+     "relationship_type": "ADDRESSES",
+     "description": "Submission instruction directly addresses this evaluation factor"
+   }
+   ```
+
+2. **Requirement → Deliverable Links** (CDRL References):
+   ```json
+   {
+     "source_entity": {
+       "entity_name": "Monthly Status Report",
+       "entity_type": "requirement",
+       "description": "Contractor shall submit monthly status reports"
+     },
+     "target_entity": {
+       "entity_name": "CDRL A001",
+       "entity_type": "deliverable",
+       "description": "Monthly Status Report deliverable"
+     },
+     "relationship_type": "PRODUCES",
+     "description": "Requirement mandates delivery of this CDRL item"
+   }
+   ```
+
+3. **Clause → Section References** (FAR/DFARS → Implementation):
+   ```json
+   {
+     "source_entity": {
+       "entity_name": "FAR 52.212-1",
+       "entity_type": "clause",
+       "description": "Instructions to Offerors clause"
+     },
+     "target_entity": {
+       "entity_name": "Section L Instructions",
+       "entity_type": "section",
+       "description": "Proposal preparation instructions"
+     },
+     "relationship_type": "IMPLEMENTS",
+     "description": "Section implements requirements of this FAR clause"
+   }
+   ```
+
+4. **Document → Section Hierarchy** (Parent → Child):
+   ```json
+   {
+     "source_entity": {
+       "entity_name": "RFP Volume I",
+       "entity_type": "document",
+       "description": "Technical proposal volume"
+     },
+     "target_entity": {
+       "entity_name": "Section C Requirements",
+       "entity_type": "section",
+       "description": "Technical requirements section"
+     },
+     "relationship_type": "CONTAINS",
+     "description": "Document contains this organizational section"
+   }
+   ```
+
+**Relationship Extraction Strategy:**
+- **Same Chunk Context**: Extract relationships between entities appearing in the same text chunk
+- **Table-Derived Relationships**: When MinerU converts tables to text, extract relationships from structured table data
+- **Cross-Reference Patterns**: Look for explicit references between sections, clauses, and requirements
+- **Immediate Extraction**: Don't defer relationship inference to post-processing algorithms
+
+**Benefits of Main Processing Relationship Extraction:**
+- Reduces dependency on complex post-processing algorithms
+- Leverages MinerU's improved table parsing capabilities
+- Captures relationships that might be lost in chunk boundaries
+- Improves overall knowledge graph quality and connectivity
+
+---
+
 **FINAL REMINDER - ENTITY TYPE COMPLIANCE:**
 
 Before outputting, verify EVERY entity uses one of the 17 ALLOWED types:
