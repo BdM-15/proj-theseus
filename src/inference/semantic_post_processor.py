@@ -21,35 +21,91 @@ Usage:
 
 import logging
 import time
+import asyncio
 from typing import Dict, Callable, Awaitable, List
 from pathlib import Path
+import os
 
 from src.inference.graph_io import parse_graphml, save_enhanced_graphml
 from src.inference.neo4j_graph_io import Neo4jGraphIO, group_entities_by_type
 from src.inference.entity_operations import ALLOWED_TYPES, FORBIDDEN_TYPES
-from lightrag.llm.openai import openai_complete_if_cache
-import os
+from src.utils.llm_client import call_llm_async
 
 logger = logging.getLogger(__name__)
 
-
-async def _call_llm_async(prompt: str, system_prompt: str = None, model: str = None, temperature: float = 0.1) -> str:
-    """Async wrapper for LLM calls"""
-    if model is None:
-        model = os.getenv("LLM_MODEL", "grok-4-fast-reasoning")
-    return await openai_complete_if_cache(
-        model=model,
-        prompt=prompt,
-        system_prompt=system_prompt,
-        hashing_kv=None,  # No caching for post-processing
-        api_key=os.getenv("LLM_BINDING_API_KEY"),
-        base_url=os.getenv("LLM_BINDING_HOST"),
-        temperature=temperature
-    )
+# Parallelization config from environment (Branch 040 pattern)
+MAX_CONCURRENT_LLM_CALLS = int(os.getenv("MAX_ASYNC", "8"))
 
 
-async def _infer_entity_type(entity_name: str, description: str, model: str, temperature: float) -> str:
-    """Infer correct entity type for a single entity"""
+def _heuristic_table_type_mapping(entity: Dict) -> str:
+    """
+    Intelligently map "table" entities (from RAG-Anything) to govcon types based on content.
+    
+    RAG-Anything's TableModalProcessor hardcodes entity_type="table" for all tables.
+    This function examines the entity name and description to determine the correct govcon type.
+    
+    Args:
+        entity: Entity dict with entity_name, description, etc.
+    
+    Returns:
+        Mapped govcon type or None if LLM inference needed
+    """
+    name = (entity.get('entity_name') or '').lower()
+    desc = (entity.get('description') or '').lower()
+    content = f"{name} {desc}"
+    
+    # CDRL/Deliverable tables → deliverable
+    if any(kw in content for kw in ['cdrl', 'contract data', 'deliverable', 'dd form 1423', 'data item']):
+        return 'deliverable'
+    
+    # Evaluation/Rating tables → evaluation_factor  
+    if any(kw in content for kw in ['evaluation', 'rating', 'scoring', 'assessment', 'criteria', 'factor']):
+        return 'evaluation_factor'
+    
+    # Performance/Metrics tables → performance_metric
+    if any(kw in content for kw in ['performance', 'metric', 'sla', 'kpi', 'threshold', 'standard']):
+        return 'performance_metric'
+    
+    # Requirements/SOW tables → requirement
+    if any(kw in content for kw in ['requirement', 'shall', 'must', 'sow', 'pws', 'task', 'work']):
+        return 'requirement'
+    
+    # Submission/Proposal tables → submission_instruction
+    if any(kw in content for kw in ['submission', 'proposal', 'volume', 'page limit', 'format']):
+        return 'submission_instruction'
+    
+    # Clause/Regulation tables → clause
+    if any(kw in content for kw in ['far ', 'dfars', 'clause', 'provision', '52.2']):
+        return 'clause'
+    
+    # Section/Document reference tables → section or document
+    if any(kw in content for kw in ['section', 'attachment', 'annex', 'exhibit', 'appendix']):
+        return 'section'
+    
+    # Organization/Personnel tables → organization or person
+    if any(kw in content for kw in ['organization', 'contractor', 'government', 'agency']):
+        return 'organization'
+    if any(kw in content for kw in ['personnel', 'staff', 'position', 'role', 'labor category']):
+        return 'person'
+    
+    # Equipment/Material tables → equipment
+    if any(kw in content for kw in ['equipment', 'material', 'supply', 'asset', 'gfe', 'gfp']):
+        return 'equipment'
+    
+    # Schedule/Timeline tables → concept (general information)
+    if any(kw in content for kw in ['schedule', 'timeline', 'milestone', 'calendar', 'date']):
+        return 'concept'
+    
+    # Pricing/Cost tables → concept (we don't have a pricing type)
+    if any(kw in content for kw in ['price', 'cost', 'clin', 'labor rate', 'fee']):
+        return 'concept'
+    
+    # Can't determine - return None to trigger LLM inference
+    return None
+
+
+async def _infer_entity_type(entity_name: str, description: str, model: str, temperature: float, semaphore: asyncio.Semaphore = None) -> str:
+    """Infer correct entity type for a single entity (with optional rate limiting)"""
     allowed_types_str = ", ".join(ALLOWED_TYPES)
     
     prompt = f"""You are a government contracting expert. Classify this entity into ONE of these types:
@@ -61,7 +117,13 @@ Description: {description or 'No description'}
 Return ONLY the entity type (lowercase with underscores). No explanation."""
     
     try:
-        response = await _call_llm_async(prompt, model=model, temperature=temperature)
+        # Use semaphore if provided for rate limiting
+        if semaphore:
+            async with semaphore:
+                response = await call_llm_async(prompt, model=model, temperature=temperature)
+        else:
+            response = await call_llm_async(prompt, model=model, temperature=temperature)
+        
         new_type = response.strip().lower()
         
         # Validate it's an allowed type
@@ -73,6 +135,50 @@ Return ONLY the entity type (lowercase with underscores). No explanation."""
     except Exception as e:
         logger.error(f"  Error inferring type for {entity_name}: {e}")
         return "concept"  # Default fallback
+
+
+async def _infer_entity_types_parallel(entities: List[Dict], model: str, temperature: float) -> List[Dict]:
+    """
+    Infer entity types in parallel with rate limiting (Branch 040 pattern).
+    
+    Uses asyncio.Semaphore to limit concurrent LLM calls based on MAX_ASYNC env var.
+    
+    Args:
+        entities: List of entities needing type inference
+        model: LLM model name
+        temperature: LLM temperature
+    
+    Returns:
+        List of entity updates with {id, new_entity_type}
+    """
+    semaphore = asyncio.Semaphore(MAX_CONCURRENT_LLM_CALLS)
+    
+    async def infer_single(entity: Dict) -> Dict:
+        new_type = await _infer_entity_type(
+            entity_name=entity['entity_name'],
+            description=entity.get('description', ''),
+            model=model,
+            temperature=temperature,
+            semaphore=semaphore
+        )
+        return {'id': entity['id'], 'new_entity_type': new_type, 'old_type': entity.get('entity_type')}
+    
+    # Run all inferences in parallel (semaphore limits concurrency)
+    logger.info(f"    Running parallel type inference ({MAX_CONCURRENT_LLM_CALLS} concurrent)...")
+    tasks = [infer_single(e) for e in entities]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    # Filter successful results
+    updates = []
+    for i, result in enumerate(results):
+        if isinstance(result, Exception):
+            logger.error(f"    Entity type inference failed for {entities[i]['entity_name']}: {result}")
+            # Use concept as fallback
+            updates.append({'id': entities[i]['id'], 'new_entity_type': 'concept'})
+        elif result['new_entity_type'] and result['new_entity_type'].lower() != (result.get('old_type') or '').lower():
+            updates.append({'id': result['id'], 'new_entity_type': result['new_entity_type']})
+    
+    return updates
 
 
 async def _infer_relationships_batch(entities: List[Dict], existing_rels: List[Dict], model: str, temperature: float) -> List[Dict]:
@@ -171,7 +277,7 @@ Format your response as JSON array:
 Return ONLY the JSON array. If no relationships found, return []."""
         
         try:
-            response = await _call_llm_async(prompt, model=model, temperature=temperature)
+            response = await call_llm_async(prompt, model=model, temperature=temperature)
             
             # Parse JSON response
             relationships = json.loads(response)
@@ -404,7 +510,7 @@ Return ONLY valid JSON array:
 If no relationships found, return []."""
 
     try:
-        response = await _call_llm_async(prompt, model=model, temperature=temperature)
+        response = await call_llm_async(prompt, model=model, temperature=temperature)
         rels = json.loads(response.strip())
         valid_rels = _validate_relationships(rels, id_to_entity, "Algorithm 8")
         logger.info(f"    → Found {len(valid_rels)} orphan relationships")
@@ -522,7 +628,7 @@ Return ONLY valid JSON array:
 """
         
         try:
-            response = await _call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
+            response = await call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
             rels = json.loads(response.strip())
             valid_rels = _validate_relationships(rels, id_to_entity, "Algorithm 1")
             all_relationships.extend(valid_rels)
@@ -557,7 +663,7 @@ Return ONLY valid JSON array:
 """
         
         try:
-            response = await _call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
+            response = await call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
             rels = json.loads(response.strip())
             valid_rels = _validate_relationships(rels, id_to_entity, "Algorithm 2")
             all_relationships.extend(valid_rels)
@@ -682,7 +788,7 @@ Return ONLY valid JSON array:
 """
         
         try:
-            response = await _call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
+            response = await call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
             rels = json.loads(response.strip())
             # Validate IDs exist
             valid_rels = []
@@ -741,7 +847,7 @@ Return ONLY valid JSON array:
 """
             
             try:
-                response = await _call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
+                response = await call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
                 rels = json.loads(response.strip())
                 pattern1_rels = _validate_relationships(rels, id_to_entity, "Algorithm 4 Pattern 1")
                 logger.info(f"    → Pattern 1 (Requirement→Deliverable): {len(pattern1_rels)} relationships")
@@ -783,7 +889,7 @@ Return ONLY valid JSON array:
 """
             
             try:
-                response = await _call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
+                response = await call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
                 rels = json.loads(response.strip())
                 pattern2_rels = _validate_relationships(rels, id_to_entity, "Algorithm 4 Pattern 2")
                 logger.info(f"    → Pattern 2 (WorkStatement→Deliverable): {len(pattern2_rels)} relationships")
@@ -824,7 +930,7 @@ Return ONLY valid JSON array:
 """
         
         try:
-            response = await _call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
+            response = await call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
             rels = json.loads(response.strip())
             valid_rels = _validate_relationships(rels, id_to_entity, "Algorithm 5")
             all_relationships.extend(valid_rels)
@@ -866,7 +972,7 @@ Return ONLY valid JSON array:
 """
         
         try:
-            response = await _call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
+            response = await call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
             rels = json.loads(response.strip())
             valid_rels = _validate_relationships(rels, id_to_entity, "Algorithm 5")
             all_relationships.extend(valid_rels)
@@ -962,13 +1068,23 @@ async def _semantic_post_processor_neo4j(
                 "processing_time": 0
             }
         
-        # Step 2: Correct entity types
-        logger.info("\n🔧 Step 2: Correcting entity types with LLM...")
+        # Step 2: Correct entity types (PARALLEL - Branch 040 pattern)
+        # Step 2: Entity Type Correction
+        # Sources of invalid types:
+        # - "table" from RAG-Anything's TableModalProcessor (hardcoded)
+        # - "other" from LightRAG fallback (now fixed to use "concept" in initialization.py)
+        # - "unknown" from extraction failures
+        # - Hash-prefixed types (#requirement) from LightRAG internal markers
+        logger.info("\n🔧 Step 2: Entity type correction...")
         entity_updates = []
         grouped = group_entities_by_type(entities)
         
         # Normalize FORBIDDEN_TYPES to lowercase for case-insensitive matching
         forbidden_types_lower = [t.lower() for t in FORBIDDEN_TYPES]
+        
+        # Collect entities needing LLM inference vs heuristic mapping
+        entities_needing_inference = []
+        heuristic_mapped = 0
         
         for entity_type, entity_group in grouped.items():
             entity_type_clean = entity_type.lower()
@@ -978,18 +1094,36 @@ async def _semantic_post_processor_neo4j(
             if has_hash_prefix:
                 entity_type_clean = entity_type_clean[1:]
             
+            # SPECIAL CASE: "table" entities from RAG-Anything
+            # These are multimodal table extractions - map based on content
+            if entity_type_clean == 'table':
+                logger.info(f"  📊 Processing {len(entity_group)} table entities (from RAG-Anything multimodal)...")
+                for entity in entity_group:
+                    mapped_type = _heuristic_table_type_mapping(entity)
+                    if mapped_type:
+                        entity_updates.append({
+                            'id': entity['id'],
+                            'new_entity_type': mapped_type
+                        })
+                        heuristic_mapped += 1
+                    else:
+                        # Can't determine type heuristically, need LLM
+                        entities_needing_inference.append(entity)
+                continue
+            
             # Process entities that need correction:
             # 1. UNKNOWN types (always need LLM inference)
             # 2. Forbidden types (need retyping to allowed types)
-            # 3. Hash-prefixed types (corrupted, need cleaning even if underlying type is allowed)
+            # 3. Hash-prefixed types (corrupted, need cleaning)
             needs_correction = (
                 entity_type_clean == 'unknown' or
+                entity_type_clean == 'other' or  # Legacy "Other" from old LightRAG runs
                 entity_type_clean in forbidden_types_lower or
                 has_hash_prefix
             )
             
             if needs_correction:
-                logger.info(f"  Processing {len(entity_group)} {entity_type} entities...")
+                logger.info(f"  ⚠️ Found {len(entity_group)} '{entity_type}' entities needing correction")
                 
                 for entity in entity_group:
                     # For hash-prefixed allowed types, just remove prefix without LLM call
@@ -999,19 +1133,22 @@ async def _semantic_post_processor_neo4j(
                             'new_entity_type': entity_type_clean  # Use cleaned type (no LLM needed)
                         })
                     else:
-                        # Call LLM to infer correct type (for UNKNOWN or forbidden types)
-                        new_type = await _infer_entity_type(
-                            entity_name=entity['entity_name'],
-                            description=entity.get('description', ''),
-                            model=llm_model_name,
-                            temperature=temperature
-                        )
-                        
-                        if new_type and new_type.lower() != entity_type_clean:
-                            entity_updates.append({
-                                'id': entity['id'],
-                                'new_entity_type': new_type
-                            })
+                        # Queue for parallel LLM inference
+                        entities_needing_inference.append(entity)
+        
+        if heuristic_mapped > 0:
+            logger.info(f"  ✅ Heuristically mapped {heuristic_mapped} table entities")
+        
+        # Run parallel LLM inference for entities that need it
+        if entities_needing_inference:
+            logger.info(f"  Running parallel LLM type inference for {len(entities_needing_inference)} entities...")
+            inferred_updates = await _infer_entity_types_parallel(
+                entities=entities_needing_inference,
+                model=llm_model_name,
+                temperature=temperature
+            )
+            entity_updates.extend(inferred_updates)
+            logger.info(f"  ✅ LLM inference complete: {len(inferred_updates)} types inferred")
         
         entities_corrected = 0
         if entity_updates:
@@ -1043,7 +1180,7 @@ async def _semantic_post_processor_neo4j(
         
         workload_stats = await enrich_workload_metadata(
             neo4j_io=neo4j_io,
-            llm_func=_call_llm_async,
+            llm_func=call_llm_async,
             batch_size=50,
             model=llm_model_name,
             temperature=temperature

@@ -18,30 +18,13 @@ Integration: Called from semantic_post_processor.enhance_knowledge_graph()
 import logging
 from typing import List, Dict, Tuple, Callable, Awaitable
 from src.inference.batch_processor import BatchProcessor
+from src.ontology.schema import VALID_ENTITY_TYPES
 
 logger = logging.getLogger(__name__)
 
-# 17 allowed entity types (lowercase with underscores)
-ALLOWED_TYPES = [
-    "organization",
-    "concept",
-    "event",
-    "technology",
-    "person",
-    "location",
-    "requirement",
-    "clause",
-    "section",
-    "document",
-    "deliverable",
-    "program",
-    "equipment",
-    "evaluation_factor",
-    "submission_instruction",
-    "strategic_theme",
-    "statement_of_work",
-    "performance_metric",
-]
+# SINGLE SOURCE OF TRUTH: Import from schema.py
+# This ensures consistency across extraction, validation, and post-processing
+ALLOWED_TYPES = list(VALID_ENTITY_TYPES)
 
 # Forbidden types that must be eliminated
 FORBIDDEN_TYPES = [

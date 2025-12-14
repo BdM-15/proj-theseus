@@ -29,12 +29,8 @@ from fastapi import UploadFile, File
 from fastapi.responses import JSONResponse
 from lightrag.api.config import global_args
 
-from src.inference import (
-    parse_graphml,
-    infer_all_relationships,
-    save_relationships_to_graphml,
-    save_relationships_to_kv_store
-)
+# Note: inference imports removed - using RAG-Anything native pipeline (Branch 039/040)
+# Post-processing handled by semantic_post_processor.enhance_knowledge_graph
 logger = logging.getLogger(__name__)
 
 # ============================================================================
@@ -207,284 +203,50 @@ async def process_document_with_semantic_inference(
         if discarded_count > 0:
             logger.info(f"🚫 Filtered {discarded_count} discarded content blocks (keeping {filtered_count}/{original_count} legitimate items)")
         
-        # Check if Neo4j storage is enabled - use custom ontology extraction BEFORE standard processing
-        import os
-        if os.getenv("GRAPH_STORAGE") == "Neo4JStorage":
-            logger.info("📊 Neo4j storage detected - using custom ontology extraction (bypassing LightRAG)")
-            
-            # Extract text from content_list for ontology processing
-            # MinerU provides: {'type': 'text'/'table'/'image', 'text': '...', 'page_idx': N}
-            from src.extraction.json_extractor import JsonExtractor
-            from src.processors import GovconMultimodalProcessor
-            
-            # Initialize extractors
-            json_extractor = JsonExtractor()
-            # Note: llm_func is passed as parameter to this function
-            
-            # PHASE 1: TEXT EXTRACTION (for custom ontology extraction)
-            text_chunks = []
-            for item in filtered_content:
-                # Filter ONLY text blocks (tables/images handled by RAG-Anything processors)
-                if item.get('type') == 'text':
-                    content_text = item.get('text', '')  # MinerU uses 'text' field, not 'content'
-                    if content_text and content_text.strip():
-                        text_chunks.append(content_text)
-            
-            # FIX: Spreadsheets with only tables may have zero text content - allow empty text
-            # RAG-Anything's multimodal processors will handle table extraction
-            if not text_chunks:
-                logger.warning(f"⚠️ No text content found in {file_name} - likely spreadsheet with only tables")
-                logger.info("📊 Skipping text extraction, proceeding with multimodal processing only")
-                
-                # Count multimodal items to verify document has extractable content
-                multimodal_count = sum(1 for item in filtered_content if item.get('type') in ['table', 'image'])
-                if multimodal_count == 0:
-                    logger.error(f"❌ Document {file_name} has no extractable content (no text, tables, or images)")
-                    return {"error": "No extractable content", "relationships_inferred": 0}
-                
-                logger.info(f"✅ Found {multimodal_count} multimodal items (tables/images) to process")
-                
-                # Skip text processing, go directly to multimodal
-                full_text = ""
-                text_entity_count = 0
-                chunked_texts = []  # Empty list - no text chunks to process
-            else:
-                full_text = "\n\n".join(text_chunks)
-                logger.info(f"📝 TEXT: Extracted {len(text_chunks)} text blocks ({len(full_text)} chars total)")
-                
-                # Use LightRAG's chunking strategy for consistent extraction
-                import tiktoken
-                chunk_size = int(os.getenv("CHUNK_SIZE", "8192"))
-                chunk_overlap = int(os.getenv("CHUNK_OVERLAP_TOKEN_SIZE", "1024"))
-                
-                tokenizer = tiktoken.get_encoding("cl100k_base")
-                tokens = tokenizer.encode(full_text)
-                
-                # Create overlapping chunks
-                chunked_texts = []
-                start = 0
-                while start < len(tokens):
-                    end = min(start + chunk_size, len(tokens))
-                    chunk_tokens = tokens[start:end]
-                    chunk_text = tokenizer.decode(chunk_tokens)
-                    chunked_texts.append(chunk_text)
-                    start += (chunk_size - chunk_overlap)  # Overlap for context
-                
-                logger.info(f"🔪 Chunked text into {len(chunked_texts)} chunks ({chunk_size} tokens, {chunk_overlap} overlap)")
+        # ========================================================================
+        # Branch 039/040 Lesson: Use RAG-Anything's native end-to-end pipeline
+        # - NO custom processors needed
+        # - Ontology injected through addon_params in initialization.py
+        # - RAG-Anything handles all multimodal processing internally
+        # - LightRAG handles chunking, extraction, parallelization natively
+        # ========================================================================
+        logger.info("🚀 Using RAG-Anything native end-to-end pipeline (Branch 039/040 approach)")
+        logger.info("   Ontology: 18 govcon entity types injected via addon_params")
+        logger.info("   Parallelization: Native LightRAG (llm_model_max_async from config)")
         
-        # PHASE 2: CUSTOM ONTOLOGY EXTRACTION (text only - tables handled by processor)
-        logger.info("🚀 Running custom ontology extraction with Pydantic schema (TEXT)...")
+        # Get workspace from environment
+        workspace = os.getenv("WORKSPACE", "default")
+        output_dir = os.path.join(global_args.working_dir, workspace)
         
-        all_entities = []
-        all_relationships = []
+        # Use RAG-Anything's native insert_content_list for ALL storage types
+        # This method handles:
+        # - Text chunking with configured CHUNK_SIZE/CHUNK_OVERLAP
+        # - Entity extraction with our ontology (via addon_params)
+        # - Multimodal content (tables/images/equations) via built-in processors
+        # - Native parallelization (llm_model_max_async)
+        # - Storage to Neo4j or NetworkX based on config
+        await rag_instance.insert_content_list(
+            content_list=filtered_content,
+            file_path=file_path,
+            doc_id=doc_id
+        )
         
-        try:
-            for i, chunk_text in enumerate(chunked_texts):
-                logger.info(f"   Processing text chunk {i+1}/{len(chunked_texts)}...")
-                extraction_result = await json_extractor.extract(chunk_text)
-                all_entities.extend(extraction_result.entities)
-                all_relationships.extend(extraction_result.relationships)
-            
-            # De-duplicate entities by name
-            unique_entities = {}
-            for entity in all_entities:
-                if entity.entity_name not in unique_entities:
-                    unique_entities[entity.entity_name] = entity
-            
-            all_entities = list(unique_entities.values())
-            
-            logger.info(
-                f"✅ TEXT EXTRACTION: "
-                f"{len(all_entities)} unique entities, "
-                f"{len(all_relationships)} relationships "
-                f"from {len(chunked_texts)} text chunks"
-            )
-            
-            # Convert Pydantic extraction to LightRAG custom_kg format
-            custom_kg = {
-                "chunks": [],
-                "entities": [],
-                "relationships": []
-            }
-            
-            # Convert text chunks only (tables handled by RAG-Anything's modal processors)
-            for i, chunk_text in enumerate(chunked_texts):
-                custom_kg["chunks"].append({
-                    "content": chunk_text,
-                    "source_id": doc_id,
-                    "file_path": file_path,
-                    "chunk_order_index": i
-                })
-            
-            # Convert entities from text extraction
-            for entity in all_entities:
-                custom_kg["entities"].append({
-                    "entity_name": entity.entity_name,
-                    "entity_type": entity.entity_type,
-                    "description": entity.description,
-                    "source_id": doc_id,
-                    "file_path": file_path
-                })
-            
-            # Convert relationships
-            for rel in all_relationships:
-                custom_kg["relationships"].append({
-                    "src_id": rel.source_entity.entity_name,
-                    "tgt_id": rel.target_entity.entity_name,
-                    "description": rel.description,
-                    "keywords": rel.relationship_type,
-                    "weight": 1.0,
-                    "source_id": doc_id
-                })
-            
-            # PHASE 3: PROCESS MULTIMODAL CONTENT (tables, images) with custom processor
-            logger.info("📊 Registering GovconMultimodalProcessor for tables/images/equations...")
-            
-            # Create custom processor instance
-            govcon_processor = GovconMultimodalProcessor(
-                lightrag=rag_instance.lightrag,
-                modal_caption_func=llm_func,
-                context_extractor=rag_instance.context_extractor
-            )
-            
-            # Override RAG-Anything's default processors with our ontology-aware processor
-            rag_instance.modal_processors["table"] = govcon_processor
-            rag_instance.modal_processors["image"] = govcon_processor
-            rag_instance.modal_processors["equation"] = govcon_processor
-            
-            logger.info("✅ Custom processors registered")
-            
-            # Insert text entities + process multimodal content
-            logger.info("💾 Inserting custom text ontology and processing multimodal content...")
-            await rag_instance.lightrag.ainsert_custom_kg(custom_kg, full_doc_id=doc_id)
-            
-            # Process multimodal content (tables, images) through RAG-Anything pipeline
-            # This will use our GovconMultimodalProcessor for entity extraction
-            multimodal_items = [item for item in filtered_content if item.get('type') in ['table', 'image', 'equation']]
-            if multimodal_items:
-                logger.info(f"📊 Processing {len(multimodal_items)} multimodal items with govcon ontology...")
-                await rag_instance.insert_content_list(
-                    content_list=multimodal_items,
-                    file_path=file_path,
-                    doc_id=doc_id
-                )
-                logger.info("✅ Multimodal content processed")
-            
-            logger.info("✅ Complete knowledge graph inserted")
-            
-            # Log queue status
-            stats = await _queue_tracker.get_stats()
-            if _queue_tracker.last_completion_time:
-                time_since = (datetime.now() - _queue_tracker.last_completion_time).total_seconds()
-                logger.info(f"⏭️  Document added to batch | Queue: {stats['processing']} processing, {stats['completed']} completed | {time_since:.0f}s since last completion (timeout: {_queue_tracker.batch_timeout_seconds}s)")
-            else:
-                logger.info(f"⏭️  Document added to batch | Queue: {stats['processing']} processing, {stats['completed']} completed")
-            
-            return {
-                "entities_extracted": len(all_entities),
-                "relationships_extracted": len(all_relationships),
-                "message": "✅ Document processed. Enhancement will run automatically when batch completes."
-            }
-            
-        except Exception as e:
-            logger.error(f"❌ Custom ontology extraction failed: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
-            return {"error": str(e)}
-    
+        logger.info("✅ RAG-Anything processing complete")
+        
+        # Log queue status
+        stats = await _queue_tracker.get_stats()
+        if _queue_tracker.last_completion_time:
+            time_since = (datetime.now() - _queue_tracker.last_completion_time).total_seconds()
+            logger.info(f"⏭️  Document added to batch | Queue: {stats['processing']} processing, {stats['completed']} completed | {time_since:.0f}s since last completion (timeout: {_queue_tracker.batch_timeout_seconds}s)")
         else:
-            # NetworkX storage - use standard RAG-Anything processing
-            logger.info("📊 NetworkX storage detected - using standard LightRAG extraction")
-            await rag_instance.insert_content_list(
-                content_list=filtered_content,
-                file_path=file_path,
-                doc_id=doc_id
-            )
-            
-            # NOTE: document_completed() moved to finally block - always called even on error
+            logger.info(f"⏭️  Document added to batch | Queue: {stats['processing']} processing, {stats['completed']} completed")
         
-            # Step 2: ROBUST - Wait for GraphML with exponential backoff (NetworkX storage only)
-            # CRITICAL: LightRAG writes to default/ subdirectory, not root working_dir
-            graphml_path = Path(global_args.working_dir) / "default" / "graph_chunk_entity_relation.graphml"
-            
-            max_retries = 5
-            wait_times = [1, 2, 3, 4, 5]  # Total: 15 seconds max
-            
-            for attempt, wait_time in enumerate(wait_times):
-                await asyncio.sleep(wait_time)
-                
-                if graphml_path.exists() and graphml_path.stat().st_size > 100:
-                    total_wait = sum(wait_times[:attempt+1])
-                    logger.info(f"✅ GraphML ready after {total_wait}s wait")
-                    break
-                
-                logger.warning(
-                    f"⏳ GraphML not ready (attempt {attempt+1}/{max_retries}), "
-                    f"waiting {wait_time}s..."
-                )
-            else:
-                # All retries exhausted
-                total_wait = sum(wait_times)
-                logger.error(
-                    f"❌ GraphML never populated after {total_wait}s total wait. "
-                    f"This indicates RAG-Anything processing failed."
-                )
-                return {
-                    "relationships_inferred": 0,
-                    "error": "GraphML file not created"
-                }
-            
-            logger.info(f"  [2/2] GraphML found: {graphml_path}")
-            
-            # Step 3: Check if batch is complete and trigger enhancement if so
-            if await _queue_tracker.is_batch_complete():
-                logger.info("🎯 BATCH COMPLETE - All documents uploaded, triggering cumulative enhancement...")
-                await _queue_tracker.mark_enhancement_running()
-                
-                try:
-                    from src.inference.semantic_post_processor import enhance_knowledge_graph
-                    inference_result = await enhance_knowledge_graph(
-                        rag_storage_path=global_args.working_dir,
-                        llm_func=llm_func,
-                        batch_size=50
-                    )
-                    
-                    logger.info("✅ Cumulative semantic enhancement complete")
-                    logger.info(f"   Relationships inferred: {inference_result.get('relationships_inferred', 0)}")
-                    logger.info(f"   Entities corrected: {inference_result.get('entities_corrected', 0)}")
-                    
-                    # Reset batch tracker for next batch
-                    await _queue_tracker.reset_batch()
-                    
-                    return {
-                        "status": "success",
-                        "relationships_inferred": inference_result.get("relationships_inferred", 0),
-                        "entities_corrected": inference_result.get("entities_corrected", 0),
-                        "method": "cumulative_batch_processing"
-                    }
-                    
-                except Exception as e:
-                    logger.error(f"❌ Cumulative enhancement failed: {e}")
-                    import traceback
-                    logger.error(traceback.format_exc())
-                    await _queue_tracker.reset_batch()  # Reset even on error
-                    return {
-                        "status": "error",
-                        "error": str(e),
-                        "method": "cumulative_batch_processing"
-                    }
-            else:
-                logger.info("⏭️  Skipping per-document enhancement (waiting for batch completion)")
-                stats = await _queue_tracker.get_stats()
-                logger.info(f"   Queue: {stats['processing']} processing, {stats['completed']} completed in batch")
-                
-                return {
-                    "status": "success",
-                    "relationships_inferred": 0,
-                    "entities_corrected": 0,
-                    "method": "batch_pending",
-                    "message": "✅ Document processed. Enhancement will run automatically when batch completes."
-                }
+        return {
+            "status": "success",
+            "relationships_inferred": 0,
+            "method": "native_rag_anything",
+            "message": "✅ Document processed via RAG-Anything native pipeline."
+        }
     
     finally:
         # CRITICAL: Always mark document as completed, even on error
@@ -532,144 +294,6 @@ async def process_document_with_semantic_inference(
         
         # Fire and forget - multiple tasks may run but only first one triggers
         asyncio.create_task(batch_completion_monitor())
-
-
-async def post_process_knowledge_graph(rag_storage_path: str, llm_func) -> dict:
-    """
-    Semantic Post-Processing: LLM-Powered Relationship Inference
-    
-    ARCHITECTURE: Replaces brittle regex patterns with LLM semantic understanding.
-    
-    Timeline:
-    - t=0-70s: LightRAG extraction (16 entity types + initial relationships)
-    - t=70s: Knowledge graph files written (GraphML, kv_store files)
-    - t=70-85s: This function runs (LLM-powered relationship inference)
-    - t=85s: Knowledge graph files UPDATED (100% document linkage, comprehensive coverage)
-    
-    Processing Pipeline:
-    1. Parse GraphML (full entity details from multimodal extraction)
-    2. Clean entity types (fixes #/>CONCEPT format corruption)
-    3. Group entities by type for efficient batching
-    4. Call Grok LLM to infer relationships using semantic understanding
-    5. Parse structured JSON responses with confidence scores and reasoning
-    6. Save new relationships to both GraphML and kv_store
-    
-    Benefits:
-    - Agency-agnostic: Handles ANY RFP structure (Navy, Air Force, Army, civilian agencies)
-    - Context-aware: Understands content semantics, not just naming patterns
-    - Self-documenting: LLM provides human-readable reasoning for each relationship
-    - Higher coverage: 100% document linkage for attachments, specs, regulations
-    - Cost-effective: ~$0.03 per document (5 LLM batches × ~$0.006/batch)
-    - Leverages existing 2M-context Grok infrastructure
-    
-    Relationship Types Inferred (5 algorithms):
-    1. Section L↔M mapping: SUBMISSION_INSTRUCTION ↔ EVALUATION_FACTOR
-    2. Document section linking: DOCUMENT → SECTION (ATTACHMENT_OF/CHILD_OF)
-    3. SOW deliverable linking: STATEMENT_OF_WORK → DELIVERABLE (REQUIRES)
-    4. Clause clustering: CLAUSE → SECTION (CHILD_OF)
-    5. Requirement evaluation: REQUIREMENT → EVALUATION_FACTOR (EVALUATED_BY)
-    
-    Args:
-        rag_storage_path: Path to rag_storage directory
-        llm_func: LLM function for semantic inference
-    
-    Returns:
-        dict: Processing result with status, relationships_added, method
-    """
-    logger.info("=" * 80)
-    logger.info("🤖 SEMANTIC POST-PROCESSING: LLM-Powered Relationship Inference")
-    logger.info("   Augmenting knowledge graph with inferred relationships")
-    logger.info("=" * 80)
-    
-    rag_storage = Path(rag_storage_path)
-    # CRITICAL: LightRAG writes to default/ subdirectory
-    graphml_path = rag_storage / "default" / "graph_chunk_entity_relation.graphml"
-    
-    # Validate GraphML file exists
-    if not graphml_path.exists():
-        logger.warning(f"GraphML file not found in {rag_storage_path}, skipping post-processing")
-        return {"status": "skipped", "reason": "no_graphml"}
-    
-    try:
-        # Step 1: Parse GraphML to extract entities and relationships
-        logger.info(f"  [1/5] Parsing GraphML: {graphml_path.name}")
-        nodes, existing_edges = parse_graphml(graphml_path)
-        
-        if not nodes:
-            logger.warning(f"No entities found in GraphML, skipping post-processing")
-            return {"status": "skipped", "reason": "no_entities"}
-        
-        # Step 2: Cleanup forbidden entity types (UNKNOWN, other, etc.)
-        logger.info(f"  [2/5] Cleaning up forbidden entity types...")
-        from src.inference.forbidden_type_cleanup import cleanup_forbidden_types
-        
-        nodes, retyping_map = await cleanup_forbidden_types(
-            entities=nodes,
-            llm_func=llm_func,
-            batch_size=50
-        )
-        
-        if retyping_map:
-            logger.info(f"  ✅ Retyped {len(retyping_map)} entities with forbidden types")
-            # Save cleaned entities back to GraphML immediately
-            from src.inference.graph_io import save_cleaned_entities_to_graphml
-            save_cleaned_entities_to_graphml(graphml_path, nodes)
-            logger.info(f"  ✅ Saved cleaned entities to GraphML")
-        
-        # Step 3: Use LLM to infer missing relationships
-        logger.info(f"  [3/5] Calling Grok LLM for semantic relationship inference...")
-        
-        new_relationships = await infer_all_relationships(
-            nodes=nodes,
-            existing_edges=existing_edges,
-            llm_func=llm_func
-        )
-        
-        if not new_relationships:
-            logger.info(f"  ℹ️  No new relationships inferred (existing graph may be complete)")
-            return {
-                "status": "success",
-                "relationships_added": 0,
-                "method": "llm_powered",
-                "message": "No new relationships needed"
-            }
-        
-        # Step 4: Save new relationships to both GraphML and kv_store
-        logger.info(f"  [4/5] Saving {len(new_relationships)} new relationships...")
-        
-        save_relationships_to_graphml(graphml_path, new_relationships, nodes)
-        # kv_store files are in default/ subdirectory alongside GraphML
-        save_relationships_to_kv_store(rag_storage / "default", new_relationships, nodes)
-        
-        # Step 5: Final validation
-        logger.info(f"  [5/5] Semantic post-processing complete")
-        
-        logger.info("=" * 80)
-        logger.info(f"🎯 SEMANTIC POST-PROCESSING COMPLETE")
-        logger.info(f"  Total new relationships: {len(new_relationships)}")
-        logger.info(f"  Method: Grok LLM semantic understanding")
-        logger.info(f"  Cost: ~$0.03 (5 inference algorithms)")
-        logger.info(f"  Processing time: ~15 seconds")
-        logger.info("=" * 80)
-        
-        return {
-            "status": "success",
-            "relationships_added": len(new_relationships),
-            "total_relationships_added": len(new_relationships),  # For background monitor compatibility
-            "method": "llm_powered",
-            "batches_processed": 5,
-            "estimated_cost_usd": 0.03
-        }
-        
-    except Exception as e:
-        logger.error(f"Error during LLM-powered post-processing: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
-        return {
-            "status": "error",
-            "error": str(e),
-            "method": "llm_powered"
-        }
 
 
 def create_insert_endpoint(app, rag_instance):

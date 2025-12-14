@@ -172,6 +172,15 @@ def setup_logging(
     processing_handler.addFilter(ProcessingFilter())
     root_logger.addHandler(processing_handler)
     
+    # CRITICAL: LightRAG's logger has propagate=False, so we must add our handler directly
+    # This captures "Chunk X of N extracted" messages from lightrag.operate (Branch 040 pattern)
+    lightrag_logger = logging.getLogger("lightrag")
+    lightrag_logger.addHandler(processing_handler)
+    
+    # Also capture raganything logs (multimodal processing)
+    raganything_logger = logging.getLogger("raganything")
+    raganything_logger.addHandler(processing_handler)
+    
     # ========================================================================
     # 2. SERVER.LOG - Server operations
     # ========================================================================

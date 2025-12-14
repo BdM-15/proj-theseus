@@ -18,6 +18,14 @@ EntityType = Literal[
     "strategic_theme", "statement_of_work", "performance_metric"
 ]
 
+# Set for fast validation lookups (Branch 040 pattern)
+VALID_ENTITY_TYPES = {
+    "organization", "concept", "event", "technology", "person", "location",
+    "requirement", "clause", "section", "document", "deliverable",
+    "evaluation_factor", "submission_instruction", "program", "equipment",
+    "strategic_theme", "statement_of_work", "performance_metric"
+}
+
 # ==========================================
 # Base Entity Model
 # ==========================================
@@ -26,7 +34,40 @@ class BaseEntity(BaseModel):
     entity_name: str = Field(..., description="The canonical name of the entity (Title Case).")
     entity_type: EntityType = Field(..., description="The strict entity type from the government contracting ontology.")
     description: str = Field(..., description="Comprehensive description including context, values, and relationships.")
-    source_text: Optional[str] = Field(None, description="The exact snippet from the source text that generated this entity.")
+
+    @model_validator(mode='before')
+    @classmethod
+    def validate_entity_type(cls, values):
+        """
+        Validate entity_type BEFORE Pydantic parsing.
+        
+        NOTE: This validator only runs for our Pydantic-based extraction (JsonExtractor).
+        It does NOT run for entities from LightRAG/RAG-Anything's native extraction.
+        
+        For invalid types:
+        - Logs a clear warning (helps identify prompt issues)
+        - Normalizes case (Organization → organization)
+        - Does NOT silently coerce - let post-processing handle legitimate type mapping
+        """
+        if isinstance(values, dict):
+            entity_type = values.get('entity_type', '')
+            if entity_type:
+                entity_type_lower = entity_type.lower()
+                
+                if entity_type_lower not in VALID_ENTITY_TYPES:
+                    entity_name = values.get('entity_name', 'unknown')
+                    # Log clearly - this helps identify prompt issues
+                    logger.warning(
+                        f"⚠️ Invalid entity_type '{entity_type}' for '{entity_name}' "
+                        f"(valid types: {', '.join(sorted(VALID_ENTITY_TYPES)[:5])}...)"
+                    )
+                    # For Pydantic extraction, use 'concept' as intelligent fallback
+                    # This is acceptable here because our prompts explicitly guide the LLM
+                    values['entity_type'] = 'concept'
+                elif entity_type != entity_type_lower:
+                    # Just normalize case
+                    values['entity_type'] = entity_type_lower
+        return values
 
     @model_validator(mode='after')
     def clean_entity_name(self):

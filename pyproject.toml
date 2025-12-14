@@ -18,6 +18,9 @@ dependencies = [
     
     # Cloud LLM access (xAI Grok via OpenAI-compatible API)
     "openai>=1.0.0",
+
+    # xAI SDK for native Grok integration (updated to 1.5.0)
+    "xai-sdk>=1.5.0",
     
     # Server framework
     "fastapi>=0.118.0",
