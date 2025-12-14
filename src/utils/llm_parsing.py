@@ -42,71 +42,64 @@ def clean_markdown_code_blocks(response: str) -> str:
 
 def _repair_truncated_json_array(text: str) -> Optional[List]:
     """
-    Attempt to repair a truncated JSON array by extracting complete objects.
-    
-    LLM output often gets truncated mid-array. This function:
-    1. Finds each complete {...} object using brace counting
-    2. Handles arbitrarily nested objects (unlike regex)
-    3. Returns list of successfully parsed objects
-    
-    Args:
-        text: Raw text containing JSON array (possibly truncated)
-    
-    Returns:
-        List of parsed dict objects, or None if nothing salvageable
+    Attempt to repair a truncated JSON array by extracting complete TOP-LEVEL objects.
+
+    We only want dicts that are direct children of the outer array. If we salvage nested
+    dicts (e.g., boe_relevance), downstream validation fails because entity_index is missing.
     """
-    salvaged = []
-    i = 0
-    
-    while i < len(text):
-        # Find the start of a JSON object
-        start = text.find('{', i)
-        if start == -1:
-            break
-        
-        # Use brace counting to find the complete object
-        brace_count = 0
-        in_string = False
-        escape_next = False
-        end = start
-        
-        for j in range(start, len(text)):
-            char = text[j]
-            
-            if escape_next:
-                escape_next = False
-                continue
-            
-            if char == '\\' and in_string:
-                escape_next = True
-                continue
-                
-            if char == '"' and not escape_next:
-                in_string = not in_string
-                continue
-            
-            if not in_string:
-                if char == '{':
-                    brace_count += 1
-                elif char == '}':
+    salvaged: List[Dict] = []
+
+    s = text.strip()
+    if not s.startswith("["):
+        return None
+
+    in_string = False
+    escape_next = False
+    array_depth = 0
+    brace_count = 0
+    start: Optional[int] = None
+
+    for i, char in enumerate(s):
+        if escape_next:
+            escape_next = False
+            continue
+
+        if char == "\\" and in_string:
+            escape_next = True
+            continue
+
+        if char == '"' and not escape_next:
+            in_string = not in_string
+            continue
+
+        if in_string:
+            continue
+
+        if char == "[":
+            array_depth += 1
+            continue
+        if char == "]":
+            array_depth = max(array_depth - 1, 0)
+            continue
+
+        if array_depth == 1:
+            if char == "{":
+                if brace_count == 0:
+                    start = i
+                brace_count += 1
+            elif char == "}":
+                if brace_count > 0:
                     brace_count -= 1
-                    if brace_count == 0:
-                        end = j
-                        break
-        
-        # If we found a complete object (braces balanced)
-        if brace_count == 0 and end > start:
-            obj_text = text[start:end + 1]
-            try:
-                obj = json.loads(obj_text)
-                salvaged.append(obj)
-            except json.JSONDecodeError:
-                pass  # Skip malformed objects
-            i = end + 1
-        else:
-            # Incomplete object, move past this opening brace
-            i = start + 1
-    
+                    if brace_count == 0 and start is not None:
+                        obj_text = s[start : i + 1]
+                        try:
+                            obj = json.loads(obj_text)
+                            if isinstance(obj, dict):
+                                salvaged.append(obj)
+                        except json.JSONDecodeError:
+                            pass
+                        start = None
+
     return salvaged if salvaged else None
 
 
