@@ -61,7 +61,7 @@ def configure_raganything_args():
     
     # LLM Configuration - xAI Grok
     global_args.llm_binding = "openai"
-    global_args.llm_model_name = os.getenv("LLM_MODEL", "grok-4-1-fast-reasoning")
+    global_args.llm_model_name = os.getenv("LLM_MODEL", "grok-4-fast-reasoning")
     global_args.llm_binding_host = xai_base_url
     global_args.llm_api_key = xai_api_key
     

@@ -1,7 +1,7 @@
 # Entity Extraction Prompt
 
 **Purpose**: Extract government contracting entities and relationships from RFP documents  
-**Model**: xAI Grok-4-1-fast-non-reasoning (2M context window, optimized for structured extraction)  
+**Model**: xAI Grok-4-fast-reasoning (2M context window, optimized for structured extraction)  
 **Prompt Size**: ~5,593 tokens (0.28% of context window)  
 **Entity Types**: 18 specialized government contracting types  
 **Enhancements**:
