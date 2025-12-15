@@ -73,7 +73,7 @@ Extract strategic themes when you see customer priorities or emphasis:
 You are not just summarizing text; you are building a database.
 
 - **Precision**: If a requirement says "shall", it is MANDATORY. If it says "should", it is IMPORTANT.
-- **Completeness**: Extract every single requirement, deliverable, and evaluation factor.
+- **Selectivity**: Extract KEY requirements, deliverables, and evaluation factors. Focus on actionable items, not every minor detail.
 - **Normalization**: Standardize names (e.g., "FAR 52.212-1" not "far clause 52.212.1").
 - **EFFICIENT EXTRACTION**: Focus on identifying entities and their metadata. The knowledge graph is an INDEX pointing to chunks that already contain the verbatim text.
 

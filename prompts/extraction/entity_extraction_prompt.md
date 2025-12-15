@@ -27,14 +27,14 @@ The description is essential for knowledge graph retrieval quality. Include:
 - **Key details**: Quantities, frequencies, constraints, relationships to other entities
 - **Domain context**: FAR/DFARS implications, UCF section relevance
 
-**Keep descriptions concise but informative** (50-200 words typical):
+**Keep descriptions concise** (20-50 words typical - LightRAG summarizes verbose descriptions anyway):
 - `entity_name` (required)
 - `entity_type` (required)
-- `description` (required) - Comprehensive semantic context for retrieval
+- `description` (required) - Brief context for semantic search and query LLM
 - Type-specific metadata fields (modal_verb, weight, frequency, etc.)
 
-**Good description example**:
-> "24/7 Help Desk support requirement from PWS Section 3.2.1. Contractor shall provide Tier 1 and Tier 2 technical support with 15-minute response SLA. Relates to Performance Metric PM-3 (Response Time). Critical for Task Order 0001 staffing."
+**Good description example** (35 words):
+> "24/7 Help Desk support requirement from PWS Section 3.2.1. Contractor shall provide Tier 1/2 support with 15-min response SLA. Relates to PM-3 Response Time metric."
 
 **Bad description** (too short, no context):
 > "Help desk support"
@@ -2602,7 +2602,7 @@ For each SOW section topic, map to corresponding evaluation factor:
 
 Algorithm: Extract section number from requirement source, map section to factor by topic
 
-      - `entity_description`: Provide a concise yet comprehensive description of the entity's attributes and activities, based _solely_ on the information present in the input text.
+      - `entity_description`: Provide a concise description (20-50 words) of the entity's key attributes, based _solely_ on the information present in the input text.
 
     - **Output Format - Entities:**
 
@@ -2637,7 +2637,7 @@ Algorithm: Extract section number from requirement source, map section to factor
     {
       "entity_name": "Canonical Name",
       "entity_type": "organization",  // or concept, event, etc.
-      "description": "Comprehensive description."
+      "description": "Brief description identifying the entity and its role (20-50 words)."
     }
     ```
 
