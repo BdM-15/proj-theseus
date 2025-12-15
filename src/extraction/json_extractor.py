@@ -194,8 +194,7 @@ Output the result strictly as a JSON object matching the schema defined in the f
                 logger,
                 "Entity extraction",
                 e,
-                context=f"[{chunk_id}] after {self.max_retries} retries",
-                failure_rate=f"{failure_rate:.1f}%"
+                context=f"[{chunk_id}] after {self.max_retries} retries (failure rate: {failure_rate:.1f}%)"
             )
 
             # Return empty result - ONLY after all retries exhausted

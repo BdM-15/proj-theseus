@@ -34,6 +34,7 @@ from src.inference.schema_prompts import (
     get_evaluation_hierarchy_guidance,
     get_document_hierarchy_guidance
 )
+from src.inference.algorithms import run_all_algorithms_parallel
 from src.ontology.schema import VALID_ENTITY_TYPES, InferredRelationship, InferredRelationshipBatch
 from src.utils.llm_client import call_llm_async
 from src.utils.llm_parsing import extract_json_from_response, parse_with_pydantic
