@@ -32,13 +32,19 @@ async def algo_8_orphan_resolution(
     orphans = []
     try:
         if neo4j_io:
-            # Use the proper Neo4jGraphIO method
-            orphan_ids = neo4j_io.get_orphaned_entity_ids()
+            # Get orphan entity names from Neo4j
+            orphan_names = neo4j_io.get_orphaned_entity_ids()
             
-            # Build orphan list from id_to_entity lookup
-            for orphan_id in orphan_ids[:50]:  # Limit to 50 for LLM context
-                if orphan_id in id_to_entity:
-                    orphans.append(id_to_entity[orphan_id])
+            # Build name→entity lookup for matching
+            name_to_entity = {e.get('entity_name', ''): e for e in entities}
+            
+            # Build orphan list from name lookup (limited to 50 for LLM context)
+            for orphan_name in orphan_names[:50]:
+                if orphan_name in name_to_entity:
+                    orphans.append(name_to_entity[orphan_name])
+                    
+            if orphan_names and not orphans:
+                logger.warning(f"    Found {len(orphan_names)} orphans in Neo4j but none matched in-memory entities")
     except Exception as e:
         logger.warning(f"    Could not query orphans: {e}")
     
