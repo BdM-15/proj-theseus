@@ -7,8 +7,11 @@ This adapter intercepts entity extraction LLM calls and:
 3. Converts to pipe-delimited format for LightRAG's parser
 4. Returns clean, validated data that LightRAG accepts
 
-NO FALLBACK: If Pydantic validation fails, the chunk is skipped.
-We either get validated data or nothing - no half measures.
+FALLBACK STRATEGY (Issue #52 - Branch 040 parity):
+If Pydantic validation fails after all retries, FALL BACK to LightRAG's native
+extraction rather than skipping the chunk entirely. Branch 040 had this fallback
+and achieved 100% success rate. Losing entity-dense chunks is worse than getting
+unvalidated extraction from LightRAG's native parser.
 
 The pipe-delimiter is just a transport format - all actual validation happens via Pydantic.
 """
@@ -135,9 +138,8 @@ class LightRAGExtractionAdapter:
             text_content = self._extract_text_content(system_prompt)
             
             if not text_content or len(text_content.strip()) < 50:
-                logger.warning(f"[{chunk_id}] Text content too short or empty - skipping chunk")
-                self._pydantic_failed += 1
-                return self._empty_result()
+                logger.warning(f"[{chunk_id}] Text content too short or empty - using LightRAG fallback")
+                return await self._fallback_to_base(prompt, system_prompt, chunk_id, **kwargs)
             
             # Use JsonExtractor for Pydantic-validated extraction
             logger.info(f"🎯 [{chunk_id}] Using Pydantic extraction ({len(text_content)} chars)")
@@ -145,9 +147,10 @@ class LightRAGExtractionAdapter:
             
             # Check if we got meaningful results
             if not result.entities:
-                logger.warning(f"[{chunk_id}] Pydantic extraction returned 0 entities - skipping chunk")
-                self._pydantic_failed += 1
-                return self._empty_result()
+                # Issue #52 fix: FALLBACK to LightRAG native extraction instead of skipping
+                # Branch 040 had this fallback and achieved 100% success rate
+                logger.warning(f"[{chunk_id}] Pydantic extraction returned 0 entities - using LightRAG fallback")
+                return await self._fallback_to_base(prompt, system_prompt, chunk_id, **kwargs)
             
             # Convert validated result to pipe-delimited format
             pipe_output = self._convert_to_pipe_format(result, chunk_id)
@@ -161,12 +164,35 @@ class LightRAGExtractionAdapter:
             return pipe_output
             
         except Exception as e:
-            logger.error(f"❌ [{chunk_id}] Pydantic extraction FAILED ({type(e).__name__}): {str(e)[:200]}")
-            self._pydantic_failed += 1
-            return self._empty_result()
+            # Issue #52 fix: FALLBACK instead of skipping entirely
+            logger.warning(f"⚠️ [{chunk_id}] Pydantic extraction failed ({type(e).__name__}), using LightRAG fallback: {str(e)[:100]}")
+            return await self._fallback_to_base(prompt, system_prompt, chunk_id, **kwargs)
+    
+    async def _fallback_to_base(
+        self,
+        prompt: str,
+        system_prompt: str,
+        chunk_id: str,
+        **kwargs
+    ) -> str:
+        """
+        Fallback to LightRAG's native extraction on Pydantic failure.
+        
+        Issue #52: Branch 040 had this fallback and achieved 100% success rate.
+        Losing entity-dense chunks (like chunk-9, chunk-18) is worse than getting
+        unvalidated extraction from LightRAG's native parser.
+        """
+        self._pydantic_failed += 1
+        logger.info(f"🔄 [{chunk_id}] Falling back to LightRAG native extraction")
+        return await self.base_llm_func(
+            prompt,
+            system_prompt=system_prompt,
+            history_messages=[],
+            **kwargs
+        )
     
     def _empty_result(self) -> str:
-        """Return empty result in LightRAG's expected format - no fallback, just skip."""
+        """Return empty result in LightRAG's expected format."""
         return COMPLETION_DELIMITER
     
     def _extract_text_content(self, system_prompt: str) -> Optional[str]:
