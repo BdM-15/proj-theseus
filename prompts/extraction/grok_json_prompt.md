@@ -79,7 +79,7 @@ You are not just summarizing text; you are building a database.
 
 ---
 
-## 2. Entity Type Definitions (The 17 Pillars)
+## 2. Entity Type Definitions (The 18 Pillars)
 
 You must classify every entity into exactly one of these types:
 

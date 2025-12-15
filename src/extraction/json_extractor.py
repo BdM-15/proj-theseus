@@ -223,8 +223,7 @@ Output the result strictly as a JSON object matching the schema defined in the f
                         {"role": "user", "content": text}
                     ],
                     temperature=0.1,
-                    max_tokens=self.max_output_tokens,
-                    stream=False  # Prevent EOF/truncation issues with xAI SDK (matches base_llm_model_func)
+                    max_tokens=self.max_output_tokens
                 )
 
                 return result

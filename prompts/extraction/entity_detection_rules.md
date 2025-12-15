@@ -1573,7 +1573,7 @@ Before finalizing entity extraction for a document chunk:
 ### 1. Required Field Validation
 
 - ✅ `entity_name`: Present and descriptive (not generic)
-- ✅ `entity_type`: Valid type from 17-type ontology
+- ✅ `entity_type`: Valid type from 18-type ontology
 - ✅ `section_origin`: Traceable location reference (optional)
 - ✅ Type-specific metadata: Appropriate fields for entity type (importance, criticality, etc.)
 

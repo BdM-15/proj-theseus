@@ -316,7 +316,7 @@ You are a Knowledge Graph Specialist responsible for extracting entities and rel
 
         1. **Entity types MUST be lowercase with underscores** (e.g., evaluation_factor, statement_of_work)
 
-        2. **You MUST use EXACTLY ONE of these 17 types for EVERY entity - NO EXCEPTIONS:**
+        2. **You MUST use EXACTLY ONE of these 18 types for EVERY entity - NO EXCEPTIONS:**
            • organization
            • concept
            • event
@@ -3290,7 +3290,7 @@ MinerU now converts tables to structured text, making relationship extraction fr
 
 **FINAL REMINDER - ENTITY TYPE COMPLIANCE:**
 
-Before outputting, verify EVERY entity uses one of the 17 ALLOWED types:
+Before outputting, verify EVERY entity uses one of the 18 ALLOWED types:
 ✅ organization, concept, event, technology, person, location, requirement, clause, section, document, deliverable, program, equipment, evaluation_factor, submission_instruction, strategic_theme, statement_of_work, performance_metric
 
 ❌ NEVER output: other, UNKNOWN, process, table, plan, policy, standard, system, regulation, framework
