@@ -233,8 +233,10 @@ Output the result strictly as a JSON object matching the schema defined in the f
                 logger.warning(f"⚠️ [{chunk_id}] Attempt {attempt}/{max_attempts} failed: {type(e).__name__}: {str(e)[:200]}")
 
                 if attempt < max_attempts:
-                    # Exponential backoff: 5s, 15s, 45s, 135s
-                    delay = 5 * (3 ** (attempt - 1))
+                    # Shorter exponential backoff to stay under LightRAG's 360s worker timeout
+                    # Old: 5, 15, 45, 135 = 200s total delays (caused worker timeouts)
+                    # New: 2, 4, 8, 16 = 30s total delays
+                    delay = 2 * (2 ** (attempt - 1))
                     logger.info(f"⏳ [{chunk_id}] Retrying in {delay} seconds...")
                     await asyncio.sleep(delay)
 
