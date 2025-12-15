@@ -21,32 +21,33 @@ Usage:
 
 import logging
 import time
+import os
+import re
 import asyncio
 import json
-import re
 from typing import Dict, Callable, Awaitable, List
-from pathlib import Path
-import os
-
 from pydantic import ValidationError
 
-from src.inference.graph_io import parse_graphml, save_enhanced_graphml
 from src.inference.neo4j_graph_io import Neo4jGraphIO, group_entities_by_type
-from src.inference.entity_operations import ALLOWED_TYPES, FORBIDDEN_TYPES
-from src.inference.algorithms import run_all_algorithms_parallel
+from src.inference.schema_prompts import (
+    get_instruction_evaluation_guidance,
+    get_evaluation_hierarchy_guidance,
+    get_document_hierarchy_guidance
+)
 from src.ontology.schema import VALID_ENTITY_TYPES, InferredRelationship, InferredRelationshipBatch
 from src.utils.llm_client import call_llm_async
-from src.utils.llm_parsing import extract_json_from_response
+from src.utils.llm_parsing import extract_json_from_response, parse_with_pydantic
 
 logger = logging.getLogger(__name__)
 
-# Parallelization config from environment (Branch 040 pattern)
-MAX_CONCURRENT_LLM_CALLS = int(os.getenv("MAX_ASYNC", "8"))
+# Convert set to list for prompt generation
+ALLOWED_TYPES = list(VALID_ENTITY_TYPES)
 
-# Batching config for Algorithms 3 & 4 (Issue #30 optimization)
-BATCH_SIZE_ALGO3 = int(os.getenv("BATCH_SIZE_ALGORITHM_3", "100"))
-BATCH_OVERLAP_ALGO3 = int(os.getenv("BATCH_OVERLAP_ALGORITHM_3", "20"))
-BATCH_SIZE_ALGO4 = int(os.getenv("BATCH_SIZE_ALGORITHM_4", "50"))
+# Configuration for semantic post-processing optimization (Issue #30)
+MAX_CONCURRENT_LLM_CALLS = int(os.getenv("MAX_ASYNC", "8"))
+BATCH_SIZE_ALGO3 = int(os.getenv("BATCH_SIZE_ALGORITHM_3", 100))
+BATCH_OVERLAP_ALGO3 = int(os.getenv("BATCH_OVERLAP_ALGORITHM_3", 20))
+BATCH_SIZE_ALGO4 = int(os.getenv("BATCH_SIZE_ALGORITHM_4", 50))
 
 
 def _heuristic_table_type_mapping(entity: Dict) -> str:
@@ -564,7 +565,8 @@ If no relationships found, return []."""
 
 async def _semantic_post_processor_neo4j(
     llm_model_name: str = None,
-    temperature: float = 0.1
+    temperature: float = 0.1,
+    rag_storage_path: str = "./rag_storage",
 ) -> Dict:
     """
     Neo4j-native semantic post-processing using Cypher queries.
@@ -790,110 +792,38 @@ async def enhance_knowledge_graph(
     batch_size: int = 50
 ) -> Dict:
     """
-    Run all semantic post-processing on extracted knowledge graph.
+    Run semantic post-processing on extracted knowledge graph (Neo4j).
     
     Steps:
-    1. Load entities/relationships from GraphML
-    2. Correct entity types (UNKNOWN -> proper types)
-    3. Infer missing relationships (semantic understanding)
-    4. Save enhanced graph back to GraphML
+    1. Load entities/relationships from Neo4j
+    2. Infer missing relationships (8 algorithms)
+    3. Enrich requirements with workload metadata
+    4. Write updates back to Neo4j
+    
+    Note: Entity type enforcement is handled at extraction time via Pydantic
+    schema validation - no post-processing correction needed.
     
     Args:
-        rag_storage_path: Path to rag_storage directory (e.g., "./rag_storage")
-        llm_func: Async LLM function for semantic operations
+        rag_storage_path: Path to rag_storage directory (unused - kept for API compatibility)
+        llm_func: Async LLM function (unused - we use centralized call_llm_async)
         batch_size: Batch size for LLM calls (default: 50)
     
     Returns:
         Stats dict with:
-        - entities_corrected: Number of entities retyped
         - relationships_inferred: Number of new relationships
+        - requirements_enriched: Number of requirements with BOE metadata
         - processing_time: Total time in seconds
     """
     logger.info("=" * 80)
-    logger.info("🧠 SEMANTIC POST-PROCESSING: LLM-Powered Graph Enhancement")
+    logger.info("🧠 SEMANTIC POST-PROCESSING: LLM-Powered Graph Enhancement (Neo4j)")
     logger.info("=" * 80)
     
-    # Check if Neo4j storage is enabled - use Cypher-based processing
-    import os
-    if os.getenv("GRAPH_STORAGE") == "Neo4JStorage":
-        logger.info("\n  📊 Neo4j storage detected - using Cypher-based semantic enhancement")
-        # Get LLM model from environment
-        llm_model = os.getenv("LLM_MODEL", "grok-4-fast-reasoning")
-        llm_temp = float(os.getenv("LLM_MODEL_TEMPERATURE", "0.1"))
-        return await _semantic_post_processor_neo4j(
-            llm_model_name=llm_model,
-            temperature=llm_temp
-        )
+    # Get LLM model from environment
+    llm_model = os.getenv("LLM_MODEL", "grok-4-fast-reasoning")
+    llm_temp = float(os.getenv("LLM_MODEL_TEMPERATURE", "0.1"))
     
-    import time
-    start_time = time.time()
-    
-    # Construct GraphML path from rag_storage_path
-    graphml_path = Path(rag_storage_path) / "default" / "graph_chunk_entity_relation.graphml"
-    
-    # Step 1: Load graph
-    logger.info("\n  [1/3] Loading knowledge graph from GraphML...")
-    nodes, edges = parse_graphml(graphml_path)
-    logger.info(f"    ✅ Loaded {len(nodes)} entities, {len(edges)} relationships")
-    
-    if not nodes:
-        logger.warning("    ⚠️  No entities found - skipping post-processing")
-        return {
-            "status": "skipped",
-            "reason": "no_entities",
-            "entities_corrected": 0,
-            "relationships_inferred": 0,
-            "processing_time": 0
-        }
-    
-    # Step 2: Entity Type Correction
-    logger.info("\n  [2/3] Entity Type Correction...")
-    from src.inference.entity_operations import correct_entity_types
-    
-    nodes, corrections = await correct_entity_types(
-        entities=nodes,
-        llm_func=llm_func,
-        batch_size=batch_size
+    return await _semantic_post_processor_neo4j(
+        llm_model_name=llm_model,
+        temperature=llm_temp,
+        rag_storage_path=rag_storage_path,
     )
-    
-    logger.info(f"    ✅ Corrected {len(corrections)} entity types")
-    
-    # Save corrected entities immediately
-    if corrections:
-        save_enhanced_graphml(graphml_path, nodes, edges)
-        logger.info(f"    ✅ Saved corrected entities to GraphML")
-    
-    # Step 3: Relationship Inference
-    logger.info("\n  [3/3] Relationship Inference...")
-    from src.inference.relationship_operations import infer_relationships
-    
-    new_relationships = await infer_relationships(
-        entities=nodes,
-        existing_relationships=edges,
-        llm_func=llm_func,
-        batch_size=batch_size
-    )
-    
-    logger.info(f"    ✅ Inferred {len(new_relationships)} new relationships")
-    
-    # Save enhanced graph
-    if new_relationships:
-        edges.extend(new_relationships)
-        save_enhanced_graphml(graphml_path, nodes, edges)
-        logger.info(f"    ✅ Saved enhanced graph to GraphML")
-    
-    # Summary
-    elapsed = time.time() - start_time
-    logger.info("\n" + "=" * 80)
-    logger.info("✅ SEMANTIC POST-PROCESSING COMPLETE")
-    logger.info(f"   Entities corrected: {len(corrections)}")
-    logger.info(f"   Relationships inferred: {len(new_relationships)}")
-    logger.info(f"   Processing time: {elapsed:.1f}s")
-    logger.info("=" * 80)
-    
-    return {
-        "status": "success",
-        "entities_corrected": len(corrections),
-        "relationships_inferred": len(new_relationships),
-        "processing_time": elapsed
-    }
