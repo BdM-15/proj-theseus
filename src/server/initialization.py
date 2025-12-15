@@ -93,7 +93,7 @@ async def initialize_raganything():
         enable_equation_processing=enable_equation,
     )
     
-    # Define BASE LLM function (xAI Grok wrapper) - Branch 040 xAI SDK integration with stream=False fix
+    # Define BASE LLM function (xAI Grok wrapper) - Branch 040 pattern (no stream override)
     async def base_llm_model_func(prompt, system_prompt=None, history_messages=[], **kwargs):
         return await openai_complete_if_cache(
             os.getenv("LLM_MODEL", "grok-4-fast-reasoning"),
@@ -102,7 +102,6 @@ async def initialize_raganything():
             history_messages=history_messages,
             api_key=xai_api_key,
             base_url=xai_base_url,
-            stream=False,  # Branch 040 fix: Prevent EOF/truncation issues with xAI SDK
             **kwargs,
         )
     
@@ -126,7 +125,7 @@ async def initialize_raganything():
         if messages:
             return await openai_complete_if_cache(
                 os.getenv("LLM_MODEL", "grok-4-fast-reasoning"), "", system_prompt=None, history_messages=[],
-                messages=messages, api_key=xai_api_key, base_url=xai_base_url, stream=False, **kwargs
+                messages=messages, api_key=xai_api_key, base_url=xai_base_url, **kwargs
             )
         elif image_data:
             messages = [
@@ -143,7 +142,7 @@ async def initialize_raganything():
             return await openai_complete_if_cache(
                 os.getenv("LLM_MODEL", "grok-4-fast-reasoning"), "", system_prompt=None, history_messages=[],
                 messages=messages,
-                api_key=xai_api_key, base_url=xai_base_url, stream=False, **kwargs
+                api_key=xai_api_key, base_url=xai_base_url, **kwargs
             )
         else:
             # Use base function for vision (not extraction adapter)
