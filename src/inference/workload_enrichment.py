@@ -239,10 +239,23 @@ Return JSON array with {len(batch)} objects (one per requirement above):
 ]
 """
             
-            # Call LLM (Branch 040 behavior: no max_tokens)
+            # Call LLM with retry for truncated responses (Issue #52 fix)
             batch_enriched = 0
             try:
-                response = await llm_func(prompt, model=model, temperature=temperature)
+                # Retry up to 2 times if we get suspiciously short responses
+                max_retries = 2
+                for attempt in range(max_retries + 1):
+                    response = await llm_func(prompt, model=model, temperature=temperature)
+                    
+                    # Check for truncated response (xAI API sometimes returns partial responses)
+                    if response and len(response) >= 500:  # Valid response should be at least 500 chars for 50 items
+                        break
+                    
+                    if attempt < max_retries:
+                        logger.warning(f"  Batch {batch_num}: Short response ({len(response) if response else 0} chars), retrying ({attempt + 1}/{max_retries})...")
+                        await asyncio.sleep(2)  # Brief delay before retry
+                    else:
+                        logger.warning(f"  Batch {batch_num}: Still short after {max_retries} retries ({len(response) if response else 0} chars)")
                 
                 # Parse JSON response using centralized utility (Branch 040 approach)
                 raw_data = extract_json_from_response(response)
