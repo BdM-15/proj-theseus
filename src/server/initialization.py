@@ -22,9 +22,8 @@ from lightrag.llm.openai import openai_complete_if_cache, openai_embed
 from lightrag.utils import EmbeddingFunc
 from raganything import RAGAnything, RAGAnythingConfig
 
-from src.core.prompt_loader import load_prompt
+# V3 unified prompt loaded directly from file - no prompt_loader needed
 from src.ontology.schema import VALID_ENTITY_TYPES
-from src.extraction.lightrag_llm_adapter import create_extraction_adapter
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +61,7 @@ async def initialize_raganything():
     # Government contracting entity types - SINGLE SOURCE OF TRUTH from schema.py
     # This ensures consistency between:
     # - LightRAG/RAG-Anything extraction (this list)
-    # - Pydantic validation (schema.py EntityType)
+    # - Semantic post-processing validation (schema.py InferredRelationship)
     # - Post-processing (schema.py VALID_ENTITY_TYPES)
     entity_types = list(VALID_ENTITY_TYPES)
     logger.info(f"📋 Loaded {len(entity_types)} entity types from schema.py")
@@ -84,6 +83,10 @@ async def initialize_raganything():
     # are automatically inherited by MinerU subprocess from os.environ after dotenv loads .env
     
     # Create RAG-Anything configuration (does NOT accept device parameter)
+    # Context extraction settings: Disabled for multimodal to prevent JSON truncation
+    # - Tables are self-contained (don't need surrounding text)
+    # - Text chunks already have 15% overlap for context
+    # - Reduces token overhead: ~2K tokens/chunk → prevents extraction truncation
     config = RAGAnythingConfig(
         working_dir=working_dir,
         parser=parser,
@@ -91,12 +94,66 @@ async def initialize_raganything():
         enable_image_processing=enable_image,
         enable_table_processing=enable_table,
         enable_equation_processing=enable_equation,
+        # Context extraction configuration (RAG-Anything defaults add 2K tokens per chunk)
+        context_window=0,                    # Disable context for multimodal (tables are self-contained)
+        max_context_tokens=0,                # No context tokens
+        include_headers=False,               # Don't include document headers
+        include_captions=True,               # Keep captions (minimal overhead, high value)
+        context_filter_content_types=["text"],  # Only text content (not used with context_window=0)
     )
+    logger.info("✅ RAG-Anything context extraction: DISABLED (prevents multimodal JSON truncation)")
+    logger.info(f"   - context_window: 0 (tables are self-contained)")
+    logger.info(f"   - max_context_tokens: 0 (no surrounding text added)")
+    logger.info(f"   - Text chunks use 15% overlap for context (no RAG-Anything context needed)")
     
-    # Define BASE LLM function (xAI Grok wrapper) - Branch 040 pattern (no stream override)
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # DUAL-MODEL LLM ROUTING (Extraction vs Query)
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # LightRAG recommends non-reasoning models for extraction because:
+    # - Extraction needs literal format compliance (exact delimiters)
+    # - Reasoning models "over-interpret" → entity names become sentences
+    # - Hallucination rate: 12% (reasoning) vs 4% (non-reasoning)
+    #
+    # Query needs reasoning models because:
+    # - Users ask nuanced questions requiring synthesis
+    # - Need to draw conclusions from knowledge graph
+    # - Provide contextual explanations
+    #
+    # Detection: Extraction prompts contain "tuple_delimiter" or entity extraction markers
+    # ═══════════════════════════════════════════════════════════════════════════════
+    
+    # Model configuration from environment
+    extraction_model = os.getenv("EXTRACTION_LLM_NAME", "grok-4-1-fast-non-reasoning")
+    reasoning_model = os.getenv("REASONING_LLM_NAME", "grok-4-fast-reasoning")
+    
+    # Extraction detection markers (from LightRAG prompts)
+    EXTRACTION_MARKERS = [
+        "tuple_delimiter",           # Core extraction delimiter
+        "entity_types",              # Entity type specification
+        "completion_delimiter",      # Extraction completion marker
+        "record_delimiter",          # Record separator
+        "-Real Data-",               # Extraction input marker
+        "extract entities",          # Direct extraction instruction
+    ]
+    
+    def is_extraction_task(prompt: str, system_prompt: str) -> bool:
+        """Detect if this is an extraction task vs query task"""
+        combined = f"{system_prompt or ''} {prompt or ''}".lower()
+        return any(marker.lower() in combined for marker in EXTRACTION_MARKERS)
+    
     async def base_llm_model_func(prompt, system_prompt=None, history_messages=[], **kwargs):
+        # Explicitly disable streaming if not already set
+        if 'stream' not in kwargs:
+            kwargs['stream'] = False
+        
+        # Route to appropriate model based on task type
+        if is_extraction_task(prompt, system_prompt):
+            model = extraction_model
+        else:
+            model = reasoning_model
+        
         return await openai_complete_if_cache(
-            os.getenv("LLM_MODEL", "grok-4-fast-reasoning"),
+            model,
             prompt,
             system_prompt=system_prompt,
             history_messages=history_messages,
@@ -106,25 +163,28 @@ async def initialize_raganything():
         )
     
     # ═══════════════════════════════════════════════════════════════════════════════
-    # Pydantic Extraction Adapter - NO FALLBACK
+    # Native LightRAG Extraction (Issue #54 - Back to Basics)
     # ═══════════════════════════════════════════════════════════════════════════════
-    # Wraps extraction calls to use our full 150KB ontology prompts + Pydantic validation.
-    # If validation fails, chunk is SKIPPED - no half measures.
-    use_pydantic_extraction = os.getenv("USE_PYDANTIC_EXTRACTION", "true").lower() == "true"
-    
-    if use_pydantic_extraction:
-        from src.extraction.lightrag_llm_adapter import create_extraction_adapter
-        llm_model_func = create_extraction_adapter(base_llm_model_func)
-        logger.info("✅ Pydantic extraction adapter ENABLED (validated data or skip)")
-    else:
-        llm_model_func = base_llm_model_func
-        logger.info("⚠️ Pydantic extraction adapter DISABLED")
+    # Using LightRAG's native tuple-delimited extraction format.
+    # Our GovCon ontology is injected via addon_params and PROMPTS override.
+    # No Pydantic validation layer - LightRAG handles extraction natively.
+    llm_model_func = base_llm_model_func
+    logger.info("✅ Using native LightRAG extraction (Issue #54 - Back to Basics)")
+    logger.info(f"✅ DUAL-MODEL routing enabled:")
+    logger.info(f"   Extraction: {extraction_model} (non-reasoning for literal format compliance)")
+    logger.info(f"   Query:      {reasoning_model} (reasoning for nuanced answers)")
     
     # Define vision function (multimodal Grok wrapper)
+    # CRITICAL: stream=False explicitly disables streaming for vision models too
+    # NOTE: Vision/multimodal processing is extraction (generating descriptions for tables/images)
+    #       so it uses the extraction model for literal format compliance
     async def vision_model_func(prompt, system_prompt=None, history_messages=[], image_data=None, messages=None, **kwargs):
+        # Explicitly disable streaming if not already set
+        if 'stream' not in kwargs:
+            kwargs['stream'] = False
         if messages:
             return await openai_complete_if_cache(
-                os.getenv("LLM_MODEL", "grok-4-fast-reasoning"), "", system_prompt=None, history_messages=[],
+                extraction_model, "", system_prompt=None, history_messages=[],
                 messages=messages, api_key=xai_api_key, base_url=xai_base_url, **kwargs
             )
         elif image_data:
@@ -140,12 +200,12 @@ async def initialize_raganything():
             if system_prompt:
                 messages.insert(0, {"role": "system", "content": system_prompt})
             return await openai_complete_if_cache(
-                os.getenv("LLM_MODEL", "grok-4-fast-reasoning"), "", system_prompt=None, history_messages=[],
+                extraction_model, "", system_prompt=None, history_messages=[],
                 messages=messages,
                 api_key=xai_api_key, base_url=xai_base_url, **kwargs
             )
         else:
-            # Use base function for vision (not extraction adapter)
+            # Use base function (which auto-routes based on task)
             return await base_llm_model_func(prompt, system_prompt, history_messages, **kwargs)
     
     # Define embedding function with safety truncation (8K chunks can slightly exceed 8192 due to overlap)
@@ -176,31 +236,38 @@ async def initialize_raganything():
         func=safe_embed_func,
     )
     
-    # Load entity extraction prompts with clear separation of concerns
-    # Branch 009: Quality-first refactoring (extraction excellence → query excellence)
-    # Philosophy: Thorough extraction enables powerful queries (2M context window)
-    # Folder structure: prompts/extraction/ (ingestion-time) vs prompts/query/ (query-time)
-    entity_extraction_prompts = [
-        load_prompt("extraction/entity_extraction_prompt"),      # ~1,450 lines - WHAT to extract (rules, types, examples)
-        load_prompt("extraction/entity_detection_rules"),        # ~1,155 lines - HOW to detect (semantic signals, UCF)
-    ]
-    custom_entity_extraction_prompt = "\n\n---\n\n".join(entity_extraction_prompts)
-
-    # Initialize RAG-Anything with custom configuration
-    # IMPORTANT: LightRAG reads chunk_token_size from environment at import time
-    # Don't override via lightrag_kwargs - let it use CHUNK_SIZE from .env
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Prompt Configuration (govcon_prompt.py architecture)
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # All prompts are now centralized in prompts/govcon_prompt.py:
+    # - entity_extraction_system_prompt: GovCon extraction instructions
+    # - entity_extraction_examples: 7 GovCon-specific examples (L↔M, requirements, clauses, etc.)
+    # - summarize_entity_descriptions: Preserve quantitative details
+    # - rag_response / naive_rag_response: Shipley lifecycle support
+    # - keywords_extraction: GovCon query understanding
+    # 
+    # Prompts are applied via PROMPTS.update(GOVCON_PROMPTS) after RAG-Anything init
+    # ═══════════════════════════════════════════════════════════════════════════════
     
-    # Build lightrag_kwargs with Neo4j configuration if enabled
+    # Build lightrag_kwargs with configuration
+    # LLM timeout configuration for complex chunks (360s default was insufficient for chunk 8)
+    llm_timeout = int(os.getenv("LLM_TIMEOUT", "600"))  # 10 minutes default (was 180s)
+    
     lightrag_kwargs = {
         "addon_params": {
             "entity_types": entity_types,
-            "entity_extraction_system_prompt": custom_entity_extraction_prompt,
-            # NOTE: entity_extraction_examples is handled at module load time via PROMPTS override
+            # NOTE: entity_extraction_system_prompt and examples are now handled via 
+            # PROMPTS.update(GOVCON_PROMPTS) after RAG-Anything initialization
+            "language": "English",
         },
         # Chunking configuration comes from environment variables:
         # - CHUNK_SIZE controls chunk_token_size (default: 8192)
         # - CHUNK_OVERLAP_SIZE controls chunk_overlap_token_size (default: 1200)
         # LightRAG reads these at dataclass field initialization time
+        
+        # LLM timeout: default 180s causes Worker timeout (2×=360s) failures on complex chunks
+        # Increased to 600s (10 min) to handle extraction from dense requirement tables
+        "default_llm_timeout": llm_timeout,
     }
     
     # Add Neo4j configuration if enabled (from config.py global_args setup)
@@ -209,26 +276,8 @@ async def initialize_raganything():
     if hasattr(global_args, 'graph_storage') and global_args.graph_storage == "Neo4JStorage":
         lightrag_kwargs["graph_storage"] = global_args.graph_storage
     
-    # ═══════════════════════════════════════════════════════════════════════════════
-    # Layer 2: Pydantic Extraction Adapter
-    # ═══════════════════════════════════════════════════════════════════════════════
-    # Wraps LLM function to intercept extraction calls and route through:
-    # - JsonExtractor (uses our full 150KB extraction prompt)
-    # - Pydantic validation (enforces schema)
-    # - Converts JSON → pipe-delimited format for LightRAG
-    #
-    # Falls back to Layer 1 (domain-enhanced LightRAG prompt) on failure
-    # ═══════════════════════════════════════════════════════════════════════════════
-    use_pydantic_extraction = os.getenv("USE_PYDANTIC_EXTRACTION", "true").lower() == "true"
-    
-    if use_pydantic_extraction:
-        llm_model_func_wrapped = create_extraction_adapter(llm_model_func)
-        logger.info("✅ Layer 2 ENABLED: Pydantic extraction adapter wrapping LLM function")
-        logger.info("   - Primary: Full 150KB prompts + Pydantic validation")
-        logger.info("   - Fallback: Layer 1 (domain-enhanced LightRAG prompt)")
-    else:
-        llm_model_func_wrapped = llm_model_func
-        logger.info("⚠️ Layer 2 DISABLED: Using Layer 1 only (USE_PYDANTIC_EXTRACTION=false)")
+    # LLM function ready for RAG-Anything (no adapter wrapping needed)
+    llm_model_func_wrapped = llm_model_func
     
     _rag_anything = RAGAnything(
         config=config,
@@ -248,89 +297,82 @@ async def initialize_raganything():
         raise RuntimeError(f"LightRAG initialization failed: {error_msg}")
     
     # ═══════════════════════════════════════════════════════════════════════════════
-    # CRITICAL: Override LightRAG's extraction prompt with our govcon domain knowledge
+    # Register GovconMultimodalProcessor for tables/images/equations
     # ═══════════════════════════════════════════════════════════════════════════════
-    # LightRAG ONLY uses addon_params for entity_types list and language.
-    # The extraction SYSTEM PROMPT always comes from PROMPTS["entity_extraction_system_prompt"].
-    # We must override this directly to inject our domain knowledge.
-    from lightrag.prompt import PROMPTS
+    # Issue #54 Architecture (Back to Basics - Native LightRAG):
+    # 
+    # MULTIMODAL Flow:
+    # 1. MinerU: Parses table images → textualized HTML (table_body)
+    # 2. GovconProcessor: Generates govcon-focused text description
+    # 3. LightRAG: Native tuple-delimited extraction
+    # 
+    # TEXT Flow:
+    # 1. RAG-Anything: Chunks text content
+    # 2. LightRAG: Native extraction with our entity_types + injected domain knowledge
+    # 
+    # Key Points:
+    # - No Pydantic/JSON extraction layer
+    # - Native LightRAG tuple-delimited format: entity<|#|>name<|#|>type<|#|>desc
+    # - Our ontology injected via PROMPTS["entity_extraction_system_prompt"]
+    # ═══════════════════════════════════════════════════════════════════════════════
+    from src.processors import GovconMultimodalProcessor
     
-    # Disable fictional examples that contaminate our ontology
-    PROMPTS["entity_extraction_examples"] = []
-    logger.info("✅ Disabled LightRAG's fictional example entities")
-    
-    # Build a custom extraction prompt that:
-    # 1. Prepends our govcon domain knowledge (entity type definitions, detection rules)
-    # 2. Keeps LightRAG's required output format (pipe-delimited)
-    # 3. Preserves all required placeholders
-    
-    govcon_domain_knowledge = f"""---Government Contracting Domain Knowledge---
-
-You are extracting entities from US Government RFP (Request for Proposal) documents.
-
-**ENTITY TYPE DEFINITIONS (18 specialized types):**
-
-1. **requirement** - Contractual obligations with modal verbs (shall, must, will, should, may)
-   - CRITICAL: Extract ALL workload drivers: quantities, frequencies, volumes, service rates
-   - Example: "service rate of 3 customers per minute" → requirement with workload data
-   - Example: "100 times per year" → requirement with frequency data
-
-2. **deliverable** - Items contractor must provide (CDRLs, reports, plans, data items)
-   - Look for: DD Form 1423, CDRL references, submission requirements
-
-3. **evaluation_factor** - How proposals will be scored (Section M content)
-   - Look for: weights, points, importance levels, rating scales
-
-4. **submission_instruction** - How to format/submit proposals (Section L content)
-   - Look for: page limits, font requirements, volume structure
-
-5. **performance_metric** - Measurable standards (SLAs, KPIs, thresholds)
-   - Look for: percentages, time limits, error rates
-
-6. **clause** - FAR/DFARS regulatory citations
-   - Pattern: FAR 52.xxx, DFARS 252.xxx
-
-7. **section** - Document structural elements
-8. **document** - Referenced documents, attachments, annexes
-9. **organization** - Government agencies, contractors, entities
-10. **person** - Roles, positions, personnel categories
-11. **equipment** - Physical items, GFE/GFP, materials
-12. **program** - Major programs referenced
-13. **strategic_theme** - Win themes, discriminators, hot buttons
-14. **statement_of_work** - PWS/SOW/SOO content
-15. **technology** - Technical systems, software, platforms
-16. **concept** - General terms that don't fit other categories
-17. **event** - Meetings, milestones, deadlines
-18. **location** - Places, facilities, sites
-
-**WORKLOAD EXTRACTION RULES:**
-- ALWAYS extract numeric values: quantities, frequencies, volumes
-- ALWAYS extract service rates: "X per minute", "Y per hour"
-- ALWAYS extract time periods: operating hours, peak times
-- ALWAYS extract staffing indicators: personnel counts, shifts
-- Include these in the entity_description field
-
-**FALLBACK:** If an entity doesn't clearly fit the above types, use `concept`.
-
----End Domain Knowledge---
-
-"""
-    
-    # Get LightRAG's original prompt and prepend our domain knowledge
-    original_prompt = PROMPTS.get("entity_extraction_system_prompt", "")
-    
-    # Replace "Other" with "concept" for fallback
-    modified_prompt = original_prompt.replace(
-        "classify it as `Other`",
-        "classify it as `concept`"
+    govcon_processor = GovconMultimodalProcessor(
+        lightrag=_rag_anything.lightrag,
+        modal_caption_func=llm_model_func_wrapped,
+        context_extractor=getattr(_rag_anything, 'context_extractor', None)
     )
     
-    # Prepend our domain knowledge
-    PROMPTS["entity_extraction_system_prompt"] = govcon_domain_knowledge + modified_prompt
+    # Override RAG-Anything's default processors with our ontology-aware processor
+    _rag_anything.modal_processors["table"] = govcon_processor
+    _rag_anything.modal_processors["image"] = govcon_processor
+    _rag_anything.modal_processors["equation"] = govcon_processor
     
-    logger.info("✅ Injected govcon domain knowledge into LightRAG extraction prompt")
-    logger.info(f"   Original prompt: {len(original_prompt)} chars")
-    logger.info(f"   Enhanced prompt: {len(PROMPTS['entity_extraction_system_prompt'])} chars")
+    logger.info("✅ GovconMultimodalProcessor registered (Issue #54 - Native LightRAG)")
+    logger.info("   - MinerU: table images → textualized HTML")
+    logger.info("   - Processor: Generates govcon-focused text descriptions")
+    logger.info("   - LightRAG: Native tuple-delimited entity extraction")
+    
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # CRITICAL: REPLACE LightRAG's ENTIRE prompt system with GovCon versions
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # LightRAG uses multiple prompts that work together:
+    # - entity_extraction_system_prompt: Extract entities/relationships
+    # - entity_extraction_examples: GovCon-specific extraction examples
+    # - summarize_entity_descriptions: Merge duplicate entities
+    # - rag_response: Answer queries using KG + documents
+    # - naive_rag_response: Answer queries using documents only
+    # - keywords_extraction: Parse user queries for retrieval
+    # - fail_response: When no context found
+    # 
+    # ALL prompts are customized for government contracting / Shipley methodology
+    # ═══════════════════════════════════════════════════════════════════════════════
+    from lightrag.prompt import PROMPTS
+    
+    # Import comprehensive GovCon prompts (govcon_prompt.py - Issue #54 architecture)
+    # This module contains all LightRAG-compatible prompts with GovCon domain intelligence
+    from prompts.govcon_prompt import GOVCON_PROMPTS
+    
+    # FULL REPLACEMENT: Apply ALL GovCon prompt overrides
+    # This replaces: extraction prompts, examples, summarization, RAG responses, keywords, fail_response
+    PROMPTS.update(GOVCON_PROMPTS)
+    
+    # Log full domain intelligence stats
+    extraction_prompt = GOVCON_PROMPTS.get('entity_extraction_system_prompt', '')
+    extraction_chars = len(extraction_prompt)
+    extraction_lines = extraction_prompt.count('\n')
+    
+    logger.info("✅ REPLACED LightRAG prompt system with FULL GovCon domain intelligence")
+    logger.info(f"   Extraction prompt: {extraction_chars:,} chars (~{extraction_chars//4:,} tokens), {extraction_lines:,} lines")
+    logger.info(f"   Source: govcon_lightrag_native.txt (Parts A-L)")
+    logger.info(f"   Domain Intelligence:")
+    logger.info(f"     • 8 Shipley user personas (Capture, Proposal, Cost, Contracts, etc.)")
+    logger.info(f"     • 18 GovCon entity types with metadata requirements")
+    logger.info(f"     • 50+ relationship inference rules (L↔M, clause clustering, etc.)")
+    logger.info(f"     • 12 annotated RFP examples (requirements, clauses, CDRLs, etc.)")
+    logger.info(f"     • Quantitative preservation rules for BOE development")
+    logger.info(f"     • Decision tree for ambiguous cases")
+    logger.info(f"   Keywords examples: {len(GOVCON_PROMPTS.get('keywords_extraction_examples', []))} GovCon-specific")
     
     # ═══════════════════════════════════════════════════════════════════════════════
     # Startup Configuration Summary

@@ -5,10 +5,10 @@ Custom endpoints for RAG-Anything + LightRAG server:
 - /insert: Document upload with automatic semantic post-processing
 - /documents/upload: WebUI document upload (also triggers post-processing)
 
-Architecture (Branch 022b1 - Batch-Aware Auto-Enhancement):
+Architecture (Issue #54 - Back to Basics with Native LightRAG):
 1. Document Upload → process_document_with_semantic_inference()
 2. RAG-Anything Processing → MinerU multimodal parsing
-3. LightRAG Extraction → Entity/relationship extraction (17 types)
+3. Native LightRAG Extraction → Entity/relationship extraction (18 types)
 4. Queue Tracking → Detect when batch completes
 5. Auto-Enhancement → Semantic post-processing runs ONCE after last document
 6. Knowledge Graph Updated → Complete cross-document relationships
@@ -153,8 +153,8 @@ async def process_document_with_semantic_inference(
     
     Pipeline:
     1. RAG-Anything multimodal processing (MinerU parser)
-    2. LLM entity extraction (17 types with metadata)
-    3. LLM relationship inference (5 algorithms) - ALWAYS RUNS
+    2. Native LightRAG entity extraction (18 govcon types)
+    3. Semantic post-processing (relationship inference) - Auto-triggered on batch completion
     4. Save complete knowledge graph
     
     Args:
@@ -210,9 +210,10 @@ async def process_document_with_semantic_inference(
         # - RAG-Anything handles all multimodal processing internally
         # - LightRAG handles chunking, extraction, parallelization natively
         # ========================================================================
+        llm_timeout = int(os.getenv("LLM_TIMEOUT", "600"))
         logger.info("🚀 Using RAG-Anything native end-to-end pipeline (Branch 039/040 approach)")
         logger.info("   Ontology: 18 govcon entity types injected via addon_params")
-        logger.info("   Parallelization: Native LightRAG (llm_model_max_async from config)")
+        logger.info(f"   Parallelization: 16 workers, {llm_timeout}s LLM timeout")
         
         # Get workspace from environment
         workspace = os.getenv("WORKSPACE", "default")

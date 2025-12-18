@@ -12,8 +12,10 @@ Implements core algorithms for government contracting RFPs:
 6. Orphan Resolution: Unconnected entities → related entities
 7. PWS Workload Enrichment: BOE metadata extraction for requirements
 
-Entity type enforcement is handled at extraction time via Pydantic schema validation
-in src/ontology/schema.py - no post-processing correction needed.
+Architecture (Issue #54 - Back to Basics):
+- Entity extraction uses native LightRAG with 18 govcon types
+- Post-processing uses Pydantic for relationship validation (InferredRelationship)
+- No LLM-based entity type correction needed - native extraction handles it
 
 Usage:
     from src.inference.semantic_post_processor import enhance_knowledge_graph

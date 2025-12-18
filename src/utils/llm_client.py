@@ -45,7 +45,7 @@ async def call_llm_async(
     Uses environment variables for configuration (Branch 040 pattern):
     - LLM_BINDING_API_KEY: API key
     - LLM_BINDING_HOST: API endpoint (default: https://api.x.ai/v1)
-    - LLM_MODEL: Model name (default: grok-4-fast-reasoning)
+    - REASONING_LLM_NAME: Model name for inference tasks (default: grok-4-fast-reasoning)
     
     Args:
         prompt: User prompt text
@@ -59,7 +59,8 @@ async def call_llm_async(
         LLM response text
     """
     if model is None:
-        model = os.getenv("LLM_MODEL", "grok-4-fast-reasoning")
+        # Default to reasoning model for inference/post-processing tasks
+        model = os.getenv("REASONING_LLM_NAME", "grok-4-fast-reasoning")
     
     # Create AsyncOpenAI client with xAI endpoint (env vars, no hardcoding)
     client = AsyncOpenAI(
@@ -153,8 +154,8 @@ def get_llm_config() -> Dict[str, Any]:
     Useful for logging configuration at startup.
     """
     return {
-        "model": os.getenv("LLM_MODEL", "grok-4-fast-reasoning"),
-        "extraction_model": os.getenv("EXTRACTION_LLM_NAME", "grok-4-fast-reasoning"),
+        "model": os.getenv("REASONING_LLM_NAME", "grok-4-fast-reasoning"),
+        "extraction_model": os.getenv("EXTRACTION_LLM_NAME", "grok-4-1-fast-non-reasoning"),
         "api_host": os.getenv("LLM_BINDING_HOST", "https://api.x.ai/v1"),
         "api_key_set": bool(os.getenv("LLM_BINDING_API_KEY")),
         "max_async": int(os.getenv("MAX_ASYNC", "8")),

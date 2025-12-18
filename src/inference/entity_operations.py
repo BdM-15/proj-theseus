@@ -6,11 +6,12 @@ Purpose: Eliminate UNKNOWN/forbidden entity types using LLM retyping
 Context: LLM extraction may produce non-standard entity types
 Solution: Post-process extracted entities with strict type enforcement
 
-Architecture:
+Architecture (Issue #54 - Back to Basics):
 - Runs BEFORE relationship inference (clean entities → better relationships)
 - Uses unified BatchProcessor for efficient batching
-- Simple prompt: "Retype these entities using ONLY these 17 types"
+- Simple prompt: "Retype these entities using ONLY these 18 govcon types"
 - Cost: ~$0.005-0.01 per RFP (200 entities × 100 tokens = ~20K tokens)
+- Note: Native LightRAG extraction reduces need for type correction
 
 Integration: Called from semantic_post_processor.enhance_knowledge_graph()
 """

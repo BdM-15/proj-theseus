@@ -330,19 +330,19 @@ class Neo4jGraphIO:
         Create new entities in Neo4j.
         
         Args:
-            entities: List of entity dicts (from JsonExtractor)
+            entities: List of entity dicts (from LightRAG native extraction)
         
         Returns:
             Number of entities created
         """
         # Filter out any entities that might have slipped through with None names
-        # Note: JsonExtractor should have rescued these, but this is a final safety net.
+        # Note: LightRAG native extraction handles this, but this is a safety net.
         valid_entities = []
         for e in entities:
             if e.get('entity_name'):
                 valid_entities.append(e)
             else:
-                # This should theoretically never happen if JsonExtractor is working
+                # This should rarely happen with native LightRAG extraction
                 logger.error(f"❌ Critical Error: Entity reached Neo4j without a name! Dropping to prevent DB corruption. Entity: {e}")
         
         if len(valid_entities) < len(entities):
@@ -353,7 +353,7 @@ class Neo4jGraphIO:
         UNWIND $entities AS entity
         MERGE (n:`{self.workspace}` {{entity_name: entity.entity_name}})
         SET n.entity_type = entity.entity_type,
-            n.created_by = 'json_extractor',
+            n.created_by = 'lightrag_native',
             n.created_at = datetime()
         
         // Set specific properties based on type
@@ -410,7 +410,7 @@ class Neo4jGraphIO:
         MATCH (target:`{self.workspace}` {{entity_name: rel.target_entity}})
         CALL apoc.create.relationship(source, rel.relationship_type, {{
             description: rel.relationship_type,
-            source: 'json_extractor',
+            source: 'lightrag_native',
             created_at: datetime()
         }}, target) YIELD rel as r
         RETURN count(r) as created_count
