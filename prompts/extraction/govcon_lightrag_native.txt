@@ -287,6 +287,29 @@ CRITICAL: Check the SUBJECT of the sentence!
 - "Government shall provide..." → CONCEPT (NOT a requirement)
 
 ================================================================================
+PART C.4: PRIORITY ORDER FOR ENTITY EXTRACTION
+================================================================================
+
+When processing an RFP, prioritize extraction in this order:
+
+1. PROGRAM - Identify top-level program FIRST (provides context for all others)
+2. SECTION - Map document structure (provides location context)
+3. EVALUATION_FACTOR - Critical for proposal planning
+4. SUBMISSION_INSTRUCTION - Determines proposal structure
+5. REQUIREMENT - Core work obligations
+6. STATEMENT_OF_WORK - Work scope definition
+7. DOCUMENT/ANNEX - Supporting documents and references
+8. CLAUSE - Regulatory compliance requirements
+9. STRATEGIC_THEME - Competitive intelligence
+10. Standard Entities - Organizations, concepts, events, equipment, technology, etc.
+
+**Why This Order Matters**: Early entities provide context for later entities:
+- Knowing the PROGRAM helps classify requirements (program-specific vs general)
+- Knowing SECTIONS helps attribute entities to their source locations
+- Knowing EVALUATION_FACTORS helps identify strategic themes (weighted >30% = hot button)
+- Requirements inherit context from their parent sections
+
+================================================================================
 PART D: THE 18 ENTITY TYPES (Government Contracting Ontology)
 ================================================================================
 
@@ -1365,6 +1388,35 @@ relation{tuple_delimiter}Treadmill Preventive Maintenance{tuple_delimiter}Treadm
 relation{tuple_delimiter}Stationary Cycle Preventive Maintenance{tuple_delimiter}Stationary Cycles{tuple_delimiter}APPLIES_TO{tuple_delimiter}Maintenance requirement applies to stationary cycle equipment
 relation{tuple_delimiter}Table H.1 Fitness Equipment Maintenance Schedule{tuple_delimiter}Appendix H Equipment Maintenance{tuple_delimiter}CHILD_OF{tuple_delimiter}Table is part of Appendix H
 
+---
+
+EXAMPLE 13: ANTI-PATTERN - NOT Extracting Forced Relationships
+
+When entities have NO semantic connection, do NOT create relationships just to connect them.
+
+Input (Two unrelated entities in same chunk):
+- Payment Terms (concept): "Net 30 payment terms apply to all invoices"
+- Cybersecurity Controls (requirement): "Contractor shall implement NIST 800-171 controls"
+
+WRONG Output (DO NOT DO THIS):
+relation{tuple_delimiter}Payment Terms{tuple_delimiter}Cybersecurity Controls{tuple_delimiter}RELATED_TO{tuple_delimiter}Both are contract requirements
+
+Why this is WRONG:
+- Payment terms and cybersecurity have NO semantic connection
+- Different topics, no shared keywords, no logical relationship
+- Creating such relationships dilutes the knowledge graph with noise
+- Makes semantic search less accurate
+
+CORRECT Output:
+(No relationship between these two entities)
+
+ANTI-PATTERN SIGNALS (DO NOT create relationships when):
+- Entities are in same chunk but discuss different topics
+- Only connection is "both are requirements" or "both in same section"
+- No shared domain keywords (see Semantic Keyword Banks)
+- No logical business or technical dependency
+- Just trying to "connect everything" without semantic justification
+
 ================================================================================
 PART L: QUALITY CHECKS BEFORE OUTPUT
 ================================================================================
@@ -1373,10 +1425,13 @@ Before finalizing extraction, validate:
 
 1. NO ORPHAN ENTITIES: Every entity should link to at least one other entity
 
-2. CONSISTENT NAMING: 
+2. CONSISTENT NAMING (CANONICALIZATION):
    - Same entity referenced with consistent naming across chunks
    - Normalize "FAR 52.212-1" vs "far 52.212-1" to single form
    - Use canonical names (Title Case for sections, exact citations for clauses)
+   - CRITICAL: If "ISS" and "Installation Support Services (ISS)" both appear in text,
+     use "Installation Support Services (ISS)" for BOTH references
+   - Do NOT create two separate entities for the same concept with different names
 
 3. METADATA COMPLETENESS:
    - Requirements: criticality, modal_verb populated
