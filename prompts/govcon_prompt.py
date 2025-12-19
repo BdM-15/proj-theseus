@@ -498,59 +498,95 @@ Output:
 }
 
 """,
-    """Example 10 (COMPREHENSIVE - Cost Estimator Persona):
+    """Example 10 (DOMAIN EXPANSION - Simple Query to Expert Keywords):
 
-Query: "Identify all workload drivers and operational parameters from the PWS. For each section, extract specific quantities, volumes, frequencies, coverage hours, staffing patterns, equipment counts, facility requirements, and personnel categories. Organize by PWS section with subsection-level details."
+Query: "What are the workload drivers?"
 
 Output:
 {
-  "high_level_keywords": ["Workload drivers", "Operational parameters", "PWS sections", "BOE development", "Labor requirements", "Staffing analysis", "Cost estimation inputs"],
-  "low_level_keywords": ["Section F.1", "Section F.2", "Section F.3", "Section G", "Section H", "Specific quantities", "Volumes", "Frequencies", "Coverage hours", "24/7 operations", "Staffing patterns", "Equipment counts", "Facility requirements", "Personnel categories", "Supervision requirements", "Subsection details", "Daily customers", "Service rates", "Operating hours"]
+  "high_level_keywords": ["Workload drivers", "Basis of Estimate", "BOE development", "Labor requirements", "Staffing analysis", "FTE calculation", "Cost estimation"],
+  "low_level_keywords": ["Frequencies", "Quantities", "Hours of coverage", "Daily customers", "Service rates", "Equipment counts", "Facility square footage", "Operating hours", "24/7 operations", "Personnel requirements", "Shift patterns", "Section F", "Section G", "Section H", "Appendix F"]
 }
+
+Explanation: User asks simple question; system expands using GovCon domain knowledge to retrieve workload-related entities across all relevant sections.
 
 """,
-    """Example 11 (COMPREHENSIVE - Proposal Manager Persona):
+    """Example 11 (DOMAIN EXPANSION - Intern-Level Query):
 
-Query: "Build a complete proposal outline based on Section L instructions. For each volume, show page limits, format requirements, font specifications, margin requirements, and how each section addresses the corresponding Section M evaluation factors."
+Query: "What do we need to put in our proposal?"
 
 Output:
 {
-  "high_level_keywords": ["Proposal outline", "Section L instructions", "Section M alignment", "Volume structure", "Compliance matrix", "Submission requirements", "Evaluation criteria mapping"],
-  "low_level_keywords": ["Technical volume", "Management volume", "Past performance volume", "Price volume", "Page limits", "Font size", "Times New Roman", "Margin requirements", "Factor 1", "Factor 2", "Factor 3", "Evaluation factor", "Adjectival rating", "Format requirements", "Section L.3", "Section L.4", "Section M.2", "Proposal instructions"]
+  "high_level_keywords": ["Proposal requirements", "Section L instructions", "Submission requirements", "Volume structure", "Compliance requirements", "Evaluation criteria"],
+  "low_level_keywords": ["Technical volume", "Management volume", "Past performance", "Price volume", "Page limits", "Font requirements", "Format specifications", "Section L", "Section M", "Evaluation factors", "Due date", "Submission method", "Number of copies", "Electronic submission"]
 }
+
+Explanation: Non-expert asks generic question; system understands they need Section L submission instructions and Section M evaluation alignment.
 
 """,
-    """Example 12 (COMPREHENSIVE - Capture Manager Persona):
+    """Example 12 (DOMAIN EXPANSION - Cost Analyst Query):
 
-Query: "Identify all customer hot buttons, evaluation priorities, and potential win themes. For each evaluation factor, show the relative importance, scoring approach, and what differentiates a high-rated response from a low-rated response."
+Query: "Give me everything I need to build the BOE for Appendix F"
 
 Output:
 {
-  "high_level_keywords": ["Customer hot buttons", "Win themes", "Evaluation priorities", "Competitive positioning", "Discriminators", "Source selection", "Capture strategy"],
-  "low_level_keywords": ["Most important factor", "Significantly more important", "Technical approach", "Management approach", "Past performance", "Key personnel", "Relevant experience", "Adjectival ratings", "Outstanding", "Satisfactory", "Strengths", "Weaknesses", "Deficiencies", "Risk assessment", "Proof points", "Mission critical"]
+  "high_level_keywords": ["Basis of Estimate", "BOE inputs", "Labor hours", "FTE calculation", "Cost drivers", "Staffing model", "Appendix F services"],
+  "low_level_keywords": ["Workload drivers", "Daily customers", "Service frequencies", "Coverage hours", "24/7 operations", "Equipment lists", "Facility requirements", "Personnel qualifications", "Section F.1", "Section F.2", "Section F.3", "Customer counts", "Service rates per hour", "Special events frequency", "Shift coverage", "USN requirements", "LN/OCN supervision"]
 }
+
+Explanation: Cost analyst needs BOE data; system retrieves all quantitative operational parameters from Appendix F excluding performance metrics.
 
 """,
-    """Example 13 (COMPREHENSIVE - Contracts Manager Persona):
+    """Example 13 (DOMAIN EXPANSION - Capture Manager Strategy):
 
-Query: "List all FAR and DFARS clauses in Section I. For each clause, identify if it's incorporated by reference or full text, the regulatory citation, applicability conditions, and any fill-in values or alternate provisions."
+Query: "What does the government really care about?"
 
 Output:
 {
-  "high_level_keywords": ["FAR clauses", "DFARS clauses", "Section I", "Contract terms", "Regulatory compliance", "Incorporated provisions", "Terms and conditions"],
-  "low_level_keywords": ["FAR 52.212-4", "FAR 52.212-5", "DFARS 252.204-7012", "DFARS 252.227-7014", "By reference", "Full text", "Applicability", "Fill-in values", "Alternate I", "Alternate II", "Deviation", "Cybersecurity", "CUI protection", "Technical data rights"]
+  "high_level_keywords": ["Evaluation priorities", "Customer hot buttons", "Win themes", "Government emphasis", "Source selection criteria", "Most important factors"],
+  "low_level_keywords": ["Section M", "Evaluation factors", "Technical approach", "Management approach", "Past performance", "Price", "Factor weights", "Adjectival ratings", "Strengths", "Weaknesses", "Risk", "Outstanding", "Acceptable", "Mission critical", "Key personnel", "Relevant experience"]
 }
+
+Explanation: Capture manager asks casual question; system understands intent is to identify evaluation priorities and discriminators from Section M.
 
 """,
-    """Example 14 (COMPREHENSIVE - Technical SME Persona):
+    """Example 14 (DOMAIN EXPANSION - Compliance Check):
 
-Query: "What are all the performance standards and quality requirements? For each metric, show the measurement method, acceptable quality level, inspection frequency, remediation timeframe, and consequences for non-compliance."
+Query: "What are we required to do?"
 
 Output:
 {
-  "high_level_keywords": ["Performance standards", "Quality requirements", "QASP", "Service level agreements", "Performance metrics", "Inspection criteria", "Quality assurance"],
-  "low_level_keywords": ["AQL", "Acceptable quality level", "Performance objective", "Measurement method", "Inspection frequency", "Monthly surveillance", "Random sampling", "Customer complaint", "Response time", "Defect threshold", "Cure period", "Remediation", "Liquidated damages", "Contract deduction", "Performance improvement plan"]
+  "high_level_keywords": ["Contractor requirements", "Mandatory obligations", "Shall statements", "Contract requirements", "Performance requirements", "Compliance obligations"],
+  "low_level_keywords": ["Shall", "Must", "Required", "Contractor shall", "Section C", "PWS", "SOW", "Deliverables", "CDRL", "Reporting requirements", "Submission deadlines", "Performance standards", "Certifications", "FAR clauses", "DFARS clauses"]
 }
+
+Explanation: User asks broad compliance question; system retrieves all mandatory requirements (shall/must statements) across the contract.
+
+""",
+    """Example 15 (DOMAIN EXPANSION - New Team Member):
+
+Query: "How is this contract structured?"
+
+Output:
+{
+  "high_level_keywords": ["Contract structure", "UCF format", "RFP organization", "Document sections", "Contract overview"],
+  "low_level_keywords": ["Section A", "Section B", "Section C", "Section D", "Section E", "Section F", "Section G", "Section H", "Section I", "Section J", "Section K", "Section L", "Section M", "CLINs", "PWS", "SOW", "Attachments", "Exhibits", "Appendices"]
+}
+
+Explanation: New team member needs orientation; system retrieves UCF structure and section organization to provide contract overview.
+
+""",
+    """Example 16 (REAL-WORLD - Polished Cost Estimator Query):
+
+Query: "Provide a complete list of workload drivers for the recreational services. Include frequencies, quantities, hours, coverage, and equipment that support developing a Basis of Estimate for labor and FTEs. Exclude surveillance metrics and performance objectives. Organize by section."
+
+Output:
+{
+  "high_level_keywords": ["Workload drivers", "Recreational services", "Basis of Estimate", "Labor calculation", "FTE development", "Cost inputs", "Appendix F"],
+  "low_level_keywords": ["Frequencies", "Quantities", "Hours of coverage", "Equipment lists", "Section F.1", "Section F.2", "Section F.3", "CRP", "Fitness Program", "Daily customers", "24/7 coverage", "Service rates", "Special events", "Customer counts", "Facility operations", "Personnel requirements", "USN staffing", "Shift coverage"]
+}
+
+Explanation: Experienced cost estimator provides detailed query; system retrieves comprehensive workload data organized by PWS section, excluding QA/surveillance metrics.
 
 """,
 ]
