@@ -188,10 +188,10 @@ async def enrich_workload_metadata(
                 if not raw_text:
                     raw_text = req.get('description', '')
                 
-                # Truncate to reasonable limit to fit 50 items in context window
-                # 50 reqs × 20K chars = 1M chars (~250K tokens) - leaves room for output
-                # The requirement NAME + description provides enough context for BOE analysis
-                display_text = raw_text[:20000] + "..." if len(raw_text) > 20000 else raw_text
+                # Truncate to reasonable limit to stay under 128K tokens
+                # 20 reqs × 5K chars = 100K chars (~25K tokens) + 4K prompt + buffer
+                # Total: ~30K tokens per batch (well under 128K)
+                display_text = raw_text[:5000] + "..." if len(raw_text) > 5000 else raw_text
 
                 batch_data.append({
                     'index': idx,  # Use simple index instead of complex Neo4j element ID
