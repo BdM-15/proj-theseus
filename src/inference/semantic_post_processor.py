@@ -588,8 +588,8 @@ async def _semantic_post_processor_neo4j(
         Dict with processing statistics
     """
     if llm_model_name is None:
-        # Use REASONING model for post-processing (not extraction model)
-        llm_model_name = os.getenv("REASONING_LLM_NAME", "grok-4-fast-reasoning")
+        # Use REASONING model for post-processing (grok-4-1 series)
+        llm_model_name = os.getenv("REASONING_LLM_NAME", "grok-4-1-fast-reasoning")
     
     logger.info("🔧 Starting Neo4j semantic post-processing...")
     start_time = time.time()
@@ -741,7 +741,8 @@ async def _semantic_post_processor_neo4j(
             id_to_entity=id_to_entity,
             neo4j_io=neo4j_io,
             model=llm_model_name,
-            temperature=temperature
+            temperature=temperature,
+            existing_relationships=relationships  # Issue #56: Pass for conditional algo execution
         )
         
         relationships_inferred = 0
@@ -865,7 +866,7 @@ async def enhance_knowledge_graph(
     logger.info("=" * 80)
     
     # Get LLM model from environment - use REASONING model for post-processing
-    llm_model = os.getenv("REASONING_LLM_NAME", "grok-4-fast-reasoning")
+    llm_model = os.getenv("REASONING_LLM_NAME", "grok-4-1-fast-reasoning")
     llm_temp = float(os.getenv("LLM_MODEL_TEMPERATURE", "0.1"))
     
     return await _semantic_post_processor_neo4j(

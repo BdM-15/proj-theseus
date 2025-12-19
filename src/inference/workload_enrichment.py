@@ -78,8 +78,8 @@ async def enrich_workload_metadata(
         Dict with enrichment statistics
     """
     if model is None:
-        # Use reasoning model for inference/enrichment tasks
-        model = os.getenv("REASONING_LLM_NAME", "grok-4-fast-reasoning")
+        # Use reasoning model for inference/enrichment tasks (grok-4-1 series)
+        model = os.getenv("REASONING_LLM_NAME", "grok-4-1-fast-reasoning")
     
     logger.info("🔧 Starting workload enrichment...")
     

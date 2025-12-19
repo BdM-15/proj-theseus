@@ -124,7 +124,7 @@ async def initialize_raganything():
     
     # Model configuration from environment
     extraction_model = os.getenv("EXTRACTION_LLM_NAME", "grok-4-1-fast-non-reasoning")
-    reasoning_model = os.getenv("REASONING_LLM_NAME", "grok-4-fast-reasoning")
+    reasoning_model = os.getenv("REASONING_LLM_NAME", "grok-4-1-fast-reasoning")
     
     # Extraction detection markers (from LightRAG prompts)
     EXTRACTION_MARKERS = [
