@@ -35,25 +35,34 @@ dependencies = [
     # Authentication (required by lightrag-hku API server)
     "PyJWT>=2.10.0",
     
+    # Neo4j graph database driver
+    "neo4j>=5.0.0",
+    
     # ============================================================================
     # GPU Acceleration for MinerU (CRITICAL for performance)
     # ============================================================================
-    # PyTorch with CUDA 12.4+ support (compatible with CUDA 12.8 drivers)
-    # MUST be installed from PyTorch index for GPU acceleration:
-    #   uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
-    # 
+    # PyTorch with CUDA 12.4 - installed from pytorch-cu124 index via [tool.uv.sources]
     # Without CUDA-enabled PyTorch, MinerU falls back to CPU-only processing:
     #   - CPU-only: ~5-10 minutes for 425-page RFP (SLOW)
     #   - GPU-accelerated: ~30-60 seconds for same document (2-10x faster)
-    # 
-    # Verify GPU is enabled after installation:
-    #   python -c "import torch; print('CUDA:', torch.cuda.is_available())"
-    # 
-    # Note: PyPI only distributes CPU-only PyTorch by default. The torch/torchvision
-    # dependencies in raganything[all] will install CPU versions. You MUST manually
-    # reinstall with --index-url flag for GPU support.
-    # ============================================================================
+    "torch>=2.5.0",
+    "torchvision>=0.20.0",
 ]
+
+# ============================================================================
+# UV Package Index Configuration (CUDA-enabled PyTorch)
+# ============================================================================
+[tool.uv]
+# Use PyTorch CUDA 12.4 index for GPU acceleration
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+[tool.uv.sources]
+# Override torch/torchvision to use CUDA 12.4 builds
+torch = { index = "pytorch-cu124" }
+torchvision = { index = "pytorch-cu124" }
 
 # Note: raganything[all] bundles the following dependencies:
 # - lightrag-hku (knowledge graph + WebUI)
@@ -61,4 +70,6 @@ dependencies = [
 # - pypdf, python-docx, python-pptx, openpyxl (document parsers)
 # - pydantic, tiktoken, nest-asyncio (utilities)
 # - ollama (local LLM support)
-# - torch, torchvision (WARNING: CPU-only versions from PyPI, see GPU section above)
+# 
+# torch/torchvision are explicitly declared above with [tool.uv.sources] to ensure
+# CUDA 12.4 builds are installed from the PyTorch index instead of CPU-only PyPI versions.

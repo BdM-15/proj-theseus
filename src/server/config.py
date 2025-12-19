@@ -59,9 +59,9 @@ def configure_raganything_args():
     global_args.host = os.getenv("HOST", "localhost")
     global_args.port = int(os.getenv("PORT", "9621"))
     
-    # LLM Configuration - xAI Grok
+    # LLM Configuration - xAI Grok (Dual-Model: Extraction uses non-reasoning, Query uses reasoning)
     global_args.llm_binding = "openai"
-    global_args.llm_model_name = os.getenv("LLM_MODEL", "grok-4-fast-reasoning")
+    global_args.llm_model_name = os.getenv("EXTRACTION_LLM_NAME", "grok-4-1-fast-non-reasoning")  # Default to extraction model
     global_args.llm_binding_host = xai_base_url
     global_args.llm_api_key = xai_api_key
     

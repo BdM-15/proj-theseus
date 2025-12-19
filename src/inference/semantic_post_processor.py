@@ -7,8 +7,10 @@ Neo4j-native LLM-powered enhancements to the extracted knowledge graph:
 1. **Relationship Inference**: Infer missing semantic relationships using 8 algorithms
 2. **Workload Enrichment**: Add BOE metadata to requirements
 
-Entity type enforcement is handled at extraction time via Pydantic schema
-validation in src/ontology/schema.py - no post-processing correction needed.
+Architecture (Issue #54 - Back to Basics):
+- Entity extraction uses native LightRAG with govcon ontology (18 types)
+- Pydantic validation is used for POST-PROCESSING only (InferredRelationship)
+- No Pydantic validation during extraction - LightRAG handles it natively
 
 Usage:
     from src.inference.semantic_post_processor import enhance_knowledge_graph
@@ -586,7 +588,8 @@ async def _semantic_post_processor_neo4j(
         Dict with processing statistics
     """
     if llm_model_name is None:
-        llm_model_name = os.getenv("LLM_MODEL", "grok-4-fast-reasoning")
+        # Use REASONING model for post-processing (not extraction model)
+        llm_model_name = os.getenv("REASONING_LLM_NAME", "grok-4-fast-reasoning")
     
     logger.info("🔧 Starting Neo4j semantic post-processing...")
     start_time = time.time()
@@ -618,19 +621,20 @@ async def _semantic_post_processor_neo4j(
         
         # Step 2: Lightweight Entity Type Cleanup (NO LLM INFERENCE)
         # ========================================================================
-        # With Pydantic validation in extraction, most invalid types are already handled.
-        # This step ONLY handles:
-        # 1. "table" from RAG-Anything's multimodal processors (bypasses our adapter)
+        # With native LightRAG extraction, most types are valid from our ontology.
+        # This step ONLY handles edge cases:
+        # 1. "table" from RAG-Anything's multimodal processors (generic type)
         # 2. Hash-prefixed types (#requirement) from LightRAG internal markers
         # 
         # NO LLM calls needed - all corrections are heuristic/deterministic.
         # ========================================================================
-        logger.info("\n🔧 Step 2: Lightweight entity type cleanup (no LLM - Pydantic handles extraction)...")
+        logger.info("\n🔧 Step 2: Lightweight entity type cleanup (native LightRAG handles most types)...")
         entity_updates = []
         grouped = group_entities_by_type(entities)
         
         table_mapped = 0
         hash_cleaned = 0
+        unknown_entities = []  # Collect UNKNOWN entities for LLM retyping
         
         for entity_type, entity_group in grouped.items():
             entity_type_clean = entity_type.lower()
@@ -665,22 +669,64 @@ async def _semantic_post_processor_neo4j(
                         'new_entity_type': entity_type_clean
                     })
                     hash_cleaned += 1
+                continue
             
-            # NOTE: "unknown", "other", and other invalid types are NOT corrected here.
-            # With Pydantic validation, these should be rare. If they exist, they indicate
-            # an extraction problem that should be fixed at the source, not post-hoc.
+            # CASE 3: "UNKNOWN" entities - created by LightRAG when relationships reference
+            # entities that weren't extracted (due to delimiter corruption or missing extraction).
+            # These could contain critical workload drivers - retype them with LLM.
+            if entity_type_clean == 'unknown':
+                unknown_entities.extend(entity_group)
         
         if table_mapped > 0:
             logger.info(f"  ✅ Heuristically mapped {table_mapped} table entities")
         if hash_cleaned > 0:
             logger.info(f"  ✅ Cleaned {hash_cleaned} hash-prefixed entity types")
         
+        # CASE 3 Processing: LLM retype UNKNOWN entities (could be critical workload drivers)
+        unknown_retyped = 0
+        if unknown_entities:
+            logger.info(f"  🔍 Retyping {len(unknown_entities)} UNKNOWN entities with LLM...")
+            from src.inference.entity_operations import retype_entities_batch
+            from src.utils.llm_client import call_llm_async
+            
+            # LLM function wrapper for retyping
+            async def llm_func(prompt: str, system_prompt: str) -> str:
+                return await call_llm_async(
+                    prompt=prompt,
+                    model=llm_model_name,
+                    system_prompt=system_prompt,
+                    temperature=0.1  # Low temp for consistent typing
+                )
+            
+            # Process in batches of 20 to avoid token limits
+            batch_size = 20
+            for i in range(0, len(unknown_entities), batch_size):
+                batch = unknown_entities[i:i+batch_size]
+                try:
+                    retyped = await retype_entities_batch(batch, llm_func)
+                    for entity in batch:
+                        entity_name = entity.get('entity_name')
+                        if entity_name in retyped:
+                            new_type = retyped[entity_name]
+                            if new_type and new_type.lower() != 'unknown':
+                                entity_updates.append({
+                                    'id': entity['id'],
+                                    'new_entity_type': new_type.lower()
+                                })
+                                unknown_retyped += 1
+                                logger.debug(f"    Retyped '{entity_name}': UNKNOWN → {new_type}")
+                except Exception as e:
+                    logger.warning(f"  ⚠️ Failed to retype batch {i//batch_size + 1}: {e}")
+            
+            if unknown_retyped > 0:
+                logger.info(f"  ✅ LLM retyped {unknown_retyped}/{len(unknown_entities)} UNKNOWN entities")
+        
         entities_corrected = 0
         if entity_updates:
             logger.info(f"\n💾 Updating {len(entity_updates)} entity types in Neo4j...")
             entities_corrected = neo4j_io.update_entity_types(entity_updates)
         else:
-            logger.info("\n✅ No entity type corrections needed (Pydantic validation working)")
+            logger.info("\n✅ No entity type corrections needed (native LightRAG extraction working)")
         
         # Step 3: Infer missing relationships using PARALLEL modular algorithms
         logger.info("\n🔗 Step 3: Inferring relationships with PARALLEL algorithm execution...")
@@ -711,8 +757,7 @@ async def _semantic_post_processor_neo4j(
         
         workload_stats = await enrich_workload_metadata(
             neo4j_io=neo4j_io,
-            llm_func=call_llm_async,
-            batch_size=50,  # Keep 50 - graceful per-item handling saves costs
+            batch_size=5,  # Small batches, NO truncation - full detail for quality (~94K tokens max)
             model=llm_model_name,
             temperature=temperature
         )
@@ -819,8 +864,8 @@ async def enhance_knowledge_graph(
     logger.info("🧠 SEMANTIC POST-PROCESSING: LLM-Powered Graph Enhancement (Neo4j)")
     logger.info("=" * 80)
     
-    # Get LLM model from environment
-    llm_model = os.getenv("LLM_MODEL", "grok-4-fast-reasoning")
+    # Get LLM model from environment - use REASONING model for post-processing
+    llm_model = os.getenv("REASONING_LLM_NAME", "grok-4-fast-reasoning")
     llm_temp = float(os.getenv("LLM_MODEL_TEMPERATURE", "0.1"))
     
     return await _semantic_post_processor_neo4j(

@@ -9,26 +9,35 @@ Key Features:
 - Environment variable configuration (no hardcoding)
 - Async support with optional batching
 - JSON mode for structured outputs
+- Instructor integration for Pydantic-enforced responses (post-processing)
 - Consistent error handling
 
 Usage:
-    from src.utils.llm_client import call_llm_async, call_llm_batch
+    from src.utils.llm_client import call_llm_async, call_llm_batch, call_llm_structured
     
     # Simple text response
     response = await call_llm_async("What is 2+2?")
     
     # Batch processing with parallelization
     responses = await call_llm_batch(prompts, max_concurrent=8)
+    
+    # Pydantic-enforced structured output (uses Instructor)
+    result = await call_llm_structured(prompt, MyPydanticModel, max_retries=3)
 """
 
 import os
 import asyncio
 import logging
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Type, TypeVar
 
+import instructor
 from openai import AsyncOpenAI
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
+
+# Type variable for Pydantic model generic
+T = TypeVar('T', bound=BaseModel)
 
 
 async def call_llm_async(
@@ -45,7 +54,7 @@ async def call_llm_async(
     Uses environment variables for configuration (Branch 040 pattern):
     - LLM_BINDING_API_KEY: API key
     - LLM_BINDING_HOST: API endpoint (default: https://api.x.ai/v1)
-    - LLM_MODEL: Model name (default: grok-4-fast-reasoning)
+    - REASONING_LLM_NAME: Model name for inference tasks (default: grok-4-fast-reasoning)
     
     Args:
         prompt: User prompt text
@@ -59,7 +68,8 @@ async def call_llm_async(
         LLM response text
     """
     if model is None:
-        model = os.getenv("LLM_MODEL", "grok-4-fast-reasoning")
+        # Default to reasoning model for inference/post-processing tasks
+        model = os.getenv("REASONING_LLM_NAME", "grok-4-fast-reasoning")
     
     # Create AsyncOpenAI client with xAI endpoint (env vars, no hardcoding)
     client = AsyncOpenAI(
@@ -147,14 +157,83 @@ async def call_llm_batch(
     return results
 
 
+async def call_llm_structured(
+    prompt: str,
+    response_model: Type[T],
+    system_prompt: Optional[str] = None,
+    model: Optional[str] = None,
+    temperature: float = 0.1,
+    max_tokens: Optional[int] = None,
+    max_retries: int = 3
+) -> T:
+    """
+    Call LLM with Pydantic schema enforcement using Instructor library.
+    
+    Uses Instructor's MD_JSON mode which:
+    - Automatically strips markdown code blocks (```json...```)
+    - Enforces Pydantic schema at API level (not post-validation)
+    - Provides error feedback to LLM for self-correction on retry
+    
+    This is the RECOMMENDED approach for post-processing tasks that need
+    structured JSON output (workload enrichment, relationship inference, etc.)
+    
+    Args:
+        prompt: User prompt text
+        response_model: Pydantic model class to enforce (e.g., WorkloadEnrichmentResponse)
+        system_prompt: Optional system prompt
+        model: LLM model name (default: REASONING_LLM_NAME for post-processing)
+        temperature: Sampling temperature (default: 0.1 for deterministic)
+        max_tokens: Maximum output tokens (default: LLM_MAX_OUTPUT_TOKENS)
+        max_retries: Number of retries with error feedback (default: 3)
+    
+    Returns:
+        Validated Pydantic model instance
+    
+    Raises:
+        Exception: If all retries fail
+    """
+    if model is None:
+        model = os.getenv("REASONING_LLM_NAME", "grok-4-fast-reasoning")
+    
+    if max_tokens is None:
+        max_tokens = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "128000"))
+    
+    # Create OpenAI client wrapped with Instructor
+    openai_client = AsyncOpenAI(
+        api_key=os.getenv("LLM_BINDING_API_KEY"),
+        base_url=os.getenv("LLM_BINDING_HOST", "https://api.x.ai/v1")
+    )
+    
+    # MD_JSON mode: automatically extracts JSON from markdown code blocks
+    client = instructor.from_openai(openai_client, mode=instructor.Mode.MD_JSON)
+    
+    # Build messages
+    messages = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": prompt})
+    
+    # Use Instructor with built-in retry and error feedback
+    result = await client.chat.completions.create(
+        model=model,
+        response_model=response_model,
+        messages=messages,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        max_retries=max_retries,  # Instructor handles retries with error feedback
+    )
+    
+    return result
+
+
 def get_llm_config() -> Dict[str, Any]:
     """
     Get current LLM configuration from environment variables.
     Useful for logging configuration at startup.
     """
     return {
-        "model": os.getenv("LLM_MODEL", "grok-4-fast-reasoning"),
-        "extraction_model": os.getenv("EXTRACTION_LLM_NAME", "grok-4-fast-reasoning"),
+        "model": os.getenv("REASONING_LLM_NAME", "grok-4-fast-reasoning"),
+        "extraction_model": os.getenv("EXTRACTION_LLM_NAME", "grok-4-1-fast-non-reasoning"),
         "api_host": os.getenv("LLM_BINDING_HOST", "https://api.x.ai/v1"),
         "api_key_set": bool(os.getenv("LLM_BINDING_API_KEY")),
         "max_async": int(os.getenv("MAX_ASYNC", "8")),

@@ -90,13 +90,14 @@ class BaseEntity(BaseModel):
         """
         Validate entity_type BEFORE Pydantic parsing.
         
-        NOTE: This validator only runs for our Pydantic-based extraction (JsonExtractor).
-        It does NOT run for entities from LightRAG/RAG-Anything's native extraction.
+        NOTE (Issue #54 - Back to Basics):
+        This validator is now primarily used for post-processing operations,
+        not extraction. Native LightRAG handles extraction with our ontology.
         
         For invalid types:
         - Logs a clear warning (helps identify prompt issues)
         - Normalizes case (Organization → organization)
-        - Does NOT silently coerce - let post-processing handle legitimate type mapping
+        - Uses 'concept' as fallback for unknown types
         """
         if isinstance(values, dict):
             entity_type = values.get('entity_type', '')
@@ -110,8 +111,7 @@ class BaseEntity(BaseModel):
                         f"⚠️ Invalid entity_type '{entity_type}' for '{entity_name}' "
                         f"(valid types: {', '.join(sorted(VALID_ENTITY_TYPES)[:5])}...)"
                     )
-                    # For Pydantic extraction, use 'concept' as intelligent fallback
-                    # This is acceptable here because our prompts explicitly guide the LLM
+                    # Use 'concept' as intelligent fallback
                     values['entity_type'] = 'concept'
                 elif entity_type != entity_type_lower:
                     # Just normalize case
@@ -173,11 +173,26 @@ class PerformanceMetric(BaseEntity):
 # Relationship Model
 # ==========================================
 
+class RelationshipEntity(BaseModel):
+    """
+    Entity reference for relationships.
+    Requires entity_name, entity_type, and description for full context.
+    """
+    entity_name: str = Field(..., description="Name of the entity being referenced")
+    entity_type: str = Field(..., description="Type of the entity being referenced")
+    description: str = Field(..., description="Brief description of the entity (20-50 words)")
+
+
 class Relationship(BaseModel):
-    source_entity: BaseEntity = Field(..., description="Full source entity object with entity_name, entity_type, and description.")
-    target_entity: BaseEntity = Field(..., description="Full target entity object with entity_name, entity_type, and description.")
+    """
+    Relationship between two entities with full context.
+    
+    All fields are REQUIRED for complete intelligence capture.
+    """
+    source_entity: RelationshipEntity = Field(..., description="Source entity with name, type, and description")
+    target_entity: RelationshipEntity = Field(..., description="Target entity with name, type, and description")
     relationship_type: str = Field(..., description="Type of relationship (e.g., EVALUATED_BY, GUIDES, CHILD_OF, ATTACHMENT_OF, PRODUCES).")
-    description: str = Field(..., description="Explanation of the relationship.")
+    description: str = Field(..., description="Explanation of the relationship (20-50 words)")
 
 # ==========================================
 # Container for LLM Output
@@ -280,7 +295,7 @@ class WorkloadEnrichmentItem(BaseModel):
     boe_relevance: Dict[str, float] = Field(default_factory=dict, description="Confidence scores per BOE category.")
     labor_drivers: List[str] = Field(default_factory=list, description="Labor-specific details.")
     material_needs: List[str] = Field(default_factory=list, description="Material-specific details.")
-    complexity_score: int = Field(default=5, ge=1, le=10, description="Complexity 1-10.")
+    complexity_score: int = Field(default=5, ge=0, le=10, description="Complexity 0-10 (0=unknown, 1-10=assessed).")
     complexity_rationale: str = Field(default="", description="Complexity explanation.")
     effort_estimate: str = Field(default="", description="Effort description.")
     

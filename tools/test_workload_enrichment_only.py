@@ -29,10 +29,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from dotenv import load_dotenv
 load_dotenv()
 
-# CRITICAL: Override MAX_ASYNC BEFORE importing modules that use it
-# Branch 040 used 4 workers and had 100% success
-# Too many concurrent requests causes truncated xAI API responses
-os.environ["MAX_ASYNC"] = os.getenv("TEST_MAX_WORKERS", "4")
+# CRITICAL: Override worker count BEFORE importing modules that use it
+# With batch_size=25 (smaller batches), we can run more workers in parallel
+# 8 workers × 25 reqs/batch = 200 reqs processed per wave
+os.environ.setdefault("WORKLOAD_MAX_WORKERS", os.getenv("TEST_MAX_WORKERS", "8"))
 
 # Configure logging BEFORE imports that use it
 import logging
@@ -54,21 +54,26 @@ async def run_workload_enrichment_only():
     # Import after path setup
     from src.inference.neo4j_graph_io import Neo4jGraphIO
     from src.inference.workload_enrichment import enrich_workload_metadata
-    from src.utils.llm_client import call_llm_async
     
-    # Get config from environment (MAX_ASYNC already overridden at top of file)
-    model = os.getenv("LLM_MODEL", "grok-4-fast-reasoning")
+    # Get config from environment
+    # Use REASONING model for enrichment (not extraction model)
+    model = os.getenv("REASONING_LLM_NAME", os.getenv("LLM_MODEL", "grok-4-fast-reasoning"))
     temperature = float(os.getenv("LLM_MODEL_TEMPERATURE", "0.1"))
-    batch_size = int(os.getenv("WORKLOAD_BATCH_SIZE", "50"))
-    max_workers = os.getenv("MAX_ASYNC", "4")
+    batch_size = int(os.getenv("WORKLOAD_BATCH_SIZE", "5"))  # No truncation, ~94K tokens max (under 128K)
+    max_workers = os.getenv("WORKLOAD_MAX_WORKERS", os.getenv("MAX_ASYNC", "8"))  # More workers for smaller batches
+    max_output_tokens = os.getenv("LLM_MAX_OUTPUT_TOKENS", "128000")
+    max_retries = os.getenv("LLM_MAX_RETRIES", "3")
     
     print(f"\nConfiguration:")
-    print(f"  LLM Model:    {model}")
-    print(f"  Temperature:  {temperature}")
-    print(f"  Batch Size:   {batch_size}")
-    print(f"  Max Workers:  {max_workers} (Branch 040 used 4)")
-    print(f"  Neo4j URI:    {os.getenv('NEO4J_URI', 'bolt://localhost:7687')}")
-    print(f"  Workspace:    {os.getenv('NEO4J_WORKSPACE', 'default')}")
+    print(f"  LLM Model:        {model}")
+    print(f"  Temperature:      {temperature}")
+    print(f"  Batch Size:       {batch_size}")
+    print(f"  Max Workers:      {max_workers}")
+    print(f"  Max Output Tokens:{max_output_tokens}")
+    print(f"  Max Retries:      {max_retries} (Instructor with error feedback)")
+    print(f"  Neo4j URI:        {os.getenv('NEO4J_URI', 'bolt://localhost:7687')}")
+    print(f"  Workspace:        {os.getenv('NEO4J_WORKSPACE', 'default')}")
+    print(f"\n  Using Instructor for Pydantic-enforced structured output")
     
     # Initialize Neo4j connection
     print("\n[1/3] Connecting to Neo4j...")
@@ -101,7 +106,6 @@ async def run_workload_enrichment_only():
         
         stats = await enrich_workload_metadata(
             neo4j_io=neo4j_io,
-            llm_func=call_llm_async,
             batch_size=batch_size,
             model=model,
             temperature=temperature
