@@ -277,14 +277,58 @@ Name: "Host Nation Cultural Sensitivity"
 
 C.3 Requirement Criticality Classification
 -------------------------------------------
-MANDATORY: SHALL/MUST/WILL (with contractor/offeror as subject) - Zero defects, non-negotiable compliance
-IMPORTANT: SHOULD (with contractor/offeror as subject) - High priority, best practice, expected but not absolute
-OPTIONAL: MAY (with contractor/offeror as subject) - Contractor discretion, alternative approaches acceptable
-INFORMATIONAL: SHALL/MUST with Government as subject - NOT a contractor requirement, extract as concept or skip
+MANDATORY (Priority Score: 100): SHALL/MUST/WILL (with contractor/offeror as subject) - Zero defects, non-negotiable compliance
+IMPORTANT (Priority Score: 75): SHOULD (with contractor/offeror as subject) - High priority, best practice, expected but not absolute
+OPTIONAL (Priority Score: 25): MAY (with contractor/offeror as subject) - Contractor discretion, alternative approaches acceptable
+INFORMATIONAL (Priority Score: 0): SHALL/MUST with Government as subject - NOT a contractor requirement, extract as concept or skip
 
 CRITICAL: Check the SUBJECT of the sentence!
 - "Contractor shall provide..." → REQUIREMENT (MANDATORY)
 - "Government shall provide..." → CONCEPT (NOT a requirement)
+
+C.3.1 Requirement Type Classification (Content-Based)
+------------------------------------------------------
+Classify requirements by their functional nature (use req_type field):
+
+FUNCTIONAL - "provide", "deliver", "perform", "execute" + service/product
+   Examples: "Contractor shall provide 24/7 help desk support"
+             "Perform preventive maintenance on all equipment"
+             "Deliver monthly status reports"
+
+PERFORMANCE - SLA language, metrics, measurable outcomes
+   Examples: "99.9% system uptime"
+             "Response within 24 hours of incident report"
+             "First-time fix rate ≥ 95%"
+
+SECURITY - NIST references, FedRAMP, clearance levels, cybersecurity
+   Examples: "FedRAMP Moderate authorization required"
+             "Personnel require Secret clearance"
+             "Implement NIST 800-53 controls"
+
+TECHNICAL - Technology stack, platforms, software versions, infrastructure
+   Examples: "Deploy on AWS GovCloud"
+             "Use Java 11 or higher"
+             "PostgreSQL database required"
+
+INTERFACE - Integration points, data exchange, APIs, system connections
+   Examples: "Integrate with agency ERP system"
+             "Support HTTPS/TLS 1.3"
+             "RESTful API with OAuth 2.0"
+
+MANAGEMENT - Reporting, governance, oversight, project management
+   Examples: "Submit monthly status reports"
+             "Use Agile/Scrum methodology"
+             "PMI-certified Project Manager required"
+
+DESIGN - Standards compliance, architectural mandates, design constraints
+   Examples: "Section 508 accessibility compliance"
+             "Follow agency branding guidelines"
+             "Microservices architecture"
+
+QUALITY - QA processes, testing, verification, validation
+   Examples: "Automated test coverage ≥ 80%"
+             "ISO 9001 certification"
+             "Peer code review required"
 
 ================================================================================
 PART C.4: PRIORITY ORDER FOR ENTITY EXTRACTION
