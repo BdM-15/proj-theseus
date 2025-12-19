@@ -638,11 +638,18 @@ async def _semantic_post_processor_neo4j(
         
         for entity_type, entity_group in grouped.items():
             entity_type_clean = entity_type.lower()
-            has_hash_prefix = entity_type_clean.startswith('#')
             
-            # Strip # prefix if present (LightRAG internal marker)
-            if has_hash_prefix:
-                entity_type_clean = entity_type_clean[1:]
+            # Strip various prefix formats from LightRAG internal markers
+            # Handles: "#requirement", "#|requirement", "|requirement"
+            has_hash_prefix = entity_type_clean.startswith('#')
+            has_pipe_prefix = entity_type_clean.startswith('|') or entity_type_clean.startswith('#|')
+            
+            if entity_type_clean.startswith('#|'):
+                entity_type_clean = entity_type_clean[2:]  # Strip "#|"
+            elif has_hash_prefix:
+                entity_type_clean = entity_type_clean[1:]  # Strip "#"
+            elif entity_type_clean.startswith('|'):
+                entity_type_clean = entity_type_clean[1:]  # Strip "|"
             
             # CASE 1: "table" entities from RAG-Anything multimodal processors
             # These bypass our Pydantic adapter - map based on content heuristically
@@ -660,8 +667,8 @@ async def _semantic_post_processor_neo4j(
                     # NO LLM fallback - extraction should have handled this
                 continue
             
-            # CASE 2: Hash-prefixed types (#requirement) - just clean the prefix
-            if has_hash_prefix and entity_type_clean in [t.lower() for t in ALLOWED_TYPES]:
+            # CASE 2: Prefixed types (#requirement, #|requirement, |requirement) - clean the prefix
+            if (has_hash_prefix or has_pipe_prefix) and entity_type_clean in [t.lower() for t in ALLOWED_TYPES]:
                 logger.info(f"  🔧 Cleaning {len(entity_group)} '{entity_type}' → '{entity_type_clean}'")
                 for entity in entity_group:
                     entity_updates.append({
@@ -680,7 +687,7 @@ async def _semantic_post_processor_neo4j(
         if table_mapped > 0:
             logger.info(f"  ✅ Heuristically mapped {table_mapped} table entities")
         if hash_cleaned > 0:
-            logger.info(f"  ✅ Cleaned {hash_cleaned} hash-prefixed entity types")
+            logger.info(f"  ✅ Cleaned {hash_cleaned} prefixed entity types (#, #|, |)")
         
         # CASE 3 Processing: LLM retype UNKNOWN entities (could be critical workload drivers)
         unknown_retyped = 0
