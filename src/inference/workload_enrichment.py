@@ -44,7 +44,7 @@ from src.ontology.schema import (
     WorkloadEnrichmentResponse,
     normalize_boe_category
 )
-from src.utils.llm_parsing import extract_json_from_response
+from src.utils.llm_client import call_llm_structured
 
 logger = logging.getLogger(__name__)
 
@@ -54,26 +54,25 @@ BOE_CATEGORIES = [cat.value for cat in BOECategory]
 
 async def enrich_workload_metadata(
     neo4j_io: Neo4jGraphIO,
-    llm_func: Callable[[str, str, str, float], Awaitable[str]],
-    batch_size: int = 50,
+    batch_size: int = 20,  # Reduced to stay under 128K tokens (~106K/batch)
     model: str = None,
-    temperature: float = 0.1
+    temperature: float = 0.1,
+    llm_func: Callable[[str, str, str, float], Awaitable[str]] = None  # Deprecated, kept for compatibility
 ) -> Dict[str, any]:
     """
-    Enrich all REQUIREMENT entities with workload metadata (PHASE 3A OPTIMIZED).
+    Enrich all REQUIREMENT entities with workload metadata using Instructor.
     
-    PHASE 3A OPTIMIZATION:
-    - Parallel worker processing (5 concurrent batches)
-    - Shared chunk cache to avoid redundant loading
-    - Semaphore-based concurrency control
-    - Expected: 14 min ΓåÆ 2.8 min (80% reduction)
+    Uses Instructor library for schema-enforced structured outputs:
+    - Automatic JSON extraction from markdown responses
+    - Pydantic schema validation at API level  
+    - Built-in retry with error feedback to LLM
     
     Args:
         neo4j_io: Neo4j graph I/O handler
-        llm_func: Async LLM function (prompt, system_prompt, model, temperature) -> response
         batch_size: Number of requirements to process per LLM call
-        model: LLM model name
+        model: LLM model name (defaults to REASONING_LLM_NAME)
         temperature: LLM temperature
+        llm_func: DEPRECATED - kept for backward compatibility, ignored
     
     Returns:
         Dict with enrichment statistics
@@ -123,8 +122,8 @@ async def enrich_workload_metadata(
         return {"requirements_enriched": 0, "category_distribution": {}}
     
     # PHASE 3A: Parallel batch processing with semaphore control
-    # Branch 040 behavior: reuse MAX_ASYNC (default 4)
-    max_workers = int(os.getenv("MAX_ASYNC", "4"))
+    # With batch_size=25, we can run more workers in parallel (8 vs extraction's 16)
+    max_workers = int(os.getenv("WORKLOAD_MAX_WORKERS", os.getenv("MAX_ASYNC", "8")))
     if max_workers < 1:
         max_workers = 4
     
@@ -189,9 +188,10 @@ async def enrich_workload_metadata(
                 if not raw_text:
                     raw_text = req.get('description', '')
                 
-                # Truncate to reasonable limit (e.g. 100000 chars) to fit in context
-                # Increased to 100k to leverage Grok-4's 2M context window
-                display_text = raw_text[:100000] + "..." if len(raw_text) > 100000 else raw_text
+                # Truncate to reasonable limit to fit 50 items in context window
+                # 50 reqs × 20K chars = 1M chars (~250K tokens) - leaves room for output
+                # The requirement NAME + description provides enough context for BOE analysis
+                display_text = raw_text[:20000] + "..." if len(raw_text) > 20000 else raw_text
 
                 batch_data.append({
                     'index': idx,  # Use simple index instead of complex Neo4j element ID
@@ -215,73 +215,57 @@ async def enrich_workload_metadata(
 
 ## Task
 
-Analyze all {len(batch)} requirements above and return a JSON array with workload metadata for each.
+Analyze all {len(batch)} requirements above and return a JSON object with workload metadata for each.
 
 **CRITICAL INSTRUCTIONS:**
-1. Return ONLY the JSON array - no markdown code blocks, no explanations, no additional text
+1. Return ONLY the JSON object - no markdown code blocks, no explanations, no additional text
 2. Use the EXACT 'index' field from the JSON above for each "entity_index" field in your response
 3. Return results in the SAME ORDER as the input (index 0, 1, 2, ...)
+4. Wrap the array in a "requirements" key
 
-Return JSON array with {len(batch)} objects (one per requirement above):
-[
-  {{
-    "entity_index": 0,
-    "has_workload_metric": true,
-    "workload_categories": ["Labor", "Materials"],
-    "boe_relevance": {{"Labor": 0.95, "Materials": 0.80}},
-    "labor_drivers": ["..."],
-    "material_needs": ["..."],
-    "complexity_score": 6,
-    "complexity_rationale": "...",
-    "effort_estimate": "...",
-    "enriched_by": "workload_analysis_v1"
-  }},
-  ...
-]
+Return JSON object with {len(batch)} items (one per requirement above):
+{{
+  "requirements": [
+    {{
+      "entity_index": 0,
+      "has_workload_metric": true,
+      "workload_categories": ["Labor", "Materials"],
+      "boe_relevance": {{"Labor": 0.95, "Materials": 0.80}},
+      "labor_drivers": ["..."],
+      "material_needs": ["..."],
+      "complexity_score": 6,
+      "complexity_rationale": "...",
+      "effort_estimate": "...",
+      "enriched_by": "workload_analysis_v1"
+    }},
+    ...
+  ]
+}}
 """
             
-            # Call LLM with retry for truncated responses (Issue #52 fix)
+            # Call LLM using Instructor for Pydantic-enforced structured output
+            # Instructor handles: JSON extraction, schema validation, retries with error feedback
             batch_enriched = 0
             try:
-                # Retry up to 2 times if we get suspiciously short responses
-                max_retries = 2
-                for attempt in range(max_retries + 1):
-                    response = await llm_func(prompt, model=model, temperature=temperature)
-                    
-                    # Check for truncated response (xAI API sometimes returns partial responses)
-                    if response and len(response) >= 500:  # Valid response should be at least 500 chars for 50 items
-                        break
-                    
-                    if attempt < max_retries:
-                        logger.warning(f"  Batch {batch_num}: Short response ({len(response) if response else 0} chars), retrying ({attempt + 1}/{max_retries})...")
-                        await asyncio.sleep(2)  # Brief delay before retry
-                    else:
-                        logger.warning(f"  Batch {batch_num}: Still short after {max_retries} retries ({len(response) if response else 0} chars)")
+                max_output_tokens = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "128000"))
+                max_retries = int(os.getenv("LLM_MAX_RETRIES", "3"))
                 
-                # Parse JSON response using centralized utility (Branch 040 approach)
-                raw_data = extract_json_from_response(response)
+                # Use Instructor's call_llm_structured for schema-enforced output
+                # This eliminates manual JSON parsing and adds error feedback to LLM on retry
+                enrichment_response = await call_llm_structured(
+                    prompt=prompt,
+                    response_model=WorkloadEnrichmentResponse,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_output_tokens,
+                    max_retries=max_retries
+                )
                 
-                # Normalize to list format (Branch 040 behavior: accept list or {requirements: [...]})
-                if not isinstance(raw_data, list):
-                    if isinstance(raw_data, dict) and 'requirements' in raw_data:
-                        raw_data = raw_data['requirements']
-                    else:
-                        logger.error(f"  Batch {batch_num}: LLM returned non-array response: {type(raw_data)}")
-                        return 0
+                # Instructor already validated the response - get the requirements list
+                enrichment_items = enrichment_response.requirements
                 
-                # Update Neo4j with enrichment data using Pydantic validation
-                for raw_enrichment in raw_data:
-                    # Validate with Pydantic model
-                    try:
-                        enrichment = WorkloadEnrichmentItem.model_validate(raw_enrichment)
-                    except ValidationError as ve:
-                        logger.warning(f"  Batch {batch_num}: Pydantic validation error: {ve}")
-                        # Try to salvage what we can (Branch 040 pattern)
-                        enrichment = WorkloadEnrichmentItem(
-                            entity_index=raw_enrichment.get('entity_index', 0),
-                            has_workload_metric=raw_enrichment.get('has_workload_metric', True),
-                            workload_categories=raw_enrichment.get('workload_categories', [])
-                        )
+                # Process each validated enrichment item
+                for enrichment in enrichment_items:
                     
                     entity_index = enrichment.entity_index
                     
@@ -301,16 +285,16 @@ Return JSON array with {len(batch)} objects (one per requirement above):
                     for cat in categories:
                         category_distribution[cat] += 1
                     
-                    # Prepare properties for Neo4j
+                    # Prepare properties for Neo4j (use Pydantic model attributes directly)
                     properties = {
                         'has_workload_metric': True,
                         'workload_categories': json.dumps(categories),  # Store as JSON string
-                        'boe_relevance': json.dumps(raw_enrichment.get('boe_relevance', {})),
-                        'labor_drivers': json.dumps(raw_enrichment.get('labor_drivers', [])),
-                        'material_needs': json.dumps(raw_enrichment.get('material_needs', [])),
-                        'complexity_score': raw_enrichment.get('complexity_score', 5),
-                        'complexity_rationale': raw_enrichment.get('complexity_rationale', ''),
-                        'effort_estimate': raw_enrichment.get('effort_estimate', ''),
+                        'boe_relevance': json.dumps(enrichment.boe_relevance),
+                        'labor_drivers': json.dumps(enrichment.labor_drivers),
+                        'material_needs': json.dumps(enrichment.material_needs),
+                        'complexity_score': enrichment.complexity_score,
+                        'complexity_rationale': enrichment.complexity_rationale,
+                        'effort_estimate': enrichment.effort_estimate,
                         'enriched_by': 'workload_analysis_v1'
                     }
                     

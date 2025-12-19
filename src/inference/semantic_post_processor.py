@@ -588,7 +588,8 @@ async def _semantic_post_processor_neo4j(
         Dict with processing statistics
     """
     if llm_model_name is None:
-        llm_model_name = os.getenv("LLM_MODEL", "grok-4-fast-reasoning")
+        # Use REASONING model for post-processing (not extraction model)
+        llm_model_name = os.getenv("REASONING_LLM_NAME", "grok-4-fast-reasoning")
     
     logger.info("🔧 Starting Neo4j semantic post-processing...")
     start_time = time.time()
@@ -756,8 +757,7 @@ async def _semantic_post_processor_neo4j(
         
         workload_stats = await enrich_workload_metadata(
             neo4j_io=neo4j_io,
-            llm_func=call_llm_async,
-            batch_size=50,  # Keep 50 - graceful per-item handling saves costs
+            batch_size=20,  # Reduced to stay under 128K tokens (~106K/batch, avoids xAI 2x pricing)
             model=llm_model_name,
             temperature=temperature
         )
