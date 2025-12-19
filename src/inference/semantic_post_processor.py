@@ -757,7 +757,7 @@ async def _semantic_post_processor_neo4j(
         
         workload_stats = await enrich_workload_metadata(
             neo4j_io=neo4j_io,
-            batch_size=20,  # Reduced to stay under 128K tokens (~106K/batch, avoids xAI 2x pricing)
+            batch_size=10,  # Smaller batches with full 20K text (~54K tokens/batch)
             model=llm_model_name,
             temperature=temperature
         )

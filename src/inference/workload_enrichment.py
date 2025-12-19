@@ -54,7 +54,7 @@ BOE_CATEGORIES = [cat.value for cat in BOECategory]
 
 async def enrich_workload_metadata(
     neo4j_io: Neo4jGraphIO,
-    batch_size: int = 20,  # Reduced to stay under 128K tokens (~106K/batch)
+    batch_size: int = 10,  # Reduced to stay under 128K tokens (~54K/batch) with full 20K text
     model: str = None,
     temperature: float = 0.1,
     llm_func: Callable[[str, str, str, float], Awaitable[str]] = None  # Deprecated, kept for compatibility
@@ -188,10 +188,10 @@ async def enrich_workload_metadata(
                 if not raw_text:
                     raw_text = req.get('description', '')
                 
-                # Truncate to reasonable limit to stay under 128K tokens
-                # 20 reqs × 5K chars = 100K chars (~25K tokens) + 4K prompt + buffer
-                # Total: ~30K tokens per batch (well under 128K)
-                display_text = raw_text[:5000] + "..." if len(raw_text) > 5000 else raw_text
+                # Truncate to reasonable limit while preserving detail for enrichment
+                # 10 reqs × 20K chars = 200K chars (~50K tokens) + 4K prompt
+                # Total: ~54K tokens per batch (well under 128K threshold)
+                display_text = raw_text[:20000] + "..." if len(raw_text) > 20000 else raw_text
 
                 batch_data.append({
                     'index': idx,  # Use simple index instead of complex Neo4j element ID
