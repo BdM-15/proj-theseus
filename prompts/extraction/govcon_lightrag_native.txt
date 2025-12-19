@@ -910,9 +910,20 @@ Output Format Overview:
 
 CRITICAL DELIMITER FORMATTING:
 The field separator MUST be output EXACTLY as shown - all 5 characters: <|#|>
-DO NOT output partial delimiters like "#|", "|#", "|#|", or "<|#" 
+
+FORBIDDEN PATTERNS (these WILL cause parsing failure):
+- "#|requirement" - WRONG! The entity_type field must be ONLY "requirement"
+- "|requirement" - WRONG! No leading pipe
+- "requirement|" - WRONG! No trailing pipe  
+- "<|#requirement" - WRONG! Missing closing |>
+- Entity types with ANY special characters: |, <, >, #, /, \, (, )
+
+CORRECT: entity<|#|>Name<|#|>requirement<|#|>Description
+WRONG:   entity<|#|>Name<|#|>#|requirement<|#|>Description
+
 DO NOT add extra characters or spaces around the delimiter
 Each line = entity/relation + EXACTLY 3 or 4 delimiters (for entity/relation respectively)
+The entity_type field must be a CLEAN word with no prefixes or special characters
 
 ENTITY FORMAT (4 fields, 3 delimiters):
 entity{tuple_delimiter}entity_name{tuple_delimiter}entity_type{tuple_delimiter}entity_description

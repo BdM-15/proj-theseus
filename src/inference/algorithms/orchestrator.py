@@ -30,10 +30,11 @@ logger = logging.getLogger(__name__)
 MAX_CONCURRENT_LLM_CALLS = int(os.getenv("MAX_ASYNC", "8"))
 
 # Conditional execution thresholds (Issue #56)
-# If existing coverage >= threshold, skip the algorithm
-ALGO_3_COVERAGE_THRESHOLD = float(os.getenv("ALGO_3_THRESHOLD", "0.3"))  # 30% of reqs linked to factors
-ALGO_4_COVERAGE_THRESHOLD = float(os.getenv("ALGO_4_THRESHOLD", "0.3"))  # 30% of deliverables linked
-ALGO_6_COVERAGE_THRESHOLD = float(os.getenv("ALGO_6_THRESHOLD", "0.5"))  # 50% of concepts linked
+# DISABLED: Quality over cost - always run all algorithms
+# Set thresholds to 1.0 to effectively disable skipping
+ALGO_3_COVERAGE_THRESHOLD = float(os.getenv("ALGO_3_THRESHOLD", "1.0"))  # Always run (quality over cost)
+ALGO_4_COVERAGE_THRESHOLD = float(os.getenv("ALGO_4_THRESHOLD", "1.0"))  # Always run (quality over cost)
+ALGO_6_COVERAGE_THRESHOLD = float(os.getenv("ALGO_6_THRESHOLD", "1.0"))  # Always run (quality over cost)
 
 
 def check_extraction_coverage(

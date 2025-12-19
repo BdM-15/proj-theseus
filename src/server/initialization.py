@@ -163,16 +163,24 @@ async def initialize_raganything():
         )
     
     # ═══════════════════════════════════════════════════════════════════════════════
-    # Native LightRAG Extraction (Issue #54 - Back to Basics)
+    # Native LightRAG Extraction with Output Sanitization (Issue #56)
     # ═══════════════════════════════════════════════════════════════════════════════
-    # Using LightRAG's native tuple-delimited extraction format.
+    # Using LightRAG's native tuple-delimited extraction format with a lightweight
+    # sanitization wrapper that fixes common LLM malformation patterns:
+    # - #|requirement → requirement (hash prefix from delimiter leakage)
+    # - Extra pipes in descriptions causing field count errors
+    # 
+    # This approach preserves native LightRAG performance while preventing entity drops.
     # Our GovCon ontology is injected via addon_params and PROMPTS override.
-    # No Pydantic validation layer - LightRAG handles extraction natively.
-    llm_model_func = base_llm_model_func
-    logger.info("✅ Using native LightRAG extraction (Issue #54 - Back to Basics)")
+    # ═══════════════════════════════════════════════════════════════════════════════
+    from src.extraction.output_sanitizer import create_sanitizing_wrapper
+    
+    llm_model_func = create_sanitizing_wrapper(base_llm_model_func)
+    logger.info("✅ Using native LightRAG extraction with output sanitization (Issue #56)")
     logger.info(f"✅ DUAL-MODEL routing enabled:")
     logger.info(f"   Extraction: {extraction_model} (non-reasoning for literal format compliance)")
     logger.info(f"   Query:      {reasoning_model} (reasoning for nuanced answers)")
+    logger.info(f"   Sanitizer:  Fixes malformed delimiters (#|type → type)")
     
     # Define vision function (multimodal Grok wrapper)
     # CRITICAL: stream=False explicitly disables streaming for vision models too
@@ -311,9 +319,9 @@ async def initialize_raganything():
     # 2. LightRAG: Native extraction with our entity_types + injected domain knowledge
     # 
     # Key Points:
-    # - No Pydantic/JSON extraction layer
     # - Native LightRAG tuple-delimited format: entity<|#|>name<|#|>type<|#|>desc
     # - Our ontology injected via PROMPTS["entity_extraction_system_prompt"]
+    # - Post-processing Step 2 cleans up any malformed entity types
     # ═══════════════════════════════════════════════════════════════════════════════
     from src.processors import GovconMultimodalProcessor
     

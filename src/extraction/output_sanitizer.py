@@ -1,0 +1,245 @@
+"""
+LLM Output Sanitizer - Fixes common malformation patterns in LightRAG extraction output.
+
+This module provides a lightweight wrapper that sanitizes LLM output BEFORE LightRAG
+parses it. Unlike the Pydantic adapter, this doesn't change the output format - it
+just fixes common corruption patterns that cause entity/relationship drops.
+
+Common Issues Fixed:
+1. #|entity_type → entity_type (hash prefix from delimiter leakage)
+2. |entity_type → entity_type (pipe prefix)
+3. entity_type| → entity_type (pipe suffix)
+4. Extra pipes in descriptions causing field count errors
+
+Issue #56: Post-Processing Overhaul
+"""
+
+import re
+import logging
+from typing import Optional
+
+logger = logging.getLogger(__name__)
+
+# LightRAG's expected delimiter
+TUPLE_DELIMITER = "<|#|>"
+
+
+def sanitize_extraction_output(raw_output: str) -> str:
+    """
+    Sanitize LLM extraction output to fix common malformation patterns.
+    
+    This runs BEFORE LightRAG's parser sees the output, fixing issues that
+    would otherwise cause entities/relationships to be silently dropped.
+    
+    Args:
+        raw_output: Raw LLM output string
+        
+    Returns:
+        Sanitized output string
+    """
+    if not raw_output:
+        return raw_output
+    
+    original_len = len(raw_output)
+    output = raw_output
+    fixes_applied = []
+    
+    # Split into lines to process each record
+    lines = output.split('\n')
+    fixed_lines = []
+    
+    for line in lines:
+        fixed_line = _fix_line(line)
+        if fixed_line != line:
+            fixes_applied.append(f"Fixed: '{line[:50]}...' → '{fixed_line[:50]}...'")
+        fixed_lines.append(fixed_line)
+    
+    output = '\n'.join(fixed_lines)
+    
+    # Log if any fixes were applied
+    if fixes_applied and len(fixes_applied) <= 5:
+        for fix in fixes_applied:
+            logger.debug(f"🔧 Output sanitization: {fix}")
+    elif fixes_applied:
+        logger.info(f"🔧 Output sanitization: {len(fixes_applied)} lines fixed")
+    
+    return output
+
+
+def _fix_line(line: str) -> str:
+    """Fix a single line of extraction output."""
+    if not line.strip():
+        return line
+    
+    # First, apply pre-split fixes for delimiter corruption BEFORE splitting
+    # This catches things like "#|requirement" in the middle of the string
+    line = _pre_split_fixes(line)
+    
+    # Split by delimiter
+    parts = line.split(TUPLE_DELIMITER)
+    
+    if len(parts) < 3:
+        return line  # Not a valid record, leave as-is
+    
+    # Check if this is an entity line (4 fields) or relation line (5 fields)
+    record_type = parts[0].strip().lower()
+    
+    if record_type == 'entity' and len(parts) >= 4:
+        # Entity: entity<|#|>name<|#|>type<|#|>description
+        # Fix the entity_type field (index 2)
+        parts[2] = _clean_entity_type(parts[2])
+        
+        # Fix description field if it has embedded pipes causing field overflow
+        if len(parts) > 4:
+            # Merge extra fields back into description using space (NOT delimiter!)
+            extra_count = len(parts) - 4
+            parts[3] = ' '.join(parts[3:])  # Merge with space, not delimiter
+            parts = parts[:4]
+            _stats.field_count_fixes += 1
+            logger.info(f"🔧 Merged {extra_count} extra entity fields into description")
+            
+    elif record_type in ('relation', 'relationship') and len(parts) >= 5:
+        # Relation: relation<|#|>source<|#|>target<|#|>keywords<|#|>description
+        # Fix if we have too many fields (pipes in description)
+        if len(parts) > 5:
+            # Merge extra fields back into description using space (NOT delimiter!)
+            extra_count = len(parts) - 5
+            parts[4] = ' '.join(parts[4:])  # Merge with space, not delimiter
+            parts = parts[:5]
+            _stats.field_count_fixes += 1
+            logger.info(f"🔧 Merged {extra_count} extra relation fields into description")
+    
+    return TUPLE_DELIMITER.join(parts)
+
+
+def _pre_split_fixes(line: str) -> str:
+    """
+    Apply fixes to the line BEFORE splitting by delimiter.
+    
+    Catches patterns like: entity<|#|>Name<|#|>#|requirement<|#|>Desc
+    Where "#|requirement" has the hash prefix stuck to the entity type.
+    
+    IMPORTANT: Must handle whitespace EVERYWHERE:
+    - <|#|>#|requirement<|#|>      (no spaces)
+    - <|#|>#| requirement<|#|>     (space AFTER prefix, BEFORE word) ← THIS WAS MISSING
+    - <|#|> #|requirement<|#|>     (space before prefix)
+    - <|#|>#|requirement <|#|>     (space after word)
+    """
+    if not line:
+        return line
+    
+    original = line
+    
+    # Pattern: <|#|> [space?] [#|]+ [space?] word [space?] <|#|>
+    # The key fix: \s* AFTER [#|]+ to handle "# | requirement" or "#| requirement"
+    line = re.sub(r'<\|#\|>\s*[#|]+\s*(\w+)\s*<\|#\|>', r'<|#|>\1<|#|>', line)
+    
+    # Pattern: <|#|>word|<|#|> → <|#|>word<|#|> (trailing pipe after word)
+    line = re.sub(r'<\|#\|>\s*(\w+)\|+\s*<\|#\|>', r'<|#|>\1<|#|>', line)
+    
+    # Log if we made any changes (helps diagnose what patterns we're catching)
+    if line != original:
+        _stats.pre_split_fixes += 1
+        logger.info(f"🔧 Pre-split fix applied: delimiter corruption repaired")
+    
+    return line
+
+
+def _clean_entity_type(entity_type: str) -> str:
+    """
+    Clean entity type field by removing common malformation patterns.
+    
+    Fixes:
+    - #|requirement → requirement
+    - |requirement → requirement
+    - requirement| → requirement
+    - #requirement → requirement
+    """
+    if not entity_type:
+        return entity_type
+    
+    original = entity_type
+    cleaned = entity_type.strip()
+    
+    # Remove leading patterns: #|, |, #, with optional whitespace
+    cleaned = re.sub(r'^[#|\s]+', '', cleaned)
+    
+    # Remove trailing patterns: |, #, with optional whitespace
+    cleaned = re.sub(r'[#|\s]+$', '', cleaned)
+    
+    # Remove any remaining special characters that shouldn't be in entity type
+    # Entity types should be alphanumeric with underscores only
+    cleaned = re.sub(r'[<>()\'"/\\]', '', cleaned)
+    
+    cleaned = cleaned.strip()
+    
+    if cleaned != original:
+        _stats.entity_type_fixes += 1
+        # Log at INFO level so we can see what's being caught
+        logger.info(f"🔧 Entity type sanitized: '{original}' → '{cleaned}'")
+    
+    return cleaned
+
+
+class SanitizerStats:
+    """Track sanitization statistics for monitoring."""
+    def __init__(self):
+        self.calls = 0
+        self.sanitized = 0
+        self.pre_split_fixes = 0
+        self.entity_type_fixes = 0
+        self.field_count_fixes = 0
+    
+    def log_summary(self):
+        if self.calls > 0:
+            logger.info(f"📊 Sanitizer Stats: {self.calls} calls, {self.sanitized} outputs sanitized")
+            if self.pre_split_fixes or self.entity_type_fixes or self.field_count_fixes:
+                logger.info(f"   Fixes: {self.pre_split_fixes} pre-split, {self.entity_type_fixes} entity types, {self.field_count_fixes} field counts")
+
+# Global stats instance
+_stats = SanitizerStats()
+
+
+def get_sanitizer_stats() -> SanitizerStats:
+    """Get current sanitizer statistics."""
+    return _stats
+
+
+def create_sanitizing_wrapper(base_llm_func):
+    """
+    Create a wrapper that sanitizes LLM output before returning it.
+    
+    This is a lightweight alternative to the full Pydantic adapter.
+    It doesn't change the output format, just fixes common corruption.
+    
+    Usage in initialization.py:
+        from src.extraction.output_sanitizer import create_sanitizing_wrapper
+        
+        llm_model_func = create_sanitizing_wrapper(base_llm_model_func)
+    """
+    async def sanitizing_llm_func(
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        history_messages: list = None,
+        **kwargs
+    ) -> str:
+        # Call the base LLM function
+        raw_output = await base_llm_func(
+            prompt,
+            system_prompt=system_prompt,
+            history_messages=history_messages or [],
+            **kwargs
+        )
+        
+        # Only sanitize extraction outputs (detected by delimiter presence)
+        if isinstance(raw_output, str) and TUPLE_DELIMITER in raw_output:
+            _stats.calls += 1
+            sanitized = sanitize_extraction_output(raw_output)
+            if sanitized != raw_output:
+                _stats.sanitized += 1
+            return sanitized
+        
+        return raw_output
+    
+    return sanitizing_llm_func
+
