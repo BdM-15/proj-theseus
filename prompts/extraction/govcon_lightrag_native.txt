@@ -88,6 +88,103 @@ EXTRACTION ANTI-PATTERNS (DO NOT DO):
 ❌ "Equipment available" (loses "8 refrigeration units")
 
 ================================================================================
+PART B.2: CRITICAL TABLE EXTRACTION RULES (Equipment & Maintenance Data)
+================================================================================
+
+**CRITICAL: Tables contain high-value workload data that MUST be extracted as structured entities.**
+
+Tables are NOT just formatting - they contain critical workload drivers for BOE development.
+The LLM must recognize table structures and extract granular data, not summaries.
+
+B.2.1 EQUIPMENT INVENTORY TABLES (e.g., "Table H.2 Appliance Listing")
+----------------------------------------------------------------------
+When processing equipment inventory tables:
+
+1. **Extract EACH building as a LOCATION entity** with equipment counts
+   - Entity: "Building 2959 Laundry Facility" (location)
+   - Include counts in description: "69 washers, 69 dryers (138 total units)"
+
+2. **Extract equipment aggregates as EQUIPMENT entities** by maintenance schedule
+   - Entity: "Weekly Maintenance Equipment Inventory" (equipment)
+   - Include totals: "370 washers, 399 dryers (769 total units)"
+
+3. **Create LOCATION→EQUIPMENT relationships** using HAS_EQUIPMENT
+   - Building 2959 --HAS_EQUIPMENT--> Weekly Maintenance Equipment Inventory
+
+4. **Preserve maintenance schedule context** (Weekly, Monthly, On-Call)
+   - Include schedule in entity description for FTE calculation
+
+5. **Extract ALL rows, not just summaries** - building-level data is critical for workload estimation
+   - Each building = separate LOCATION entity
+   - Summary totals = EQUIPMENT entity aggregates
+
+B.2.2 MAINTENANCE SCHEDULE TABLES (e.g., "Table H.1 Preventive Maintenance")
+----------------------------------------------------------------------------
+When processing maintenance schedule tables:
+
+1. **Extract maintenance tasks as REQUIREMENT entities**
+   - Include frequency in labor_drivers: "weekly visual inspection", "monthly lubrication"
+
+2. **Capture frequencies explicitly**:
+   - Weekly tasks → labor_drivers: ["weekly"]
+   - Monthly tasks → labor_drivers: ["monthly"]
+   - Quarterly tasks → labor_drivers: ["quarterly"]
+   - Annual/Semiannual → labor_drivers: ["2x per year"] or ["annually"]
+
+3. **Extract equipment types as EQUIPMENT entities**
+   - "Treadmills" (equipment)
+   - "Stationary Cycles" (equipment)
+
+4. **Create APPLIES_TO relationships between requirements and equipment**
+   - Treadmill Preventive Maintenance --APPLIES_TO--> Treadmills
+
+B.2.3 TABLE EXTRACTION PRIORITIES
+---------------------------------
+✅ MUST DO:
+- Extract ALL rows with quantities (not just totals/summaries)
+- Preserve building numbers, equipment counts, and schedules
+- Link tables to their parent appendix/section using CHILD_OF
+- Create relationships between locations, equipment, and requirements
+
+❌ MUST NOT DO:
+- Do NOT extract tables as generic "concept" entities
+- Do NOT summarize table data - extract each location/equipment row
+- Do NOT lose building-level granularity
+- Do NOT merge disparate maintenance schedules into single entities
+
+ANTI-PATTERN (WRONG):
+entity{tuple_delimiter}Laundry Equipment{tuple_delimiter}concept{tuple_delimiter}Various laundry equipment across multiple buildings.
+
+CORRECT PATTERN:
+entity{tuple_delimiter}Building 2959 Laundry Facility{tuple_delimiter}location{tuple_delimiter}Building 2959. Equipment counts: 69 washers, 69 dryers (138 total units). Maintenance schedule: Weekly.
+entity{tuple_delimiter}Building 3880 Laundry Facility{tuple_delimiter}location{tuple_delimiter}Building 3880. Equipment counts: 44 washers, 50 dryers (94 total units). Maintenance schedule: Weekly.
+entity{tuple_delimiter}Weekly Maintenance Equipment Inventory{tuple_delimiter}equipment{tuple_delimiter}Weekly maintenance schedule equipment. Total: 370 washers, 399 dryers (769 total units).
+
+B.2.4 TABLE TYPE-SPECIFIC GUIDANCE (MinerU Table Processing)
+------------------------------------------------------------
+MinerU converts tables to structured text. Use these guidelines for different table types:
+
+**Evaluation Matrices (Section M):**
+- Extract relationships between factors and their evaluation criteria
+- Look for weight/point distributions across subfactors
+- Create CHILD_OF relationships for subfactor hierarchy
+
+**CDRL Schedules (Section J):**
+- Extract relationships between deliverables and their requirements
+- Capture due dates, frequencies, and format requirements
+- Create TRACKED_BY relationships linking requirements to CDRLs
+
+**Requirements Tables (Section C):**
+- Extract relationships between requirements and their specifications
+- Separate workload (requirement) from surveillance (performance_metric)
+- Use SPLIT RULE: One row with action + metric = TWO entities
+
+**Cross-Reference Tables:**
+- Extract Section L ↔ M mappings directly from table structures
+- Volume/Factor correspondence tables → GUIDES relationships
+- Compliance matrices → EVALUATED_BY relationships
+
+================================================================================
 PART C: CRITICAL DISTINCTIONS (Priority Detection Rules)
 ================================================================================
 
