@@ -91,3 +91,52 @@
 - `prompts/relationship_inference/document_hierarchy.md`
 - `prompts/relationship_inference/deliverable_traceability.md`
 
+---
+
+## Extraction Prompt Audit (Completed Dec 19, 2025)
+
+### Relationship Rules in `govcon_lightrag_native.txt`
+
+**Part F: Relationship Patterns and Inference Rules** contains comprehensive rules:
+
+| Relationship Type | Purpose | Status |
+|-------------------|---------|--------|
+| CHILD_OF | Hierarchical structure | ✅ In prompt |
+| GUIDES | Section L → M mapping | ✅ In prompt (F.2) |
+| EVALUATED_BY | Requirement → Eval Factor | ✅ In prompt (F.3) |
+| MEASURED_BY | Requirement → Performance Metric | ✅ In prompt |
+| PRODUCES | SOW → Deliverable | ✅ In prompt |
+| TRACKED_BY | Deliverable → CDRL | ✅ In prompt |
+| APPLIES_TO | Requirement → Equipment | ✅ In prompt |
+| REFERENCES | Cross-document references | ✅ In prompt |
+| ATTACHMENT_OF | Document → Section | ✅ In prompt |
+
+**Missing from Extraction (Handled by Post-Processing)**:
+- FULFILLED_BY (Deliverable → Requirement) - Algorithm 4 handles this
+- Cross-document semantic linking - Algorithm 6 handles this
+
+### Entity Metadata in Extraction Prompt
+
+| Entity Type | Required Metadata | Status |
+|-------------|-------------------|--------|
+| requirement | criticality, modal_verb, req_type, labor_drivers | ✅ In Part D |
+| evaluation_factor | weight, importance, subfactors | ✅ In Part D |
+| submission_instruction | page_limit, format_reqs, volume | ✅ In Part D |
+| performance_metric | threshold, measurement_method | ✅ In Part D |
+
+**Note**: `material_needs` is NOT in extraction prompt but IS in Pydantic schema.
+
+### Format Agnosticism Assessment
+
+**Algorithm Code**: Only 1 Section reference (comment in algo_1) ✅
+
+**Relationship Prompts**: Use UCF sections as EDUCATIONAL context but emphasize pattern-based detection:
+- `instruction_evaluation_linking.md` line 25: "format-agnostic, works across all RFP structures"
+- Pattern 4: "Agnostic Content-Based Detection"
+
+**Extraction Prompt**: Uses Section references in:
+- Part E: UCF Reference (Educational)
+- Part K: Examples (Educational)
+
+**Conclusion**: System is already reasonably format-agnostic. UCF references are for LLM education, not hardcoded logic.
+
