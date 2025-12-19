@@ -59,7 +59,7 @@ async def run_workload_enrichment_only():
     # Use REASONING model for enrichment (not extraction model)
     model = os.getenv("REASONING_LLM_NAME", os.getenv("LLM_MODEL", "grok-4-fast-reasoning"))
     temperature = float(os.getenv("LLM_MODEL_TEMPERATURE", "0.1"))
-    batch_size = int(os.getenv("WORKLOAD_BATCH_SIZE", "10"))  # ~54K tokens/batch with full 20K text per req
+    batch_size = int(os.getenv("WORKLOAD_BATCH_SIZE", "5"))  # No truncation, ~94K tokens max (under 128K)
     max_workers = os.getenv("WORKLOAD_MAX_WORKERS", os.getenv("MAX_ASYNC", "8"))  # More workers for smaller batches
     max_output_tokens = os.getenv("LLM_MAX_OUTPUT_TOKENS", "128000")
     max_retries = os.getenv("LLM_MAX_RETRIES", "3")
