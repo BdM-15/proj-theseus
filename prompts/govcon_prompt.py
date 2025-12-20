@@ -374,32 +374,11 @@ Extract two distinct types of keywords:
    - Recognize clause patterns: FAR 52.xxx, DFARS 252.xxx
    - Recognize CDRL patterns: CDRL A001, CDRL A016
    - Recognize section patterns: Section L, Section M, Section C.3.2
-   - Recognize UCF structure: evaluation factors, submission instructions, SOW/PWS
    - Recognize Shipley concepts: win themes, discriminators, hot buttons, BOE
-
-5. **CRITICAL - Hierarchical Document Expansion (ANY Document Structure):**
-   - Government documents use nested hierarchical numbering (parent → child → grandchild)
-   - When user asks about a topic, include keywords for ALL hierarchy levels found in the document
-   - Common patterns to recognize and expand:
-     * Numeric: 1.0 → 1.1 → 1.1.2 → 1.1.2.4
-     * Alphanumeric: A.1 → A.1.2 → A.1.2.3
-     * Mixed: 3.2.1.a → 3.2.1.b
-     * Paragraph: Para 4.1 → Para 4.1.2
-   - The pattern is: If document has nested structure X.Y.Z, include X, X.Y, and X.Y.Z levels
-   - Rationale: Each hierarchy level contains UNIQUE details MISSED if only top-level is searched
-   - ADAPT to whatever structure the actual document uses - patterns vary by solicitation
 
 5. **Handle Edge Cases:** For vague queries (e.g., "hello", "ok"), return empty lists for both types.
 
 6. **Language:** Keywords in {language}. Preserve proper nouns exactly.
-
-7. **CRITICAL - Domain Adaptation:**
-   - Examples below show patterns across DIFFERENT contract types (Facility, IT, Food, Security)
-   - Do NOT copy example keywords verbatim - ADAPT to the actual query domain
-   - If query is about "help desk" → use IT support keywords (not fitness center)
-   - If query is about "meal service" → use food service keywords (not security guards)
-   - Identify the domain from the user's query and generate domain-appropriate keywords
-   - When domain is unclear, use generic government contracting terms
 
 ---Examples---
 
@@ -421,89 +400,89 @@ Output:"""
 GOVCON_PROMPTS["keywords_extraction_examples"] = [
     """Example 1:
 
-Query: "What are the workload drivers for the fitness program?"
+Query: "What are the workload drivers?"
 
 Output:
 {
-  "high_level_keywords": ["Workload drivers", "Fitness program", "Labor requirements", "BOE inputs"],
-  "low_level_keywords": ["Customer count", "Operating hours", "Service desk coverage", "Equipment maintenance", "Daily visitors"]
+  "high_level_keywords": ["Workload drivers", "Basis of Estimate", "Labor requirements", "Cost estimation"],
+  "low_level_keywords": ["Frequencies", "Quantities", "Hours of coverage", "Daily volumes", "Service rates", "Equipment counts", "Operating hours", "Personnel requirements"]
 }
 
 """,
     """Example 2:
 
-Query: "What FAR and DFARS clauses are incorporated in Section I?"
+Query: "What FAR and DFARS clauses apply?"
 
 Output:
 {
-  "high_level_keywords": ["Contract clauses", "Section I", "Regulatory compliance", "Incorporated clauses"],
-  "low_level_keywords": ["FAR clauses", "DFARS clauses", "FAR 52.212-4", "DFARS 252.204-7012", "By reference"]
+  "high_level_keywords": ["Contract clauses", "Regulatory compliance", "Terms and conditions"],
+  "low_level_keywords": ["FAR clauses", "DFARS clauses", "FAR 52.212-4", "DFARS 252.204-7012", "Incorporated by reference"]
 }
 
 """,
     """Example 3:
 
-Query: "What are the evaluation factors and their weights?"
+Query: "What are the evaluation factors?"
 
 Output:
 {
-  "high_level_keywords": ["Evaluation factors", "Section M", "Proposal evaluation", "Source selection"],
-  "low_level_keywords": ["Technical approach", "Management approach", "Past performance", "Price factor", "Factor weighting", "Most important", "Adjectival ratings"]
+  "high_level_keywords": ["Evaluation factors", "Section M", "Source selection", "Proposal evaluation"],
+  "low_level_keywords": ["Technical approach", "Management approach", "Past performance", "Price", "Factor weights", "Adjectival ratings"]
 }
 
 """,
     """Example 4:
 
-Query: "What deliverables are required monthly to the COR?"
+Query: "What deliverables are required?"
 
 Output:
 {
-  "high_level_keywords": ["Deliverables", "Monthly reports", "Contract requirements", "Reporting"],
-  "low_level_keywords": ["CDRL", "COR", "Contracting Officer Representative", "Monthly status report", "Due date", "Submission frequency", "Calendar day"]
+  "high_level_keywords": ["Deliverables", "Contract requirements", "Reporting requirements"],
+  "low_level_keywords": ["CDRL", "Monthly reports", "Status reports", "Due dates", "Submission frequency", "COR"]
 }
 
 """,
     """Example 5:
 
-Query: "What are the page limits for the technical volume?"
+Query: "What are the proposal page limits?"
 
 Output:
 {
-  "high_level_keywords": ["Submission requirements", "Section L", "Proposal format", "Volume structure"],
-  "low_level_keywords": ["Technical volume", "Page limit", "Font size", "Times New Roman", "Margins", "Page count", "Format requirements"]
+  "high_level_keywords": ["Submission requirements", "Section L", "Proposal format"],
+  "low_level_keywords": ["Page limits", "Technical volume", "Font size", "Margins", "Format requirements"]
 }
 
 """,
     """Example 6:
 
-Query: "What are the performance metrics for customer service?"
+Query: "What are the performance standards?"
 
 Output:
 {
-  "high_level_keywords": ["Performance metrics", "Service level agreements", "QASP", "Performance standards"],
-  "low_level_keywords": ["Response time", "Customer satisfaction", "Defect threshold", "Monthly inspection", "AQL", "Performance objective"]
+  "high_level_keywords": ["Performance metrics", "QASP", "Service levels", "Quality standards"],
+  "low_level_keywords": ["Response time", "AQL", "Defect threshold", "Inspection frequency", "Performance objective"]
 }
 
 """,
     """Example 7:
 
-Query: "What equipment is government furnished versus contractor furnished?"
+Query: "What does the government care about most?"
 
 Output:
 {
-  "high_level_keywords": ["Government furnished equipment", "Contractor furnished equipment", "Property provisions", "GFE/CFE"],
-  "low_level_keywords": ["GFE", "CFE", "Equipment list", "Inventory", "Furnished property", "FAR 52.245"]
+  "high_level_keywords": ["Win themes", "Customer priorities", "Evaluation priorities", "Discriminators"],
+  "low_level_keywords": ["Hot buttons", "Most important factor", "Mission critical", "Key personnel", "Relevant experience"]
 }
 
 """,
     """Example 8:
 
-Query: "What are the customer hot buttons and win themes?"
+Query: "What are we required to do?"
 
 Output:
 {
-  "high_level_keywords": ["Win themes", "Customer priorities", "Discriminators", "Capture strategy", "Competitive positioning"],
-  "low_level_keywords": ["Hot buttons", "Mission critical", "Key to success", "Most important factor", "Government emphasis", "Proof points"]
+  "high_level_keywords": ["Contractor requirements", "Mandatory obligations", "Scope of work"],
+  "low_level_keywords": ["Shall statements", "Must requirements", "PWS", "SOW", "Tasks", "Performance standards"]
 }
 
 """,
@@ -513,165 +492,9 @@ Query: "How does Section L map to Section M?"
 
 Output:
 {
-  "high_level_keywords": ["Section L to M mapping", "Proposal compliance", "Evaluation alignment", "Submission structure"],
-  "low_level_keywords": ["Technical volume", "Management volume", "Factor 1", "Factor 2", "Page limits", "Addresses factor", "Guides evaluation"]
+  "high_level_keywords": ["L to M mapping", "Proposal compliance", "Evaluation alignment"],
+  "low_level_keywords": ["Section L", "Section M", "Technical volume", "Evaluation factors", "Page limits"]
 }
-
-""",
-    """Example 10 (DOMAIN EXPANSION - Simple Query to Expert Keywords):
-
-Query: "What are the workload drivers?"
-
-Output:
-{
-  "high_level_keywords": ["Workload drivers", "Basis of Estimate", "BOE development", "Labor requirements", "Staffing analysis", "FTE calculation", "Cost estimation"],
-  "low_level_keywords": ["Frequencies", "Quantities", "Hours of coverage", "Daily customers", "Service rates", "Equipment counts", "Facility square footage", "Operating hours", "24/7 operations", "Personnel requirements", "Shift patterns", "Appendix F", "Section F.1", "Section F.2", "Section F.3", "Section G", "Section H", "F.2.1", "F.2.3", "F.2.4", "F.3.1", "F.3.2", "Subsection details", "Operational parameters"]
-}
-
-Explanation: User asks simple question; system expands to ALL section and subsection levels (F.1, F.2.1, F.2.3.1, etc.) to capture granular operational details. Keywords must include subsection patterns to retrieve specific requirements.
-
-""",
-    """Example 11 (DOMAIN EXPANSION - Intern-Level Query):
-
-Query: "What do we need to put in our proposal?"
-
-Output:
-{
-  "high_level_keywords": ["Proposal requirements", "Section L instructions", "Submission requirements", "Volume structure", "Compliance requirements", "Evaluation criteria"],
-  "low_level_keywords": ["Technical volume", "Management volume", "Past performance", "Price volume", "Page limits", "Font requirements", "Format specifications", "Section L", "Section M", "Evaluation factors", "Due date", "Submission method", "Number of copies", "Electronic submission"]
-}
-
-Explanation: Non-expert asks generic question; system understands they need Section L submission instructions and Section M evaluation alignment.
-
-""",
-    """Example 12 (DOMAIN EXPANSION - Cost Analyst Query with SUBSECTION Granularity):
-
-Query: "Give me everything I need to build the BOE for Appendix F"
-
-Output:
-{
-  "high_level_keywords": ["Basis of Estimate", "BOE inputs", "Labor hours", "FTE calculation", "Cost drivers", "Staffing model", "Appendix F services", "Recreational services", "Fitness program"],
-  "low_level_keywords": ["Workload drivers", "Daily customers", "Service frequencies", "Coverage hours", "24/7 operations", "Equipment lists", "Facility requirements", "Personnel qualifications", "Section F.1", "Section F.2", "Section F.3", "F.2.1 Operation Locations", "F.2.2 C.A.C Operations", "F.2.3 Resale Activities", "F.2.3.1 Customer Service Bar", "F.2.4 Special Events", "F.2.5 Community Activity Program", "F.2.6 Weekly Activities", "F.2.9 Inventory", "F.2.10 Equipment Maintenance", "F.3.1 Fitness Locations", "F.3.2 Sports Program", "F.3.5 Facilities Maintenance", "Customer counts", "Service rates per hour", "Special events frequency", "Shift coverage", "USN requirements", "LN/OCN supervision"]
-}
-
-Explanation: Cost analyst needs BOE data; system MUST expand to SUBSECTION level (F.2.1, F.2.3.1, F.3.5.2) to capture ALL granular operational metrics. Each subsection contains unique workload drivers that aggregate to total labor requirements.
-
-""",
-    """Example 13 (DOMAIN EXPANSION - Capture Manager Strategy):
-
-Query: "What does the government really care about?"
-
-Output:
-{
-  "high_level_keywords": ["Evaluation priorities", "Customer hot buttons", "Win themes", "Government emphasis", "Source selection criteria", "Most important factors"],
-  "low_level_keywords": ["Section M", "Evaluation factors", "Technical approach", "Management approach", "Past performance", "Price", "Factor weights", "Adjectival ratings", "Strengths", "Weaknesses", "Risk", "Outstanding", "Acceptable", "Mission critical", "Key personnel", "Relevant experience"]
-}
-
-Explanation: Capture manager asks casual question; system understands intent is to identify evaluation priorities and discriminators from Section M.
-
-""",
-    """Example 14 (DOMAIN EXPANSION - Compliance Check):
-
-Query: "What are we required to do?"
-
-Output:
-{
-  "high_level_keywords": ["Contractor requirements", "Mandatory obligations", "Shall statements", "Contract requirements", "Performance requirements", "Compliance obligations"],
-  "low_level_keywords": ["Shall", "Must", "Required", "Contractor shall", "Section C", "PWS", "SOW", "Deliverables", "CDRL", "Reporting requirements", "Submission deadlines", "Performance standards", "Certifications", "FAR clauses", "DFARS clauses"]
-}
-
-Explanation: User asks broad compliance question; system retrieves all mandatory requirements (shall/must statements) across the contract.
-
-""",
-    """Example 15 (DOMAIN EXPANSION - New Team Member):
-
-Query: "How is this contract structured?"
-
-Output:
-{
-  "high_level_keywords": ["Contract structure", "UCF format", "RFP organization", "Document sections", "Contract overview"],
-  "low_level_keywords": ["Section A", "Section B", "Section C", "Section D", "Section E", "Section F", "Section G", "Section H", "Section I", "Section J", "Section K", "Section L", "Section M", "CLINs", "PWS", "SOW", "Attachments", "Exhibits", "Appendices"]
-}
-
-Explanation: New team member needs orientation; system retrieves UCF structure and section organization to provide contract overview.
-
-""",
-    """Example 16 (REAL-WORLD - Polished Cost Estimator Query):
-
-Query: "Provide a complete list of workload drivers for the recreational services. Include frequencies, quantities, hours, coverage, and equipment that support developing a Basis of Estimate for labor and FTEs. Exclude surveillance metrics and performance objectives. Organize by section."
-
-Output:
-{
-  "high_level_keywords": ["Workload drivers", "Recreational services", "Basis of Estimate", "Labor calculation", "FTE development", "Cost inputs", "Appendix F"],
-  "low_level_keywords": ["Frequencies", "Quantities", "Hours of coverage", "Equipment lists", "Section F.1", "Section F.2", "Section F.3", "F.2.1", "F.2.2", "F.2.3", "F.2.3.1", "F.2.3.2", "F.2.4", "F.2.5", "F.2.6", "F.2.9", "F.2.10", "F.3.1", "F.3.2", "F.3.5", "CRP", "Fitness Program", "Daily customers", "24/7 coverage", "Service rates", "Special events", "Customer counts", "Facility operations", "Personnel requirements", "USN staffing", "Shift coverage", "Subsection requirements"]
-}
-
-Explanation: Experienced cost estimator provides detailed query; system retrieves comprehensive workload data INCLUDING ALL SUBSECTIONS (F.2.1, F.2.3.1, F.3.5.2, etc.) for complete granular detail.
-
-""",
-    """Example 17 (CRITICAL - Hierarchical Document Pattern - GENERALIZABLE):
-
-Query: "What are the specific requirements for the fitness centers?"
-
-Output:
-{
-  "high_level_keywords": ["Fitness requirements", "Fitness program", "Sports program", "Physical fitness", "Exercise facilities", "Gym operations"],
-  "low_level_keywords": ["Fitness center", "Fitness annex", "Satellite facilities", "Main gym", "24/7 coverage", "Daily customers", "Headcounts", "Operation locations", "Sports events", "Equipment maintenance", "Interior maintenance", "Equipment cleaning", "Personnel requirements", "Subsection", "Paragraph", "Nested requirements"]
-}
-
-Explanation: PATTERN-BASED APPROACH - Include topic-specific keywords (fitness, gym, equipment) plus generic hierarchy indicators (subsection, paragraph, nested). The system should retrieve ALL hierarchy levels regardless of the specific numbering scheme (1.2.3, A.1.2, F.3.5.2.1, etc.) used by the document. Let the knowledge graph's actual structure guide what's retrieved.
-
-""",
-    """Example 18 (DIVERSE DOMAIN - IT Services Contract):
-
-Query: "What are the workload drivers for help desk support?"
-
-Output:
-{
-  "high_level_keywords": ["Help desk workload", "IT support requirements", "Service desk operations", "Technical support", "Incident management", "Ticket volume"],
-  "low_level_keywords": ["Tickets per day", "Call volume", "Average handle time", "Response time", "Resolution time", "Tier 1 support", "Tier 2 support", "Tier 3 escalation", "24/7 coverage", "Business hours", "After hours support", "Users supported", "Devices supported", "SLA requirements", "First call resolution", "Help desk staff", "Technician requirements"]
-}
-
-Explanation: IT SERVICES domain - keywords are specific to help desk/IT support. The PATTERN is the same (expand to operational metrics, volumes, coverage) but TERMS are domain-appropriate. System should identify domain from query and generate relevant keywords.
-
-""",
-    """Example 19 (DIVERSE DOMAIN - Food Services Contract):
-
-Query: "What are the labor requirements for dining operations?"
-
-Output:
-{
-  "high_level_keywords": ["Food service labor", "Dining operations", "Cafeteria staffing", "Meal service requirements", "Kitchen operations", "Food preparation"],
-  "low_level_keywords": ["Meals per day", "Headcount", "Dining facility capacity", "Breakfast service", "Lunch service", "Dinner service", "Operating hours", "Peak meal times", "Kitchen staff", "Serving staff", "Food handlers", "Menu cycles", "Special diets", "Grab and go", "Catering events", "Food safety certifications", "ServSafe"]
-}
-
-Explanation: FOOD SERVICES domain - same pattern (operational metrics, volumes, staffing) but keywords are food-service specific. LLM should recognize query domain and adapt keyword vocabulary accordingly.
-
-""",
-    """Example 20 (DIVERSE DOMAIN - Security Services Contract):
-
-Query: "What are the staffing requirements?"
-
-Output:
-{
-  "high_level_keywords": ["Security staffing", "Guard requirements", "Access control", "Physical security", "Force protection", "Security operations"],
-  "low_level_keywords": ["Guard posts", "Patrol routes", "Shift coverage", "24/7 security", "Entry control points", "Visitor processing", "Badge checks", "Vehicle inspections", "Armed guards", "Unarmed guards", "Supervisor ratio", "Response time", "Incident reports", "Clearance requirements", "Training certifications", "Post orders"]
-}
-
-Explanation: SECURITY SERVICES domain - demonstrates pattern applies to physical security contracts. Keywords reflect security-specific operational metrics and staffing patterns.
-
-""",
-    """Example 21 (CRITICAL - Domain Adaptation Instruction):
-
-Query: "What does this contract require us to do?"
-
-Output:
-{
-  "high_level_keywords": ["Contract requirements", "Scope of work", "Performance requirements", "Deliverables", "Contractor obligations", "Service requirements"],
-  "low_level_keywords": ["Shall statements", "Must requirements", "Mandatory", "Required services", "Tasks", "Subtasks", "Work breakdown", "Service levels", "Performance standards", "Reporting requirements", "Deliverable schedule", "Personnel requirements", "Qualifications", "Certifications"]
-}
-
-Explanation: DOMAIN-AGNOSTIC query - when domain is unclear, use GENERIC contract terms that apply to ANY solicitation type. The LLM should: (1) Identify domain from query context if possible, (2) Use domain-specific keywords when domain is clear, (3) Fall back to generic contract terms when domain is unclear. Examples 10-20 show domain-specific patterns; this example shows the generic fallback.
 
 """,
 ]
