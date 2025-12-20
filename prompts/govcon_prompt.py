@@ -393,6 +393,14 @@ Extract two distinct types of keywords:
 
 6. **Language:** Keywords in {language}. Preserve proper nouns exactly.
 
+7. **CRITICAL - Domain Adaptation:**
+   - Examples below show patterns across DIFFERENT contract types (Facility, IT, Food, Security)
+   - Do NOT copy example keywords verbatim - ADAPT to the actual query domain
+   - If query is about "help desk" → use IT support keywords (not fitness center)
+   - If query is about "meal service" → use food service keywords (not security guards)
+   - Identify the domain from the user's query and generate domain-appropriate keywords
+   - When domain is unclear, use generic government contracting terms
+
 ---Examples---
 
 {examples}
@@ -614,17 +622,56 @@ Output:
 Explanation: PATTERN-BASED APPROACH - Include topic-specific keywords (fitness, gym, equipment) plus generic hierarchy indicators (subsection, paragraph, nested). The system should retrieve ALL hierarchy levels regardless of the specific numbering scheme (1.2.3, A.1.2, F.3.5.2.1, etc.) used by the document. Let the knowledge graph's actual structure guide what's retrieved.
 
 """,
-    """Example 18 (PATTERN - Topic Expansion Without Assuming Document Structure):
+    """Example 18 (DIVERSE DOMAIN - IT Services Contract):
 
-Query: "What are the maintenance requirements?"
+Query: "What are the workload drivers for help desk support?"
 
 Output:
 {
-  "high_level_keywords": ["Maintenance requirements", "Preventive maintenance", "Equipment maintenance", "Facility maintenance", "Repair requirements", "Upkeep"],
-  "low_level_keywords": ["Maintenance schedule", "Inspection frequency", "Repair response time", "Equipment checks", "Cleaning requirements", "Daily maintenance", "Weekly maintenance", "Monthly maintenance", "Annual maintenance", "Interior maintenance", "Exterior maintenance", "Preventive", "Corrective", "Emergency repairs", "Maintenance personnel", "Technician requirements"]
+  "high_level_keywords": ["Help desk workload", "IT support requirements", "Service desk operations", "Technical support", "Incident management", "Ticket volume"],
+  "low_level_keywords": ["Tickets per day", "Call volume", "Average handle time", "Response time", "Resolution time", "Tier 1 support", "Tier 2 support", "Tier 3 escalation", "24/7 coverage", "Business hours", "After hours support", "Users supported", "Devices supported", "SLA requirements", "First call resolution", "Help desk staff", "Technician requirements"]
 }
 
-Explanation: Topic-focused keywords that will match maintenance entities regardless of WHERE they appear in document hierarchy. The keywords focus on WHAT (maintenance concepts) not WHERE (specific section numbers). This approach works across any document structure.
+Explanation: IT SERVICES domain - keywords are specific to help desk/IT support. The PATTERN is the same (expand to operational metrics, volumes, coverage) but TERMS are domain-appropriate. System should identify domain from query and generate relevant keywords.
+
+""",
+    """Example 19 (DIVERSE DOMAIN - Food Services Contract):
+
+Query: "What are the labor requirements for dining operations?"
+
+Output:
+{
+  "high_level_keywords": ["Food service labor", "Dining operations", "Cafeteria staffing", "Meal service requirements", "Kitchen operations", "Food preparation"],
+  "low_level_keywords": ["Meals per day", "Headcount", "Dining facility capacity", "Breakfast service", "Lunch service", "Dinner service", "Operating hours", "Peak meal times", "Kitchen staff", "Serving staff", "Food handlers", "Menu cycles", "Special diets", "Grab and go", "Catering events", "Food safety certifications", "ServSafe"]
+}
+
+Explanation: FOOD SERVICES domain - same pattern (operational metrics, volumes, staffing) but keywords are food-service specific. LLM should recognize query domain and adapt keyword vocabulary accordingly.
+
+""",
+    """Example 20 (DIVERSE DOMAIN - Security Services Contract):
+
+Query: "What are the staffing requirements?"
+
+Output:
+{
+  "high_level_keywords": ["Security staffing", "Guard requirements", "Access control", "Physical security", "Force protection", "Security operations"],
+  "low_level_keywords": ["Guard posts", "Patrol routes", "Shift coverage", "24/7 security", "Entry control points", "Visitor processing", "Badge checks", "Vehicle inspections", "Armed guards", "Unarmed guards", "Supervisor ratio", "Response time", "Incident reports", "Clearance requirements", "Training certifications", "Post orders"]
+}
+
+Explanation: SECURITY SERVICES domain - demonstrates pattern applies to physical security contracts. Keywords reflect security-specific operational metrics and staffing patterns.
+
+""",
+    """Example 21 (CRITICAL - Domain Adaptation Instruction):
+
+Query: "What does this contract require us to do?"
+
+Output:
+{
+  "high_level_keywords": ["Contract requirements", "Scope of work", "Performance requirements", "Deliverables", "Contractor obligations", "Service requirements"],
+  "low_level_keywords": ["Shall statements", "Must requirements", "Mandatory", "Required services", "Tasks", "Subtasks", "Work breakdown", "Service levels", "Performance standards", "Reporting requirements", "Deliverable schedule", "Personnel requirements", "Qualifications", "Certifications"]
+}
+
+Explanation: DOMAIN-AGNOSTIC query - when domain is unclear, use GENERIC contract terms that apply to ANY solicitation type. The LLM should: (1) Identify domain from query context if possible, (2) Use domain-specific keywords when domain is clear, (3) Fall back to generic contract terms when domain is unclear. Examples 10-20 show domain-specific patterns; this example shows the generic fallback.
 
 """,
 ]
