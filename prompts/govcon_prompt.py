@@ -377,6 +377,13 @@ Extract two distinct types of keywords:
    - Recognize UCF structure: evaluation factors, submission instructions, SOW/PWS
    - Recognize Shipley concepts: win themes, discriminators, hot buttons, BOE
 
+5. **CRITICAL - Subsection Granularity Expansion:**
+   - When user asks about ANY section, ALWAYS expand to subsection levels
+   - Pattern: Section F → F.1 → F.2 → F.2.1 → F.2.3 → F.2.3.1 (all levels!)
+   - Example: "workload drivers" → include "F.2.1", "F.2.3.1", "F.3.5.2.1" etc.
+   - Rationale: Each subsection contains UNIQUE operational details that are MISSED if only top-level sections are searched
+   - This granular expansion is REQUIRED for comprehensive retrieval of specific requirements
+
 5. **Handle Edge Cases:** For vague queries (e.g., "hello", "ok"), return empty lists for both types.
 
 6. **Language:** Keywords in {language}. Preserve proper nouns exactly.
@@ -505,10 +512,10 @@ Query: "What are the workload drivers?"
 Output:
 {
   "high_level_keywords": ["Workload drivers", "Basis of Estimate", "BOE development", "Labor requirements", "Staffing analysis", "FTE calculation", "Cost estimation"],
-  "low_level_keywords": ["Frequencies", "Quantities", "Hours of coverage", "Daily customers", "Service rates", "Equipment counts", "Facility square footage", "Operating hours", "24/7 operations", "Personnel requirements", "Shift patterns", "Section F", "Section G", "Section H", "Appendix F"]
+  "low_level_keywords": ["Frequencies", "Quantities", "Hours of coverage", "Daily customers", "Service rates", "Equipment counts", "Facility square footage", "Operating hours", "24/7 operations", "Personnel requirements", "Shift patterns", "Appendix F", "Section F.1", "Section F.2", "Section F.3", "Section G", "Section H", "F.2.1", "F.2.3", "F.2.4", "F.3.1", "F.3.2", "Subsection details", "Operational parameters"]
 }
 
-Explanation: User asks simple question; system expands using GovCon domain knowledge to retrieve workload-related entities across all relevant sections.
+Explanation: User asks simple question; system expands to ALL section and subsection levels (F.1, F.2.1, F.2.3.1, etc.) to capture granular operational details. Keywords must include subsection patterns to retrieve specific requirements.
 
 """,
     """Example 11 (DOMAIN EXPANSION - Intern-Level Query):
@@ -524,17 +531,17 @@ Output:
 Explanation: Non-expert asks generic question; system understands they need Section L submission instructions and Section M evaluation alignment.
 
 """,
-    """Example 12 (DOMAIN EXPANSION - Cost Analyst Query):
+    """Example 12 (DOMAIN EXPANSION - Cost Analyst Query with SUBSECTION Granularity):
 
 Query: "Give me everything I need to build the BOE for Appendix F"
 
 Output:
 {
-  "high_level_keywords": ["Basis of Estimate", "BOE inputs", "Labor hours", "FTE calculation", "Cost drivers", "Staffing model", "Appendix F services"],
-  "low_level_keywords": ["Workload drivers", "Daily customers", "Service frequencies", "Coverage hours", "24/7 operations", "Equipment lists", "Facility requirements", "Personnel qualifications", "Section F.1", "Section F.2", "Section F.3", "Customer counts", "Service rates per hour", "Special events frequency", "Shift coverage", "USN requirements", "LN/OCN supervision"]
+  "high_level_keywords": ["Basis of Estimate", "BOE inputs", "Labor hours", "FTE calculation", "Cost drivers", "Staffing model", "Appendix F services", "Recreational services", "Fitness program"],
+  "low_level_keywords": ["Workload drivers", "Daily customers", "Service frequencies", "Coverage hours", "24/7 operations", "Equipment lists", "Facility requirements", "Personnel qualifications", "Section F.1", "Section F.2", "Section F.3", "F.2.1 Operation Locations", "F.2.2 C.A.C Operations", "F.2.3 Resale Activities", "F.2.3.1 Customer Service Bar", "F.2.4 Special Events", "F.2.5 Community Activity Program", "F.2.6 Weekly Activities", "F.2.9 Inventory", "F.2.10 Equipment Maintenance", "F.3.1 Fitness Locations", "F.3.2 Sports Program", "F.3.5 Facilities Maintenance", "Customer counts", "Service rates per hour", "Special events frequency", "Shift coverage", "USN requirements", "LN/OCN supervision"]
 }
 
-Explanation: Cost analyst needs BOE data; system retrieves all quantitative operational parameters from Appendix F excluding performance metrics.
+Explanation: Cost analyst needs BOE data; system MUST expand to SUBSECTION level (F.2.1, F.2.3.1, F.3.5.2) to capture ALL granular operational metrics. Each subsection contains unique workload drivers that aggregate to total labor requirements.
 
 """,
     """Example 13 (DOMAIN EXPANSION - Capture Manager Strategy):
@@ -583,10 +590,23 @@ Query: "Provide a complete list of workload drivers for the recreational service
 Output:
 {
   "high_level_keywords": ["Workload drivers", "Recreational services", "Basis of Estimate", "Labor calculation", "FTE development", "Cost inputs", "Appendix F"],
-  "low_level_keywords": ["Frequencies", "Quantities", "Hours of coverage", "Equipment lists", "Section F.1", "Section F.2", "Section F.3", "CRP", "Fitness Program", "Daily customers", "24/7 coverage", "Service rates", "Special events", "Customer counts", "Facility operations", "Personnel requirements", "USN staffing", "Shift coverage"]
+  "low_level_keywords": ["Frequencies", "Quantities", "Hours of coverage", "Equipment lists", "Section F.1", "Section F.2", "Section F.3", "F.2.1", "F.2.2", "F.2.3", "F.2.3.1", "F.2.3.2", "F.2.4", "F.2.5", "F.2.6", "F.2.9", "F.2.10", "F.3.1", "F.3.2", "F.3.5", "CRP", "Fitness Program", "Daily customers", "24/7 coverage", "Service rates", "Special events", "Customer counts", "Facility operations", "Personnel requirements", "USN staffing", "Shift coverage", "Subsection requirements"]
 }
 
-Explanation: Experienced cost estimator provides detailed query; system retrieves comprehensive workload data organized by PWS section, excluding QA/surveillance metrics.
+Explanation: Experienced cost estimator provides detailed query; system retrieves comprehensive workload data INCLUDING ALL SUBSECTIONS (F.2.1, F.2.3.1, F.3.5.2, etc.) for complete granular detail.
+
+""",
+    """Example 17 (CRITICAL - Subsection Granularity Pattern):
+
+Query: "What are the specific requirements for the fitness centers?"
+
+Output:
+{
+  "high_level_keywords": ["Fitness requirements", "Fitness program", "Sports program", "Physical fitness", "Exercise facilities"],
+  "low_level_keywords": ["Section F.3", "F.3.1 Operation Locations", "F.3.2 Comprehensive Sports", "F.3.2.2 Instructor-Led Classes", "F.3.2.3 Special Sports Events", "F.3.3 Equipment Sign Out", "F.3.4 Daily Paperwork", "F.3.5 Fitness Centers Maintenance", "F.3.5.1 Exterior Facilities", "F.3.5.2 Interior Maintenance", "F.3.5.2.1 Equipment Cleaning", "F.3.5.2.2 Equipment Return", "F.3.5.2.3 Trash Water Bottles", "F.3.5.2.4 Jerseys", "F.3.5.2.5 Bottled Water", "F.3.5.2.6 Equipment Inspection", "F.3.6 Monthly Calendar", "F.3.7 Personnel Requirements", "Fitness center", "Fitness annex", "Satellite facilities", "Main gym", "24/7 coverage", "1600 daily customers", "Headcounts"]
+}
+
+Explanation: CRITICAL PATTERN - When user asks about ANY section, system MUST expand to ALL subsection levels (F.3 → F.3.1 → F.3.5 → F.3.5.2 → F.3.5.2.1). Each subsection level contains unique operational details that would be MISSED if only top-level sections are searched. This granular expansion is REQUIRED for comprehensive retrieval.
 
 """,
 ]
