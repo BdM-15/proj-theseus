@@ -377,12 +377,17 @@ Extract two distinct types of keywords:
    - Recognize UCF structure: evaluation factors, submission instructions, SOW/PWS
    - Recognize Shipley concepts: win themes, discriminators, hot buttons, BOE
 
-5. **CRITICAL - Subsection Granularity Expansion:**
-   - When user asks about ANY section, ALWAYS expand to subsection levels
-   - Pattern: Section F → F.1 → F.2 → F.2.1 → F.2.3 → F.2.3.1 (all levels!)
-   - Example: "workload drivers" → include "F.2.1", "F.2.3.1", "F.3.5.2.1" etc.
-   - Rationale: Each subsection contains UNIQUE operational details that are MISSED if only top-level sections are searched
-   - This granular expansion is REQUIRED for comprehensive retrieval of specific requirements
+5. **CRITICAL - Hierarchical Document Expansion (ANY Document Structure):**
+   - Government documents use nested hierarchical numbering (parent → child → grandchild)
+   - When user asks about a topic, include keywords for ALL hierarchy levels found in the document
+   - Common patterns to recognize and expand:
+     * Numeric: 1.0 → 1.1 → 1.1.2 → 1.1.2.4
+     * Alphanumeric: A.1 → A.1.2 → A.1.2.3
+     * Mixed: 3.2.1.a → 3.2.1.b
+     * Paragraph: Para 4.1 → Para 4.1.2
+   - The pattern is: If document has nested structure X.Y.Z, include X, X.Y, and X.Y.Z levels
+   - Rationale: Each hierarchy level contains UNIQUE details MISSED if only top-level is searched
+   - ADAPT to whatever structure the actual document uses - patterns vary by solicitation
 
 5. **Handle Edge Cases:** For vague queries (e.g., "hello", "ok"), return empty lists for both types.
 
@@ -596,17 +601,30 @@ Output:
 Explanation: Experienced cost estimator provides detailed query; system retrieves comprehensive workload data INCLUDING ALL SUBSECTIONS (F.2.1, F.2.3.1, F.3.5.2, etc.) for complete granular detail.
 
 """,
-    """Example 17 (CRITICAL - Subsection Granularity Pattern):
+    """Example 17 (CRITICAL - Hierarchical Document Pattern - GENERALIZABLE):
 
 Query: "What are the specific requirements for the fitness centers?"
 
 Output:
 {
-  "high_level_keywords": ["Fitness requirements", "Fitness program", "Sports program", "Physical fitness", "Exercise facilities"],
-  "low_level_keywords": ["Section F.3", "F.3.1 Operation Locations", "F.3.2 Comprehensive Sports", "F.3.2.2 Instructor-Led Classes", "F.3.2.3 Special Sports Events", "F.3.3 Equipment Sign Out", "F.3.4 Daily Paperwork", "F.3.5 Fitness Centers Maintenance", "F.3.5.1 Exterior Facilities", "F.3.5.2 Interior Maintenance", "F.3.5.2.1 Equipment Cleaning", "F.3.5.2.2 Equipment Return", "F.3.5.2.3 Trash Water Bottles", "F.3.5.2.4 Jerseys", "F.3.5.2.5 Bottled Water", "F.3.5.2.6 Equipment Inspection", "F.3.6 Monthly Calendar", "F.3.7 Personnel Requirements", "Fitness center", "Fitness annex", "Satellite facilities", "Main gym", "24/7 coverage", "1600 daily customers", "Headcounts"]
+  "high_level_keywords": ["Fitness requirements", "Fitness program", "Sports program", "Physical fitness", "Exercise facilities", "Gym operations"],
+  "low_level_keywords": ["Fitness center", "Fitness annex", "Satellite facilities", "Main gym", "24/7 coverage", "Daily customers", "Headcounts", "Operation locations", "Sports events", "Equipment maintenance", "Interior maintenance", "Equipment cleaning", "Personnel requirements", "Subsection", "Paragraph", "Nested requirements"]
 }
 
-Explanation: CRITICAL PATTERN - When user asks about ANY section, system MUST expand to ALL subsection levels (F.3 → F.3.1 → F.3.5 → F.3.5.2 → F.3.5.2.1). Each subsection level contains unique operational details that would be MISSED if only top-level sections are searched. This granular expansion is REQUIRED for comprehensive retrieval.
+Explanation: PATTERN-BASED APPROACH - Include topic-specific keywords (fitness, gym, equipment) plus generic hierarchy indicators (subsection, paragraph, nested). The system should retrieve ALL hierarchy levels regardless of the specific numbering scheme (1.2.3, A.1.2, F.3.5.2.1, etc.) used by the document. Let the knowledge graph's actual structure guide what's retrieved.
+
+""",
+    """Example 18 (PATTERN - Topic Expansion Without Assuming Document Structure):
+
+Query: "What are the maintenance requirements?"
+
+Output:
+{
+  "high_level_keywords": ["Maintenance requirements", "Preventive maintenance", "Equipment maintenance", "Facility maintenance", "Repair requirements", "Upkeep"],
+  "low_level_keywords": ["Maintenance schedule", "Inspection frequency", "Repair response time", "Equipment checks", "Cleaning requirements", "Daily maintenance", "Weekly maintenance", "Monthly maintenance", "Annual maintenance", "Interior maintenance", "Exterior maintenance", "Preventive", "Corrective", "Emergency repairs", "Maintenance personnel", "Technician requirements"]
+}
+
+Explanation: Topic-focused keywords that will match maintenance entities regardless of WHERE they appear in document hierarchy. The keywords focus on WHAT (maintenance concepts) not WHERE (specific section numbers). This approach works across any document structure.
 
 """,
 ]
