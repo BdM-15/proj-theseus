@@ -96,7 +96,7 @@ GOVCON_PROMPTS["entity_extraction_system_prompt"] = _load_extraction_prompt()
 # ENTITY EXTRACTION USER PROMPT
 # ═══════════════════════════════════════════════════════════════════════════════
 GOVCON_PROMPTS["entity_extraction_user_prompt"] = """---Task---
-Extract entities and relationships from the input text to be processed.
+Extract entities and relationships from the input text in Data to be Processed below.
 
 ---Instructions---
 1.  **Strict Adherence to Format:** Follow all format requirements from the system prompt including output order, field delimiters, and proper noun handling.
@@ -150,7 +150,7 @@ You are a Federal Government Contracting Knowledge Graph Specialist, proficient 
 
 ---Task---
 
-Synthesize a list of descriptions of a given entity or relation into a single, comprehensive summary for government contracting analysis.
+Synthesize a list of descriptions of a given entity or relation into a single, comprehensive, and cohesive summary for government contracting analysis.
 
 ---Instructions---
 
@@ -218,7 +218,7 @@ You are a Federal Government Contracting Intelligence Specialist supporting the 
 
 **Capture Team Roles:**
 - **Capture Managers:** Win themes, competitive positioning, customer hot buttons, discriminators
-- **Proposal Managers:** Compliance matrices, proposal outlines, Section L↔M mapping, page limits
+- **Proposal Managers:** Compliance matrices, proposal outlines, instructions-to-evaluation alignment, page limits
 - **Proposal Writers:** Requirement details, technical specifications, deliverable descriptions
 - **Cost Estimators:** Workload drivers, labor hours, equipment counts, frequencies, BOE inputs
 - **Contracts Managers:** FAR/DFARS clauses, terms & conditions, regulatory compliance, CLINs
@@ -251,7 +251,7 @@ Consider the conversation history if provided to maintain conversational flow an
      * Service rates, frequencies, dollar amounts, quantities
      * Time ranges, coverage specifications, thresholds
    - Cite exact clause numbers (FAR 52.xxx, DFARS 252.xxx)
-   - Cite section references (Section L.3.1, Section M.2)
+   - Cite document structure references (e.g., Section L.3.1, Paragraph 4.2.1, Appendix F.3)
    - Cite CDRL numbers, CLIN numbers
    - Distinguish mandatory (shall/must) from advisory (should/may) requirements
    - Note evaluation factor weights and importance levels
@@ -372,8 +372,8 @@ Extract two distinct types of keywords:
 
 4. **GovCon Domain Awareness:**
    - Recognize clause patterns: FAR 52.xxx, DFARS 252.xxx
-   - Recognize CDRL patterns: CDRL A001, CDRL A016
-   - Recognize section patterns: Section L, Section M, Section C.3.2
+   - Recognize deliverable patterns: CDRL A001, DID, SOW deliverables
+   - Recognize document structure patterns: Section X.Y.Z, Paragraph N.N, Appendix A
    - Recognize Shipley concepts: win themes, discriminators, hot buttons, BOE
 
 5. **Handle Edge Cases:** For vague queries (e.g., "hello", "ok"), return empty lists for both types.
@@ -426,7 +426,7 @@ Query: "What are the evaluation factors?"
 
 Output:
 {
-  "high_level_keywords": ["Evaluation factors", "Section M", "Source selection", "Proposal evaluation"],
+  "high_level_keywords": ["Evaluation factors", "Evaluation criteria", "Source selection", "Proposal evaluation"],
   "low_level_keywords": ["Technical approach", "Management approach", "Past performance", "Price", "Factor weights", "Adjectival ratings"]
 }
 
@@ -448,7 +448,7 @@ Query: "What are the proposal page limits?"
 
 Output:
 {
-  "high_level_keywords": ["Submission requirements", "Section L", "Proposal format"],
+  "high_level_keywords": ["Submission requirements", "Proposal instructions", "Proposal format"],
   "low_level_keywords": ["Page limits", "Technical volume", "Font size", "Margins", "Format requirements"]
 }
 
@@ -488,12 +488,12 @@ Output:
 """,
     """Example 9:
 
-Query: "How does Section L map to Section M?"
+Query: "How do proposal instructions align to evaluation factors?"
 
 Output:
 {
-  "high_level_keywords": ["L to M mapping", "Proposal compliance", "Evaluation alignment"],
-  "low_level_keywords": ["Section L", "Section M", "Technical volume", "Evaluation factors", "Page limits"]
+  "high_level_keywords": ["Instructions-to-evaluation alignment", "Proposal compliance", "Evaluation traceability"],
+  "low_level_keywords": ["Submission instructions", "Evaluation factors", "Technical volume", "Compliance matrix", "Page limits"]
 }
 
 """,
@@ -505,15 +505,15 @@ Output:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 GOVCON_PROMPTS["fail_response"] = (
-    "I couldn't find relevant information in the RFP documents to answer that question. "
+    "I couldn't find relevant information in the documents to answer that question. "
     "Please try rephrasing your query or asking about specific:\n"
-    "- Sections (L, M, C, I, J)\n"
-    "- Requirements (shall/should statements)\n"
-    "- Evaluation factors and weights\n"
-    "- Deliverables and CDRLs\n"
-    "- FAR/DFARS clauses\n"
+    "- Submission instructions or proposal requirements\n"
+    "- Evaluation factors and criteria\n"
+    "- Scope of work or performance requirements\n"
+    "- Deliverables and reporting requirements\n"
+    "- Contract clauses (FAR/DFARS if applicable)\n"
     "- Workload drivers and quantities\n"
-    "- Performance metrics and thresholds[no-context]"
+    "- Performance metrics and standards[no-context]"
 )
 
 
