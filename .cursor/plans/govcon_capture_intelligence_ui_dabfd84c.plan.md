@@ -5,14 +5,23 @@ todos:
   - id: core-app
     content: Create Streamlit app skeleton with dark theme CSS and multi-page structure
     status: pending
+  - id: server-manager
+    content: Build lazy server spawner with port allocation and lifecycle management
+    status: pending
   - id: api-client
-    content: Build LightRAG API client wrapper for all endpoints
+    content: Build LightRAG API client wrapper with dynamic port routing
+    status: pending
+  - id: command-center
+    content: Build Command Center landing page with cross-workspace metrics and health matrix
     status: pending
   - id: personas
     content: Implement persona config with role-specific prompts and entity filters
     status: pending
   - id: sidebar
-    content: Implement persistent sidebar with workspace/model/persona selectors
+    content: Implement sidebar with lazy workspace spawning, server status, and close button
+    status: pending
+  - id: portfolio
+    content: Build Contract Portfolio page with IDIQ hierarchy and task order analysis
     status: pending
   - id: chat-page
     content: Build Chat page with full conversation memory and persona-aware prompts
@@ -21,7 +30,7 @@ todos:
     content: Create Dashboard with entity counts and persona-focused widgets
     status: pending
   - id: compliance
-    content: Build Compliance Matrix page with L/M auto-mapping
+    content: Build Compliance Matrix page with L/M auto-mapping and Excel export
     status: pending
   - id: win-themes
     content: Create Win Theme Builder with theme synthesis
@@ -29,8 +38,11 @@ todos:
   - id: documents
     content: Implement Document Hub with upload and status tracking
     status: pending
+  - id: exports
+    content: Add export functionality for Excel, PowerPoint, and Word formats
+    status: pending
   - id: graph-viz
-    content: Add Knowledge Explorer with interactive graph visualization
+    content: Add Knowledge Explorer with interactive graph visualization (Phase 8)
     status: pending
 ---
 
@@ -47,6 +59,7 @@ todos:
 ```mermaid
 graph TB
     subgraph ui [Streamlit Frontend]
+        Sidebar[Sidebar + Server Manager]
         Dashboard[Dashboard]
         Chat[Capture Chat]
         Compliance[Compliance Matrix]
@@ -55,19 +68,246 @@ graph TB
         Docs[Document Hub]
     end
     
-    subgraph backend [LightRAG Backend]
-        API["/query, /api/chat"]
-        Neo4j[(Neo4j Graph)]
-        Storage[(RAG Storage)]
+    subgraph manager [Server Manager]
+        Spawner[Lazy Spawner]
+        PortAlloc[Port Allocator]
+        Registry[Server Registry]
     end
     
-    Dashboard --> API
-    Chat --> API
-    Compliance --> Neo4j
-    WinThemes --> API
-    Graph --> Neo4j
-    Docs --> Storage
+    subgraph servers [LightRAG Servers - On Demand]
+        S1["Server :9621 - adab_iss_final"]
+        S2["Server :9622 - swa_log"]
+        SN["Server :962N - workspace_N"]
+    end
+    
+    subgraph storage [Storage Layer]
+        RAG[(rag_storage/)]
+        Neo4j[(Neo4j Graph)]
+    end
+    
+    Sidebar --> Spawner
+    Spawner --> PortAlloc
+    Spawner --> Registry
+    Spawner --> S1
+    Spawner --> S2
+    Spawner --> SN
+    S1 --> RAG
+    S2 --> RAG
+    SN --> RAG
+    S1 --> Neo4j
 ```
+
+---
+
+## Workspace Server Management (Lazy Spawning)
+
+**Problem**: LightRAG binds to a single workspace at startup. No runtime switching API exists.
+
+**Solution**: Lazy server spawning - start a dedicated LightRAG server per workspace only when selected.
+
+### Design Principles
+
+1. **On-Demand Only**: Servers start when workspace is selected, not at app launch
+2. **Scalable**: Supports 100s of workspaces without memory bloat
+3. **Persistent Until Closed**: Server remains running until explicitly stopped
+4. **Auto-Detection**: Scan `rag_storage/` for valid workspaces (has `kv_store_text_chunks.json`)
+
+### Server Manager Implementation
+
+```python
+# capture_ui/services/server_manager.py
+
+import subprocess
+import requests
+import time
+from pathlib import Path
+from typing import Dict, Optional
+import logging
+
+logger = logging.getLogger(__name__)
+
+class WorkspaceServerManager:
+    """Manages LightRAG server instances per workspace with lazy spawning"""
+    
+    BASE_PORT = 9621
+    RAG_STORAGE_ROOT = Path("rag_storage")
+    STARTUP_TIMEOUT = 60  # seconds
+    
+    def __init__(self):
+        self.running_servers: Dict[str, dict] = {}  # workspace -> {port, process, pid}
+        self.port_counter = 0
+    
+    def detect_workspaces(self) -> list[str]:
+        """Auto-detect valid workspaces from rag_storage subdirectories"""
+        workspaces = []
+        for folder in sorted(self.RAG_STORAGE_ROOT.iterdir()):
+            if folder.is_dir():
+                # Valid workspace has processed chunks
+                if (folder / "kv_store_text_chunks.json").exists():
+                    workspaces.append(folder.name)
+        return workspaces
+    
+    def get_server_status(self, workspace: str) -> dict:
+        """Get status of a workspace server"""
+        if workspace not in self.running_servers:
+            return {"status": "stopped", "port": None}
+        
+        info = self.running_servers[workspace]
+        try:
+            resp = requests.get(f"http://localhost:{info['port']}/health", timeout=2)
+            return {"status": "running", "port": info["port"]}
+        except:
+            # Process died unexpectedly
+            del self.running_servers[workspace]
+            return {"status": "stopped", "port": None}
+    
+    def start_server(self, workspace: str) -> str:
+        """Start server for workspace (lazy spawning). Returns API URL."""
+        # Already running?
+        status = self.get_server_status(workspace)
+        if status["status"] == "running":
+            logger.info(f"Server for {workspace} already running on port {status['port']}")
+            return f"http://localhost:{status['port']}"
+        
+        # Allocate port
+        port = self.BASE_PORT + self.port_counter
+        self.port_counter += 1
+        
+        # Start server process
+        env = os.environ.copy()
+        env["WORKSPACE"] = workspace
+        env["PORT"] = str(port)
+        env["WORKING_DIR"] = str(self.RAG_STORAGE_ROOT / workspace)
+        
+        logger.info(f"Starting LightRAG server for '{workspace}' on port {port}...")
+        
+        proc = subprocess.Popen(
+            ["python", "app.py", "--port", str(port)],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        
+        self.running_servers[workspace] = {
+            "port": port,
+            "process": proc,
+            "pid": proc.pid,
+        }
+        
+        # Wait for startup
+        api_url = f"http://localhost:{port}"
+        for i in range(self.STARTUP_TIMEOUT):
+            try:
+                requests.get(f"{api_url}/health", timeout=1)
+                logger.info(f"Server for '{workspace}' ready on port {port}")
+                return api_url
+            except:
+                time.sleep(1)
+        
+        # Startup failed
+        proc.kill()
+        del self.running_servers[workspace]
+        raise RuntimeError(f"Failed to start server for {workspace} within {self.STARTUP_TIMEOUT}s")
+    
+    def stop_server(self, workspace: str) -> bool:
+        """Stop server for workspace (explicit close)"""
+        if workspace not in self.running_servers:
+            return False
+        
+        info = self.running_servers[workspace]
+        logger.info(f"Stopping server for '{workspace}' (port {info['port']})...")
+        
+        try:
+            info["process"].terminate()
+            info["process"].wait(timeout=10)
+        except:
+            info["process"].kill()
+        
+        del self.running_servers[workspace]
+        return True
+    
+    def get_active_servers(self) -> Dict[str, int]:
+        """Return dict of workspace -> port for all running servers"""
+        active = {}
+        for workspace in list(self.running_servers.keys()):
+            status = self.get_server_status(workspace)
+            if status["status"] == "running":
+                active[workspace] = status["port"]
+        return active
+
+# Singleton instance
+server_manager = WorkspaceServerManager()
+```
+
+### UI Integration (Sidebar)
+
+```python
+# In sidebar.py
+
+from services.server_manager import server_manager
+
+# Workspace selection with server status
+workspaces = server_manager.detect_workspaces()
+active_servers = server_manager.get_active_servers()
+
+st.sidebar.markdown("### Workspace")
+
+# Show available workspaces with status indicators
+for ws in workspaces:
+    status = "🟢" if ws in active_servers else "⚪"
+    col1, col2 = st.sidebar.columns([4, 1])
+    
+    with col1:
+        if st.button(f"{status} {ws}", key=f"ws_{ws}"):
+            with st.spinner(f"Starting {ws}..."):
+                api_url = server_manager.start_server(ws)
+                st.session_state.current_workspace = ws
+                st.session_state.api_url = api_url
+    
+    with col2:
+        if ws in active_servers:
+            if st.button("✕", key=f"close_{ws}"):
+                server_manager.stop_server(ws)
+                if st.session_state.get("current_workspace") == ws:
+                    st.session_state.current_workspace = None
+                    st.session_state.api_url = None
+                st.rerun()
+
+# Show current workspace prominently
+if st.session_state.get("current_workspace"):
+    st.sidebar.success(f"Active: {st.session_state.current_workspace}")
+```
+
+### Server Status Display
+
+```
+┌─────────────────────────────────┐
+│  Workspace                      │
+├─────────────────────────────────┤
+│  🟢 adab_iss_final     [✕]     │  ← Running, can close
+│  ⚪ swa_log            [ ]     │  ← Stopped, click to start
+│  ⚪ mcpp_drfp_2025     [ ]     │
+│  ⚪ 1_adab_iss_2025    [ ]     │
+│  ... (scrollable)              │
+├─────────────────────────────────┤
+│  ✓ Active: adab_iss_final      │
+│    Port: 9621                   │
+└─────────────────────────────────┘
+```
+
+### Memory Considerations
+
+| Scenario | Memory Usage |
+
+|----------|--------------|
+
+| 1 workspace active | ~300-500MB |
+
+| 5 workspaces active | ~1.5-2.5GB |
+
+| 100 workspaces available, 3 active | ~1-1.5GB |
+
+> **Note**: Only active (running) servers consume memory. Idle workspaces have zero footprint.
 
 ---
 
@@ -117,19 +357,81 @@ graph TB
 
 ## Pages and Features
 
-### 1. Dashboard (`pages/1_Dashboard.py`)
+### 0. Command Center (`pages/0_Command_Center.py`) - LANDING PAGE
 
-**Purpose**: At-a-glance opportunity health for capture reviews.
+**Purpose**: Cross-workspace portfolio overview. See everything at a glance BEFORE selecting a workspace.
 
 **Features**:
 
-- **Workspace Selector** (sidebar dropdown) - Switch between RFP workspaces
+**Portfolio Summary Cards**:
+```
+┌────────────────────────────────────────────────────────────────────┐
+│  PORTFOLIO COMMAND CENTER                                          │
+├────────────────┬────────────────┬────────────────┬────────────────┤
+│  📁 Workspaces │  📊 Total Req  │  🔗 Relations  │  ⏰ Pending    │
+│       12       │     1,847      │     3,291      │       2        │
+├────────────────┴────────────────┴────────────────┴────────────────┤
+│                                                                    │
+│  WORKSPACE HEALTH MATRIX                                           │
+│  ┌──────────────────┬───────┬────────┬───────┬────────┬────────┐  │
+│  │ Workspace        │ Reqs  │ Clauses│ KG    │ Status │ Action │  │
+│  ├──────────────────┼───────┼────────┼───────┼────────┼────────┤  │
+│  │ 🟢 adab_iss_final│  234  │   45   │ 92%   │ Ready  │ [Open] │  │
+│  │ 🟢 swa_log       │  189  │   38   │ 88%   │ Ready  │ [Open] │  │
+│  │ 🟡 mcpp_drfp     │  312  │   52   │ 75%   │ Review │ [Open] │  │
+│  │ ⚪ new_upload    │   --  │   --   │  --   │ Pending│ [Proc] │  │
+│  └──────────────────┴───────┴────────┴───────┴────────┴────────┘  │
+│                                                                    │
+│  IDIQ CONTRACT FAMILIES                                            │
+│  ┌─────────────────────────────────────────────────────────────┐  │
+│  │ 🔗 AFCAP V (3 task orders)                                  │  │
+│  │    Trend: Technical weight ↑12% across TOs                  │  │
+│  │    Common themes: Mission continuity, rapid response        │  │
+│  ├─────────────────────────────────────────────────────────────┤  │
+│  │ 🔗 LOGCAP V (2 task orders)                                 │  │
+│  │    Trend: Performance metrics becoming more stringent       │  │
+│  └─────────────────────────────────────────────────────────────┘  │
+│                                                                    │
+│  COMPLIANCE STATUS ROLLUP                                          │
+│  [████████████░░░░] 78% avg compliance across active workspaces   │
+│  ⚠️ 3 workspaces have MANDATORY requirements without coverage     │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+**Key Metrics**:
+- **Entity Counts Comparison**: Side-by-side requirement/clause/deliverable counts per workspace
+- **KG Health Score**: Relationship density, entity completeness, inference quality (0-100%)
+- **IDIQ Trend Analysis**: Cross-task-order patterns (factor weights, recurring themes)
+- **Compliance Status Rollup**: Green/Yellow/Red per workspace with drill-down
+- **Processing Queue**: Pending uploads and their estimated completion
+
+**Interactions**:
+- Click workspace row → Opens that workspace's Dashboard
+- Click IDIQ family → Opens Portfolio page filtered to that contract
+- Click compliance warning → Opens Compliance Matrix for that workspace
+
+**Data Sources**:
+- Workspace metadata files (`workspace_meta.json`)
+- Neo4j aggregate queries across all workspaces
+- Server manager status for processing state
+
+---
+
+### 1. Dashboard (`pages/1_Dashboard.py`) - WORKSPACE DETAIL
+
+**Purpose**: At-a-glance opportunity health for a SINGLE selected workspace.
+
+**Features**:
+
+- **Workspace Header**: Contract name, solicitation number, due date countdown
 - **Opportunity Scorecard**: Entity counts by type, processing status
 - **Compliance Heatmap**: Section L requirements vs Section M factors coverage
 - **Key Dates Timeline**: Events extracted from RFP (deadlines, milestones)
 - **Quick Actions**: Jump to chat, view compliance matrix, export briefing
+- **Back to Command Center**: Return to portfolio overview
 
-**Data Source**: Neo4j queries via existing API
+**Data Source**: Neo4j queries via existing API for selected workspace
 
 ---
 
@@ -214,6 +516,70 @@ graph TB
 - **Reprocess Button**: Re-run extraction with updated prompts
 
 **API**: `POST /documents/upload`, `GET /documents/status`
+
+---
+
+### 7. Contract Portfolio (`pages/7_Portfolio.py`)
+
+**Purpose**: Manage contract hierarchies (Standard vs IDIQ + Task Orders) and enable cross-contract intelligence.
+
+**Why IDIQ Matters**: IDIQs let you prepare solutions in advance. When the IDIQ base is awarded, you know the contract vehicle, terms, and scope before task orders drop. This is a strategic advantage over standard one-off contracts.
+
+**Features**:
+
+**Contract Hierarchy View**:
+```
+┌─────────────────────────────────────────────────────┐
+│  CONTRACT PORTFOLIO                                  │
+├─────────────────────────────────────────────────────┤
+│  📋 Standard Contracts (3)                           │
+│    └ SWA Logistics Support (swa_log)                │
+│    └ ADAB ISS Final (adab_iss_final)                │
+│    └ MCPP DRFP 2025 (mcpp_drfp_2025)                │
+│                                                      │
+│  🔗 IDIQ Contracts (1)                               │
+│    └─ AFCAP V Base Contract                          │
+│       ├─ Task Order 001: ADAB Infrastructure         │
+│       ├─ Task Order 002: Al Dhafra Support           │
+│       └─ [+ New Task Order]                          │
+└─────────────────────────────────────────────────────┘
+```
+
+**IDIQ Analysis Panel** (when IDIQ selected):
+- **Base Contract Summary**: Core requirements, ceiling values, period of performance
+- **Task Order Timeline**: Visual timeline of issued task orders
+- **Delta Analysis**: What changes between base and each task order
+  - New requirements added
+  - Modified evaluation factor weights
+  - Additional clauses incorporated
+- **Trend Detection**: Patterns across task orders
+  - Recurring requirement types
+  - Factor weight shifts over time
+  - Common discriminator themes
+
+**Task Order Preparation Mode**:
+- View IDIQ base requirements as "foundation"
+- Identify reusable proposal content across task orders
+- Track which clauses are inherited vs. task-specific
+- Suggested prompts: "What base IDIQ requirements will likely appear in task orders?"
+
+**Data Model** (from schema design):
+```python
+# Workspace metadata (workspace_meta.json in each rag_storage folder)
+{
+    "contract_type": "idiq" | "standard" | "task_order",
+    "parent_contract": "afcap_v_base",  # For task orders only
+    "hierarchy_level": 0 | 1,  # 0=base/standard, 1=task order
+    "solicitation_number": "FA8003-24-R-0001",
+    "award_date": "2024-03-15"
+}
+```
+
+**Implementation Notes**:
+- Workspace auto-detection scans for `workspace_meta.json` to determine hierarchy
+- If no metadata file, treat as standard contract (backward compatible)
+- IDIQ grouping is derived from `parent_contract` field
+- Delta analysis queries Neo4j for entity/relationship differences
 
 ---
 
@@ -342,44 +708,59 @@ PERSONAS = {
 ## Sidebar (Persistent Across All Pages)
 
 ```
-┌─────────────────────────┐
-│  🏛️ GovCon Capture     │
-│  Intelligence           │
-├─────────────────────────┤
-│  Workspace: [dropdown]  │
-│  ○ ADAB ISS Final       │
-│  ○ SWA Log              │
-│  ○ New Workspace...     │
-├─────────────────────────┤
-│  Persona: [dropdown]    │
-│  ○ 🎯 Capture Manager   │
-│  ○ 📋 Proposal Manager  │
-│  ○ 📊 Tech/Cost Est.    │
-│  ○ ⚖️ Contracts Mgr     │
-│  ○ 📅 Program Manager   │
-│  ○ ✍️ Proposal Writer   │
-├─────────────────────────┤
-│  Model: [dropdown]      │
-│  ○ grok-4-1-fast-reason │
-├─────────────────────────┤
-│  Query Mode: [radio]    │
-│  ○ Mix (recommended)    │
-│  ○ Hybrid               │
-│  ○ Local                │
-│  ○ Global               │
-│  (auto-set by persona)  │
-├─────────────────────────┤
-│  📊 Dashboard           │
-│  💬 Capture Chat        │
-│  ✅ Compliance Matrix   │
-│  🎯 Win Themes          │
-│  🔗 Knowledge Explorer  │
-│  📁 Documents           │
-├─────────────────────────┤
-│  ⚙️ Settings            │
-│  📤 Export Session      │
-└─────────────────────────┘
+┌─────────────────────────────────┐
+│  🏛️ GovCon Capture Intelligence │
+├─────────────────────────────────┤
+│  🏠 COMMAND CENTER              │  ← Always visible, returns to overview
+├─────────────────────────────────┤
+│  WORKSPACES (click to start)    │
+│  ┌───────────────────────┬───┐  │
+│  │ 🟢 adab_iss_final     │ ✕ │  │  ← Running (port 9621)
+│  │ ⚪ swa_log             │   │  │  ← Stopped
+│  │ ⚪ mcpp_drfp_2025      │   │  │
+│  │ ⚪ 1_adab_iss_2025     │   │  │
+│  │ ... (scrollable)       │   │  │
+│  └───────────────────────┴───┘  │
+│  ✓ Active: adab_iss_final       │
+│    Port: 9621                    │
+├─────────────────────────────────┤
+│  Persona: [dropdown]             │
+│  ○ 🎯 Capture Manager            │
+│  ○ 📋 Proposal Manager           │
+│  ○ 📊 Tech/Cost Est.             │
+│  ○ ⚖️ Contracts Mgr              │
+│  ○ 📅 Program Manager            │
+│  ○ ✍️ Proposal Writer            │
+├─────────────────────────────────┤
+│  Model: [dropdown]               │
+│  ○ grok-4-1-fast-reasoning       │
+├─────────────────────────────────┤
+│  Query Mode: [radio]             │
+│  ○ Mix (recommended)             │
+│  ○ Hybrid                        │
+│  ○ Local                         │
+│  ○ Global                        │
+│  (auto-set by persona)           │
+├─────────────────────────────────┤
+│  WORKSPACE PAGES (when active)   │
+│  📊 Dashboard                    │
+│  💬 Capture Chat                 │
+│  ✅ Compliance Matrix            │
+│  🎯 Win Themes                   │
+│  🔗 Knowledge Explorer           │
+│  📁 Documents                    │
+│  📋 Portfolio                    │
+├─────────────────────────────────┤
+│  ⚙️ Settings                     │
+│  📤 Export Session               │
+└─────────────────────────────────┘
 ```
+
+**Navigation Flow**:
+1. App opens → Command Center (cross-workspace overview)
+2. Click workspace row or "Open" button → Starts server, navigates to Dashboard
+3. Workspace pages enabled only when a workspace is active
+4. Click "Command Center" in sidebar → Returns to portfolio overview
 
 ---
 
@@ -390,24 +771,29 @@ capture_ui/
 ├── app.py                      # Main entry, page config, global CSS
 ├── config/
 │   ├── personas.py             # PERSONAS dict with role-specific configs
-│   └── settings.py             # App-wide settings (API URLs, defaults)
+│   └── settings.py             # App-wide settings (ports, paths, defaults)
+├── services/
+│   ├── server_manager.py       # Lazy server spawning and lifecycle management
+│   └── workspace_registry.py   # Contract hierarchy detection and IDIQ grouping
 ├── pages/
-│   ├── 1_Dashboard.py
+│   ├── 0_Command_Center.py     # Cross-workspace portfolio overview (LANDING)
+│   ├── 1_Dashboard.py          # Single workspace detail view
 │   ├── 2_Chat.py
 │   ├── 3_Compliance.py
 │   ├── 4_WinThemes.py
 │   ├── 5_Graph.py
-│   └── 6_Documents.py
+│   ├── 6_Documents.py
+│   └── 7_Portfolio.py          # Contract hierarchy + IDIQ analysis
 ├── components/
-│   ├── sidebar.py              # Shared sidebar logic + persona selector
+│   ├── sidebar.py              # Workspace selector + persona + server status
 │   ├── chat_message.py         # Custom styled chat bubbles
 │   ├── entity_card.py          # Reusable entity display
 │   └── compliance_table.py     # L/M matrix component
 ├── api/
-│   └── lightrag_client.py      # API wrapper for LightRAG endpoints
+│   └── lightrag_client.py      # API wrapper with dynamic port routing
 ├── styles/
 │   └── midnight.css            # Dark theme + vibrant accents
-└── requirements.txt            # streamlit, requests, pandas, pyvis
+└── requirements.txt            # streamlit, requests, pandas, pyvis, psutil
 ```
 
 ---
@@ -459,33 +845,99 @@ This replaces the static `CAPTURE_PROMPTS` dict - prompts are now defined per-pe
 ## Implementation Order
 
 | Phase | Deliverable | Effort |
-
 |-------|-------------|--------|
-
 | 1 | Core app skeleton + dark theme CSS | 0.5 day |
+| 2 | **Server Manager** (lazy spawning, port allocation, lifecycle) | 1 day |
+| 3 | **Command Center** (cross-workspace overview, health matrix, metrics) | 1-2 days |
+| 4 | Persona config + sidebar with workspace/server status | 0.5 day |
+| 5 | Workspace Dashboard (single workspace detail view) | 1 day |
+| 6 | Chat page with persona-aware prompts and full memory | 1-2 days |
+| 7 | Compliance Matrix (L/M mapping) + Excel export | 1-2 days |
+| 8 | Win Theme Builder | 1 day |
+| 9 | Document Hub | 1 day |
+| 10 | **Contract Portfolio** (IDIQ hierarchy, task order analysis, trends) | 1-2 days |
+| 11 | Export Suite (PowerPoint, Word) | 1 day |
+| 12 | Knowledge Graph visualization (demo/wow factor) | 1-2 days |
 
-| 2 | Persona config + sidebar with selectors | 0.5 day |
+**Total**: ~12-17 days for full implementation
 
-| 3 | Chat page with persona-aware prompts and full memory | 1-2 days |
-
-| 4 | Dashboard with persona-focused widgets | 1 day |
-
-| 5 | Compliance Matrix (L/M mapping) | 1-2 days |
-
-| 6 | Win Theme Builder | 1 day |
-
-| 7 | Document Hub | 1 day |
-
-| 8 | Knowledge Graph visualization | 1-2 days |
-
-**Total**: ~8-11 days for full implementation
+> **Priority Note**: Phase 3 (Command Center) is the user's first impression - shows portfolio health at a glance. Phase 10 (Contract Portfolio) enables IDIQ analysis. Phase 12 (Graph) is for stakeholder demos.
 
 ---
 
-## Questions Before Proceeding
+## Design Decisions (Finalized)
 
-1. **Workspace detection**: Should I auto-detect workspaces from `rag_storage/` folders, or do you want manual configuration?
+### 1. Workspace Management: Lazy Server Spawning
 
-2. **Graph visualization priority**: Is the Knowledge Explorer (visual graph) high priority, or should I focus on the text-based analysis tools first?
+- **Auto-detect** workspaces from `rag_storage/` subdirectories (must have `kv_store_text_chunks.json`)
+- **Lazy spawning**: Server starts ONLY when workspace is selected
+- **Persistent until closed**: Server remains running until user explicitly clicks "Close"
+- **Scalable**: Supports 100s of workspaces - only active ones consume memory
+- **Port allocation**: Dynamic ports starting from 9621, incrementing per active workspace
+- **Rationale**: LightRAG binds to workspace at startup - no runtime switching API exists
 
-3. **Export formats**: Beyond Markdown chat export, do you need Excel exports for compliance matrices or PowerPoint for capture reviews?
+### 2. Implementation Priority: Server Manager First
+
+- Phase 2 (Server Manager) is critical infrastructure - all features depend on it
+- Phases 3-9: Core functionality (chat, dashboard, compliance, win themes, documents)
+- Phase 10: Knowledge Graph visualization (last)
+- Rationale: Graph is a "wow factor" demo for non-believers, but text tools provide daily value
+
+### 3. Export Formats
+
+| Export Type | Format | Use Case |
+
+|-------------|--------|----------|
+
+| Compliance Matrix | Excel (.xlsx) | Proposal compliance tracking |
+
+| Capture Review | PowerPoint (.pptx) | Gate reviews, leadership briefings |
+
+| Analysis Reports | Word (.docx) | Detailed RFP analysis documentation |
+
+| Chat Transcripts | Markdown (.md) | Quick sharing, version control |
+
+**Libraries**: `openpyxl` (Excel), `python-pptx` (PowerPoint), `python-docx` (Word)
+
+### 4. IDIQ Contract Hierarchy
+
+**Problem**: IDIQs have parent-child relationships (base contract → task orders) that need special handling.
+
+**Solution**: Workspace metadata file (`workspace_meta.json`) defines hierarchy:
+
+```json
+{
+  "contract_type": "idiq",
+  "parent_contract": null,
+  "hierarchy_level": 0,
+  "solicitation_number": "FA8003-24-R-0001"
+}
+```
+
+**Hierarchy Levels**:
+- `0` = Base contract (IDIQ or standard)
+- `1` = Task order (links to parent via `parent_contract`)
+
+**Strategic Value**:
+- IDIQs allow "preparation in advance" - know contract vehicle before task orders drop
+- Cross-task-order analysis reveals trends (recurring requirements, factor weight shifts)
+- Reusable proposal content identification across task orders
+- Inherited vs. task-specific clause tracking
+
+**Backward Compatibility**: Workspaces without `workspace_meta.json` are treated as standard contracts.
+
+---
+
+## Dependencies (requirements.txt)
+
+```
+streamlit>=1.30.0
+requests>=2.31.0
+pandas>=2.0.0
+psutil>=5.9.0             # Process management for server lifecycle
+pyvis>=0.3.2              # Graph visualization
+streamlit-agraph>=0.0.45  # Alternative graph component
+openpyxl>=3.1.0           # Excel export
+python-pptx>=0.6.21       # PowerPoint export
+python-docx>=1.1.0        # Word export
+```
