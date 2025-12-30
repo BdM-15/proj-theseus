@@ -20,17 +20,33 @@ WebUI query responses exhibited several accessibility issues:
 4. **Unjustified Recommendations** - Win themes stated without explaining WHY they win
 5. **SME-Only Language** - Assumed reader expertise in DoD contracting
 
-## Solution: Surgical Enhancement
+## Solution: Explicit Instructions with DO NOT Examples
 
-Added **Instruction #5: Accessibility & Explanation Quality** (~90 words) to both prompts:
+Initial soft instructions were ignored by the LLM. **v2.1.1** strengthened with explicit WRONG/RIGHT examples:
 
 ```markdown
-5. **Accessibility & Explanation Quality** (Critical for non-expert users):
-  - Spell out all acronyms on first use, then use the abbreviation: "Contracting Officer's Representative (COR)"
-  - Assume the reader is intelligent but NOT a domain expert—briefly explain specialized GovCon concepts when introduced
-  - When presenting structured data (qualifications, metrics, workload), use **bulleted/sub-bulleted lists with bold headers** instead of markdown tables (tables render poorly in chat interfaces)
-  - Every recommendation or win theme MUST include WHY it wins—connect to Government pain points or evaluation priorities with supporting evidence
-  - Prefer thoroughness and clarity over brevity—elaborate when it aids understanding; include relevant source quotes when they strengthen your point
+5. **Accessibility & Explanation Quality** (MANDATORY - responses failing these will confuse users):
+
+  **A. ACRONYMS - ALWAYS spell out on first use:**
+  - WRONG: "All personnel must be USNs with SECRET clearance per PWS 5.0"
+  - RIGHT: "All personnel must be U.S. Nationals (USNs) with SECRET security clearance, as specified in Performance Work Statement (PWS) Section 5.0"
+
+  **B. NO MARKDOWN TABLES - use bulleted lists instead:**
+  - Tables render as broken text in chat interfaces
+  - WRONG: "| Position | Quals | Notes |" (table syntax)
+  - RIGHT: Use nested bullets with bold headers
+
+  **C. EXPLAIN CONCEPTS - don't assume expertise:**
+  - If you mention a system (BUILDER, PAVER, NexGen IT), explain what it does in plain English
+  - If you cite a metric (BCI >= 85%), explain what BCI measures and why 85% matters
+
+  **D. NO MEANINGLESS JARGON - every claim must be concrete and logical:**
+  - WRONG: "Our team exceeds quals with 150% average experience" (nonsensical)
+  - RIGHT: "Propose candidates with 15 years experience when PWS requires 10 years minimum—this 50% buffer demonstrates depth"
+
+  **E. CONSULTATIVE DEPTH over telegraphic summaries:**
+  - Write like you're explaining to a smart colleague who hasn't read this RFP
+  - DO NOT write shorthand notes or bullet-only summaries—provide narrative context
 ```
 
 ## Design Principles
