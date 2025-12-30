@@ -39,9 +39,19 @@ Domain Intelligence Included:
 - Part K: 12 Annotated RFP Examples
 - Part L: Quality Checks
 
-Version: 2.0.0 (Full Domain Intelligence)
+Version: 2.1.0 (Accessibility & Human Readability Enhancement)
 Last Updated: December 2025
 Source: govcon_lightrag_native.txt (~35K tokens)
+
+Changelog:
+----------
+v2.1.0 (Dec 2025) - Issue #60: RAG Response Accessibility
+  - Added "Accessibility & Explanation Quality" instruction to rag_response and naive_rag_response
+  - Acronyms must be spelled out on first use
+  - Assume non-expert audience; explain GovCon concepts briefly
+  - Use bulleted lists instead of tables (better chat rendering)
+  - Recommendations must include WHY with evidence
+  - Prefer thoroughness over brevity
 """
 
 from __future__ import annotations
@@ -271,13 +281,20 @@ Consider the conversation history if provided.
   - Present in {response_type}
   - **ASCII-ONLY**: Write "<=2" not "≤2", ">=95%" not "≥95%"
 
-5. **References Section**:
+5. **Accessibility & Explanation Quality** (Critical for non-expert users):
+  - Spell out all acronyms on first use, then use the abbreviation: "Contracting Officer's Representative (COR)"
+  - Assume the reader is intelligent but NOT a domain expert—briefly explain specialized GovCon concepts when introduced
+  - When presenting structured data (qualifications, metrics, workload), use **bulleted/sub-bulleted lists with bold headers** instead of markdown tables (tables render poorly in chat interfaces)
+  - Every recommendation or win theme MUST include WHY it wins—connect to Government pain points or evaluation priorities with supporting evidence
+  - Prefer thoroughness and clarity over brevity—elaborate when it aids understanding; include relevant source quotes when they strengthen your point
+
+6. **References Section**:
   - Heading: `### References`
   - Format: `- [n] Document Title`
   - Maximum 5 most relevant citations
   - No content after references
 
-6. **Additional Instructions**: {user_prompt}
+7. **Additional Instructions**: {user_prompt}
 
 
 ---Context---
@@ -335,13 +352,20 @@ Consider the conversation history if provided.
   - Present in {response_type}
   - **ASCII-ONLY**: Write "<=2" not "≤2", ">=95%" not "≥95%"
 
-5. **References Section**:
+5. **Accessibility & Explanation Quality** (Critical for non-expert users):
+  - Spell out all acronyms on first use, then use the abbreviation: "Contracting Officer's Representative (COR)"
+  - Assume the reader is intelligent but NOT a domain expert—briefly explain specialized GovCon concepts when introduced
+  - When presenting structured data (qualifications, metrics, workload), use **bulleted/sub-bulleted lists with bold headers** instead of markdown tables (tables render poorly in chat interfaces)
+  - Every recommendation or win theme MUST include WHY it wins—connect to Government pain points or evaluation priorities with supporting evidence
+  - Prefer thoroughness and clarity over brevity—elaborate when it aids understanding; include relevant source quotes when they strengthen your point
+
+6. **References Section**:
   - Heading: `### References`
   - Format: `- [n] Document Title`
   - Maximum 5 most relevant citations
   - No content after references
 
-6. **Additional Instructions**: {user_prompt}
+7. **Additional Instructions**: {user_prompt}
 
 
 ---Context---
