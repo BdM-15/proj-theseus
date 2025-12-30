@@ -9,9 +9,13 @@ Common Issues Fixed:
 1. #|entity_type → entity_type (hash prefix from delimiter leakage)
 2. |entity_type → entity_type (pipe prefix)
 3. entity_type| → entity_type (pipe suffix)
-4. Extra pipes in descriptions causing field count errors
+4. #/>entity_type → entity_type (hash-slash-greater-than corruption)
+5. (entity_type → entity_type (parenthesis prefix corruption)
+6. Extra pipes in descriptions causing field count errors
+7. Special characters in entity type field (/, >, <, etc.)
 
 Issue #56: Post-Processing Overhaul
+Updated: December 2025 - Enhanced patterns from MCPP II processing logs
 """
 
 import re
@@ -121,26 +125,56 @@ def _pre_split_fixes(line: str) -> str:
     
     IMPORTANT: Must handle whitespace EVERYWHERE:
     - <|#|>#|requirement<|#|>      (no spaces)
-    - <|#|>#| requirement<|#|>     (space AFTER prefix, BEFORE word) ← THIS WAS MISSING
+    - <|#|>#| requirement<|#|>     (space AFTER prefix, BEFORE word)
     - <|#|> #|requirement<|#|>     (space before prefix)
     - <|#|>#|requirement <|#|>     (space after word)
+    - <|#|>#/>requirement<|#|>     (hash-slash-greater-than corruption - MCPP II pattern)
+    - <|#|>(requirement<|#|>       (parenthesis prefix corruption)
     """
     if not line:
         return line
     
     original = line
     
-    # Pattern: <|#|> [space?] [#|]+ [space?] word [space?] <|#|>
-    # The key fix: \s* AFTER [#|]+ to handle "# | requirement" or "#| requirement"
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Pattern 1: Hash-pipe prefix corruption
+    # <|#|>#|requirement<|#|> → <|#|>requirement<|#|>
+    # <|#|>#| requirement<|#|> → <|#|>requirement<|#|>
+    # ═══════════════════════════════════════════════════════════════════════════════
     line = re.sub(r'<\|#\|>\s*[#|]+\s*(\w+)\s*<\|#\|>', r'<|#|>\1<|#|>', line)
     
-    # Pattern: <|#|>word|<|#|> → <|#|>word<|#|> (trailing pipe after word)
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Pattern 2: Hash-slash-greater-than corruption (seen in MCPP II logs)
+    # <|#|>#/>requirement<|#|> → <|#|>requirement<|#|>
+    # <|#|>#/> requirement<|#|> → <|#|>requirement<|#|>
+    # Also handles: #/>, #\>, #|>, etc.
+    # ═══════════════════════════════════════════════════════════════════════════════
+    line = re.sub(r'<\|#\|>\s*#[/\\|>]+\s*(\w+)\s*<\|#\|>', r'<|#|>\1<|#|>', line)
+    
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Pattern 3: Parenthesis prefix corruption (seen in MCPP II logs)
+    # <|#|>(requirement<|#|> → <|#|>requirement<|#|>
+    # <|#|>( requirement<|#|> → <|#|>requirement<|#|>
+    # ═══════════════════════════════════════════════════════════════════════════════
+    line = re.sub(r'<\|#\|>\s*\(\s*(\w+)\s*<\|#\|>', r'<|#|>\1<|#|>', line)
+    
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Pattern 4: Trailing pipe after entity type
+    # <|#|>requirement|<|#|> → <|#|>requirement<|#|>
+    # ═══════════════════════════════════════════════════════════════════════════════
     line = re.sub(r'<\|#\|>\s*(\w+)\|+\s*<\|#\|>', r'<|#|>\1<|#|>', line)
+    
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Pattern 5: General garbage prefix before entity type
+    # <|#|>[symbols]entity_type<|#|> → <|#|>entity_type<|#|>
+    # Catches any non-word characters before the actual entity type
+    # ═══════════════════════════════════════════════════════════════════════════════
+    line = re.sub(r'<\|#\|>\s*[^\w\s]+\s*(\w+(?:_\w+)*)\s*<\|#\|>', r'<|#|>\1<|#|>', line)
     
     # Log if we made any changes (helps diagnose what patterns we're catching)
     if line != original:
         _stats.pre_split_fixes += 1
-        logger.info(f"🔧 Pre-split fix applied: delimiter corruption repaired")
+        logger.debug(f"🔧 Pre-split fix: '{original[:80]}...' → '{line[:80]}...'")
     
     return line
 
@@ -149,11 +183,14 @@ def _clean_entity_type(entity_type: str) -> str:
     """
     Clean entity type field by removing common malformation patterns.
     
-    Fixes:
+    Fixes (observed in MCPP II processing logs):
     - #|requirement → requirement
     - |requirement → requirement
     - requirement| → requirement
     - #requirement → requirement
+    - #/>requirement → requirement (hash-slash-greater-than)
+    - (requirement → requirement (parenthesis prefix)
+    - requirement) → requirement (parenthesis suffix)
     """
     if not entity_type:
         return entity_type
@@ -161,22 +198,32 @@ def _clean_entity_type(entity_type: str) -> str:
     original = entity_type
     cleaned = entity_type.strip()
     
-    # Remove leading patterns: #|, |, #, with optional whitespace
-    cleaned = re.sub(r'^[#|\s]+', '', cleaned)
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Step 1: Remove leading garbage patterns
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Pattern: #|, |#, #/, #>, #\, etc. at the start
+    cleaned = re.sub(r'^[#|/\\><\(\)\s]+', '', cleaned)
     
-    # Remove trailing patterns: |, #, with optional whitespace
-    cleaned = re.sub(r'[#|\s]+$', '', cleaned)
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Step 2: Remove trailing garbage patterns  
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Pattern: |, #, >, etc. at the end
+    cleaned = re.sub(r'[#|/\\><\(\)\s]+$', '', cleaned)
     
-    # Remove any remaining special characters that shouldn't be in entity type
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Step 3: Remove any remaining special characters in the middle
     # Entity types should be alphanumeric with underscores only
-    cleaned = re.sub(r'[<>()\'"/\\]', '', cleaned)
+    # ═══════════════════════════════════════════════════════════════════════════════
+    cleaned = re.sub(r'[<>()\'"/\\|#]', '', cleaned)
     
-    cleaned = cleaned.strip()
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Step 4: Normalize - lowercase, remove spaces (entity types like "statement_of_work")
+    # ═══════════════════════════════════════════════════════════════════════════════
+    cleaned = cleaned.strip().lower().replace(' ', '_')
     
-    if cleaned != original:
+    if cleaned != original.strip().lower().replace(' ', '_'):
         _stats.entity_type_fixes += 1
-        # Log at INFO level so we can see what's being caught
-        logger.info(f"🔧 Entity type sanitized: '{original}' → '{cleaned}'")
+        logger.debug(f"🔧 Entity type sanitized: '{original}' → '{cleaned}'")
     
     return cleaned
 

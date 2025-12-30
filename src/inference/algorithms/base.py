@@ -76,11 +76,19 @@ def parse_llm_json_response(response: str, algorithm_name: str) -> List[Dict]:
     
     Handles:
     - Markdown code blocks
-    - Truncated responses
+    - Truncated responses (returns empty list gracefully)
+    - Severely truncated responses (< 50 chars)
     - Various wrapper formats
     
     Returns empty list on failure (graceful degradation).
+    
+    Updated Dec 2025: Enhanced truncation handling for Algorithm 3/5 failures.
     """
+    # Early check for severely truncated responses (seen in MCPP II logs: 41-45 chars)
+    if not response or len(response.strip()) < 20:
+        logger.warning(f"{algorithm_name}: Response too short ({len(response) if response else 0} chars), returning empty")
+        return []
+    
     try:
         data = extract_json_from_response(response, allow_array=True)
         
@@ -98,7 +106,11 @@ def parse_llm_json_response(response: str, algorithm_name: str) -> List[Dict]:
             return []
             
     except (ValueError, json.JSONDecodeError) as e:
-        logger.error(f"{algorithm_name}: JSON parse failed: {str(e)[:100]}")
+        # Check if this is a truncation issue
+        if 'truncated' in str(e).lower() or len(response) < 100:
+            logger.warning(f"{algorithm_name}: Likely truncated response ({len(response)} chars), returning empty")
+        else:
+            logger.error(f"{algorithm_name}: JSON parse failed: {str(e)[:100]}")
         return []
     except Exception as e:
         logger.error(f"{algorithm_name}: Unexpected parse error: {e}")

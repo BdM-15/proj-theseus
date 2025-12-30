@@ -46,11 +46,20 @@ def _repair_truncated_json_array(text: str) -> Optional[List]:
 
     We only want dicts that are direct children of the outer array. If we salvage nested
     dicts (e.g., boe_relevance), downstream validation fails because entity_index is missing.
+    
+    Updated Dec 2025: Enhanced to handle severely truncated responses (e.g., 45 chars)
+    by checking for partial objects and skipping them gracefully.
     """
     salvaged: List[Dict] = []
 
     s = text.strip()
     if not s.startswith("["):
+        return None
+    
+    # Check for severely truncated responses (less than minimum viable JSON array with one object)
+    # Minimum viable: [{"a":"b"}] = 11 chars
+    if len(s) < 11:
+        logger.warning(f"JSON array too short to contain valid objects: {len(s)} chars")
         return None
 
     in_string = False
@@ -100,6 +109,10 @@ def _repair_truncated_json_array(text: str) -> Optional[List]:
                             pass
                         start = None
 
+    # Log info about truncation
+    if start is not None and brace_count > 0:
+        logger.debug(f"Found incomplete JSON object at end of array (truncated response)")
+    
     return salvaged if salvaged else None
 
 
@@ -169,7 +182,16 @@ def extract_json_from_response(response: str, allow_array: bool = True) -> Union
             logger.warning(f"Salvaged {len(salvaged)} items from truncated JSON array")
             return salvaged
     
-    # Step 6: All parsing attempts failed
+    # Step 6: Check for severely truncated response (common with API timeouts/rate limits)
+    # Return empty array for post-processing algorithms (graceful degradation)
+    if len(cleaned) < 50 and cleaned.strip().startswith('['):
+        logger.warning(
+            f"Severely truncated JSON array detected ({len(cleaned)} chars). "
+            f"Returning empty array for graceful degradation."
+        )
+        return []
+    
+    # Step 7: All parsing attempts failed
     logger.error(
         f"Failed to extract JSON from LLM response. "
         f"Length: {len(response)} chars, "
