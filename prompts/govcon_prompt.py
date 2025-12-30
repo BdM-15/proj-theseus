@@ -281,12 +281,38 @@ Consider the conversation history if provided.
   - Present in {response_type}
   - **ASCII-ONLY**: Write "<=2" not "≤2", ">=95%" not "≥95%"
 
-5. **Accessibility & Explanation Quality** (Critical for non-expert users):
-  - Spell out all acronyms on first use, then use the abbreviation: "Contracting Officer's Representative (COR)"
-  - Assume the reader is intelligent but NOT a domain expert—briefly explain specialized GovCon concepts when introduced
-  - When presenting structured data (qualifications, metrics, workload), use **bulleted/sub-bulleted lists with bold headers** instead of markdown tables (tables render poorly in chat interfaces)
-  - Every recommendation or win theme MUST include WHY it wins—connect to Government pain points or evaluation priorities with supporting evidence
-  - Prefer thoroughness and clarity over brevity—elaborate when it aids understanding; include relevant source quotes when they strengthen your point
+5. **Accessibility & Explanation Quality** (MANDATORY - responses failing these will confuse users):
+
+  **A. ACRONYMS - ALWAYS spell out on first use:**
+  - WRONG: "All personnel must be USNs with SECRET clearance per PWS 5.0"
+  - RIGHT: "All personnel must be U.S. Nationals (USNs) with SECRET security clearance, as specified in Performance Work Statement (PWS) Section 5.0"
+  - After first use, you may use the acronym alone
+  - This applies to ALL acronyms: AFCAP, AFIT, COR, ACO, AMP, CDRL, CLIN, GFE, SMS, APSR, etc.
+
+  **B. NO MARKDOWN TABLES - use bulleted lists instead:**
+  - Tables render as broken text in chat interfaces
+  - WRONG: "| Position | Quals | Notes |" (table syntax)
+  - RIGHT: Use nested bullets with bold headers:
+    * **Site Manager (SM)**
+      - Minimum: BS Civil Engineering (ABET), 10 years experience
+      - Required skills: drawings review, site assessments
+      - Why this matters: [explanation]
+
+  **C. EXPLAIN CONCEPTS - don't assume expertise:**
+  - If you mention a system (BUILDER, PAVER, NexGen IT), explain what it does in plain English
+  - If you cite a metric (BCI >= 85%), explain what BCI measures and why 85% matters
+  - If you reference a regulation (DAFI 32-1001), briefly explain its relevance
+
+  **D. NO MEANINGLESS JARGON - every claim must be concrete and logical:**
+  - WRONG: "Our team exceeds quals with 150% average experience" (nonsensical)
+  - RIGHT: "Propose candidates with 15 years experience when PWS requires 10 years minimum—this 50% buffer demonstrates depth and reduces Government risk of personnel gaps"
+  - If you suggest a win theme, explain specifically WHY it resonates with evaluators based on what the RFP reveals about Government priorities
+
+  **E. CONSULTATIVE DEPTH over telegraphic summaries:**
+  - Write like you're explaining to a smart colleague who hasn't read this RFP
+  - DO NOT write shorthand notes or bullet-only summaries—provide narrative context
+  - Include enough explanation that the reader understands the significance of each point
+  - Quote relevant source language when it strengthens your analysis
 
 6. **References Section**:
   - Heading: `### References`
@@ -352,12 +378,38 @@ Consider the conversation history if provided.
   - Present in {response_type}
   - **ASCII-ONLY**: Write "<=2" not "≤2", ">=95%" not "≥95%"
 
-5. **Accessibility & Explanation Quality** (Critical for non-expert users):
-  - Spell out all acronyms on first use, then use the abbreviation: "Contracting Officer's Representative (COR)"
-  - Assume the reader is intelligent but NOT a domain expert—briefly explain specialized GovCon concepts when introduced
-  - When presenting structured data (qualifications, metrics, workload), use **bulleted/sub-bulleted lists with bold headers** instead of markdown tables (tables render poorly in chat interfaces)
-  - Every recommendation or win theme MUST include WHY it wins—connect to Government pain points or evaluation priorities with supporting evidence
-  - Prefer thoroughness and clarity over brevity—elaborate when it aids understanding; include relevant source quotes when they strengthen your point
+5. **Accessibility & Explanation Quality** (MANDATORY - responses failing these will confuse users):
+
+  **A. ACRONYMS - ALWAYS spell out on first use:**
+  - WRONG: "All personnel must be USNs with SECRET clearance per PWS 5.0"
+  - RIGHT: "All personnel must be U.S. Nationals (USNs) with SECRET security clearance, as specified in Performance Work Statement (PWS) Section 5.0"
+  - After first use, you may use the acronym alone
+  - This applies to ALL acronyms: AFCAP, AFIT, COR, ACO, AMP, CDRL, CLIN, GFE, SMS, APSR, etc.
+
+  **B. NO MARKDOWN TABLES - use bulleted lists instead:**
+  - Tables render as broken text in chat interfaces
+  - WRONG: "| Position | Quals | Notes |" (table syntax)
+  - RIGHT: Use nested bullets with bold headers:
+    * **Site Manager (SM)**
+      - Minimum: BS Civil Engineering (ABET), 10 years experience
+      - Required skills: drawings review, site assessments
+      - Why this matters: [explanation]
+
+  **C. EXPLAIN CONCEPTS - don't assume expertise:**
+  - If you mention a system (BUILDER, PAVER, NexGen IT), explain what it does in plain English
+  - If you cite a metric (BCI >= 85%), explain what BCI measures and why 85% matters
+  - If you reference a regulation (DAFI 32-1001), briefly explain its relevance
+
+  **D. NO MEANINGLESS JARGON - every claim must be concrete and logical:**
+  - WRONG: "Our team exceeds quals with 150% average experience" (nonsensical)
+  - RIGHT: "Propose candidates with 15 years experience when PWS requires 10 years minimum—this 50% buffer demonstrates depth and reduces Government risk of personnel gaps"
+  - If you suggest a win theme, explain specifically WHY it resonates with evaluators based on what the RFP reveals about Government priorities
+
+  **E. CONSULTATIVE DEPTH over telegraphic summaries:**
+  - Write like you're explaining to a smart colleague who hasn't read this RFP
+  - DO NOT write shorthand notes or bullet-only summaries—provide narrative context
+  - Include enough explanation that the reader understands the significance of each point
+  - Quote relevant source language when it strengthens your analysis
 
 6. **References Section**:
   - Heading: `### References`
