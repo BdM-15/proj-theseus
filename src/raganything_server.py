@@ -41,7 +41,10 @@ import uvicorn
 # Import modular components (AFTER load_dotenv() so they see environment variables)
 from src.server.config import configure_raganything_args
 from src.server.initialization import initialize_raganything, get_rag_instance
-from src.server.routes import create_insert_endpoint, create_documents_upload_endpoint
+from src.server.routes import (
+    create_insert_endpoint,
+    create_documents_upload_endpoint,
+)
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -77,6 +80,13 @@ async def main():
     
     # Step 3: Create LightRAG server (WebUI + query endpoints)
     app = create_app(global_args)
+
+    # Log the effective model configuration the WebUI /query endpoint will use.
+    # LightRAG's API server passes `args.llm_model` directly into openai_complete_if_cache(...)
+    # (see: lightrag/api/lightrag_server.py -> create_optimized_openai_llm_func).
+    logger.info(f"✅ WebUI Query Model (effective): {getattr(global_args, 'llm_model', None)}")
+    logger.info(f"   - Extraction model (env EXTRACTION_LLM_NAME): {os.getenv('EXTRACTION_LLM_NAME')}")
+    logger.info(f"   - Reasoning model (env REASONING_LLM_NAME):  {os.getenv('REASONING_LLM_NAME')}")
     
     # Step 4: Override endpoints to use RAG-Anything + semantic post-processing
     # Remove original LightRAG endpoints that don't support multimodal processing
@@ -93,7 +103,7 @@ async def main():
     create_insert_endpoint(app, rag_instance)
     create_documents_upload_endpoint(app, rag_instance)
     
-    logger.info(f"✅ Custom endpoints registered: /insert, /documents/upload (multimodal + semantic inference)")
+    logger.info("✅ Custom endpoints registered: /insert, /documents/upload (multimodal + semantic inference)")
     
     # Print startup summary with pipeline flow
     chunk_size = os.getenv("CHUNK_SIZE", "4096")
@@ -120,7 +130,7 @@ async def main():
     logger.info("")
     logger.info(f"{YELLOW}3.{RESET} {BOLD}Entity Extraction{RESET} {CYAN}(18 custom types){RESET}")
     logger.info(f"   {CYAN}├─>{RESET} Native LightRAG extraction (~22K tokens FULL govcon prompt)")
-    logger.info(f"   {CYAN}├─>{RESET} LLM: {os.getenv('LLM_MODEL', 'grok-4-1-fast-reasoning')}")
+    logger.info(f"   {CYAN}├─>{RESET} LLM (query model): {getattr(global_args, 'llm_model', os.getenv('LLM_MODEL', 'unknown'))}")
     logger.info(f"   {CYAN}└─>{RESET} Tuple-delimited output (Issue #54 - Back to Basics)")
     logger.info("")
     logger.info(f"{YELLOW}4.{RESET} {BOLD}Relationship Extraction{RESET}")

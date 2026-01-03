@@ -39,10 +39,10 @@ async def initialize_raganything():
     - Entity Types: 18 government contracting types (semantic-first detection)
     - LLM: xAI Grok-4-fast-reasoning (cloud processing, 2M context)
     - Embeddings: OpenAI text-embedding-3-large (3072-dim, 8192 token limit)
-    - Chunking: 8K tokens (overlap: 1.2K) - Multiple focused extraction passes
+    - Chunking: 4K tokens (overlap: ~600) - Multiple focused extraction passes
     
     Architecture Note:
-    LightRAG chunks documents at 8192 tokens. Same chunks go to BOTH:
+    LightRAG chunks documents at 4096 tokens. Same chunks go to BOTH:
     - LLM entity extraction (multiple focused passes = comprehensive entity coverage)
     - Embedding generation (fits within 8192 token limit, no truncation needed)
     Smaller chunks prevent LLM attention decay that caused 50K chunk extraction failure.
@@ -94,17 +94,19 @@ async def initialize_raganything():
         enable_image_processing=enable_image,
         enable_table_processing=enable_table,
         enable_equation_processing=enable_equation,
-        # Context extraction configuration (RAG-Anything defaults add 2K tokens per chunk)
-        context_window=0,                    # Disable context for multimodal (tables are self-contained)
-        max_context_tokens=0,                # No context tokens
-        include_headers=False,               # Don't include document headers
-        include_captions=True,               # Keep captions (minimal overhead, high value)
-        context_filter_content_types=["text"],  # Only text content (not used with context_window=0)
+        # Context extraction configuration - read from env vars
+        # Include surrounding page text for section context (tables know they're in "APPENDIX H")
+        context_window=int(os.getenv("RAGANYTHING_CONTEXT_WINDOW", "1")),
+        max_context_tokens=int(os.getenv("RAGANYTHING_MAX_CONTEXT_TOKENS", "2000")),
+        include_headers=os.getenv("RAGANYTHING_INCLUDE_HEADERS", "true").lower() == "true",
+        include_captions=True,
+        context_filter_content_types=["text"],
     )
-    logger.info("✅ RAG-Anything context extraction: DISABLED (prevents multimodal JSON truncation)")
-    logger.info(f"   - context_window: 0 (tables are self-contained)")
-    logger.info(f"   - max_context_tokens: 0 (no surrounding text added)")
-    logger.info(f"   - Text chunks use 15% overlap for context (no RAG-Anything context needed)")
+    context_window = int(os.getenv("RAGANYTHING_CONTEXT_WINDOW", "1"))
+    logger.info(f"✅ RAG-Anything context extraction: {'ENABLED' if context_window > 0 else 'DISABLED'}")
+    logger.info(f"   - context_window: {context_window}")
+    logger.info(f"   - max_context_tokens: {os.getenv('RAGANYTHING_MAX_CONTEXT_TOKENS', '2000')}")
+    logger.info(f"   - include_headers: {os.getenv('RAGANYTHING_INCLUDE_HEADERS', 'true')}")
     
     # ═══════════════════════════════════════════════════════════════════════════════
     # DUAL-MODEL LLM ROUTING (Extraction vs Query)
@@ -216,7 +218,7 @@ async def initialize_raganything():
             # Use base function (which auto-routes based on task)
             return await base_llm_model_func(prompt, system_prompt, history_messages, **kwargs)
     
-    # Define embedding function with safety truncation (8K chunks can slightly exceed 8192 due to overlap)
+    # Define embedding function with safety truncation (chunks can slightly exceed 8192 embedding limit)
     async def safe_embed_func(texts):
         """Truncate texts to 8192 tokens before embedding to handle edge cases"""
         import tiktoken
@@ -269,8 +271,8 @@ async def initialize_raganything():
             "language": "English",
         },
         # Chunking configuration comes from environment variables:
-        # - CHUNK_SIZE controls chunk_token_size (default: 8192)
-        # - CHUNK_OVERLAP_SIZE controls chunk_overlap_token_size (default: 1200)
+        # - CHUNK_SIZE controls chunk_token_size (default: 4096)
+        # - CHUNK_OVERLAP_SIZE controls chunk_overlap_token_size (default: 600)
         # LightRAG reads these at dataclass field initialization time
         
         # LLM timeout: default 180s causes Worker timeout (2×=360s) failures on complex chunks
@@ -303,6 +305,30 @@ async def initialize_raganything():
         error_msg = result.get("error", "Unknown error")
         logger.error(f"Failed to initialize LightRAG: {error_msg}")
         raise RuntimeError(f"LightRAG initialization failed: {error_msg}")
+    
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # CRITICAL FIX: Extend VDB meta_fields to preserve entity_type and description
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # LightRAG's default meta_fields only includes: {entity_name, source_id, content, file_path}
+    # Our GovCon ontology requires entity_type and description for proper filtering and retrieval.
+    # Without this fix, entity_type and description are stripped during VDB storage!
+    # 
+    # Root cause: lightrag.py line 598 hardcodes meta_fields without entity_type/description
+    # Fix: Extend meta_fields AFTER LightRAG initialization but BEFORE document processing
+    # ═══════════════════════════════════════════════════════════════════════════════
+    lightrag_instance = _rag_anything.lightrag
+    
+    # Extend entities VDB meta_fields
+    original_entity_meta = lightrag_instance.entities_vdb.meta_fields
+    extended_entity_meta = original_entity_meta | {"entity_type", "description"}
+    lightrag_instance.entities_vdb.meta_fields = extended_entity_meta
+    logger.info(f"✅ Extended entities_vdb.meta_fields: {extended_entity_meta}")
+    
+    # Extend relationships VDB meta_fields (for keywords and description)
+    original_rel_meta = lightrag_instance.relationships_vdb.meta_fields
+    extended_rel_meta = original_rel_meta | {"keywords", "description"}
+    lightrag_instance.relationships_vdb.meta_fields = extended_rel_meta
+    logger.info(f"✅ Extended relationships_vdb.meta_fields: {extended_rel_meta}")
     
     # ═══════════════════════════════════════════════════════════════════════════════
     # Register GovconMultimodalProcessor for tables/images/equations

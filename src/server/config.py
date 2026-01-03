@@ -61,14 +61,26 @@ def configure_raganything_args():
     
     # LLM Configuration - xAI Grok (Dual-Model: Extraction uses non-reasoning, Query uses reasoning)
     global_args.llm_binding = "openai"
-    global_args.llm_model_name = os.getenv("EXTRACTION_LLM_NAME", "grok-4-1-fast-non-reasoning")  # Default to extraction model
+
+    # IMPORTANT: LightRAG's API server uses `llm_model` (from env `LLM_MODEL`) for /query.
+    # We explicitly bind queries to the reasoning model to avoid "compliance-only" answers.
+    #
+    # Extraction is handled separately by RAG-Anything via src/server/initialization.py (dual-model router),
+    # so setting the query model here will NOT force extraction to use reasoning.
+    query_model = os.getenv("REASONING_LLM_NAME", "grok-4-1-fast-reasoning")
+
+    # Keep legacy fields (some older code paths may read these), but ensure the canonical fields are set.
+    global_args.llm_model = query_model
+    global_args.llm_model_name = query_model
     global_args.llm_binding_host = xai_base_url
+    global_args.llm_binding_api_key = xai_api_key
     global_args.llm_api_key = xai_api_key
     
     # Embedding Configuration - OpenAI (MUST use OpenAI endpoint, not xAI!)
     global_args.embedding_binding = "openai"
     global_args.embedding_model_name = os.getenv("EMBEDDING_MODEL", "text-embedding-3-large")
     global_args.embedding_binding_host = "https://api.openai.com/v1"  # OpenAI endpoint for embeddings
+    global_args.embedding_binding_api_key = openai_api_key
     global_args.embedding_api_key = openai_api_key
     global_args.embedding_dim = int(os.getenv("EMBEDDING_DIM", "3072"))  # Environment-driven for flexibility
     

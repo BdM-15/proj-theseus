@@ -1,0 +1,25 @@
+candidate_narrative_chunks=8
+
+score=4 file=Attachment 1. SWA TAS PWS 12 Nov 2025.pdf ref=1 chunk=chunk-334e10d7c4b0f2128e312084348c1d20
+.2.10. The Government reserves the right to have the contractor provide data and information during performance of the task order via the following CDRLs: CDRL: A001 - AFCAP Management Plan CDRL: A002 - Task Order Management Plan (TOMP) CDRL: A003 - Travel/Trip Reports CDRL: A004 - Monthly Status Reports CDRL: A005 - F
+
+score=4 file=Attachment 1. SWA TAS PWS 12 Nov 2025.pdf ref=1 chunk=chunk-995e533d351ea95a75b97d4eaa4cfa94
+to support Contractor vehicles for official use only. Official use includes those activities that directly support the requirements of this PWS. When contractors are lodged off-base due to lodging non-availability or mission requirements, the commute to and from the base is considered official use and will be provided 
+
+score=4 file=Attachment 1. SWA TAS PWS 12 Nov 2025.pdf ref=1 chunk=chunk-6224f36cb6d646c4927c3b052812ff48
+equipment or remove data plates of any type from any type of equipment, military or commercial. The Contractor shall deliver turn-in documents to the Government and maintain copies for the term of the TO. The Contractor shall transfer all turn-in documents back to the Government at the time of TO closeout. The Contract
+
+score=4 file=Attachment 1. SWA TAS PWS 12 Nov 2025.pdf ref=1 chunk=chunk-cf43fb2f4f8b33bd9b635528d6eebfb0
+C – Government Furnished Life Support and Services Appendix D – Government Furnished Property Appendix E – Contract Data Requirements List (CDRL) Appendix F – Transient Alert Services Appendix G – Al Udeid Air Base (AUAB), Qatar Appendix H – Al Dhafra Air Base (ADAB), UAE Appendix I – Ali Al Salem Air Base (AASAB), Kuw
+
+score=3 file=Attachment 1. SWA TAS PWS 12 Nov 2025.pdf ref=1 chunk=chunk-bd150ab263793ee0c377a494ed194c24
+1.3.8.13; 1.3.8.13 subparagraphs Deliverable: Government Furnished Property (GFP); Reporting of GFP Deliverable Comments: Government Furnished Property – On specific task orders the Government may provide GFP. When a task order intends to provide GFP to a contractor, the task order PWS will include a list of GFP prior 
+
+score=3 file=Attachment 1. SWA TAS PWS 12 Nov 2025.pdf ref=1 chunk=chunk-c266829cd1d288d969e5a3248aa009e1
+PERFORMANCE WORK STATEMENT (PWS) TRANSIENT AIRCRAFT SERVICES, MULTI-LOCATIONS, SOUTHWEST ASIA (SWA) AIR FORCE CENTRAL COMMAND (USAFCENT), SHAW AFB, SC 12 November 2025 1.0. DESCRIPTION OF SERVICES. In accordance with (IAW) the Air Force Contract Augmentation Program (AFCAP) V Basic Contract, the Contractor shall provid
+
+score=3 file=Attachment 1. SWA TAS PWS 12 Nov 2025.pdf ref=1 chunk=chunk-d3306e2886f30c7f119ec3667644b017
+all flight line vehicles. F.1.5. PROCESSING TURN-AROUND SERVICES. The Contractor shall perform processing turn-around services on all transient aircraft as requested by the aircraft commander IAW DAFI 21-101, Maintenance Management of Aircraft, AMC 21-101 Supplement and Air Combat Command (ACC) Sup I 21-101. The Contra
+
+score=3 file=Attachment 1. SWA TAS PWS 12 Nov 2025.pdf ref=1 chunk=chunk-b143f74309a8b4127ce22fb75327099a
+-15, F/A 18, U-2, RQ-4, A-10, KC-10, EA-6B, B-747, B-757, B-767, MD-11, KC-135, AN-12, AN-124, and IL-76 etc. The Contractor shall coordinate tow approval through either the 379 MOC or 8 EAMS (or equivalent EAS), depending on location of the final parking spot. The Contractor shall document tow operators’ qualification

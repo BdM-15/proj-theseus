@@ -29,7 +29,7 @@ GovCon Capture Vibe is an **ontology-modified RAG system** for federal RFP analy
 
 **Current Performance** (December 2025):
 
-- **MCPP II RFP** (425 pages): **~60 minutes** end-to-end processing
+- **MCPP II RFP** (425 pages): **38 minutes** end-to-end processing at **$2.12**
 - **Entity extraction**: 1,522 entities across 18 specialized types
 - **Graph storage**: Neo4j (primary) with workspace isolation
 - **Architecture**: RAG-Anything (multimodal PDF parsing via MinerU) + LightRAG (knowledge graph + WebUI) + xAI Grok-4 (fast-reasoning)
@@ -87,7 +87,7 @@ RAG-Anything Multimodal Pipeline
 Cloud Processing (xAI Grok-4.1)
     ├─ LLM: grok-4-1-fast-non-reasoning (extraction) + grok-4-1-fast-reasoning (queries)
     ├─ Embeddings: OpenAI text-embedding-3-large (3072-dim)
-    ├─ Chunk size: 8,192 tokens with 1,200 token overlap (15%)
+    ├─ Chunk size: 4,096 tokens with 15% overlap (~614 tokens)
     ├─ Concurrency: 16 workers (MAX_ASYNC, prevents rate limit errors)
     └─ Temperature: 0.1 (deterministic extraction)
          ↓
@@ -158,8 +158,8 @@ GRAPH_STORAGE=Neo4JStorage  # or NetworkXStorage
 WORKING_DIR=./rag_storage/workspace_name
 
 # Chunking (REQUIRED - no defaults)
-CHUNK_SIZE=8192                    # 8K tokens per chunk (optimized for quality)
-CHUNK_OVERLAP_SIZE=1200            # 15% overlap for continuity (1200/8192)
+CHUNK_SIZE=4096                    # 4K tokens per chunk (optimized for quality)
+CHUNK_OVERLAP_SIZE=600             # 15% overlap for continuity (~614/4096)
 
 # Concurrency
 MAX_ASYNC=16                       # 16 parallel LLM requests (prevents rate limit errors)
@@ -171,9 +171,9 @@ BATCH_TIMEOUT_SECONDS=30  # Wait before triggering post-processing
 
 **Performance Results**:
 
-- **MCPP II DRAFT RFP** (425 pages): ~60 minutes, 1,522 entities, ~1,000 relationships
+- **MCPP II DRAFT RFP** (425 pages): 38 minutes, $2.12 cost, 1,500+ entities
 - **Entity density**: ~3.6 entities/page (comprehensive coverage)
-- **Chunk size**: 8,192 tokens with 1,200 token overlap (15%)
+- **Chunk size**: 4,096 tokens with 15% overlap (~614 tokens)
 
 ---
 
@@ -193,7 +193,7 @@ BATCH_TIMEOUT_SECONDS=30  # Wait before triggering post-processing
 - ❌ **Regex Issues**: Fictitious entities, false boundaries, pattern fragility
 - ✅ **LLM Benefits**: Semantic understanding, context awareness, handles variations
 
-**Outcome**: Production uses pure LLM semantic processing with 8,192-token chunking for comprehensive entity extraction without regex preprocessing.
+**Outcome**: Production uses pure LLM semantic processing with 4,096-token chunking for comprehensive entity extraction without regex preprocessing.
 
 ---
 
@@ -563,11 +563,11 @@ VALID_RELATIONSHIPS = {
 
 | Metric                  | Current Production (Dec 2025) | Notes                                     |
 | ----------------------- | ----------------------------- | ----------------------------------------- |
-| **Processing Time**     | ~60 minutes (425-page RFP)    | MCPP II DRAFT RFP baseline                |
+| **Processing Time**     | 38 minutes (425-page RFP)     | MCPP II DRAFT RFP baseline ($2.12 cost)   |
 | **Entities Extracted**  | 1,522 entities                | 18 specialized govcon types               |
 | **Relationships Found** | ~1,000 relationships          | 5 relationship types + semantic inference |
 | **Entity Density**      | ~3.6 entities/page            | Comprehensive coverage                    |
-| **Chunk Size**          | 8,192 tokens                  | Optimized for extraction quality          |
+| **Chunk Size**          | 4,096 tokens                  | Optimized for extraction quality          |
 | **Storage**             | Neo4j (primary)               | Workspace-isolated, Cypher queries        |
 | **LLM Model**           | grok-4-1-fast-* (dual)        | 2M context, temp=0.0/0.1 extraction/query |
 | **Validation**          | Pydantic + 5x retry           | Zero malformed entities                   |
@@ -614,9 +614,9 @@ VALID_RELATIONSHIPS = {
 
 **Monthly Projections**:
 
-- 10 RFPs/month: ~$8.50
-- 50 RFPs/month: ~$42.50
-- 100 RFPs/month: ~$85.00
+- 10 RFPs/month: ~$21
+- 50 RFPs/month: ~$106
+- 100 RFPs/month: ~$212
 
 **ROI**: Minimal costs vs 60-minute processing time per large RFP.
 

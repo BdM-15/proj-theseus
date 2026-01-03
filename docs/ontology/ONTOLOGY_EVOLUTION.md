@@ -57,14 +57,14 @@ October-November 2025 (Phase 5: Cloud Acceleration)
 ├── Entity types expanded: 11 → 18 specialized types
 ├── Instructor + Pydantic schema validation implemented
 ├── MinerU multimodal parsing integrated
-└── Processing: 30-60 minutes per RFP (~$4 cost)
+└── Processing: 38 minutes per 425-page RFP ($2.12 cost)
 
 November 2025 (Phase 6: Semantic Post-Processing) ✅ CURRENT
 ├── 8 LLM-powered relationship inference algorithms
 ├── Neo4j 5.25 enterprise storage (Docker)
 ├── Section L↔M mapping automated
 ├── Workload enrichment with BOE categories
-├── Full RFP processing: 30-60 minutes (~$4/RFP)
+├── Full RFP processing: 38 minutes ($2.12/RFP) - validated on MCPP II
 └── Production-ready on main branch
 ```
 
@@ -611,9 +611,9 @@ interface RfpAnalysisData {
 
 | Metric       | Local (Branch 002) | Cloud (Branch 003+) | Improvement          |
 | ------------ | ------------------ | ------------------- | -------------------- |
-| 71-page RFP  | ~8 hours           | 30-40 minutes       | **~12x faster**      |
-| 425-page RFP | ~16 hours          | 45-60 minutes       | **~16x faster**      |
-| Cost per RFP | $0 (local)         | ~$4                 | Acceptable for speed |
+| 71-page RFP  | ~8 hours           | 15-20 minutes       | **~24x faster**      |
+| 425-page RFP | ~16 hours          | 38 minutes          | **~25x faster**      |
+| Cost per RFP | $0 (local)         | ~$2.12              | Exceptional value    |
 
 ### Architecture Evolution
 
@@ -748,9 +748,9 @@ class BOECategory(str, Enum):
 | -------------------- | ----------------------- |
 | Entity Types         | 18                      |
 | Semantic Algorithms  | 8                       |
-| Navy MBOS (71 pages) | 594 entities, 30-40 min |
-| Large RFP (400+ pg)  | 45-60 minutes           |
-| Cost per RFP         | ~$4                     |
+| Navy MBOS (71 pages) | 594 entities, 15-20 min |
+| MCPP II (425 pages)  | 38 minutes, $2.12       |
+| Cost per RFP         | ~$2                     |
 | Graph Storage        | Neo4j 5.25              |
 | Zero Contamination   | ✅ Achieved             |
 
@@ -766,8 +766,8 @@ class BOECategory(str, Enum):
 ├─────────────────────────────────────────────────────────────────────┤
 │  1. DOCUMENT UPLOAD → PDF/DOCX to /documents/upload                │
 │  2. MINERU PARSING → Tables, images, text via RAG-Anything         │
-│  3. LIGHTRAG CHUNKING → 8,192 tokens/chunk, 15% overlap            │
-│  4. ENTITY EXTRACTION → 18 types via xAI Grok + Instructor         │
+│  3. LIGHTRAG CHUNKING → 4,096 tokens/chunk, 15% overlap            │
+│  4. ENTITY EXTRACTION → 18 types via native LightRAG + sanitizer   │
 │  5. RELATIONSHIP EXTRACTION → LightRAG native inference            │
 │  6. SEMANTIC POST-PROCESSING → 8 LLM algorithms                    │
 │                                                                     │
@@ -795,7 +795,7 @@ class BOECategory(str, Enum):
 | Zero contamination       | ✅     | Pydantic validation blocks external knowledge |
 | 18 entity types          | ✅     | `src/ontology/schema.py`                      |
 | Section L↔M mapping      | ✅     | Algorithm 1: Instruction-Evaluation Linking   |
-| Production performance   | ✅     | 30-60 min per RFP (vs 8-16 hrs local)         |
+| Production performance   | ✅     | 38 min per RFP (vs 8-16 hrs local), $2.12     |
 | Enterprise storage       | ✅     | Neo4j with APOC                               |
 
 ### GitHub Issues & Roadmap

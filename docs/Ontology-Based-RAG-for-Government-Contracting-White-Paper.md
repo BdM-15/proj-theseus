@@ -294,8 +294,8 @@ The system provides an **enterprise RFP intelligence platform** powered by Neo4j
 │  │     ├─ Strategic theme alignment                           │ │
 │  │     └─ Performance metric mapping                          │ │
 │  │                                                             │ │
-│  │  Performance: ~$4 per full RFP, 30-60 minutes              │ │
-│  │  Speed: ~12x faster than local processing                  │ │
+│  │  Performance: $2.12 per 425-page RFP, 38 minutes            │ │
+│  │  Speed: ~25x faster than manual analysis                   │ │
 │  └────────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
                               ▲

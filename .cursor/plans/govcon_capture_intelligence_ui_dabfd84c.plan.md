@@ -364,6 +364,7 @@ if st.session_state.get("current_workspace"):
 **Features**:
 
 **Portfolio Summary Cards**:
+
 ```
 ┌────────────────────────────────────────────────────────────────────┐
 │  PORTFOLIO COMMAND CENTER                                          │
@@ -400,6 +401,7 @@ if st.session_state.get("current_workspace"):
 ```
 
 **Key Metrics**:
+
 - **Entity Counts Comparison**: Side-by-side requirement/clause/deliverable counts per workspace
 - **KG Health Score**: Relationship density, entity completeness, inference quality (0-100%)
 - **IDIQ Trend Analysis**: Cross-task-order patterns (factor weights, recurring themes)
@@ -407,11 +409,13 @@ if st.session_state.get("current_workspace"):
 - **Processing Queue**: Pending uploads and their estimated completion
 
 **Interactions**:
+
 - Click workspace row → Opens that workspace's Dashboard
 - Click IDIQ family → Opens Portfolio page filtered to that contract
 - Click compliance warning → Opens Compliance Matrix for that workspace
 
 **Data Sources**:
+
 - Workspace metadata files (`workspace_meta.json`)
 - Neo4j aggregate queries across all workspaces
 - Server manager status for processing state
@@ -528,6 +532,7 @@ if st.session_state.get("current_workspace"):
 **Features**:
 
 **Contract Hierarchy View**:
+
 ```
 ┌─────────────────────────────────────────────────────┐
 │  CONTRACT PORTFOLIO                                  │
@@ -546,6 +551,7 @@ if st.session_state.get("current_workspace"):
 ```
 
 **IDIQ Analysis Panel** (when IDIQ selected):
+
 - **Base Contract Summary**: Core requirements, ceiling values, period of performance
 - **Task Order Timeline**: Visual timeline of issued task orders
 - **Delta Analysis**: What changes between base and each task order
@@ -558,12 +564,14 @@ if st.session_state.get("current_workspace"):
   - Common discriminator themes
 
 **Task Order Preparation Mode**:
+
 - View IDIQ base requirements as "foundation"
 - Identify reusable proposal content across task orders
 - Track which clauses are inherited vs. task-specific
 - Suggested prompts: "What base IDIQ requirements will likely appear in task orders?"
 
 **Data Model** (from schema design):
+
 ```python
 # Workspace metadata (workspace_meta.json in each rag_storage folder)
 {
@@ -576,6 +584,7 @@ if st.session_state.get("current_workspace"):
 ```
 
 **Implementation Notes**:
+
 - Workspace auto-detection scans for `workspace_meta.json` to determine hierarchy
 - If no metadata file, treat as standard contract (backward compatible)
 - IDIQ grouping is derived from `parent_contract` field
@@ -757,6 +766,7 @@ PERSONAS = {
 ```
 
 **Navigation Flow**:
+
 1. App opens → Command Center (cross-workspace overview)
 2. Click workspace row or "Open" button → Starts server, navigates to Dashboard
 3. Workspace pages enabled only when a workspace is active
@@ -845,18 +855,31 @@ This replaces the static `CAPTURE_PROMPTS` dict - prompts are now defined per-pe
 ## Implementation Order
 
 | Phase | Deliverable | Effort |
+
 |-------|-------------|--------|
+
 | 1 | Core app skeleton + dark theme CSS | 0.5 day |
+
 | 2 | **Server Manager** (lazy spawning, port allocation, lifecycle) | 1 day |
+
 | 3 | **Command Center** (cross-workspace overview, health matrix, metrics) | 1-2 days |
+
 | 4 | Persona config + sidebar with workspace/server status | 0.5 day |
+
 | 5 | Workspace Dashboard (single workspace detail view) | 1 day |
+
 | 6 | Chat page with persona-aware prompts and full memory | 1-2 days |
+
 | 7 | Compliance Matrix (L/M mapping) + Excel export | 1-2 days |
+
 | 8 | Win Theme Builder | 1 day |
+
 | 9 | Document Hub | 1 day |
+
 | 10 | **Contract Portfolio** (IDIQ hierarchy, task order analysis, trends) | 1-2 days |
+
 | 11 | Export Suite (PowerPoint, Word) | 1 day |
+
 | 12 | Knowledge Graph visualization (demo/wow factor) | 1-2 days |
 
 **Total**: ~12-17 days for full implementation
@@ -915,10 +938,12 @@ This replaces the static `CAPTURE_PROMPTS` dict - prompts are now defined per-pe
 ```
 
 **Hierarchy Levels**:
+
 - `0` = Base contract (IDIQ or standard)
 - `1` = Task order (links to parent via `parent_contract`)
 
 **Strategic Value**:
+
 - IDIQs allow "preparation in advance" - know contract vehicle before task orders drop
 - Cross-task-order analysis reveals trends (recurring requirements, factor weight shifts)
 - Reusable proposal content identification across task orders

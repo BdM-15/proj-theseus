@@ -26,7 +26,7 @@ An **Ontology-Based RAG system** for federal RFP analysis that transforms generi
 | **Document Parsing**  | [MinerU](https://github.com/opendatalab/MinerU) via RAG-Anything | Multimodal PDF extraction (tables, images, equations) |
 | **RAG Orchestration** | [RAG-Anything](https://github.com/HKUDS/RAG-Anything) v1.2.8+    | Document processing pipeline coordination             |
 | **Knowledge Graph**   | [LightRAG](https://github.com/HKUDS/LightRAG) v1.4.9.7+          | Graph construction with WebUI (pip: `lightrag-hku`)   |
-| **LLM**               | xAI Grok-4-fast-reasoning                                        | Entity extraction, relationship inference (~$4/RFP)   |
+| **LLM**               | xAI Grok-4.1-fast (dual-model routing)                           | Extraction: non-reasoning, Query: reasoning (~$2/RFP) |
 | **Embeddings**        | OpenAI text-embedding-3-large                                    | 3072-dimensional vector similarity                    |
 | **Graph Storage**     | Neo4j 5.25 Community / NetworkX                                  | Enterprise graph with APOC or local fallback          |
 | **Structured Output** | [Instructor](https://github.com/jxnl/instructor) + Pydantic      | Schema-enforced LLM responses                         |
@@ -94,7 +94,7 @@ python app.py
 │     └── Tables, images, text extraction with structure preservation │
 │                                                                     │
 │  3. LIGHTRAG CHUNKING                                              │
-│     └── 8,192 tokens/chunk with 1,200 token overlap (15%)          │
+│     └── 4,096 tokens/chunk with 15% overlap (~614 tokens)          │
 │                                                                     │
 │  4. ENTITY EXTRACTION (xAI Grok + Instructor)                      │
 │     └── 18 government contracting entity types                      │
@@ -219,8 +219,8 @@ NEO4J_PASSWORD=your-password
 # ============================================================================
 # Processing Configuration
 # ============================================================================
-CHUNK_SIZE=8192                     # Tokens per chunk
-CHUNK_OVERLAP=1200                  # 15% overlap
+CHUNK_SIZE=4096                     # Tokens per chunk
+CHUNK_OVERLAP=600                   # 15% overlap
 MAX_ASYNC=32                        # Parallel processing
 ```
 
@@ -265,9 +265,9 @@ docker run -d --name neo4j \
 
 | RFP Size              | Processing Time | Cost   | Entities Extracted |
 | --------------------- | --------------- | ------ | ------------------ |
-| 71 pages (Navy MBOS)  | 30-40 minutes   | ~$4.00 | 594 entities       |
-| 425 pages (Large RFP) | 45-60 minutes   | ~$4.00 | 2,500+ entities    |
-| 500+ pages            | 60-90 minutes   | ~$6.00 | 3,500+ entities    |
+| 71 pages (Navy MBOS)  | 15-20 minutes   | ~$1.00 | 594 entities       |
+| 425 pages (MCPP II)   | 38 minutes      | $2.12  | 1,500+ entities    |
+| 500+ pages            | 45-60 minutes   | ~$3.00 | 2,500+ entities    |
 
 ### Cost Breakdown (per RFP)
 
@@ -277,7 +277,7 @@ docker run -d --name neo4j \
 | Extraction output              | ~500K output | $0.25       |
 | Post-processing (8 algorithms) | ~1M total    | $0.50       |
 | Query overhead                 | ~200K        | $0.10       |
-| **Total**                      | ~7M tokens   | **~$4/RFP** |
+| **Total**                      | ~5M tokens   | **~$2/RFP** |
 
 ---
 
@@ -406,4 +406,4 @@ MIT License - See [LICENSE](LICENSE) for details.
 **Last Updated**: November 2025  
 **Version**: 0.3.0  
 **Status**: Production-ready with Neo4j enterprise storage  
-**Processing**: ~$4/RFP with xAI Grok + OpenAI embeddings
+**Processing**: ~$2/RFP with xAI Grok + OpenAI embeddings (38 min for 425-page RFP)

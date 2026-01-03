@@ -301,6 +301,51 @@ When reviewing or writing code:
 4. **DON'T** create relationships to non-existent entities (ghost nodes)
 5. **DON'T** skip Pydantic validation "for speed" - it catches critical errors
 6. **DON'T** use `pip install` directly - use `uv sync` for reproducibility
+7. **DON'T** add custom code when LightRAG/RAG-Anything already has the feature - check configs first
+8. **DON'T** create custom preprocessing modules - use existing framework abstractions
+
+---
+
+## LightRAG Framework Guidelines
+
+*Based on [LightRAG AGENTS.md](https://github.com/HKUDS/LightRAG/blob/main/AGENTS.md)*
+
+### Core Principle: Use the Framework, Don't Fight It
+
+Before adding custom code, always check if LightRAG or RAG-Anything already provides the capability via:
+- Configuration parameters (`.env` variables)
+- Existing abstractions in `lightrag.base`
+- Built-in processors in `raganything.modalprocessors`
+
+### Coding Style (LightRAG Native)
+
+- Use `lightrag.utils.logger` instead of `print` statements
+- Extend storage/pipeline abstractions via `lightrag.base`
+- Keep reusable helpers in existing `utils_*.py` files - don't create new modules
+- Python modules: lowercase with underscores
+- Annotate functions with type hints; use dataclasses for state
+
+### Agent Workflow
+
+- **Trivial fixes**: Skip planning, just do it (e.g., config changes)
+- **Non-trivial work**: Provide multi-step plans, keep updated
+- Honor existing modifications - never revert/discard user changes unless asked
+- Validate changes by running tests when feasible
+
+### Configuration Over Code
+
+```python
+# BAD: Adding custom preprocessing
+class SectionContextInjector:  # DON'T DO THIS
+    def inject_context(self, content_list):
+        ...
+
+# GOOD: Use RAG-Anything's built-in context extraction
+config = RAGAnythingConfig(
+    context_window=int(os.getenv("RAGANYTHING_CONTEXT_WINDOW", "1")),
+    include_headers=True,  # Already does what you need!
+)
+```
 
 ---
 
@@ -333,5 +378,5 @@ Some git commands page output via `less`, which looks like a “stuck menu” an
 
 ---
 
-*Last Updated: December 2025*
+*Last Updated: January 2026*
 
