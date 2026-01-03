@@ -84,11 +84,18 @@ class GovconMultimodalProcessor(BaseModalProcessor):
             return None
         
         try:
-            # Use RAG-Anything's context extractor
+            # Use RAG-Anything's context extractor API:
+            # extract_context(content_source, current_item_info, content_format)
+            # current_item_info needs page_idx for page-based context extraction
+            current_item_info = {
+                "page_idx": page_idx,
+                "type": content_type
+            }
+            
             context = self.context_extractor.extract_context(
-                content_list=self._content_list,
-                target_page_idx=page_idx,
-                content_format=self._content_format
+                self._content_list,  # content_source (positional)
+                current_item_info,   # current_item_info (positional)
+                self._content_format or "minerU"  # content_format (positional)
             )
             
             if context and len(context) > 50:

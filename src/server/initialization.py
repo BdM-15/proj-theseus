@@ -118,7 +118,7 @@ async def initialize_raganything():
     logger.info(f"   - max_context_tokens: {config.max_context_tokens}")
     logger.info(f"   - include_headers: {config.include_headers}")
     logger.info(f"   - include_captions: {config.include_captions}")
-    logger.info(f"   - context_filter_content_types: {context_filter_content_types}")
+    logger.info(f"   - context_filter_content_types: {getattr(config, 'context_filter_content_types', ['text'])}")
     
     # ═══════════════════════════════════════════════════════════════════════════════
     # DUAL-MODEL LLM ROUTING (Extraction vs Query)
