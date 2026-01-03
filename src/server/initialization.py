@@ -93,21 +93,13 @@ async def initialize_raganything():
     #              → CHILD_OF relationship to APPENDIX_H_WORKLOAD_DATA
     #
     # This enables Algorithm 7 (CDRL/Section patterns) to infer parent relationships.
+    #
+    # IMPORTANT: Context settings are read by RAGAnythingConfig from env vars:
+    #   CONTEXT_WINDOW, CONTEXT_MODE, CONTENT_FORMAT, MAX_CONTEXT_TOKENS,
+    #   INCLUDE_HEADERS, INCLUDE_CAPTIONS, CONTEXT_FILTER_CONTENT_TYPES
     # ═══════════════════════════════════════════════════════════════════════════════
     
-    # Parse context extraction settings from environment
-    context_window = int(os.getenv("RAGANYTHING_CONTEXT_WINDOW", "2"))
-    context_mode = os.getenv("RAGANYTHING_CONTEXT_MODE", "page")
-    content_format = os.getenv("RAGANYTHING_CONTENT_FORMAT", "minerU")
-    max_context_tokens = int(os.getenv("RAGANYTHING_MAX_CONTEXT_TOKENS", "3000"))
-    include_headers = os.getenv("RAGANYTHING_INCLUDE_HEADERS", "true").lower() == "true"
-    include_captions = os.getenv("RAGANYTHING_INCLUDE_CAPTIONS", "true").lower() == "true"
-    
-    # Parse context filter content types (comma-separated in env, default to text)
-    context_filter_raw = os.getenv("RAGANYTHING_CONTEXT_FILTER_CONTENT_TYPES", "text")
-    context_filter_content_types = [t.strip() for t in context_filter_raw.split(",") if t.strip()]
-    
-    # Create RAG-Anything configuration with full context-aware processing
+    # Create RAG-Anything configuration - it reads context settings from env vars automatically
     config = RAGAnythingConfig(
         working_dir=working_dir,
         parser=parser,
@@ -115,24 +107,17 @@ async def initialize_raganything():
         enable_image_processing=enable_image,
         enable_table_processing=enable_table,
         enable_equation_processing=enable_equation,
-        # Context extraction configuration - enables section awareness for tables/images
-        context_window=context_window,
-        context_mode=context_mode,
-        content_format=content_format,
-        max_context_tokens=max_context_tokens,
-        include_headers=include_headers,
-        include_captions=include_captions,
-        context_filter_content_types=context_filter_content_types,
+        # Context settings are automatically loaded from env vars by RAGAnythingConfig
     )
     
-    # Log context-aware processing configuration
-    logger.info(f"✅ RAG-Anything context-aware processing: {'ENABLED' if context_window > 0 else 'DISABLED'}")
-    logger.info(f"   - context_window: {context_window} pages")
-    logger.info(f"   - context_mode: {context_mode}")
-    logger.info(f"   - content_format: {content_format}")
-    logger.info(f"   - max_context_tokens: {max_context_tokens}")
-    logger.info(f"   - include_headers: {include_headers}")
-    logger.info(f"   - include_captions: {include_captions}")
+    # Log context-aware processing configuration (read from config after env var loading)
+    logger.info(f"✅ RAG-Anything context-aware processing: {'ENABLED' if config.context_window > 0 else 'DISABLED'}")
+    logger.info(f"   - context_window: {config.context_window} pages")
+    logger.info(f"   - context_mode: {config.context_mode}")
+    logger.info(f"   - content_format: {config.content_format}")
+    logger.info(f"   - max_context_tokens: {config.max_context_tokens}")
+    logger.info(f"   - include_headers: {config.include_headers}")
+    logger.info(f"   - include_captions: {config.include_captions}")
     logger.info(f"   - context_filter_content_types: {context_filter_content_types}")
     
     # ═══════════════════════════════════════════════════════════════════════════════
@@ -378,10 +363,18 @@ async def initialize_raganything():
     # ═══════════════════════════════════════════════════════════════════════════════
     from src.processors import GovconMultimodalProcessor
     
+    # Get the context_extractor that RAGAnything created during _ensure_lightrag_initialized()
+    # This is properly configured with the context settings from RAGAnythingConfig
+    context_extractor = _rag_anything.context_extractor
+    if context_extractor:
+        logger.info(f"✅ Context extractor available: window={context_extractor.config.context_window}, mode={context_extractor.config.context_mode}")
+    else:
+        logger.warning("⚠️ Context extractor not available - tables will be processed without section context")
+    
     govcon_processor = GovconMultimodalProcessor(
         lightrag=_rag_anything.lightrag,
         modal_caption_func=llm_model_func_wrapped,
-        context_extractor=getattr(_rag_anything, 'context_extractor', None)
+        context_extractor=context_extractor
     )
     
     # Override RAG-Anything's default processors with our ontology-aware processor
