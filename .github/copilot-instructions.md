@@ -26,111 +26,106 @@
 - `docs/capture-intelligence/FEATURE_ROADMAP.md` - Future features and agent-powered proposal development workflows
 - `docs/inference/SEMANTIC_POST_PROCESSING.md` - LLM relationship inference algorithms
 - `docs/neo4j/NEO4J_USER_GUIDE.md` - Graph database workspace management
-
-**Note**: Suggest updates to these documents if you find incomplete or conflicting information.
+- `tests/TEST_SCRIPTS_README.md` - Guide for running validation scripts
 
 ### Root Folders
 
 - `src/` - Python source code organized by domain
 - `prompts/` - LLM prompt templates for extraction and inference
-- `tests/` - Validation scripts (test\_\*.py files, run directly with Python)
+- `tests/` - Validation scripts and pytest suite
 - `tools/` - Neo4j workspace management and validation utilities
 - `docs/` - Architecture documentation and feature roadmaps
 - `inputs/` - RFP document staging (uploaded/ and **enqueued**/ subdirs)
 - `rag_storage/` - Per-workspace knowledge graph data (GraphML + embeddings)
 
-### Core Architecture (`src/` folder)
+---
 
-- `src/server/` - FastAPI server configuration and routing
-  - `config.py` - LightRAG global_args setup (MUST load .env first)
+## Architecture & LightRAG Integration
+
+This project wraps **LightRAG** and **RAGAnything** to provide specialized government contracting capabilities.
+
+### Core Components (`src/`)
+
+- `src/raganything_server.py` - **Main Entry Point**. Orchestrates the server, initializes LightRAG, and sets up routes.
+- `src/server/` - Server configuration and routing
+  - `config.py` - LightRAG `global_args` setup (MUST load .env first)
   - `routes.py` - Custom endpoints with batch completion detection
   - `initialization.py` - RAGAnything wrapper initialization
-- `src/inference/` - Semantic post-processing algorithms
-  - `semantic_post_processor.py` - 8 LLM relationship inference algorithms
-  - `neo4j_graph_io.py` - Neo4j CRUD operations
-  - `batch_processor.py` - Auto-trigger logic after document batches
-- `src/ontology/` - Domain schema validation
-  - `schema.py` - Pydantic models for 18 entity types
+- `src/inference/` - Semantic post-processing algorithms (8 LLM relationship inference algorithms)
+- `src/ontology/` - Domain schema validation (Pydantic models for 18 entity types)
 - `src/extraction/` - Custom entity extraction logic
-- `raganything_server.py` - Main entry point (orchestrates all components)
 
-**Dependencies**: Uses `raganything[all]` and `lightrag-hku` from pip. **NO forked libraries** - all customization via configuration and wrapper modules.
+### Processing Pipeline
 
-### Processing Pipeline (6 Steps)
+1. **Document Upload** → `/insert` or `/documents/upload` endpoints
+2. **MinerU Parsing** → Tables, images, text extraction (GPU-accelerated)
+3. **LightRAG Chunking** → 8,192 tokens/chunk, 15% overlap
+4. **Entity Extraction** → 18 govcon types via xAI Grok + Pydantic validation
+5. **Relationship Extraction** → LightRAG native inference
+6. **Semantic Post-Processing** → 8 LLM algorithms (auto-triggered after batch)
 
-```
-1. Document Upload → /insert or /documents/upload endpoints
-2. MinerU Parsing → Tables, images, text extraction (GPU-accelerated)
-3. LightRAG Chunking → 8,192 tokens/chunk, 15% overlap
-4. Entity Extraction → 18 govcon types via xAI Grok + Pydantic validation
-5. Relationship Extraction → LightRAG native inference
-6. Semantic Post-Processing → 8 LLM algorithms (auto-triggered after batch)
-```
+### RAG-Anything & MinerU Integration
 
-**Key Modules**:
+We leverage **RAG-Anything** for multimodal document processing, using **MinerU** as the underlying parser.
 
-| Path                        | Purpose                                                |
-| --------------------------- | ------------------------------------------------------ |
-| `app.py`                    | Entry point - starts Neo4j Docker + server             |
-| `src/raganything_server.py` | Server orchestration, imports modular components       |
-| `src/server/config.py`      | LightRAG global_args configuration                     |
-| `src/server/routes.py`      | Custom `/insert`, `/documents/upload` + batch tracking |
-| `src/inference/`            | Semantic post-processing algorithms                    |
-| `src/ontology/schema.py`    | Pydantic models for entity validation                  |
-| `prompts/extraction/`       | Entity extraction prompts (~3,000 lines)               |
+- **Multimodal Support**: Handles text, images, tables, and equations.
+- **MinerU Configuration**:
+  - Controlled via `RAGAnythingConfig` in `src/server/initialization.py`.
+  - Key settings: `parser="mineru"`, `parse_method="auto"`.
+  - **GPU Acceleration**: MinerU requires CUDA for efficient parsing. Ensure `device="cuda"` is set if available.
+- **Vision Model**: Uses `vision_model_func` (typically GPT-4o or similar) to analyze images extracted by MinerU.
+- **Direct Content Insertion**: Supports inserting pre-parsed content lists via `insert_content_list` for testing or custom pipelines.
 
 ---
 
-## Validating Changes
+## Development Guidelines
 
-MANDATORY: Always activate virtual environment and check for errors BEFORE running scripts or declaring work complete.
+### Coding Style & Conventions
+
+- **Python**: Follow PEP 8. Use 4-space indentation.
+- **Logging**: Use `logging.getLogger(__name__)` or `lightrag.utils.logger`. **Avoid `print`**.
+- **State Modeling**: Use `dataclasses` or Pydantic models.
+- **Type Hinting**: Annotate functions and variables.
+- **Imports**:
+
+  - **CRITICAL**: Load `.env` (`load_dotenv()`) **BEFORE** importing any LightRAG modules. LightRAG evaluates defaults (like `CHUNK_SIZE`) at import time.
+  - **Pattern**:
+
+    ```python
+    from dotenv import load_dotenv
+    load_dotenv()  # MUST BE FIRST
+
+    from lightrag import LightRAG
+    from lightrag.api.config import global_args
+    ```
+
+### Agent Workflow & Best Practices
+
+- **Search**: Use `rg` (grep_search) for fast text search. Use `file_search` for file names.
+- **Paths**: Use repo-relative paths for all commands.
+- **Modifications**: Honor existing local modifications. Never revert user changes without explicit instruction.
+- **Planning**: For non-trivial work, create a multi-step plan.
+- **Validation**: Always validate changes by running relevant tests (`pytest` or specific scripts).
+
+---
+
+## Testing & Validation
+
+**MANDATORY**: Always activate virtual environment (`.venv`) before running tests.
+
+### Running Tests
+
+1.  **Quick Validation Scripts**:
+    - Refer to `tests/TEST_SCRIPTS_README.md` for specific scenarios.
+    - Example: `python tests/test_neo4j_quick.py`
+2.  **Full Suite**:
+    - Run `python -m pytest tests` to run the standard test suite.
+    - Use markers if available (check `tests/pytest.ini` if present).
 
 ### Environment Setup
 
-- **NEVER run Python commands without activating .venv first**
-- Monitor terminal prompt for `(.venv)` indicator
-- Use ONE terminal session for all sequential commands
-
-### Validation Steps
-
-`.env` MUST load BEFORE importing LightRAG (see `src/raganything_server.py` line 23):
-
-```python
-from dotenv import load_dotenv
-load_dotenv()  # BEFORE any LightRAG imports
-```
-
-LightRAG uses `os.getenv()` in dataclass defaults at import time.
-
-### Import Patterns
-
-```python
-# ✅ CORRECT: pip-installed packages
-from lightrag import LightRAG
-from raganything import RAGAnything
-from lightrag.api.config import global_args
-
-# ❌ WRONG: These don't exist locally
-from lightrag.lightrag import LightRAG  # ModuleNotFoundError
-```
-
-### Entity Type Handling
-
-Entity types are lowercase internally (see `src/server/config.py` line 76):
-
-```python
-global_args.entity_types = ["requirement", "clause", "section", ...]  # lowercase
-```
-
-Validation via Pydantic in `src/ontology/schema.py` - do NOT modify entity types post-extraction.
-
-### Finding Related Code
-
-1. **Semantic search first** - Use for general concepts like "batch processing" or "entity extraction"
-2. **Grep for exact strings** - Use for error messages, class names, or function names
-3. **Follow imports** - Check which files import problematic modules (especially circular dependencies)
-4. **Check test files** - Often reveal usage patterns and expected behavior (e.g., `tests/test_json_extraction.py` shows entity validation)
-5. **Trace prompts** - Entity extraction logic lives in `prompts/extraction/` (~3,000 lines), not Python code
+- Monitor terminal prompt for `(.venv)` indicator.
+- Ensure `.env` is configured correctly for the test environment (e.g., `GRAPH_STORAGE`, `NEO4J_URI`).
 
 ---
 
@@ -138,7 +133,7 @@ Validation via Pydantic in `src/ontology/schema.py` - do NOT modify entity types
 
 ### **NEVER Work Directly on `main` Branch**
 
-**Rule**: ALL development happens on feature branches to isolate experimentation and enable easy rollback.
+**Rule**: ALL development happens on feature branches.
 
 ### Branch Naming Convention
 
@@ -146,104 +141,22 @@ Validation via Pydantic in `src/ontology/schema.py` - do NOT modify entity types
 
 **Examples**:
 
-- `028-parallel-chunk-extraction` (Issue #17)
-- `029-prompt-compression` (Issue #14)
-- `030-shipley-knowledge-graph` (Issue #25)
+- `028-parallel-chunk-extraction`
+- `029-prompt-compression`
 
-**Number Sequence**: Incremental counter showing branch creation order in application lifecycle (easy to track "when was this developed?")
+**Agent Responsibility**:
 
-**Agent Responsibility**: When planning a feature implementation, the agent MUST:
-
-1. Identify the next branch number (check `git branch -a` for highest number)
-2. Create descriptive name from GitHub issue title (kebab-case)
-3. Suggest branch creation: `git checkout -b {number}-{description}`
-4. Document branch purpose in plan
-
-### Branch Workflow
-
-```powershell
-# 1. Start from main (ensure up-to-date)
-git checkout main
-git pull origin main
-
-# 2. Create feature branch (agent suggests name)
-git checkout -b 028-parallel-chunk-extraction
-
-# 3. Develop, commit iteratively
-git add <files>
-git commit -m "feat: implement parallel chunk extraction with semaphore"
-
-# 4. Push to remote
-git push -u origin 028-parallel-chunk-extraction
-
-# 5. Create PR linking to issue
-# (GitHub UI or gh CLI)
-
-# 6. After merge, delete branch
-git checkout main
-git pull origin main
-git branch -d 028-parallel-chunk-extraction
-```
+1. Identify the next branch number (check `git branch -a`).
+2. Create descriptive name from GitHub issue title.
+3. Suggest branch creation: `git checkout -b {number}-{description}`.
 
 ### Commit Message Format
 
 Follow [Conventional Commits](https://www.conventionalcommits.org/):
+`type(scope): description`
 
-```
-<type>(<scope>): <description>
-
-[optional body]
-
-[optional footer(s)]
-```
-
-**Types**:
-
-- `feat:` New feature (e.g., "feat: add parallel chunk processing")
-- `fix:` Bug fix (e.g., "fix: handle empty extraction results")
-- `refactor:` Code restructuring (e.g., "refactor: extract semaphore logic to helper")
-- `docs:` Documentation only (e.g., "docs: update ARCHITECTURE.md with parallelism")
-- `test:` Adding/updating tests (e.g., "test: add parallel extraction validation")
-- `chore:` Maintenance (e.g., "chore: update dependencies")
-
-**Scope** (optional): `extraction`, `inference`, `neo4j`, `prompts`, `agents`
-
-**Examples**:
-
-```
-feat(extraction): implement parallel chunk processing with asyncio.gather
-
-- Add semaphore-based concurrency (8x default)
-- Use existing MAX_ASYNC env var
-- Preserve error handling and retry logic
-- Expected 87% time reduction for extraction phase
-
-Closes #17
-```
-
----
-
-## Development Workflows
-
-### Adding New Entity Types
-
-1. Add to `src/server/config.py` → `global_args.entity_types` (lowercase)
-2. Add Pydantic model to `src/ontology/schema.py`
-3. Update `prompts/extraction/entity_extraction_prompt.md` with examples
-4. Test with `tests/test_json_extraction.py`
-
-### Neo4j Workspace Management
-
-```powershell
-# List all workspaces
-python tools/neo4j/clear_neo4j.py --list
-
-# Duplicate baseline workspace (interactive)
-python tools/neo4j/duplicate_workspace.py
-
-# Clear workspace for fresh testing
-python tools/neo4j/clear_neo4j.py --workspace NAME
-```
+- **Types**: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`
+- **Scope**: `extraction`, `inference`, `neo4j`, `prompts`, `agents`
 
 ---
 
@@ -265,7 +178,12 @@ GRAPH_STORAGE=Neo4JStorage  # or NetworkXStorage
 WORKING_DIR=./rag_storage/workspace_name
 
 # Batch processing
-BATCH_TIMEOUT_SECONDS=30  # Wait before triggering post-processing
+BATCH_TIMEOUT_SECONDS=30
+
+# RAG-Anything Configuration
+PARSER=mineru
+PARSE_METHOD=auto
+# OUTPUT_DIR=./rag_storage/output # Optional override
 ```
 
 ---
@@ -274,54 +192,16 @@ BATCH_TIMEOUT_SECONDS=30  # Wait before triggering post-processing
 
 ### Batch Document Upload
 
-The `DocumentQueueTracker` in `src/server/routes.py` auto-detects batch completion:
-
-- Uploads register via `register_request_start()`
-- Processing tracked via `document_started()` / `document_completed()`
-- Post-processing triggers after `BATCH_TIMEOUT_SECONDS` with no new uploads
+The `DocumentQueueTracker` in `src/server/routes.py` auto-detects batch completion. Uploads register via `register_request_start()`.
 
 ### Custom Endpoint Override
 
-Routes override LightRAG defaults in `src/raganything_server.py` (lines 86-93):
+Routes override LightRAG defaults in `src/raganything_server.py`.
 
-```python
-# Remove original endpoints, add custom ones with multimodal + semantic inference
-create_insert_endpoint(app, rag_instance)
-create_documents_upload_endpoint(app, rag_instance)
-```
+### File Operations
 
----
+Use workspace tools (`read_file`, `create_file`, `replace_string_in_file`), NOT PowerShell for file I/O.
 
-## File Operations
+### GPU Warning
 
-**Use workspace tools** (read_file, create_file, replace_string_in_file), NOT PowerShell for file I/O.
-
-**PowerShell only for**: `python`, `uv`, `git`, `docker` commands.
-
----
-
-## GPU Warning
-
-After `uv sync`, PyTorch downgrades to CPU-only. Reinstall CUDA versions manually:
-
-```powershell
-uv pip install torch==2.9.0+cu128 torchvision==0.24.0+cu128 --index-url https://download.pytorch.org/whl/cu128
-```
-
-Verify: `python -c "import torch; print(torch.cuda.is_available())"` → should be `True`
-
----
-
-## Context Engineering Notes
-
-This is a **living document** - refine based on observed AI mistakes or shortcomings. When implementing future features from `docs/future_features/`, consider creating:
-
-- **Custom agents** (`.github/agents/*.agent.md`) for specialized workflows (e.g., planning, implementation, validation)
-- **Prompt files** (`.github/prompts/*.prompt.md`) for reusable task workflows
-- **Agent handoffs** for multi-step processes (plan → implement → test)
-
-See [VS Code Context Engineering Guide](https://code.visualstudio.com/docs/copilot/guides/context-engineering-guide) for patterns.
-
----
-
-**Last Updated**: December 2025
+After `uv sync`, PyTorch might downgrade to CPU-only. Reinstall CUDA versions manually if needed (see `README.md` or previous instructions).
