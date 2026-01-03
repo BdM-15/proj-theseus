@@ -82,11 +82,32 @@ async def initialize_raganything():
     # MINERU_PDF_RENDER_TIMEOUT, CUDA_VISIBLE_DEVICES, HF_TOKEN, HF_HUB_DISABLE_SYMLINKS_WARNING, etc.)
     # are automatically inherited by MinerU subprocess from os.environ after dotenv loads .env
     
-    # Create RAG-Anything configuration (does NOT accept device parameter)
-    # Context extraction settings: Disabled for multimodal to prevent JSON truncation
-    # - Tables are self-contained (don't need surrounding text)
-    # - Text chunks already have 15% overlap for context
-    # - Reduces token overhead: ~2K tokens/chunk → prevents extraction truncation
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # RAG-ANYTHING CONTEXT-AWARE PROCESSING (Issue #62)
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # When processing multimodal content (tables, images, equations), RAG-Anything
+    # can extract surrounding page context to provide section awareness.
+    #
+    # Without context: Table on p53 → "table_p53" (isolated node, no relationships)
+    # With context: Table on p53 → "AL JABER AIR BASE workload table from Appendix H"
+    #              → CHILD_OF relationship to APPENDIX_H_WORKLOAD_DATA
+    #
+    # This enables Algorithm 7 (CDRL/Section patterns) to infer parent relationships.
+    # ═══════════════════════════════════════════════════════════════════════════════
+    
+    # Parse context extraction settings from environment
+    context_window = int(os.getenv("RAGANYTHING_CONTEXT_WINDOW", "2"))
+    context_mode = os.getenv("RAGANYTHING_CONTEXT_MODE", "page")
+    content_format = os.getenv("RAGANYTHING_CONTENT_FORMAT", "minerU")
+    max_context_tokens = int(os.getenv("RAGANYTHING_MAX_CONTEXT_TOKENS", "3000"))
+    include_headers = os.getenv("RAGANYTHING_INCLUDE_HEADERS", "true").lower() == "true"
+    include_captions = os.getenv("RAGANYTHING_INCLUDE_CAPTIONS", "true").lower() == "true"
+    
+    # Parse context filter content types (comma-separated in env, default to text)
+    context_filter_raw = os.getenv("RAGANYTHING_CONTEXT_FILTER_CONTENT_TYPES", "text")
+    context_filter_content_types = [t.strip() for t in context_filter_raw.split(",") if t.strip()]
+    
+    # Create RAG-Anything configuration with full context-aware processing
     config = RAGAnythingConfig(
         working_dir=working_dir,
         parser=parser,
@@ -94,19 +115,25 @@ async def initialize_raganything():
         enable_image_processing=enable_image,
         enable_table_processing=enable_table,
         enable_equation_processing=enable_equation,
-        # Context extraction configuration - read from env vars
-        # Include surrounding page text for section context (tables know they're in "APPENDIX H")
-        context_window=int(os.getenv("RAGANYTHING_CONTEXT_WINDOW", "1")),
-        max_context_tokens=int(os.getenv("RAGANYTHING_MAX_CONTEXT_TOKENS", "2000")),
-        include_headers=os.getenv("RAGANYTHING_INCLUDE_HEADERS", "true").lower() == "true",
-        include_captions=True,
-        context_filter_content_types=["text"],
+        # Context extraction configuration - enables section awareness for tables/images
+        context_window=context_window,
+        context_mode=context_mode,
+        content_format=content_format,
+        max_context_tokens=max_context_tokens,
+        include_headers=include_headers,
+        include_captions=include_captions,
+        context_filter_content_types=context_filter_content_types,
     )
-    context_window = int(os.getenv("RAGANYTHING_CONTEXT_WINDOW", "1"))
-    logger.info(f"✅ RAG-Anything context extraction: {'ENABLED' if context_window > 0 else 'DISABLED'}")
-    logger.info(f"   - context_window: {context_window}")
-    logger.info(f"   - max_context_tokens: {os.getenv('RAGANYTHING_MAX_CONTEXT_TOKENS', '2000')}")
-    logger.info(f"   - include_headers: {os.getenv('RAGANYTHING_INCLUDE_HEADERS', 'true')}")
+    
+    # Log context-aware processing configuration
+    logger.info(f"✅ RAG-Anything context-aware processing: {'ENABLED' if context_window > 0 else 'DISABLED'}")
+    logger.info(f"   - context_window: {context_window} pages")
+    logger.info(f"   - context_mode: {context_mode}")
+    logger.info(f"   - content_format: {content_format}")
+    logger.info(f"   - max_context_tokens: {max_context_tokens}")
+    logger.info(f"   - include_headers: {include_headers}")
+    logger.info(f"   - include_captions: {include_captions}")
+    logger.info(f"   - context_filter_content_types: {context_filter_content_types}")
     
     # ═══════════════════════════════════════════════════════════════════════════════
     # DUAL-MODEL LLM ROUTING (Extraction vs Query)
