@@ -7,7 +7,19 @@ requires-python = ">=3.13"
 dependencies = [
     # Core RAG functionality (includes lightrag-hku, MinerU, and document parsers)
     "raganything[all]>=1.2.8",
-    
+    # MinerU document parser - EXPLICIT constraint to prevent downgrade
+    "mineru[core]>=2.7.0",
+    # MinerU runtime dependencies not properly declared in mineru[core]
+    # (MinerU OCR postprocess imports these directly.)
+    "shapely>=2.0.0",
+    "pyclipper>=1.3.0.post6",
+    # Needed for loading some upstream serialized model artifacts
+    "dill>=0.3.8",
+    # MinerU OCR config loader imports OmegaConf at runtime
+    "omegaconf>=2.3.0",
+    "doclayout-yolo>=0.0.4",
+    # MinerU pipeline backend imports ultralytics.YOLO
+    "ultralytics>=8.0.0",
     # LightRAG with RAG-Anything compatibility (REQUIRED: >= 1.4.9.7)
     # v1.4.9.7 includes:
     # - Enhanced Neo4j workspace isolation and performance
@@ -15,29 +27,22 @@ dependencies = [
     # - Improved connection pooling and retry logic
     # - Full-text search improvements (CJK analyzer support)
     "lightrag-hku>=1.4.9.7",
-    
     # Cloud LLM access (xAI Grok via OpenAI-compatible API)
-    "openai>=1.0.0",
-
+    # Pinned <2.0.0 for compatibility with instructor.
+    "openai>=1.70.0,<2.0.0",
     # xAI SDK for native Grok integration (updated to 1.5.0)
     "xai-sdk>=1.5.0",
-    
     # Instructor for Pydantic-validated LLM extraction with automatic retry
     "instructor>=1.3.2",
-    
     # Server framework
     "fastapi>=0.118.0",
     "uvicorn>=0.37.0",
-    
     # Configuration management
     "python-dotenv>=1.0.0",
-    
     # Authentication (required by lightrag-hku API server)
     "PyJWT>=2.10.0",
-    
     # Neo4j graph database driver
     "neo4j>=5.0.0",
-    
     # ============================================================================
     # GPU Acceleration for MinerU (CRITICAL for performance)
     # ============================================================================
@@ -47,6 +52,12 @@ dependencies = [
     #   - GPU-accelerated: ~30-60 seconds for same document (2-10x faster)
     "torch>=2.5.0",
     "torchvision>=0.20.0",
+    "python-multipart>=0.0.21",
+    "transformers>=4.57.3",
+    "accelerate>=1.12.0",
+    "ftfy>=6.3.1",
+    # transformers (and other HF libs) currently require huggingface-hub <1.0
+    "huggingface-hub>=0.34.0,<1.0.0",
 ]
 
 # ============================================================================
@@ -54,6 +65,16 @@ dependencies = [
 # ============================================================================
 [tool.uv]
 # Use PyTorch CUDA 12.4 index for GPU acceleration
+
+# Override resolution to force compatible versions
+# LightRAG 1.4.9.10 has numpy<2.0.0 constraint but MinerU 2.6.4+ needs numpy>=2.1.0
+# LightRAG only uses numpy for simple ndarray returns, works fine with numpy 2.x
+override-dependencies = [
+    "lightrag-hku>=1.4.9.10",
+    "mineru>=2.7.0",
+    "numpy>=2.1.0,<2.3.0",  # Override LightRAG's <2.0.0 constraint (also keep OpenCV compatible)
+]
+
 [[tool.uv.index]]
 name = "pytorch-cu124"
 url = "https://download.pytorch.org/whl/cu124"
