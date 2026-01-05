@@ -247,7 +247,18 @@ async def initialize_raganything():
             else:
                 truncated_texts.append(text)
         
-        return await openai_embed(truncated_texts, model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-large"), api_key=openai_api_key)
+        # IMPORTANT: lightrag's `openai_embed` symbol is wrapped with default attrs
+        # (embedding_dim=1536 for text-embedding-3-small). When our `.env` uses
+        # `text-embedding-3-large` (3072 dims) and dimensions are not explicitly sent,
+        # the wrapper can mis-validate and raise a "Vector count mismatch".
+        #
+        # Use the unwrapped function (`openai_embed.func`) to avoid that mismatch.
+        embed_impl = getattr(openai_embed, "func", openai_embed)
+        return await embed_impl(
+            truncated_texts,
+            model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-large"),
+            api_key=openai_api_key,
+        )
     
     # Get embedding dimension from environment (flexibility for different models)
     embedding_dim = int(os.getenv("EMBEDDING_DIM", "3072"))
@@ -445,7 +456,14 @@ async def initialize_raganything():
     logger.info(f"{BOLD}{MAGENTA}🎯 CONFIGURATION{RESET}")
     logger.info(f"{CYAN}{'═' * 80}{RESET}")
     logger.info(f"{GREEN}Entity Types:{RESET} {BOLD}{len(entity_types)}{RESET} specialized (organization, requirement, evaluation_factor, etc.)")
-    logger.info(f"{GREEN}Parser:{RESET} {BOLD}MinerU 2.6.4{RESET} | Device: {BOLD}{GREEN if device == 'cuda' else YELLOW}{device.upper()}{RESET} | Method: {parse_method.upper()}")
+    try:
+        from importlib import metadata as _metadata
+        mineru_version = _metadata.version("mineru")
+    except Exception:
+        mineru_version = "unknown"
+    logger.info(
+        f"{GREEN}Parser:{RESET} {BOLD}MinerU {mineru_version}{RESET} | Device: {BOLD}{GREEN if device == 'cuda' else YELLOW}{device.upper()}{RESET} | Method: {parse_method.upper()}"
+    )
     logger.info(f"{GREEN}Multimodal:{RESET} Images, Tables, Equations {BOLD}{GREEN}ENABLED{RESET}")
     logger.info(f"{GREEN}Advanced:{RESET} Formula Recognition, Table Merge {BOLD}{GREEN}ENABLED{RESET} | Timeout: {YELLOW}600s{RESET}")
     logger.info(f"{CYAN}{'═' * 80}{RESET}")
@@ -534,7 +552,47 @@ async def initialize_raganything():
     _rag_anything.lightrag.doc_status.get_docs_paginated = filtered_get_docs_paginated
     # ═════════════════════════════════════════════════════════════════════════════
     
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # MinerU Model Warmup - Download VLM model at startup, not during processing
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # MinerU 2.7.0 uses a VLM model (MinerU2.5-2509-1.2B) that must be downloaded
+    # from HuggingFace Hub. Without warmup, this happens on first document upload,
+    # causing unexpected delays and potential timeout/permission errors.
+    #
+    # The warmup runs `mineru --version` which triggers model download without
+    # parsing any document. HF_HUB_DISABLE_SYMLINKS=1 in .env prevents Windows
+    # symlink permission errors during download.
+    # ═══════════════════════════════════════════════════════════════════════════════
+    await warmup_mineru_model()
+    
     return _rag_anything
+
+
+async def warmup_mineru_model():
+    """Pre-download MinerU VLM model at startup to avoid delays during document processing"""
+    import asyncio
+    import os
+    
+    logger.info("🔄 Warming up MinerU VLM model (downloading if needed)...")
+    
+    try:
+        # CRITICAL: Set env vars BEFORE importing huggingface_hub
+        # These must be set before the HF library reads them
+        os.environ["HF_HUB_DISABLE_SYMLINKS"] = "1"
+        os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+        
+        from huggingface_hub import snapshot_download
+        
+        model_path = await asyncio.to_thread(
+            snapshot_download,
+            "opendatalab/MinerU2.5-2509-1.2B"
+        )
+        logger.info(f"✅ MinerU VLM model ready: {model_path}")
+        
+    except Exception as e:
+        # Non-fatal - model files are downloaded, symlink just failed
+        # MinerU will still work as the blobs are present
+        logger.warning(f"⚠️ MinerU warmup: {e} - will download on first document")
 
 
 def get_rag_instance():

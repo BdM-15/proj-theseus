@@ -130,6 +130,8 @@ def _pre_split_fixes(line: str) -> str:
     - <|#|>#|requirement <|#|>     (space after word)
     - <|#|>#/>requirement<|#|>     (hash-slash-greater-than corruption - MCPP II pattern)
     - <|#|>(requirement<|#|>       (parenthesis prefix corruption)
+    
+    CRITICAL: Handle multi-word entity types like "person role" which (\w+) doesn't match!
     """
     if not line:
         return line
@@ -137,9 +139,17 @@ def _pre_split_fixes(line: str) -> str:
     original = line
     
     # ═══════════════════════════════════════════════════════════════════════════════
-    # Pattern 1: Hash-pipe prefix corruption
+    # Pattern 1: Hash-pipe prefix corruption (MOST COMMON)
     # <|#|>#|requirement<|#|> → <|#|>requirement<|#|>
     # <|#|>#| requirement<|#|> → <|#|>requirement<|#|>
+    # <|#|>#|person role<|#|> → <|#|>person role<|#|>  (multi-word!)
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Use [^<]+ instead of \w+ to match ANY characters until the next delimiter
+    line = re.sub(r'<\|#\|>\s*#\|+\s*([^<]+?)\s*<\|#\|>', r'<|#|>\1<|#|>', line)
+    
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Pattern 1b: Simpler hash-pipe at start of field (backup pattern)
+    # <|#|>#|word → <|#|>word (for single words)
     # ═══════════════════════════════════════════════════════════════════════════════
     line = re.sub(r'<\|#\|>\s*[#|]+\s*(\w+)\s*<\|#\|>', r'<|#|>\1<|#|>', line)
     
@@ -149,23 +159,23 @@ def _pre_split_fixes(line: str) -> str:
     # <|#|>#/> requirement<|#|> → <|#|>requirement<|#|>
     # Also handles: #/>, #\>, #|>, etc.
     # ═══════════════════════════════════════════════════════════════════════════════
-    line = re.sub(r'<\|#\|>\s*#[/\\|>]+\s*(\w+)\s*<\|#\|>', r'<|#|>\1<|#|>', line)
+    line = re.sub(r'<\|#\|>\s*#[/\\|>]+\s*([^<]+?)\s*<\|#\|>', r'<|#|>\1<|#|>', line)
     
     # ═══════════════════════════════════════════════════════════════════════════════
     # Pattern 3: Parenthesis prefix corruption (seen in MCPP II logs)
     # <|#|>(requirement<|#|> → <|#|>requirement<|#|>
     # <|#|>( requirement<|#|> → <|#|>requirement<|#|>
     # ═══════════════════════════════════════════════════════════════════════════════
-    line = re.sub(r'<\|#\|>\s*\(\s*(\w+)\s*<\|#\|>', r'<|#|>\1<|#|>', line)
+    line = re.sub(r'<\|#\|>\s*\(\s*([^<]+?)\s*<\|#\|>', r'<|#|>\1<|#|>', line)
     
     # ═══════════════════════════════════════════════════════════════════════════════
     # Pattern 4: Trailing pipe after entity type
     # <|#|>requirement|<|#|> → <|#|>requirement<|#|>
     # ═══════════════════════════════════════════════════════════════════════════════
-    line = re.sub(r'<\|#\|>\s*(\w+)\|+\s*<\|#\|>', r'<|#|>\1<|#|>', line)
+    line = re.sub(r'<\|#\|>\s*([^<|]+?)\|+\s*<\|#\|>', r'<|#|>\1<|#|>', line)
     
     # ═══════════════════════════════════════════════════════════════════════════════
-    # Pattern 5: General garbage prefix before entity type
+    # Pattern 5: General garbage prefix before entity type (single word)
     # <|#|>[symbols]entity_type<|#|> → <|#|>entity_type<|#|>
     # Catches any non-word characters before the actual entity type
     # ═══════════════════════════════════════════════════════════════════════════════
@@ -183,14 +193,18 @@ def _clean_entity_type(entity_type: str) -> str:
     """
     Clean entity type field by removing common malformation patterns.
     
-    Fixes (observed in MCPP II processing logs):
-    - #|requirement → requirement
-    - |requirement → requirement
-    - requirement| → requirement
-    - #requirement → requirement
+    This is the LAST LINE OF DEFENSE before LightRAG's validation rejects entities.
+    LightRAG rejects entity types containing: ' ( ) < > | / \
+    
+    Fixes (observed in processing logs):
+    - #|requirement → requirement (hash-pipe prefix - CRITICAL, causes drops)
+    - |requirement → requirement (pipe prefix)
+    - requirement| → requirement (pipe suffix)
+    - #requirement → requirement (hash prefix)
     - #/>requirement → requirement (hash-slash-greater-than)
     - (requirement → requirement (parenthesis prefix)
     - requirement) → requirement (parenthesis suffix)
+    - #| person → person (space after corruption prefix)
     """
     if not entity_type:
         return entity_type
@@ -199,27 +213,48 @@ def _clean_entity_type(entity_type: str) -> str:
     cleaned = entity_type.strip()
     
     # ═══════════════════════════════════════════════════════════════════════════════
-    # Step 1: Remove leading garbage patterns
+    # Step 1: Handle the CRITICAL #| prefix pattern that causes entity drops
+    # This is the most common corruption pattern from LLM delimiter leakage
+    # Must handle variants: "#|type", "# |type", "#| type", "# | type"
     # ═══════════════════════════════════════════════════════════════════════════════
-    # Pattern: #|, |#, #/, #>, #\, etc. at the start
+    # Remove #| or # | at the start (with optional spaces around)
+    cleaned = re.sub(r'^#\s*\|\s*', '', cleaned)
+    # Remove |# at the start (reversed order)
+    cleaned = re.sub(r'^\|\s*#\s*', '', cleaned)
+    
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Step 2: Remove leading garbage patterns (more comprehensive)
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Pattern: #|, |#, #/, #>, #\, |, #, etc. at the start
     cleaned = re.sub(r'^[#|/\\><\(\)\s]+', '', cleaned)
     
     # ═══════════════════════════════════════════════════════════════════════════════
-    # Step 2: Remove trailing garbage patterns  
+    # Step 3: Remove trailing garbage patterns  
     # ═══════════════════════════════════════════════════════════════════════════════
     # Pattern: |, #, >, etc. at the end
     cleaned = re.sub(r'[#|/\\><\(\)\s]+$', '', cleaned)
     
     # ═══════════════════════════════════════════════════════════════════════════════
-    # Step 3: Remove any remaining special characters in the middle
+    # Step 4: Remove any remaining special characters that LightRAG rejects
+    # LightRAG validation: any(char in entity_type for char in ["'", "(", ")", "<", ">", "|", "/", "\\"])
     # Entity types should be alphanumeric with underscores only
     # ═══════════════════════════════════════════════════════════════════════════════
     cleaned = re.sub(r'[<>()\'"/\\|#]', '', cleaned)
     
     # ═══════════════════════════════════════════════════════════════════════════════
-    # Step 4: Normalize - lowercase, remove spaces (entity types like "statement_of_work")
+    # Step 5: Normalize - lowercase, convert spaces to underscores
+    # Entity types like "statement of work" → "statement_of_work"
     # ═══════════════════════════════════════════════════════════════════════════════
     cleaned = cleaned.strip().lower().replace(' ', '_')
+    
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Step 6: Final validation - ensure no forbidden characters remain
+    # If any slip through, log a warning so we can add patterns
+    # ═══════════════════════════════════════════════════════════════════════════════
+    forbidden_chars = ["'", "(", ")", "<", ">", "|", "/", "\\"]
+    remaining_forbidden = [c for c in forbidden_chars if c in cleaned]
+    if remaining_forbidden:
+        logger.warning(f"⚠️ Entity type still contains forbidden chars after cleaning: '{cleaned}' (chars: {remaining_forbidden})")
     
     if cleaned != original.strip().lower().replace(' ', '_'):
         _stats.entity_type_fixes += 1

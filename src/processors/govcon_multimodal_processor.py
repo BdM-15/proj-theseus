@@ -206,10 +206,13 @@ Include exact values - never generalize "100 times per year" to "frequent"."""
             description = str(modal_content.get("content", modal_content))[:500]
         
         # Create entity info metadata
+        # Note: summary is used for VDB content field - no truncation needed
+        # LightRAG handles consolidation via LLM summarization during entity merge
+        # Embedding API (8191 tokens) handles any overflow gracefully
         entity_info = {
             "entity_name": entity_name or f"{content_type}_p{page_idx}",
             "entity_type": content_type,
-            "summary": description[:200],
+            "summary": description,  # Full context preserved for embeddings
             "page_idx": page_idx,
         }
         
