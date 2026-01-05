@@ -100,6 +100,83 @@ A.2.4 RELATIONSHIP HYGIENE
 - Use consistent entity names in source_entity and target_entity fields
 - Entity names in relationships MUST exactly match extracted entity names
 
+A.2.5 CANONICAL ENTITY FORM RULE
+--------------------------------
+When the same logical entity appears with different name variations across 
+chunks, you MUST normalize to a single canonical form. This prevents duplicate 
+nodes in the knowledge graph.
+
+CANONICAL FORM PATTERN: "(Identifier) (Full-Descriptive-Title)"
+
+RECOGNITION RULES:
+- If two names share the same identifier (e.g., "Appendix G"), they are the 
+  SAME entity regardless of how the descriptive portion varies
+- If two names share the same acronym in parentheses, they are the SAME entity
+- If one name is a substring/abbreviation of another, use the LONGER form
+
+EXAMPLES OF MERGING TO CANONICAL FORM:
+  "Appendix G" + "Appendix G AUAB" + "Appendix G Al Udeid Air Base" 
+  → Canonical: "Appendix G Al Udeid Air Base (AUAB)"
+  
+  "CDRL A002" + "CDRL A002 Task Order Management Plan"
+  → Canonical: "CDRL A002 Task Order Management Plan"
+  
+  "Section L" + "Section L Proposal Preparation Instructions"
+  → Canonical: "Section L Proposal Preparation Instructions"
+
+RULE: When you encounter a short-form reference (e.g., "Appendix G"), check if 
+you have already extracted a longer canonical form. If yes, use the canonical 
+form. If this is the first occurrence, extract with maximum available context.
+
+A.2.6 HIERARCHICAL SIBLING RELATIONSHIPS
+----------------------------------------
+Document sections that share the same structural level are SIBLINGS, not a 
+parent-child chain. This rule prevents incorrect CHILD_OF relationship chains.
+
+IMPORTANT: Siblings being structurally independent does NOT mean they are 
+unrelated. Sibling sections often have rich cross-references and content 
+connections that SHOULD be extracted as relationships.
+
+SIBLING PATTERN RECOGNITION:
+- Lettered sequences at same level: A, B, C, D... are siblings
+- Numbered sequences at same level: 1, 2, 3, 4... are siblings
+- Roman numeral sequences: I, II, III, IV... are siblings
+- Any series of top-level document divisions are siblings to each other
+- Attachments, exhibits, appendices, annexes at same level are siblings
+
+CORRECT HIERARCHY PATTERN:
+  Parent Document
+  ├── Division X (sibling to Y and Z)
+  ├── Division Y (sibling to X and Z)
+  │   ├── Y.1 Sub-section (child of Division Y)
+  │   └── Y.2 Sub-section (child of Division Y)
+  └── Division Z (sibling to X and Y)
+
+INCORRECT PATTERN (DO NOT DO):
+  Division X → CHILD_OF → Division Y → CHILD_OF → Division Z  ❌
+
+WHEN TO USE CHILD_OF:
+- Sub-sections within a parent section (3.1 is CHILD_OF Section 3)
+- Exhibits/tables within a parent attachment
+- Numbered paragraphs within a clause or article
+- Any content explicitly nested under a parent heading
+
+CROSS-REFERENCES BETWEEN SIBLINGS (ENCOURAGED):
+Sibling sections often reference each other's content. Extract these as 
+relationships using appropriate types like REFERENCES, MAPS_TO, EVALUATED_BY, 
+SUPPORTS, INFORMS, SPECIFIES, CONSTRAINS, etc.
+
+PATTERN-BASED CROSS-REFERENCE EXAMPLES:
+- Submission instructions → MAPS_TO → Evaluation criteria
+- Workload/volume data → INFORMS → Performance requirements
+- Deliverable specifications → REFERENCES → Data format definitions
+- Evaluation factors → EVALUATED_BY → Instructions in another section
+- Technical requirements → CONSTRAINED_BY → Terms and conditions
+
+These cross-section connections are CRITICAL for traceability and compliance 
+mapping. Extract them whenever the text indicates a relationship between 
+content in structurally separate sections, regardless of document format.
+
 ================================================================================
 PART B: QUANTITATIVE DETAIL PRESERVATION (Critical for BOE Development)
 ================================================================================
@@ -682,6 +759,20 @@ Extract:
 PART F: RELATIONSHIP PATTERNS AND INFERENCE RULES
 ================================================================================
 
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  FUNDAMENTAL RULE #1: NUMBERED HIERARCHY (ALWAYS APPLY)                      ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║  ANY entity with numbering X.Y.Z is CHILD_OF entity X.Y (if X.Y exists).     ║
+║  This is AUTOMATIC and UNIVERSAL - applies to ALL numbered entities.         ║
+║                                                                              ║
+║  Examples:                                                                   ║
+║  • F.1.5.7 → CHILD_OF → F.1.5 → CHILD_OF → F.1 → CHILD_OF → Section F       ║
+║  • 3.2.1.4 → CHILD_OF → 3.2.1 → CHILD_OF → 3.2 → CHILD_OF → Section 3       ║
+║  • C.5.2.3 → CHILD_OF → C.5.2 → CHILD_OF → C.5                              ║
+║                                                                              ║
+║  DO NOT leave numbered entities as orphans when parent numbers exist!        ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
 F.1 Mandatory Relationship Types
 ---------------------------------
 CHILD_OF - Hierarchical structure (sections, subsections, numbered documents)
@@ -879,15 +970,24 @@ Pattern: "CDRL A001" and "Monthly Status Report" mentioned in same paragraph/sec
 Action: Create TRACKED_BY relationship from deliverable to CDRL
 Confidence: 0.75 (medium - co-location inference)
 
-Rule 6: Numbered Requirements to Parent Appendix/Section (CRITICAL FOR RETRIEVAL)
-Pattern: Entity with numbered prefix (H.1.x, F.2.x, I.3.x, etc.) and parent Appendix/Section exists
-Action: ALWAYS create CHILD_OF relationship from numbered requirement to parent:
-- "H.1.1 Lavatory Servicing ADAB" --CHILD_OF--> "Appendix H Al Dhafra Air Base"
-- "F.2.4 Special Events Arrangement" --CHILD_OF--> "Appendix F Recreational Services"
-- "I.3.2 Water Delivery Schedule" --CHILD_OF--> "Appendix I Water Delivery"
-Confidence: 0.95 (high - explicit numbering pattern matches appendix letter)
-WHY THIS MATTERS: Without CHILD_OF, queries like "What are the services in Appendix H?" 
-cannot retrieve H.1.x requirements because they appear disconnected in the graph.
+Rule 6: UNIVERSAL Numbered Hierarchy (CRITICAL - PATTERN-BASED)
+==============================================================
+UNIVERSAL PATTERN: Any entity numbered X.Y.Z is CHILD_OF entity X.Y (if it exists).
+This applies recursively: X.Y.Z.W → X.Y.Z → X.Y → X
+
+ALWAYS create CHILD_OF relationships for numbered hierarchies:
+- "F.1.5.7 Maintenance Support" --CHILD_OF--> "F.1.5 [parent section]"
+- "F.1.5.11.2 AGE Inspections" --CHILD_OF--> "F.1.5.11 Minor Maintenance"
+- "3.2.1.4 Specific Task" --CHILD_OF--> "3.2.1 Task Category"
+- "C.3.2.1 Subsection" --CHILD_OF--> "C.3.2 Section"
+
+ALSO link to named parent sections/appendices when evident:
+- "F.1.5.7" in Appendix F --CHILD_OF--> "Appendix F" or "Section F"
+- Requirements under "PWS 3.1" --CHILD_OF--> "PWS 3.1"
+
+Confidence: 0.98 (very high - deterministic numbering pattern)
+WHY THIS MATTERS: Without CHILD_OF chains, F.1.5.7 appears as orphan disconnected 
+from F.1.5, breaking queries like "What are requirements under section F.1.5?"
 
 Rule 7: Workload Data to Parent Appendix (CRITICAL FOR BOE QUERIES)
 Pattern: Table or workload data (H.2.0, aircraft forecast, equipment inventory) in site appendix
@@ -1639,14 +1739,4 @@ DELIMITER REFERENCE
 
 Language: {language}
 
-================================================================================
-DOCUMENT TO ANALYZE
-================================================================================
-
----Real Data to be Processed---
-<Input>
-Entity_types: [{entity_types}]
-Text:
-```
-{input_text}
-```
+Entity types to extract: [{entity_types}]

@@ -4,14 +4,21 @@ Government Contracting Multimodal Processor
 Extends RAG-Anything's BaseModalProcessor to apply government contracting ontology
 to multimodal content from MinerU (tables, images, equations).
 
-Architecture (Issue #54 - Back to Basics):
+Architecture (Issue #54 - Back to Basics, Issue #62 - Context-Aware Processing):
 - Uses RAG-Anything's native multimodal processing
 - Generates text descriptions that LightRAG processes natively
+- Extracts surrounding page context for section awareness
 - No Pydantic/JSON extraction - pure text for tuple-delimited extraction
+
+Issue #62 Enhancement:
+Tables/images are processed with surrounding page context, enabling:
+- Section-aware entity names ("Appendix H Workload Table" vs "table_p53")
+- CHILD_OF relationships inferred by Algorithm 7
+- Better VDB embeddings that capture section semantics
 """
 
 import logging
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, Optional
 from raganything.modalprocessors import BaseModalProcessor
 
 logger = logging.getLogger(__name__)
@@ -22,7 +29,10 @@ class GovconMultimodalProcessor(BaseModalProcessor):
     Multimodal processor that generates government contracting focused descriptions.
     
     Issue #54: Simplified to use native LightRAG extraction.
-    Tables/images/equations get descriptive text → LightRAG extracts entities natively.
+    Issue #62: Enhanced with context-aware processing for section awareness.
+    
+    Tables/images/equations get descriptive text with surrounding context
+    → LightRAG extracts entities natively with parent section relationships.
     """
     
     def __init__(self, lightrag, modal_caption_func, context_extractor):
@@ -32,10 +42,72 @@ class GovconMultimodalProcessor(BaseModalProcessor):
         Args:
             lightrag: LightRAG instance for storage/indexing
             modal_caption_func: LLM function (Grok-4 for text analysis)
-            context_extractor: RAG-Anything's context extraction utility
+            context_extractor: RAG-Anything's context extraction utility (Issue #62)
         """
         super().__init__(lightrag, modal_caption_func, context_extractor)
-        logger.info("🏛️ GovconMultimodalProcessor initialized (native LightRAG extraction)")
+        self._content_list = None
+        self._content_format = None
+        logger.info("🏛️ GovconMultimodalProcessor initialized (context-aware processing enabled)")
+    
+    def set_content_source(self, content_list, content_format):
+        """
+        Set the document content for context extraction.
+        
+        Called by RAG-Anything before processing multimodal items.
+        Stores content_list for extract_surrounding_context().
+        
+        Args:
+            content_list: MinerU parsed content (pages/items)
+            content_format: Parser format ("minerU", etc.)
+        """
+        super().set_content_source(content_list, content_format)
+        self._content_list = content_list
+        self._content_format = content_format
+        logger.debug(f"📄 Content source set: {len(content_list) if content_list else 0} items, format={content_format}")
+    
+    def _extract_surrounding_context(self, page_idx: int, content_type: str) -> Optional[str]:
+        """
+        Extract surrounding page context for section awareness (Issue #62).
+        
+        Uses RAG-Anything's context_extractor to get text from surrounding pages,
+        enabling tables to know what section/appendix they belong to.
+        
+        Args:
+            page_idx: Page index of the multimodal item
+            content_type: Type of content ("table", "image", "equation")
+            
+        Returns:
+            Surrounding context text, or None if unavailable
+        """
+        if not self.context_extractor or not self._content_list:
+            logger.debug(f"⚠️ Context extraction unavailable for {content_type} on page {page_idx}")
+            return None
+        
+        try:
+            # Use RAG-Anything's context extractor API:
+            # extract_context(content_source, current_item_info, content_format)
+            # current_item_info needs page_idx for page-based context extraction
+            current_item_info = {
+                "page_idx": page_idx,
+                "type": content_type
+            }
+            
+            context = self.context_extractor.extract_context(
+                self._content_list,  # content_source (positional)
+                current_item_info,   # current_item_info (positional)
+                self._content_format or "minerU"  # content_format (positional)
+            )
+            
+            if context and len(context) > 50:
+                logger.info(f"📖 Extracted {len(context)} chars of context for {content_type} on page {page_idx}")
+                return context
+            else:
+                logger.debug(f"📖 Minimal context for {content_type} on page {page_idx}")
+                return None
+                
+        except Exception as e:
+            logger.warning(f"⚠️ Context extraction failed for {content_type} on page {page_idx}: {e}")
+            return None
     
     async def generate_description_only(
         self,
@@ -45,10 +117,10 @@ class GovconMultimodalProcessor(BaseModalProcessor):
         entity_name: str = None
     ) -> Tuple[str, Dict[str, Any]]:
         """
-        Generate government contracting focused description for multimodal content.
+        Generate government contracting focused description with context awareness.
         
         Issue #54: Returns text description that LightRAG processes natively.
-        No JSON extraction - LightRAG uses its tuple-delimited format.
+        Issue #62: Includes surrounding page context for section awareness.
         
         Args:
             modal_content: MinerU output (textualized content)
@@ -61,15 +133,29 @@ class GovconMultimodalProcessor(BaseModalProcessor):
         """
         page_idx = modal_content.get("page_idx", item_info.get("page_idx", 0) if item_info else 0)
         
+        # Issue #62: Extract surrounding context for section awareness
+        surrounding_context = self._extract_surrounding_context(page_idx, content_type)
+        context_section = ""
+        if surrounding_context:
+            context_section = f"""
+DOCUMENT CONTEXT (from surrounding pages):
+{surrounding_context[:2000]}
+
+Use this context to understand what SECTION, APPENDIX, or ATTACHMENT this {content_type} belongs to.
+Include the parent section name in your description (e.g., "This table from Appendix H - Workload Data...").
+
+"""
+        
         if content_type == "table":
             table_body = modal_content.get("table_body", "")
             table_caption = modal_content.get("table_caption", [])
             caption_text = ', '.join(table_caption) if isinstance(table_caption, list) else str(table_caption or '')
             
-            # Generate descriptive prompt for LLM
+            # Generate descriptive prompt for LLM with context awareness
             prompt = f"""Analyze this government contracting table and provide a comprehensive description.
-
+{context_section}
 Focus on extracting:
+- DOCUMENT LOCATION: Section, Appendix, or Attachment this table belongs to
 - WORKLOAD DRIVERS: Frequencies, quantities, hours, coverage, service rates
 - REQUIREMENTS: Specifications, standards, performance criteria, modal verbs (shall/must/will)
 - PERFORMANCE METRICS: KPIs, thresholds, SLAs, measurement methods
@@ -81,7 +167,8 @@ Caption: {caption_text}
 Table Content:
 {table_body}
 
-Provide a detailed description that captures ALL quantitative data (numbers, rates, frequencies, dollar amounts).
+IMPORTANT: Start your description with the section/appendix location if known from context.
+Include ALL quantitative data (numbers, rates, frequencies, dollar amounts).
 Include exact values - never generalize "100 times per year" to "frequent"."""
 
             # Use modal_caption_func to generate description
@@ -98,29 +185,38 @@ Include exact values - never generalize "100 times per year" to "frequent"."""
         elif content_type == "image":
             image_caption = modal_content.get("img_caption", [])
             caption_text = ', '.join(image_caption) if isinstance(image_caption, list) else str(image_caption or '')
-            description = f"Image from page {page_idx}: {caption_text}" if caption_text else f"Image from page {page_idx}"
+            
+            # Include context for images too
+            if surrounding_context:
+                description = f"Image from page {page_idx} ({surrounding_context[:500]}): {caption_text}" if caption_text else f"Image from page {page_idx} (context: {surrounding_context[:300]})"
+            else:
+                description = f"Image from page {page_idx}: {caption_text}" if caption_text else f"Image from page {page_idx}"
             
         elif content_type == "equation":
             equation_content = modal_content.get("content", "")
-            description = f"Equation from page {page_idx}: {equation_content[:500]}"
+            
+            # Include context for equations
+            if surrounding_context:
+                description = f"Equation from page {page_idx} ({surrounding_context[:300]}): {equation_content[:500]}"
+            else:
+                description = f"Equation from page {page_idx}: {equation_content[:500]}"
             
         else:
             # Generic fallback
             description = str(modal_content.get("content", modal_content))[:500]
         
         # Create entity info metadata
+        # Note: summary is used for VDB content field - no truncation needed
+        # LightRAG handles consolidation via LLM summarization during entity merge
+        # Embedding API (8191 tokens) handles any overflow gracefully
         entity_info = {
             "entity_name": entity_name or f"{content_type}_p{page_idx}",
             "entity_type": content_type,
-            "summary": description[:200],
+            "summary": description,  # Full context preserved for embeddings
             "page_idx": page_idx,
         }
         
         return description, entity_info
-    
-    def set_content_source(self, content_list, content_format):
-        """Required by BaseModalProcessor for context extraction."""
-        super().set_content_source(content_list, content_format)
     
     async def process_multimodal_content(
         self,

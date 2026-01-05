@@ -170,10 +170,16 @@ async def process_document_with_semantic_inference(
     logger.info(f"🔧 Using RAG-Anything + LLM semantic inference (format-agnostic)")
     
     # Step 1: Parse document with MinerU (multimodal extraction)
+    # Backend selection: MinerU 2.7.0 defaults to slow "hybrid-auto-engine"
+    # Use "pipeline" for fast ONNX-based parsing (same as MinerU 2.6.x behavior)
+    import os
+    mineru_backend = os.getenv("MINERU_BACKEND", "pipeline")
+    
     content_list, doc_id = await rag_instance.parse_document(
         file_path=file_path,
         output_dir=global_args.working_dir,
-        parse_method="auto"
+        parse_method="auto",
+        backend=mineru_backend
     )
     
     # Register document in queue tracker

@@ -58,62 +58,69 @@ def _heuristic_table_type_mapping(entity: Dict) -> str:
     Intelligently map "table" entities (from RAG-Anything) to govcon types based on content.
     
     RAG-Anything's TableModalProcessor hardcodes entity_type="table" for all tables.
-    This function examines the entity name and description to determine the correct govcon type.
+    This function examines the entity name and content to determine the correct govcon type.
     
     Args:
-        entity: Entity dict with entity_name, description, etc.
+        entity: Entity dict with entity_name, content, etc.
     
     Returns:
         Mapped govcon type or None if LLM inference needed
     """
     name = (entity.get('entity_name') or '').lower()
-    desc = (entity.get('description') or '').lower()
-    content = f"{name} {desc}"
+    # BUG FIX: Table entities have content in 'content' field, not 'description'
+    # The VDB stores: entity_name, entity_type, content, source_id, file_path, vector
+    desc = (entity.get('description') or entity.get('content') or '').lower()
+    text = f"{name} {desc}"
     
     # CDRL/Deliverable tables → deliverable
-    if any(kw in content for kw in ['cdrl', 'contract data', 'deliverable', 'dd form 1423', 'data item']):
+    if any(kw in text for kw in ['cdrl', 'contract data', 'deliverable', 'dd form 1423', 'data item']):
         return 'deliverable'
     
     # Evaluation/Rating tables → evaluation_factor  
-    if any(kw in content for kw in ['evaluation', 'rating', 'scoring', 'assessment', 'criteria', 'factor']):
+    if any(kw in text for kw in ['evaluation', 'rating', 'scoring', 'assessment', 'criteria', 'factor']):
         return 'evaluation_factor'
     
     # Performance/Metrics tables → performance_metric
-    if any(kw in content for kw in ['performance', 'metric', 'sla', 'kpi', 'threshold', 'standard']):
+    if any(kw in text for kw in ['performance', 'metric', 'sla', 'kpi', 'threshold', 'standard']):
         return 'performance_metric'
     
+    # Workload data tables → requirement (CRITICAL for BOE/workload enrichment)
+    # Must come BEFORE the general 'work' pattern to catch workload-specific tables
+    if any(kw in text for kw in ['workload', 'aircraft visit', 'estimated monthly', 'h.2.0', 'j.2.0', 'k.2.0', 'l.2.0']):
+        return 'requirement'
+    
     # Requirements/SOW tables → requirement
-    if any(kw in content for kw in ['requirement', 'shall', 'must', 'sow', 'pws', 'task', 'work']):
+    if any(kw in text for kw in ['requirement', 'shall', 'must', 'sow', 'pws', 'task', 'work']):
         return 'requirement'
     
     # Submission/Proposal tables → submission_instruction
-    if any(kw in content for kw in ['submission', 'proposal', 'volume', 'page limit', 'format']):
+    if any(kw in text for kw in ['submission', 'proposal', 'volume', 'page limit', 'format']):
         return 'submission_instruction'
     
     # Clause/Regulation tables → clause
-    if any(kw in content for kw in ['far ', 'dfars', 'clause', 'provision', '52.2']):
+    if any(kw in text for kw in ['far ', 'dfars', 'clause', 'provision', '52.2']):
         return 'clause'
     
     # Section/Document reference tables → section or document
-    if any(kw in content for kw in ['section', 'attachment', 'annex', 'exhibit', 'appendix']):
+    if any(kw in text for kw in ['section', 'attachment', 'annex', 'exhibit', 'appendix']):
         return 'section'
     
     # Organization/Personnel tables → organization or person
-    if any(kw in content for kw in ['organization', 'contractor', 'government', 'agency']):
+    if any(kw in text for kw in ['organization', 'contractor', 'government', 'agency']):
         return 'organization'
-    if any(kw in content for kw in ['personnel', 'staff', 'position', 'role', 'labor category']):
+    if any(kw in text for kw in ['personnel', 'staff', 'position', 'role', 'labor category']):
         return 'person'
     
     # Equipment/Material tables → equipment
-    if any(kw in content for kw in ['equipment', 'material', 'supply', 'asset', 'gfe', 'gfp']):
+    if any(kw in text for kw in ['equipment', 'material', 'supply', 'asset', 'gfe', 'gfp']):
         return 'equipment'
     
     # Schedule/Timeline tables → concept (general information)
-    if any(kw in content for kw in ['schedule', 'timeline', 'milestone', 'calendar', 'date']):
+    if any(kw in text for kw in ['schedule', 'timeline', 'milestone', 'calendar', 'date']):
         return 'concept'
     
     # Pricing/Cost tables → concept (we don't have a pricing type)
-    if any(kw in content for kw in ['price', 'cost', 'clin', 'labor rate', 'fee']):
+    if any(kw in text for kw in ['price', 'cost', 'clin', 'labor rate', 'fee']):
         return 'concept'
     
     # Can't determine heuristically - default to 'concept' (no LLM fallback)

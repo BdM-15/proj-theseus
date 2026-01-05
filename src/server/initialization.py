@@ -82,11 +82,24 @@ async def initialize_raganything():
     # MINERU_PDF_RENDER_TIMEOUT, CUDA_VISIBLE_DEVICES, HF_TOKEN, HF_HUB_DISABLE_SYMLINKS_WARNING, etc.)
     # are automatically inherited by MinerU subprocess from os.environ after dotenv loads .env
     
-    # Create RAG-Anything configuration (does NOT accept device parameter)
-    # Context extraction settings: Disabled for multimodal to prevent JSON truncation
-    # - Tables are self-contained (don't need surrounding text)
-    # - Text chunks already have 15% overlap for context
-    # - Reduces token overhead: ~2K tokens/chunk → prevents extraction truncation
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # RAG-ANYTHING CONTEXT-AWARE PROCESSING (Issue #62)
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # When processing multimodal content (tables, images, equations), RAG-Anything
+    # can extract surrounding page context to provide section awareness.
+    #
+    # Without context: Table on p53 → "table_p53" (isolated node, no relationships)
+    # With context: Table on p53 → "AL JABER AIR BASE workload table from Appendix H"
+    #              → CHILD_OF relationship to APPENDIX_H_WORKLOAD_DATA
+    #
+    # This enables Algorithm 7 (CDRL/Section patterns) to infer parent relationships.
+    #
+    # IMPORTANT: Context settings are read by RAGAnythingConfig from env vars:
+    #   CONTEXT_WINDOW, CONTEXT_MODE, CONTENT_FORMAT, MAX_CONTEXT_TOKENS,
+    #   INCLUDE_HEADERS, INCLUDE_CAPTIONS, CONTEXT_FILTER_CONTENT_TYPES
+    # ═══════════════════════════════════════════════════════════════════════════════
+    
+    # Create RAG-Anything configuration - it reads context settings from env vars automatically
     config = RAGAnythingConfig(
         working_dir=working_dir,
         parser=parser,
@@ -94,19 +107,18 @@ async def initialize_raganything():
         enable_image_processing=enable_image,
         enable_table_processing=enable_table,
         enable_equation_processing=enable_equation,
-        # Context extraction configuration - read from env vars
-        # Include surrounding page text for section context (tables know they're in "APPENDIX H")
-        context_window=int(os.getenv("RAGANYTHING_CONTEXT_WINDOW", "1")),
-        max_context_tokens=int(os.getenv("RAGANYTHING_MAX_CONTEXT_TOKENS", "2000")),
-        include_headers=os.getenv("RAGANYTHING_INCLUDE_HEADERS", "true").lower() == "true",
-        include_captions=True,
-        context_filter_content_types=["text"],
+        # Context settings are automatically loaded from env vars by RAGAnythingConfig
     )
-    context_window = int(os.getenv("RAGANYTHING_CONTEXT_WINDOW", "1"))
-    logger.info(f"✅ RAG-Anything context extraction: {'ENABLED' if context_window > 0 else 'DISABLED'}")
-    logger.info(f"   - context_window: {context_window}")
-    logger.info(f"   - max_context_tokens: {os.getenv('RAGANYTHING_MAX_CONTEXT_TOKENS', '2000')}")
-    logger.info(f"   - include_headers: {os.getenv('RAGANYTHING_INCLUDE_HEADERS', 'true')}")
+    
+    # Log context-aware processing configuration (read from config after env var loading)
+    logger.info(f"✅ RAG-Anything context-aware processing: {'ENABLED' if config.context_window > 0 else 'DISABLED'}")
+    logger.info(f"   - context_window: {config.context_window} pages")
+    logger.info(f"   - context_mode: {config.context_mode}")
+    logger.info(f"   - content_format: {config.content_format}")
+    logger.info(f"   - max_context_tokens: {config.max_context_tokens}")
+    logger.info(f"   - include_headers: {config.include_headers}")
+    logger.info(f"   - include_captions: {config.include_captions}")
+    logger.info(f"   - context_filter_content_types: {getattr(config, 'context_filter_content_types', ['text'])}")
     
     # ═══════════════════════════════════════════════════════════════════════════════
     # DUAL-MODEL LLM ROUTING (Extraction vs Query)
@@ -235,7 +247,18 @@ async def initialize_raganything():
             else:
                 truncated_texts.append(text)
         
-        return await openai_embed(truncated_texts, model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-large"), api_key=openai_api_key)
+        # IMPORTANT: lightrag's `openai_embed` symbol is wrapped with default attrs
+        # (embedding_dim=1536 for text-embedding-3-small). When our `.env` uses
+        # `text-embedding-3-large` (3072 dims) and dimensions are not explicitly sent,
+        # the wrapper can mis-validate and raise a "Vector count mismatch".
+        #
+        # Use the unwrapped function (`openai_embed.func`) to avoid that mismatch.
+        embed_impl = getattr(openai_embed, "func", openai_embed)
+        return await embed_impl(
+            truncated_texts,
+            model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-large"),
+            api_key=openai_api_key,
+        )
     
     # Get embedding dimension from environment (flexibility for different models)
     embedding_dim = int(os.getenv("EMBEDDING_DIM", "3072"))
@@ -351,10 +374,18 @@ async def initialize_raganything():
     # ═══════════════════════════════════════════════════════════════════════════════
     from src.processors import GovconMultimodalProcessor
     
+    # Get the context_extractor that RAGAnything created during _ensure_lightrag_initialized()
+    # This is properly configured with the context settings from RAGAnythingConfig
+    context_extractor = _rag_anything.context_extractor
+    if context_extractor:
+        logger.info(f"✅ Context extractor available: window={context_extractor.config.context_window}, mode={context_extractor.config.context_mode}")
+    else:
+        logger.warning("⚠️ Context extractor not available - tables will be processed without section context")
+    
     govcon_processor = GovconMultimodalProcessor(
         lightrag=_rag_anything.lightrag,
         modal_caption_func=llm_model_func_wrapped,
-        context_extractor=getattr(_rag_anything, 'context_extractor', None)
+        context_extractor=context_extractor
     )
     
     # Override RAG-Anything's default processors with our ontology-aware processor
@@ -425,7 +456,14 @@ async def initialize_raganything():
     logger.info(f"{BOLD}{MAGENTA}🎯 CONFIGURATION{RESET}")
     logger.info(f"{CYAN}{'═' * 80}{RESET}")
     logger.info(f"{GREEN}Entity Types:{RESET} {BOLD}{len(entity_types)}{RESET} specialized (organization, requirement, evaluation_factor, etc.)")
-    logger.info(f"{GREEN}Parser:{RESET} {BOLD}MinerU 2.6.4{RESET} | Device: {BOLD}{GREEN if device == 'cuda' else YELLOW}{device.upper()}{RESET} | Method: {parse_method.upper()}")
+    try:
+        from importlib import metadata as _metadata
+        mineru_version = _metadata.version("mineru")
+    except Exception:
+        mineru_version = "unknown"
+    logger.info(
+        f"{GREEN}Parser:{RESET} {BOLD}MinerU {mineru_version}{RESET} | Device: {BOLD}{GREEN if device == 'cuda' else YELLOW}{device.upper()}{RESET} | Method: {parse_method.upper()}"
+    )
     logger.info(f"{GREEN}Multimodal:{RESET} Images, Tables, Equations {BOLD}{GREEN}ENABLED{RESET}")
     logger.info(f"{GREEN}Advanced:{RESET} Formula Recognition, Table Merge {BOLD}{GREEN}ENABLED{RESET} | Timeout: {YELLOW}600s{RESET}")
     logger.info(f"{CYAN}{'═' * 80}{RESET}")
@@ -514,7 +552,47 @@ async def initialize_raganything():
     _rag_anything.lightrag.doc_status.get_docs_paginated = filtered_get_docs_paginated
     # ═════════════════════════════════════════════════════════════════════════════
     
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # MinerU Model Warmup - Download VLM model at startup, not during processing
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # MinerU 2.7.0 uses a VLM model (MinerU2.5-2509-1.2B) that must be downloaded
+    # from HuggingFace Hub. Without warmup, this happens on first document upload,
+    # causing unexpected delays and potential timeout/permission errors.
+    #
+    # The warmup runs `mineru --version` which triggers model download without
+    # parsing any document. HF_HUB_DISABLE_SYMLINKS=1 in .env prevents Windows
+    # symlink permission errors during download.
+    # ═══════════════════════════════════════════════════════════════════════════════
+    await warmup_mineru_model()
+    
     return _rag_anything
+
+
+async def warmup_mineru_model():
+    """Pre-download MinerU VLM model at startup to avoid delays during document processing"""
+    import asyncio
+    import os
+    
+    logger.info("🔄 Warming up MinerU VLM model (downloading if needed)...")
+    
+    try:
+        # CRITICAL: Set env vars BEFORE importing huggingface_hub
+        # These must be set before the HF library reads them
+        os.environ["HF_HUB_DISABLE_SYMLINKS"] = "1"
+        os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+        
+        from huggingface_hub import snapshot_download
+        
+        model_path = await asyncio.to_thread(
+            snapshot_download,
+            "opendatalab/MinerU2.5-2509-1.2B"
+        )
+        logger.info(f"✅ MinerU VLM model ready: {model_path}")
+        
+    except Exception as e:
+        # Non-fatal - model files are downloaded, symlink just failed
+        # MinerU will still work as the blobs are present
+        logger.warning(f"⚠️ MinerU warmup: {e} - will download on first document")
 
 
 def get_rag_instance():

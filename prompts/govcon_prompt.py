@@ -116,6 +116,15 @@ Extract entities and relationships from the input text in Data to be Processed b
 5.  **Quantitative Preservation:** Preserve ALL numbers, rates, frequencies, dollar amounts, and thresholds exactly as stated.
 6.  **Metadata Completeness:** Ensure all type-specific metadata is populated (criticality for requirements, weights for factors, page limits for instructions, thresholds for metrics).
 
+---Data to be Processed---
+<Entity_types>
+[{entity_types}]
+
+<Input Text>
+```
+{input_text}
+```
+
 <Output>
 """
 
@@ -409,8 +418,8 @@ Query: "What are the workload drivers?"
 
 Output:
 {
-  "high_level_keywords": ["Workload drivers", "Basis of Estimate", "Labor requirements", "Cost estimation"],
-  "low_level_keywords": ["Frequencies", "Quantities", "Hours of coverage", "Daily volumes", "Service rates", "Equipment counts", "Operating hours", "Personnel requirements"]
+  "high_level_keywords": ["Workload drivers", "Basis of Estimate", "Estimated workload data", "Workload quantities"],
+  "low_level_keywords": ["Monthly quantities", "Annual totals", "Grand total", "Service volumes", "Frequencies", "Workload table", "Estimated monthly", "Service rates"]
 }
 
 """,
@@ -510,6 +519,17 @@ Output:
 {
   "high_level_keywords": ["Instructions-to-evaluation alignment", "Proposal compliance", "Evaluation traceability"],
   "low_level_keywords": ["Submission instructions", "Evaluation factors", "Technical volume", "Compliance matrix", "Page limits"]
+}
+
+""",
+    """Example 10:
+
+Query: "How many service events per month?"
+
+Output:
+{
+  "high_level_keywords": ["Service frequency", "Workload schedule", "Estimated workload data", "Monthly quantities"],
+  "low_level_keywords": ["Monthly totals", "Grand total", "Annual total", "Estimated monthly", "Workload table", "Service volumes", "Appendix workload"]
 }
 
 """,

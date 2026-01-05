@@ -76,6 +76,30 @@ We leverage **RAG-Anything** for multimodal document processing, using **MinerU*
 - **Vision Model**: Uses `vision_model_func` (typically GPT-4o or similar) to analyze images extracted by MinerU.
 - **Direct Content Insertion**: Supports inserting pre-parsed content lists via `insert_content_list` for testing or custom pipelines.
 
+#### Context-Aware Processing (Issue #62)
+
+RAG-Anything provides context-aware processing to include surrounding page text when processing tables/images. This enables:
+
+- **Section Awareness**: Tables know they belong to "Appendix H - Workload Data"
+- **CHILD_OF Relationships**: Algorithm 7 can infer parent section relationships
+- **Better Embeddings**: VDB captures section semantics, not just isolated content
+
+**Configuration (.env)**:
+
+```bash
+CONTEXT_WINDOW=2              # Pages of surrounding context (0=disabled)
+CONTEXT_MODE=page             # Extraction mode: "page" or "chunk"
+CONTENT_FORMAT=minerU         # Parser format hint
+MAX_CONTEXT_TOKENS=3000       # Token budget for context
+INCLUDE_HEADERS=true          # Include section headers
+INCLUDE_CAPTIONS=true         # Include table/figure captions
+CONTEXT_FILTER_CONTENT_TYPES=text  # Content types in context
+```
+
+**Note**: These env var names match RAGAnything's `RAGAnythingConfig` (no `RAGANYTHING_` prefix).
+
+**GovconMultimodalProcessor**: Custom processor in `src/processors/govcon_multimodal_processor.py` extracts context via `context_extractor.extract_context()` and injects it into LLM prompts for table/image analysis.
+
 ---
 
 ## Development Guidelines
