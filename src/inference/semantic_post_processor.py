@@ -32,13 +32,8 @@ from pydantic import ValidationError
 
 from src.core import get_settings
 from src.inference.neo4j_graph_io import Neo4jGraphIO, group_entities_by_type
-from src.inference.schema_prompts import (
-    get_instruction_evaluation_guidance,
-    get_evaluation_hierarchy_guidance,
-    get_document_hierarchy_guidance
-)
 from src.inference.algorithms import run_all_algorithms_parallel
-from src.ontology.schema import VALID_ENTITY_TYPES, InferredRelationship, InferredRelationshipBatch
+from src.ontology.schema import VALID_ENTITY_TYPES, InferredRelationship
 from src.utils.llm_client import call_llm_async
 from src.utils.llm_parsing import extract_json_from_response, parse_with_pydantic
 

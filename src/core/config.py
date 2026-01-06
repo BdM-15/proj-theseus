@@ -21,7 +21,6 @@ LightRAG evaluates os.getenv() at import time for dataclass defaults.
 """
 
 import os
-from functools import lru_cache
 from typing import Optional
 
 from pydantic import Field

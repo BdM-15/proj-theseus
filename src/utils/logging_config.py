@@ -46,7 +46,6 @@ def log_banner(
     title: str,
     items: Optional[List[Tuple[str, str]]] = None,
     width: int = 80,
-    emoji: str = "",
     logger: Optional[logging.Logger] = None
 ) -> None:
     """

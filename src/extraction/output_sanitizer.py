@@ -131,7 +131,7 @@ def _pre_split_fixes(line: str) -> str:
     - <|#|>#/>requirement<|#|>     (hash-slash-greater-than corruption - MCPP II pattern)
     - <|#|>(requirement<|#|>       (parenthesis prefix corruption)
     
-    CRITICAL: Handle multi-word entity types like "person role" which (\w+) doesn't match!
+    CRITICAL: Handle multi-word entity types like "person role" which (\\w+) doesn't match!
     """
     if not line:
         return line
