@@ -28,6 +28,9 @@ load_dotenv()
 import asyncio
 import logging
 
+# Import centralized settings AFTER load_dotenv
+from src.core import get_settings
+
 # Suppress verbose logging from libraries
 logging.getLogger("raganything").setLevel(logging.WARNING)
 logging.getLogger("lightrag").setLevel(logging.WARNING)
@@ -84,9 +87,10 @@ async def main():
     # Log the effective model configuration the WebUI /query endpoint will use.
     # LightRAG's API server passes `args.llm_model` directly into openai_complete_if_cache(...)
     # (see: lightrag/api/lightrag_server.py -> create_optimized_openai_llm_func).
+    settings = get_settings()
     logger.info(f"✅ WebUI Query Model (effective): {getattr(global_args, 'llm_model', None)}")
-    logger.info(f"   - Extraction model (env EXTRACTION_LLM_NAME): {os.getenv('EXTRACTION_LLM_NAME')}")
-    logger.info(f"   - Reasoning model (env REASONING_LLM_NAME):  {os.getenv('REASONING_LLM_NAME')}")
+    logger.info(f"   - Extraction model (env EXTRACTION_LLM_NAME): {settings.extraction_llm_name}")
+    logger.info(f"   - Reasoning model (env REASONING_LLM_NAME):  {settings.reasoning_llm_name}")
     
     # Step 4: Override endpoints to use RAG-Anything + semantic post-processing
     # Remove original LightRAG endpoints that don't support multimodal processing
@@ -106,7 +110,7 @@ async def main():
     logger.info("✅ Custom endpoints registered: /insert, /documents/upload (multimodal + semantic inference)")
     
     # Print startup summary with pipeline flow
-    chunk_size = os.getenv("CHUNK_SIZE", "4096")
+    chunk_size = settings.chunk_size or 4096
     graph_storage = global_args.graph_storage if hasattr(global_args, 'graph_storage') else "NetworkXStorage"
     
     # ANSI color codes
@@ -130,7 +134,7 @@ async def main():
     logger.info("")
     logger.info(f"{YELLOW}3.{RESET} {BOLD}Entity Extraction{RESET} {CYAN}(18 custom types){RESET}")
     logger.info(f"   {CYAN}├─>{RESET} Native LightRAG extraction (~22K tokens FULL govcon prompt)")
-    logger.info(f"   {CYAN}├─>{RESET} LLM (query model): {getattr(global_args, 'llm_model', os.getenv('LLM_MODEL', 'unknown'))}")
+    logger.info(f"   {CYAN}├─>{RESET} LLM (query model): {getattr(global_args, 'llm_model', settings.reasoning_llm_name)}")
     logger.info(f"   {CYAN}└─>{RESET} Tuple-delimited output (Issue #54 - Back to Basics)")
     logger.info("")
     logger.info(f"{YELLOW}4.{RESET} {BOLD}Relationship Extraction{RESET}")
@@ -161,12 +165,12 @@ async def main():
         logger.info(f"{GREEN}Neo4j Aura:{RESET}         {BLUE}https://console.neo4j.io{RESET} {YELLOW}(recommended){RESET}")
     logger.info("")
     logger.info(f"{YELLOW}Working Directory:{RESET}  {global_args.working_dir}")
-    logger.info(f"{YELLOW}Current Workspace:{RESET}  {BOLD}{os.getenv('WORKSPACE', 'default')}{RESET}")
+    logger.info(f"{YELLOW}Current Workspace:{RESET}  {BOLD}{settings.workspace}{RESET}")
     logger.info("")
     logger.info(f"{GREEN}▸ LLM Configuration (Dual-Model):{RESET}")
-    logger.info(f"  {CYAN}Extraction:{RESET}       {os.getenv('EXTRACTION_LLM_NAME', 'grok-4-1-fast-non-reasoning')} {YELLOW}(non-reasoning){RESET}")
-    logger.info(f"  {CYAN}Reasoning:{RESET}        {os.getenv('REASONING_LLM_NAME', 'grok-4-1-fast-reasoning')} {GREEN}(reasoning){RESET}")
-    logger.info(f"  {CYAN}Embeddings:{RESET}       {os.getenv('EMBEDDING_MODEL', 'text-embedding-3-large')} ({os.getenv('EMBEDDING_DIM', '3072')}D)")
+    logger.info(f"  {CYAN}Extraction:{RESET}       {settings.extraction_llm_name} {YELLOW}(non-reasoning){RESET}")
+    logger.info(f"  {CYAN}Reasoning:{RESET}        {settings.reasoning_llm_name} {GREEN}(reasoning){RESET}")
+    logger.info(f"  {CYAN}Embeddings:{RESET}       {settings.embedding_model} ({settings.embedding_dim}D)")
     logger.info(f"{CYAN}{'═' * 80}{RESET}")
     logger.info("")
     

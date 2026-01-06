@@ -29,6 +29,8 @@ from fastapi import UploadFile, File
 from fastapi.responses import JSONResponse
 from lightrag.api.config import global_args
 
+from src.core import get_settings
+
 # Note: inference imports removed - using RAG-Anything native pipeline (Branch 039/040)
 # Post-processing handled by semantic_post_processor.enhance_knowledge_graph
 logger = logging.getLogger(__name__)
@@ -51,7 +53,8 @@ class DocumentQueueTracker:
         self.enhancement_pending = False  # Whether enhancement needs to run
         self.enhancement_running = False  # Prevent duplicate enhancement
         self.lock = asyncio.Lock()    # Thread-safe state updates
-        self.batch_timeout_seconds = int(os.getenv("BATCH_TIMEOUT_SECONDS", "30"))  # Time to wait after last completion
+        settings = get_settings()
+        self.batch_timeout_seconds = settings.batch_timeout_seconds
     
     async def register_request_start(self, filename: str):
         """Register that an upload request has started (before parsing)"""
@@ -172,8 +175,8 @@ async def process_document_with_semantic_inference(
     # Step 1: Parse document with MinerU (multimodal extraction)
     # Backend selection: MinerU 2.7.0 defaults to slow "hybrid-auto-engine"
     # Use "pipeline" for fast ONNX-based parsing (same as MinerU 2.6.x behavior)
-    import os
-    mineru_backend = os.getenv("MINERU_BACKEND", "pipeline")
+    settings = get_settings()
+    mineru_backend = settings.mineru_backend
     
     content_list, doc_id = await rag_instance.parse_document(
         file_path=file_path,
@@ -216,13 +219,13 @@ async def process_document_with_semantic_inference(
         # - RAG-Anything handles all multimodal processing internally
         # - LightRAG handles chunking, extraction, parallelization natively
         # ========================================================================
-        llm_timeout = int(os.getenv("LLM_TIMEOUT", "600"))
+        llm_timeout = settings.llm_timeout
         logger.info("🚀 Using RAG-Anything native end-to-end pipeline (Branch 039/040 approach)")
         logger.info("   Ontology: 18 govcon entity types injected via addon_params")
         logger.info(f"   Parallelization: 16 workers, {llm_timeout}s LLM timeout")
         
-        # Get workspace from environment
-        workspace = os.getenv("WORKSPACE", "default")
+        # Get workspace from centralized settings
+        workspace = settings.workspace
         output_dir = os.path.join(global_args.working_dir, workspace)
         
         # Use RAG-Anything's native insert_content_list for ALL storage types

@@ -3,19 +3,22 @@ Server Configuration for RAG-Anything + LightRAG
 
 Configures global_args for LightRAG server with government contracting ontology.
 Uses xAI Grok for LLM and OpenAI for embeddings.
+
+Configuration is loaded from src/core/config.py (centralized Settings class).
 """
 
 # CRITICAL: Load .env BEFORE importing LightRAG modules
 # LightRAG's chunk_token_size default: int(os.getenv("CHUNK_SIZE", 1200))
 # Must set environment variables before LightRAG classes are defined
-import os
 from dotenv import load_dotenv
 load_dotenv()
 
-# Now safe to import LightRAG
+# Now safe to import LightRAG and our config
 import logging
 from lightrag.api.config import global_args
 from lightrag.operate import chunking_by_token_size
+
+from src.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -26,27 +29,25 @@ def configure_raganything_args():
     
     We'll configure the LightRAG server normally, then RAG-Anything will
     wrap the storage/processing with multimodal capabilities.
+    
+    All configuration values come from the centralized Settings class.
     """
-    # Get API credentials (using RAG-Anything official variable names)
-    xai_api_key = os.getenv("LLM_BINDING_API_KEY")
-    xai_base_url = os.getenv("LLM_BINDING_HOST", "https://api.x.ai/v1")
-    openai_api_key = os.getenv("EMBEDDING_BINDING_API_KEY")
-    working_dir = os.getenv("WORKING_DIR", "./rag_storage")
+    # Get validated settings from centralized config
+    settings = get_settings()
     
     # Working directory
-    global_args.working_dir = working_dir
-    global_args.input_dir = os.getenv("INPUT_DIR", "./inputs/uploaded")
+    global_args.working_dir = settings.working_dir
+    global_args.input_dir = settings.input_dir
     
     # Graph Storage Configuration - Neo4j vs NetworkX
-    graph_storage_type = os.getenv("GRAPH_STORAGE", "NetworkXStorage")
-    if graph_storage_type == "Neo4JStorage":
+    if settings.graph_storage == "Neo4JStorage":
         from lightrag.kg.neo4j_impl import Neo4JStorage
         
         neo4j_config = {
-            "uri": os.getenv("NEO4J_URI", "neo4j://localhost:7687"),
-            "username": os.getenv("NEO4J_USERNAME", "neo4j"),
-            "password": os.getenv("NEO4J_PASSWORD"),
-            "database": os.getenv("NEO4J_DATABASE", "neo4j"),
+            "uri": settings.neo4j_uri,
+            "username": settings.neo4j_username,
+            "password": settings.neo4j_password,
+            "database": settings.neo4j_database,
         }
         
         # Create Neo4j storage instance
@@ -56,8 +57,8 @@ def configure_raganything_args():
         global_args.graph_storage = "NetworkXStorage"
     
     # Server configuration
-    global_args.host = os.getenv("HOST", "localhost")
-    global_args.port = int(os.getenv("PORT", "9621"))
+    global_args.host = settings.host
+    global_args.port = settings.port
     
     # LLM Configuration - xAI Grok (Dual-Model: Extraction uses non-reasoning, Query uses reasoning)
     global_args.llm_binding = "openai"
@@ -67,22 +68,22 @@ def configure_raganything_args():
     #
     # Extraction is handled separately by RAG-Anything via src/server/initialization.py (dual-model router),
     # so setting the query model here will NOT force extraction to use reasoning.
-    query_model = os.getenv("REASONING_LLM_NAME", "grok-4-1-fast-reasoning")
+    query_model = settings.reasoning_llm_name
 
     # Keep legacy fields (some older code paths may read these), but ensure the canonical fields are set.
     global_args.llm_model = query_model
     global_args.llm_model_name = query_model
-    global_args.llm_binding_host = xai_base_url
-    global_args.llm_binding_api_key = xai_api_key
-    global_args.llm_api_key = xai_api_key
+    global_args.llm_binding_host = settings.llm_binding_host
+    global_args.llm_binding_api_key = settings.llm_binding_api_key
+    global_args.llm_api_key = settings.llm_binding_api_key
     
     # Embedding Configuration - OpenAI (MUST use OpenAI endpoint, not xAI!)
     global_args.embedding_binding = "openai"
-    global_args.embedding_model_name = os.getenv("EMBEDDING_MODEL", "text-embedding-3-large")
-    global_args.embedding_binding_host = "https://api.openai.com/v1"  # OpenAI endpoint for embeddings
-    global_args.embedding_binding_api_key = openai_api_key
-    global_args.embedding_api_key = openai_api_key
-    global_args.embedding_dim = int(os.getenv("EMBEDDING_DIM", "3072"))  # Environment-driven for flexibility
+    global_args.embedding_model_name = settings.embedding_model
+    global_args.embedding_binding_host = settings.embedding_binding_host
+    global_args.embedding_binding_api_key = settings.embedding_binding_api_key
+    global_args.embedding_api_key = settings.embedding_binding_api_key
+    global_args.embedding_dim = settings.embedding_dim
     
     # Government contracting entity types (18 specialized types - consolidated for flexibility)
     # Semantic-first detection: Content determines entity type, not section labels
@@ -133,37 +134,48 @@ def configure_raganything_args():
         "entity_types": global_args.entity_types,  # Use our govcon ontology for ALL extraction
     }
     
-    # Parallel processing configuration
-    # NOTE: These global_args settings are for LightRAG SERVER API only (not used by RAGAnything)
-    # For RAGAnything: parallelization must be set via lightrag_kwargs in initialization.py
-    # max_parallel_insert: controls concurrent document processing (file-level parallelism)
-    max_async = int(os.getenv("MAX_ASYNC", "16"))
-    global_args.max_parallel_insert = max_async
-    # llm_model_max_async and embedding_func_max_async are set via lightrag_kwargs in initialization.py
+    # ═══════════════════════════════════════════════════════════════════════════
+    # PARALLELIZATION CONFIGURATION (Semantic naming from centralized config)
+    # ═══════════════════════════════════════════════════════════════════════════
+    # LightRAG has three concurrency controls:
+    # - max_parallel_insert: Document-level parallelism (files processed concurrently)
+    # - max_async / llm_model_max_async: Chunk-level LLM concurrency within each document
+    # - embedding_func_max_async: Embedding API concurrency
+    #
+    # Our centralized config uses semantic names for clarity:
+    # - settings.max_parallel_insert → document-level (recommended: llm_max_async / 3)
+    # - settings.llm_max_async → extraction LLM concurrency (higher for throughput)
+    # - settings.embedding_max_async → embedding concurrency
+    # - settings.post_processing_max_async → semantic inference (lower for stability)
+    # ═══════════════════════════════════════════════════════════════════════════
+    
+    # Document-level parallelism (how many files processed at once)
+    global_args.max_parallel_insert = settings.max_parallel_insert
+    
+    # Chunk-level LLM concurrency (extraction throughput)
+    effective_llm_async = settings.get_effective_llm_max_async()
+    global_args.max_async = effective_llm_async
+    
+    # Embedding API concurrency
+    effective_embedding_async = settings.get_effective_embedding_max_async()
+    global_args.embedding_func_max_async = effective_embedding_async
     
     # Chunking configuration (optimized for focused extraction)
     # CHUNK_SIZE: Document chunking for BOTH LLM entity extraction and embeddings
     # - 8K chunks = multiple focused extraction passes = comprehensive coverage
     # - Embeddings auto-truncate to model limits via EmbeddingFunc.max_token_size
-    # CRITICAL: No defaults - must be set in .env to avoid catastrophic extraction failures
     global_args.chunking_func = chunking_by_token_size
-    chunk_size = os.getenv("CHUNK_SIZE")
-    chunk_overlap = os.getenv("CHUNK_OVERLAP_SIZE")
-    if not chunk_size or not chunk_overlap:
-        raise ValueError("CHUNK_SIZE and CHUNK_OVERLAP_SIZE must be set in .env - no safe defaults exist")
-    global_args.chunk_token_size = int(chunk_size)
-    global_args.chunk_overlap_token_size = int(chunk_overlap)
+    
+    # Validate required chunking settings (centralized validation)
+    settings.validate_required_settings()
+    global_args.chunk_token_size = settings.chunk_size
+    global_args.chunk_overlap_token_size = settings.chunk_overlap_size
     
     # Multimodal support
     global_args.enable_multimodal = True
     
-    # Parallelization settings (Branch 040 pattern)
-    # MAX_ASYNC controls concurrent LLM calls for extraction and processing
-    max_async = int(os.getenv("MAX_ASYNC", "8"))
-    global_args.max_async = max_async
-    global_args.embedding_func_max_async = max_async
-    global_args.max_parallel_insert = max_async
-    
-    logger.info(f"  Parallelization: max_async={max_async}, max_parallel_insert={max_async}")
+    logger.info(f"  Parallelization: max_parallel_insert={settings.max_parallel_insert}, "
+                f"llm_max_async={effective_llm_async}, embedding_max_async={effective_embedding_async}")
+    logger.info(f"  Post-processing will use: max_async={settings.get_effective_post_processing_max_async()}")
     
     # Configuration complete - detailed startup logging happens in initialization.py

@@ -8,14 +8,16 @@ from typing import Dict, List
 
 from pydantic import ValidationError
 
+from src.core import get_settings
 from src.ontology.schema import InferredRelationship
 from src.utils.llm_client import call_llm_async
 from src.utils.llm_parsing import extract_json_from_response
 
 logger = logging.getLogger(__name__)
 
-# Parallelization config
-MAX_CONCURRENT_LLM_CALLS = int(os.getenv("MAX_ASYNC", "8"))
+# Parallelization config from centralized settings
+_settings = get_settings()
+MAX_CONCURRENT_LLM_CALLS = _settings.get_effective_post_processing_max_async()
 
 
 async def load_prompt_template(prompt_filename: str) -> str:

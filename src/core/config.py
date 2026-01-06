@@ -1,0 +1,402 @@
+"""
+Centralized Configuration for GovCon Capture Vibe
+==================================================
+
+Single source of truth for all environment variables.
+Uses Pydantic Settings for validation and type safety.
+
+Usage:
+    from src.core.config import get_settings
+    
+    settings = get_settings()
+    print(settings.llm_max_async)  # Typed, validated value
+
+Architecture:
+    - This file: Schema/structure with defaults and validation
+    - .env file: Runtime values specific to your environment
+    - .env.example: Template for new developers (committed to git)
+
+CRITICAL: This module must be imported AFTER load_dotenv() in entry points.
+LightRAG evaluates os.getenv() at import time for dataclass defaults.
+"""
+
+import os
+from functools import lru_cache
+from typing import Optional
+
+from pydantic import Field
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+    """
+    Validated configuration for GovCon Capture Vibe.
+    
+    All environment variables are loaded from .env and validated at startup.
+    Use get_settings() to access the cached singleton instance.
+    """
+    
+    # ═══════════════════════════════════════════════════════════════════════════
+    # LLM CONFIGURATION (xAI Grok)
+    # ═══════════════════════════════════════════════════════════════════════════
+    llm_binding_host: str = Field(
+        default="https://api.x.ai/v1",
+        description="LLM API endpoint (xAI Grok)"
+    )
+    llm_binding_api_key: Optional[str] = Field(
+        default=None,
+        description="xAI API key (required for LLM operations)"
+    )
+    extraction_llm_name: str = Field(
+        default="grok-4-1-fast-non-reasoning",
+        description="Non-reasoning model for extraction (literal format compliance)"
+    )
+    reasoning_llm_name: str = Field(
+        default="grok-4-1-fast-reasoning",
+        description="Reasoning model for queries and semantic inference"
+    )
+    llm_timeout: int = Field(
+        default=600,
+        description="LLM timeout in seconds (10 min for complex chunks)"
+    )
+    llm_max_output_tokens: int = Field(
+        default=128000,
+        description="Maximum output tokens for LLM responses"
+    )
+    llm_max_retries: int = Field(
+        default=5,
+        description="Maximum retries for failed LLM calls"
+    )
+    llm_model_temperature: float = Field(
+        default=0.1,
+        description="LLM temperature (low for deterministic output)"
+    )
+    
+    # ═══════════════════════════════════════════════════════════════════════════
+    # EMBEDDING CONFIGURATION (OpenAI)
+    # MUST use OpenAI endpoint, not xAI - xAI doesn't support embeddings
+    # ═══════════════════════════════════════════════════════════════════════════
+    embedding_binding_host: str = Field(
+        default="https://api.openai.com/v1",
+        description="Embedding API endpoint (OpenAI)"
+    )
+    embedding_binding_api_key: Optional[str] = Field(
+        default=None,
+        description="OpenAI API key for embeddings (required)"
+    )
+    embedding_model: str = Field(
+        default="text-embedding-3-large",
+        description="Embedding model name"
+    )
+    embedding_dim: int = Field(
+        default=3072,
+        description="Embedding dimension (must match model)"
+    )
+    
+    # ═══════════════════════════════════════════════════════════════════════════
+    # PARALLELIZATION SETTINGS
+    # Semantic naming for clarity on what each setting controls
+    # ═══════════════════════════════════════════════════════════════════════════
+    
+    # Document-level: How many documents to process concurrently
+    # LightRAG recommends 2-10, typically llm_max_async / 3
+    max_parallel_insert: int = Field(
+        default=4,
+        description="Concurrent document processing (file-level parallelism)"
+    )
+    
+    # LLM API rate limit for extraction (higher for throughput)
+    llm_max_async: int = Field(
+        default=16,
+        description="Concurrent LLM calls during extraction"
+    )
+    
+    # Embedding API rate limit (usually matches LLM)
+    embedding_max_async: int = Field(
+        default=16,
+        description="Concurrent embedding API calls"
+    )
+    
+    # Post-processing parallelism (lower for stability with complex prompts)
+    post_processing_max_async: int = Field(
+        default=8,
+        description="Concurrent LLM calls during semantic inference (lower for stability)"
+    )
+    
+    # Legacy support: MAX_ASYNC overrides all async settings if explicitly set
+    # This maintains backward compatibility with existing .env files
+    max_async: Optional[int] = Field(
+        default=None,
+        description="Global override for all async settings (legacy compatibility)"
+    )
+    
+    # ═══════════════════════════════════════════════════════════════════════════
+    # NEO4J CONFIGURATION
+    # ═══════════════════════════════════════════════════════════════════════════
+    graph_storage: str = Field(
+        default="NetworkXStorage",
+        description="Graph storage type: Neo4JStorage or NetworkXStorage"
+    )
+    neo4j_uri: str = Field(
+        default="neo4j://localhost:7687",
+        description="Neo4j connection URI"
+    )
+    neo4j_username: str = Field(
+        default="neo4j",
+        description="Neo4j username"
+    )
+    neo4j_password: Optional[str] = Field(
+        default=None,
+        description="Neo4j password"
+    )
+    neo4j_database: str = Field(
+        default="neo4j",
+        description="Neo4j database name"
+    )
+    # Workspace for multi-tenant isolation (used for both storage and Neo4j)
+    workspace: str = Field(
+        default="default",
+        description="Current workspace name - used for both RAG storage and Neo4j graph isolation"
+    )
+    
+    @property
+    def neo4j_workspace(self) -> str:
+        """Neo4j workspace always matches the main workspace for consistency."""
+        return self.workspace
+    
+    # ═══════════════════════════════════════════════════════════════════════════
+    # SERVER CONFIGURATION
+    # ═══════════════════════════════════════════════════════════════════════════
+    host: str = Field(
+        default="localhost",
+        description="Server host address"
+    )
+    port: int = Field(
+        default=9621,
+        description="Server port"
+    )
+    working_dir: str = Field(
+        default="./rag_storage",
+        description="RAG storage directory"
+    )
+    input_dir: str = Field(
+        default="./inputs/uploaded",
+        description="Document upload directory"
+    )
+    
+    # ═══════════════════════════════════════════════════════════════════════════
+    # CHUNKING CONFIGURATION
+    # These have no safe defaults - must be explicitly set in .env
+    # ═══════════════════════════════════════════════════════════════════════════
+    chunk_size: Optional[int] = Field(
+        default=None,
+        description="Chunk size in tokens (required - no safe default)"
+    )
+    chunk_overlap_size: Optional[int] = Field(
+        default=None,
+        description="Chunk overlap in tokens (required - no safe default)"
+    )
+    
+    # ═══════════════════════════════════════════════════════════════════════════
+    # BATCH PROCESSING
+    # ═══════════════════════════════════════════════════════════════════════════
+    batch_timeout_seconds: int = Field(
+        default=30,
+        description="Seconds to wait after last document before triggering semantic enhancement"
+    )
+    batch_size_algorithm_3: int = Field(
+        default=100,
+        description="Batch size for algorithm 3 (requirement-evaluation linking)"
+    )
+    batch_overlap_algorithm_3: int = Field(
+        default=20,
+        description="Batch overlap for algorithm 3"
+    )
+    batch_size_algorithm_4: int = Field(
+        default=50,
+        description="Batch size for algorithm 4 (deliverable traceability)"
+    )
+    workload_max_workers: Optional[int] = Field(
+        default=None,
+        description="Max workers for workload enrichment (defaults to post_processing_max_async)"
+    )
+    
+    # ═══════════════════════════════════════════════════════════════════════════
+    # MINERU CONFIGURATION
+    # ═══════════════════════════════════════════════════════════════════════════
+    parser: str = Field(
+        default="mineru",
+        description="Document parser: mineru or docling"
+    )
+    parse_method: str = Field(
+        default="auto",
+        description="Parse method: auto, ocr, or txt"
+    )
+    mineru_device_mode: str = Field(
+        default="auto",
+        description="MinerU device: cuda, cpu, or auto"
+    )
+    mineru_backend: str = Field(
+        default="pipeline",
+        description="MinerU backend: pipeline (fast ONNX) or hybrid-auto-engine (slow)"
+    )
+    enable_image_processing: bool = Field(
+        default=True,
+        description="Enable image extraction from documents"
+    )
+    enable_table_processing: bool = Field(
+        default=True,
+        description="Enable table extraction from documents"
+    )
+    enable_equation_processing: bool = Field(
+        default=True,
+        description="Enable equation extraction from documents"
+    )
+    
+    # ═══════════════════════════════════════════════════════════════════════════
+    # ALGORITHM THRESHOLDS
+    # Set to 1.0 to always run (quality over cost)
+    # ═══════════════════════════════════════════════════════════════════════════
+    algo_3_threshold: float = Field(
+        default=1.0,
+        description="Coverage threshold for algorithm 3 (1.0 = always run)"
+    )
+    algo_4_threshold: float = Field(
+        default=1.0,
+        description="Coverage threshold for algorithm 4 (1.0 = always run)"
+    )
+    algo_6_threshold: float = Field(
+        default=1.0,
+        description="Coverage threshold for algorithm 6 (1.0 = always run)"
+    )
+    
+    # ═══════════════════════════════════════════════════════════════════════════
+    # CONTEXT-AWARE PROCESSING (RAG-Anything)
+    # ═══════════════════════════════════════════════════════════════════════════
+    context_window: int = Field(
+        default=2,
+        description="Pages of surrounding context for tables/images"
+    )
+    context_mode: str = Field(
+        default="page",
+        description="Context extraction mode: page or chunk"
+    )
+    max_context_tokens: int = Field(
+        default=3000,
+        description="Maximum tokens for context extraction"
+    )
+    include_headers: bool = Field(
+        default=True,
+        description="Include section headers in context"
+    )
+    include_captions: bool = Field(
+        default=True,
+        description="Include table/figure captions in context"
+    )
+
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+        extra = "ignore"  # Ignore extra env vars not in model
+        # Map environment variable names to field names (for non-matching names)
+        # Pydantic automatically maps UPPER_CASE env vars to lower_case fields
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # PROPERTY ALIASES for cleaner code access
+    # ═══════════════════════════════════════════════════════════════════════════
+    
+    @property
+    def llm_host(self) -> str:
+        """Alias for llm_binding_host."""
+        return self.llm_binding_host
+    
+    @property
+    def llm_api_key(self) -> Optional[str]:
+        """Alias for llm_binding_api_key."""
+        return self.llm_binding_api_key
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # HELPER METHODS for backward compatibility with MAX_ASYNC
+    # ═══════════════════════════════════════════════════════════════════════════
+    
+    def get_effective_llm_max_async(self) -> int:
+        """Get effective LLM max async (legacy MAX_ASYNC override if set)."""
+        return self.max_async if self.max_async is not None else self.llm_max_async
+    
+    def get_effective_embedding_max_async(self) -> int:
+        """Get effective embedding max async (legacy MAX_ASYNC override if set)."""
+        return self.max_async if self.max_async is not None else self.embedding_max_async
+    
+    def get_effective_post_processing_max_async(self) -> int:
+        """Get effective post-processing max async (legacy MAX_ASYNC override if set)."""
+        return self.max_async if self.max_async is not None else self.post_processing_max_async
+    
+    def get_effective_workload_max_workers(self) -> int:
+        """Get effective workload max workers (falls back to post_processing_max_async)."""
+        if self.workload_max_workers is not None:
+            return self.workload_max_workers
+        return self.get_effective_post_processing_max_async()
+    
+    def validate_required_settings(self) -> None:
+        """
+        Validate that required settings are present.
+        Call this at startup to fail fast with clear error messages.
+        """
+        errors = []
+        
+        if not self.llm_binding_api_key:
+            errors.append("LLM_BINDING_API_KEY is required")
+        
+        if not self.embedding_binding_api_key:
+            errors.append("EMBEDDING_BINDING_API_KEY is required")
+        
+        if not self.chunk_size:
+            errors.append("CHUNK_SIZE is required (no safe default exists)")
+        
+        if not self.chunk_overlap_size:
+            errors.append("CHUNK_OVERLAP_SIZE is required (no safe default exists)")
+        
+        if self.graph_storage == "Neo4JStorage" and not self.neo4j_password:
+            errors.append("NEO4J_PASSWORD is required when using Neo4JStorage")
+        
+        if errors:
+            raise ValueError(
+                "Missing required configuration:\n  - " + "\n  - ".join(errors) +
+                "\n\nPlease check your .env file."
+            )
+
+
+# Module-level cache for settings singleton
+_settings_instance: Optional[Settings] = None
+
+
+def get_settings() -> Settings:
+    """
+    Get the cached Settings singleton.
+    
+    The settings are loaded once from .env and cached for the lifetime of the process.
+    This ensures consistent configuration across all modules.
+    
+    Returns:
+        Settings: Validated configuration object
+    
+    Example:
+        from src.core.config import get_settings
+        
+        settings = get_settings()
+        print(settings.llm_max_async)  # → 16
+    """
+    global _settings_instance
+    if _settings_instance is None:
+        _settings_instance = Settings()
+    return _settings_instance
+
+
+def reset_settings() -> None:
+    """
+    Reset the settings cache (useful for testing).
+    
+    After calling this, the next get_settings() call will reload from .env.
+    """
+    global _settings_instance
+    _settings_instance = None

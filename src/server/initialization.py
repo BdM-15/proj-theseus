@@ -24,6 +24,7 @@ from raganything import RAGAnything, RAGAnythingConfig
 
 # V3 unified prompt loaded directly from file - no prompt_loader needed
 from src.ontology.schema import VALID_ENTITY_TYPES
+from src.core import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -52,10 +53,13 @@ async def initialize_raganything():
     """
     global _rag_anything
     
-    # Get API credentials (using RAG-Anything official variable names)
-    xai_api_key = os.getenv("LLM_BINDING_API_KEY")
-    xai_base_url = os.getenv("LLM_BINDING_HOST", "https://api.x.ai/v1")
-    openai_api_key = os.getenv("EMBEDDING_BINDING_API_KEY")
+    # Get validated settings from centralized config
+    settings = get_settings()
+    
+    # API credentials from centralized config
+    xai_api_key = settings.llm_binding_api_key
+    xai_base_url = settings.llm_binding_host
+    openai_api_key = settings.embedding_binding_api_key
     working_dir = global_args.working_dir
     
     # Government contracting entity types - SINGLE SOURCE OF TRUTH from schema.py
@@ -66,13 +70,13 @@ async def initialize_raganything():
     entity_types = list(VALID_ENTITY_TYPES)
     logger.info(f"📋 Loaded {len(entity_types)} entity types from schema.py")
     
-    # MinerU configuration from environment variables
-    parser = os.getenv("PARSER", "mineru")
-    parse_method = os.getenv("PARSE_METHOD", "auto")
-    enable_image = os.getenv("ENABLE_IMAGE_PROCESSING", "true").lower() == "true"
-    enable_table = os.getenv("ENABLE_TABLE_PROCESSING", "true").lower() == "true"
-    enable_equation = os.getenv("ENABLE_EQUATION_PROCESSING", "true").lower() == "true"
-    device = os.getenv("MINERU_DEVICE_MODE", "auto")  # cuda, cpu, or auto (MinerU reads this directly)
+    # MinerU configuration from centralized settings
+    parser = settings.parser
+    parse_method = settings.parse_method
+    enable_image = settings.enable_image_processing
+    enable_table = settings.enable_table_processing
+    enable_equation = settings.enable_equation_processing
+    device = settings.mineru_device_mode
     
     # CRITICAL: MinerU reads MINERU_DEVICE_MODE from environment, NOT from RAGAnythingConfig
     # Ensure it's set in the current process environment so MinerU subprocess inherits it
@@ -136,9 +140,9 @@ async def initialize_raganything():
     # Detection: Extraction prompts contain "tuple_delimiter" or entity extraction markers
     # ═══════════════════════════════════════════════════════════════════════════════
     
-    # Model configuration from environment
-    extraction_model = os.getenv("EXTRACTION_LLM_NAME", "grok-4-1-fast-non-reasoning")
-    reasoning_model = os.getenv("REASONING_LLM_NAME", "grok-4-1-fast-reasoning")
+    # Model configuration from centralized settings
+    extraction_model = settings.extraction_llm_name
+    reasoning_model = settings.reasoning_llm_name
     
     # Extraction detection markers (from LightRAG prompts)
     EXTRACTION_MARKERS = [
@@ -256,12 +260,12 @@ async def initialize_raganything():
         embed_impl = getattr(openai_embed, "func", openai_embed)
         return await embed_impl(
             truncated_texts,
-            model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-large"),
+            model=settings.embedding_model,
             api_key=openai_api_key,
         )
     
-    # Get embedding dimension from environment (flexibility for different models)
-    embedding_dim = int(os.getenv("EMBEDDING_DIM", "3072"))
+    # Get embedding dimension from centralized settings
+    embedding_dim = settings.embedding_dim
     
     embedding_func = EmbeddingFunc(
         embedding_dim=embedding_dim,
@@ -284,7 +288,7 @@ async def initialize_raganything():
     
     # Build lightrag_kwargs with configuration
     # LLM timeout configuration for complex chunks (360s default was insufficient for chunk 8)
-    llm_timeout = int(os.getenv("LLM_TIMEOUT", "600"))  # 10 minutes default (was 180s)
+    llm_timeout = settings.llm_timeout
     
     lightrag_kwargs = {
         "addon_params": {

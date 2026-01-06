@@ -10,6 +10,8 @@ import logging
 from typing import List, Dict, Tuple
 from neo4j import GraphDatabase
 
+from src.core import get_settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -17,12 +19,13 @@ class Neo4jGraphIO:
     """Neo4j graph I/O operations for semantic post-processing"""
     
     def __init__(self):
-        """Initialize Neo4j connection from environment variables"""
-        self.uri = os.getenv("NEO4J_URI", "neo4j://localhost:7687")
-        self.username = os.getenv("NEO4J_USERNAME", "neo4j")
-        self.password = os.getenv("NEO4J_PASSWORD")
-        self.database = os.getenv("NEO4J_DATABASE", "neo4j")
-        self.workspace = os.getenv("NEO4J_WORKSPACE", "default")
+        """Initialize Neo4j connection from centralized settings"""
+        settings = get_settings()
+        self.uri = settings.neo4j_uri
+        self.username = settings.neo4j_username
+        self.password = settings.neo4j_password
+        self.database = settings.neo4j_database
+        self.workspace = settings.neo4j_workspace
         
         self.driver = GraphDatabase.driver(
             self.uri,
