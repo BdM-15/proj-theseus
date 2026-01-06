@@ -113,65 +113,60 @@ async def main():
     chunk_size = settings.chunk_size or 4096
     graph_storage = global_args.graph_storage if hasattr(global_args, 'graph_storage') else "NetworkXStorage"
     
-    # ANSI color codes
-    CYAN = '\033[96m'
-    BLUE = '\033[94m'
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    MAGENTA = '\033[95m'
-    BOLD = '\033[1m'
-    RESET = '\033[0m'
+    # Use centralized color codes from logging_config
+    from src.utils.logging_config import Colors
+    c = Colors
     
     logger.info("")
-    logger.info(f"{CYAN}{'═' * 80}{RESET}")
-    logger.info(f"{BOLD}{MAGENTA}🔄 PROCESSING PIPELINE FLOW{RESET}")
-    logger.info(f"{CYAN}{'═' * 80}{RESET}")
-    logger.info(f"{YELLOW}1.{RESET} {BOLD}Document Upload{RESET}")
-    logger.info(f"   {CYAN}└─>{RESET} MinerU multimodal parser (images/tables/equations)")
+    logger.info(f"{c.CYAN}{'═' * 80}{c.RESET}")
+    logger.info(f"{c.BOLD}{c.MAGENTA}🔄 PROCESSING PIPELINE FLOW{c.RESET}")
+    logger.info(f"{c.CYAN}{'═' * 80}{c.RESET}")
+    logger.info(f"{c.YELLOW}1.{c.RESET} {c.BOLD}Document Upload{c.RESET}")
+    logger.info(f"   {c.CYAN}└─>{c.RESET} MinerU multimodal parser (images/tables/equations)")
     logger.info("")
-    logger.info(f"{YELLOW}2.{RESET} {BOLD}LightRAG Chunking{RESET} {CYAN}({chunk_size} tokens, 15% overlap){RESET}")
-    logger.info(f"   {CYAN}└─>{RESET} Multiple focused extraction passes (prevents attention decay)")
+    logger.info(f"{c.YELLOW}2.{c.RESET} {c.BOLD}LightRAG Chunking{c.RESET} {c.CYAN}({chunk_size} tokens, 15% overlap){c.RESET}")
+    logger.info(f"   {c.CYAN}└─>{c.RESET} Multiple focused extraction passes (prevents attention decay)")
     logger.info("")
-    logger.info(f"{YELLOW}3.{RESET} {BOLD}Entity Extraction{RESET} {CYAN}(18 custom types){RESET}")
-    logger.info(f"   {CYAN}├─>{RESET} Native LightRAG extraction (~22K tokens FULL govcon prompt)")
-    logger.info(f"   {CYAN}├─>{RESET} LLM (query model): {getattr(global_args, 'llm_model', settings.reasoning_llm_name)}")
-    logger.info(f"   {CYAN}└─>{RESET} Tuple-delimited output (Issue #54 - Back to Basics)")
+    logger.info(f"{c.YELLOW}3.{c.RESET} {c.BOLD}Entity Extraction{c.RESET} {c.CYAN}(18 custom types){c.RESET}")
+    logger.info(f"   {c.CYAN}├─>{c.RESET} Native LightRAG extraction (~22K tokens FULL govcon prompt)")
+    logger.info(f"   {c.CYAN}├─>{c.RESET} LLM (query model): {getattr(global_args, 'llm_model', settings.reasoning_llm_name)}")
+    logger.info(f"   {c.CYAN}└─>{c.RESET} Tuple-delimited output (Issue #54 - Back to Basics)")
     logger.info("")
-    logger.info(f"{YELLOW}4.{RESET} {BOLD}Relationship Extraction{RESET}")
-    logger.info(f"   {CYAN}└─>{RESET} LightRAG automatic relationship inference")
+    logger.info(f"{c.YELLOW}4.{c.RESET} {c.BOLD}Relationship Extraction{c.RESET}")
+    logger.info(f"   {c.CYAN}└─>{c.RESET} LightRAG automatic relationship inference")
     logger.info("")
-    logger.info(f"{YELLOW}5.{RESET} {BOLD}Semantic Post-Processing{RESET} {GREEN}(Auto-triggered){RESET}")
-    logger.info(f"   {CYAN}├─>{RESET} 8 LLM inference algorithms (~3,500 lines prompts)")
-    logger.info(f"   {CYAN}├─>{RESET} Relationship inference (Section L↔M, Annex linkage)")
-    logger.info(f"   {CYAN}└─>{RESET} Workload enrichment + description generation")
+    logger.info(f"{c.YELLOW}5.{c.RESET} {c.BOLD}Semantic Post-Processing{c.RESET} {c.GREEN}(Auto-triggered){c.RESET}")
+    logger.info(f"   {c.CYAN}├─>{c.RESET} 8 LLM inference algorithms (~3,500 lines prompts)")
+    logger.info(f"   {c.CYAN}├─>{c.RESET} Relationship inference (Section L↔M, Annex linkage)")
+    logger.info(f"   {c.CYAN}└─>{c.RESET} Workload enrichment + description generation")
     logger.info("")
-    logger.info(f"{YELLOW}6.{RESET} {BOLD}Knowledge Graph Storage{RESET} {CYAN}({graph_storage}){RESET}")
+    logger.info(f"{c.YELLOW}6.{c.RESET} {c.BOLD}Knowledge Graph Storage{c.RESET} {c.CYAN}({graph_storage}){c.RESET}")
     if graph_storage == "Neo4JStorage":
-        logger.info(f"   {CYAN}├─>{RESET} Neo4j enterprise graph database")
-        logger.info(f"   {CYAN}├─>{RESET} Multi-workspace isolation")
-        logger.info(f"   {CYAN}└─>{RESET} APOC subgraph queries for cross-RFP intelligence")
+        logger.info(f"   {c.CYAN}├─>{c.RESET} Neo4j enterprise graph database")
+        logger.info(f"   {c.CYAN}├─>{c.RESET} Multi-workspace isolation")
+        logger.info(f"   {c.CYAN}└─>{c.RESET} APOC subgraph queries for cross-RFP intelligence")
     else:
-        logger.info(f"   {CYAN}└─>{RESET} Local GraphML files")
-    logger.info(f"{CYAN}{'═' * 80}{RESET}")
+        logger.info(f"   {c.CYAN}└─>{c.RESET} Local GraphML files")
+    logger.info(f"{c.CYAN}{'═' * 80}{c.RESET}")
     logger.info("")
     
-    logger.info(f"{CYAN}{'═' * 80}{RESET}")
-    logger.info(f"{BOLD}{MAGENTA}🌐 SERVER ENDPOINTS{RESET}")
-    logger.info(f"{CYAN}{'═' * 80}{RESET}")
-    logger.info(f"{GREEN}WebUI:{RESET}              {BLUE}http://{host}:{port}/webui{RESET}")
-    logger.info(f"{GREEN}API Docs:{RESET}           {BLUE}http://{host}:{port}/docs{RESET}")
+    logger.info(f"{c.CYAN}{'═' * 80}{c.RESET}")
+    logger.info(f"{c.BOLD}{c.MAGENTA}🌐 SERVER ENDPOINTS{c.RESET}")
+    logger.info(f"{c.CYAN}{'═' * 80}{c.RESET}")
+    logger.info(f"{c.GREEN}WebUI:{c.RESET}              {c.BLUE}http://{host}:{port}/webui{c.RESET}")
+    logger.info(f"{c.GREEN}API Docs:{c.RESET}           {c.BLUE}http://{host}:{port}/docs{c.RESET}")
     if graph_storage == "Neo4JStorage":
-        logger.info(f"{GREEN}Neo4j Browser:{RESET}      {BLUE}http://localhost:7474{RESET}")
-        logger.info(f"{GREEN}Neo4j Aura:{RESET}         {BLUE}https://console.neo4j.io{RESET} {YELLOW}(recommended){RESET}")
+        logger.info(f"{c.GREEN}Neo4j Browser:{c.RESET}      {c.BLUE}http://localhost:7474{c.RESET}")
+        logger.info(f"{c.GREEN}Neo4j Aura:{c.RESET}         {c.BLUE}https://console.neo4j.io{c.RESET} {c.YELLOW}(recommended){c.RESET}")
     logger.info("")
-    logger.info(f"{YELLOW}Working Directory:{RESET}  {global_args.working_dir}")
-    logger.info(f"{YELLOW}Current Workspace:{RESET}  {BOLD}{settings.workspace}{RESET}")
+    logger.info(f"{c.YELLOW}Working Directory:{c.RESET}  {global_args.working_dir}")
+    logger.info(f"{c.YELLOW}Current Workspace:{c.RESET}  {c.BOLD}{settings.workspace}{c.RESET}")
     logger.info("")
-    logger.info(f"{GREEN}▸ LLM Configuration (Dual-Model):{RESET}")
-    logger.info(f"  {CYAN}Extraction:{RESET}       {settings.extraction_llm_name} {YELLOW}(non-reasoning){RESET}")
-    logger.info(f"  {CYAN}Reasoning:{RESET}        {settings.reasoning_llm_name} {GREEN}(reasoning){RESET}")
-    logger.info(f"  {CYAN}Embeddings:{RESET}       {settings.embedding_model} ({settings.embedding_dim}D)")
-    logger.info(f"{CYAN}{'═' * 80}{RESET}")
+    logger.info(f"{c.GREEN}▸ LLM Configuration (Dual-Model):{c.RESET}")
+    logger.info(f"  {c.CYAN}Extraction:{c.RESET}       {settings.extraction_llm_name} {c.YELLOW}(non-reasoning){c.RESET}")
+    logger.info(f"  {c.CYAN}Reasoning:{c.RESET}        {settings.reasoning_llm_name} {c.GREEN}(reasoning){c.RESET}")
+    logger.info(f"  {c.CYAN}Embeddings:{c.RESET}       {settings.embedding_model} ({settings.embedding_dim}D)")
+    logger.info(f"{c.CYAN}{'═' * 80}{c.RESET}")
     logger.info("")
     
     # Step 5: Start server

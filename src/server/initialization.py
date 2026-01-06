@@ -447,30 +447,26 @@ async def initialize_raganything():
     # Startup Configuration Summary
     # ═══════════════════════════════════════════════════════════════════════════════
     
-    # ANSI color codes
-    CYAN = '\033[96m'
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    MAGENTA = '\033[95m'
-    BOLD = '\033[1m'
-    RESET = '\033[0m'
+    # Use centralized color codes
+    from src.utils.logging_config import Colors
+    c = Colors
     
     logger.info("")
-    logger.info(f"{CYAN}{'═' * 80}{RESET}")
-    logger.info(f"{BOLD}{MAGENTA}🎯 CONFIGURATION{RESET}")
-    logger.info(f"{CYAN}{'═' * 80}{RESET}")
-    logger.info(f"{GREEN}Entity Types:{RESET} {BOLD}{len(entity_types)}{RESET} specialized (organization, requirement, evaluation_factor, etc.)")
+    logger.info(f"{c.CYAN}{'═' * 80}{c.RESET}")
+    logger.info(f"{c.BOLD}{c.MAGENTA}🎯 CONFIGURATION{c.RESET}")
+    logger.info(f"{c.CYAN}{'═' * 80}{c.RESET}")
+    logger.info(f"{c.GREEN}Entity Types:{c.RESET} {c.BOLD}{len(entity_types)}{c.RESET} specialized (organization, requirement, evaluation_factor, etc.)")
     try:
         from importlib import metadata as _metadata
         mineru_version = _metadata.version("mineru")
     except Exception:
         mineru_version = "unknown"
     logger.info(
-        f"{GREEN}Parser:{RESET} {BOLD}MinerU {mineru_version}{RESET} | Device: {BOLD}{GREEN if device == 'cuda' else YELLOW}{device.upper()}{RESET} | Method: {parse_method.upper()}"
+        f"{c.GREEN}Parser:{c.RESET} {c.BOLD}MinerU {mineru_version}{c.RESET} | Device: {c.BOLD}{c.GREEN if device == 'cuda' else c.YELLOW}{device.upper()}{c.RESET} | Method: {parse_method.upper()}"
     )
-    logger.info(f"{GREEN}Multimodal:{RESET} Images, Tables, Equations {BOLD}{GREEN}ENABLED{RESET}")
-    logger.info(f"{GREEN}Advanced:{RESET} Formula Recognition, Table Merge {BOLD}{GREEN}ENABLED{RESET} | Timeout: {YELLOW}600s{RESET}")
-    logger.info(f"{CYAN}{'═' * 80}{RESET}")
+    logger.info(f"{c.GREEN}Multimodal:{c.RESET} Images, Tables, Equations {c.BOLD}{c.GREEN}ENABLED{c.RESET}")
+    logger.info(f"{c.GREEN}Advanced:{c.RESET} Formula Recognition, Table Merge {c.BOLD}{c.GREEN}ENABLED{c.RESET} | Timeout: {c.YELLOW}600s{c.RESET}")
+    logger.info(f"{c.CYAN}{'═' * 80}{c.RESET}")
     logger.info("")
     
     # ═══════════════════════════════════════════════════════════════════════════════
