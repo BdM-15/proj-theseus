@@ -3,9 +3,25 @@ Custom exceptions for GovCon Capture Vibe.
 
 Phase 1c: Exception Handling (#64)
 
-These exceptions provide better error categorization and debugging
-while maintaining the resilience pattern where code gracefully degrades
-on failures rather than crashing.
+DESIGN PHILOSOPHY:
+------------------
+These exceptions are used for RAISING specific, contextual errors at the 
+source of failure (LLM calls, prompt loading, storage operations). They 
+carry extra context (model name, document ID, algorithm name) that makes
+debugging easier.
+
+The CATCHING side intentionally uses broad `except Exception` blocks in many
+places (e.g., semantic_post_processor.py, routes.py). This is a deliberate
+"graceful degradation" pattern:
+  - If Algorithm 3 fails, continue with Algorithms 4-8
+  - If one document fails, continue processing the batch
+  - If one requirement enrichment fails, enrich the others
+
+Changing those broad catches to specific exceptions would BREAK resilience -
+an unexpected JSONDecodeError or KeyError would crash the whole pipeline
+instead of logging a warning and continuing.
+
+TL;DR: Specific exceptions for RAISING (context), broad catches for CATCHING (resilience).
 
 Usage:
     from src.core.exceptions import (
