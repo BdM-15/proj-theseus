@@ -22,6 +22,67 @@ import logging.handlers
 import sys
 from pathlib import Path
 from datetime import datetime
+from typing import List, Tuple, Optional
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ANSI COLOR CODES (Centralized - DRY)
+# ═══════════════════════════════════════════════════════════════════════════════
+# Use these module-level constants instead of redefining in each file
+
+class Colors:
+    """ANSI color codes for terminal output."""
+    CYAN = '\033[96m'
+    BLUE = '\033[94m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    MAGENTA = '\033[95m'
+    RED = '\033[91m'
+    BOLD = '\033[1m'
+    RESET = '\033[0m'
+
+
+def log_banner(
+    title: str,
+    items: Optional[List[Tuple[str, str]]] = None,
+    width: int = 80,
+    logger: Optional[logging.Logger] = None
+) -> None:
+    """
+    Log a standardized banner with title and optional items.
+    
+    Usage:
+        from src.utils.logging_config import log_banner, Colors
+        
+        log_banner("🎯 CONFIGURATION", [
+            ("Entity Types", "18 specialized"),
+            ("Parser", "MinerU 2.6.4"),
+        ])
+    
+    Args:
+        title: Banner title (can include emoji)
+        items: Optional list of (label, value) tuples to display
+        width: Banner width in characters (default: 80)
+        emoji: Optional emoji prefix (deprecated - include in title instead)
+        logger: Logger instance (defaults to root logger)
+    """
+    if logger is None:
+        logger = logging.getLogger()
+    
+    c = Colors
+    separator = f"{c.CYAN}{'═' * width}{c.RESET}"
+    
+    logger.info("")
+    logger.info(separator)
+    logger.info(f"{c.BOLD}{c.MAGENTA}{title}{c.RESET}")
+    logger.info(separator)
+    
+    if items:
+        for label, value in items:
+            logger.info(f"{c.GREEN}{label}:{c.RESET} {value}")
+    
+    logger.info(separator)
+    logger.info("")
 
 
 class HTTPFilter(logging.Filter):
@@ -220,27 +281,20 @@ def setup_logging(
         console_handler.addFilter(HTTPFilter())
         root_logger.addHandler(console_handler)
     
-    # Log startup message with ANSI colors
+    # Log startup message using centralized banner utility
     logger = logging.getLogger(__name__)
-    CYAN = '\033[96m'
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    BOLD = '\033[1m'
-    RESET = '\033[0m'
+    c = Colors
     
-    logger.info("")
-    logger.info(f"{CYAN}{'═' * 80}{RESET}")
-    logger.info(f"{BOLD}{CYAN}📋 LOGGING INFRASTRUCTURE{RESET}")
-    logger.info(f"{CYAN}{'═' * 80}{RESET}")
-    logger.info(f"{YELLOW}Directory:{RESET}        {log_path.absolute()}")
-    logger.info(f"{GREEN}Processing Log:{RESET}   {processing_log_file.name} {CYAN}(RFP extraction, semantic inference){RESET}")
-    logger.info(f"{GREEN}Server Log:{RESET}       {server_log_file.name} {CYAN}(startup, API calls){RESET}")
-    logger.info(f"{GREEN}Error Log:{RESET}        {error_log_file.name} {CYAN}(all errors){RESET}")
-    logger.info(f"{YELLOW}Max File Size:{RESET}    {max_file_size / 1024 / 1024:.1f}MB per file")
-    logger.info(f"{YELLOW}Backup Count:{RESET}     {backup_count} files per log")
-    logger.info(f"{YELLOW}Console Output:{RESET}   {'Enabled' if console_output else 'Disabled'} (filtered)")
-    logger.info(f"{YELLOW}Log Level:{RESET}        {log_level.upper()}")
-    logger.info(f"{CYAN}{'═' * 80}{RESET}")
+    log_banner("📋 LOGGING INFRASTRUCTURE", logger=logger)
+    logger.info(f"{c.YELLOW}Directory:{c.RESET}        {log_path.absolute()}")
+    logger.info(f"{c.GREEN}Processing Log:{c.RESET}   {processing_log_file.name} {c.CYAN}(RFP extraction, semantic inference){c.RESET}")
+    logger.info(f"{c.GREEN}Server Log:{c.RESET}       {server_log_file.name} {c.CYAN}(startup, API calls){c.RESET}")
+    logger.info(f"{c.GREEN}Error Log:{c.RESET}        {error_log_file.name} {c.CYAN}(all errors){c.RESET}")
+    logger.info(f"{c.YELLOW}Max File Size:{c.RESET}    {max_file_size / 1024 / 1024:.1f}MB per file")
+    logger.info(f"{c.YELLOW}Backup Count:{c.RESET}     {backup_count} files per log")
+    logger.info(f"{c.YELLOW}Console Output:{c.RESET}   {'Enabled' if console_output else 'Disabled'} (filtered)")
+    logger.info(f"{c.YELLOW}Log Level:{c.RESET}        {log_level.upper()}")
+    logger.info(f"{c.CYAN}{'═' * 80}{c.RESET}")
     logger.info("")
     
     return {

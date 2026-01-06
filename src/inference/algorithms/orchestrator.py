@@ -14,6 +14,7 @@ import logging
 import os
 from typing import Dict, List
 
+from src.core import get_settings
 from .algo_1_instruction_eval import algo_1_instruction_eval
 from .algo_2_eval_hierarchy import algo_2_eval_hierarchy
 from .algo_3_req_eval import algo_3_req_eval
@@ -26,15 +27,28 @@ from .base import load_prompt_template
 
 logger = logging.getLogger(__name__)
 
-# Parallelization config
-MAX_CONCURRENT_LLM_CALLS = int(os.getenv("MAX_ASYNC", "8"))
+
+def get_orchestrator_config():
+    """Get orchestrator configuration from centralized settings."""
+    settings = get_settings()
+    return {
+        'max_concurrent_llm_calls': settings.get_effective_post_processing_max_async(),
+        'algo_3_threshold': settings.algo_3_threshold,
+        'algo_4_threshold': settings.algo_4_threshold,
+        'algo_6_threshold': settings.algo_6_threshold,
+    }
+
+
+# Legacy constants for backward compatibility
+_settings = get_settings()
+MAX_CONCURRENT_LLM_CALLS = _settings.get_effective_post_processing_max_async()
 
 # Conditional execution thresholds (Issue #56)
 # DISABLED: Quality over cost - always run all algorithms
 # Set thresholds to 1.0 to effectively disable skipping
-ALGO_3_COVERAGE_THRESHOLD = float(os.getenv("ALGO_3_THRESHOLD", "1.0"))  # Always run (quality over cost)
-ALGO_4_COVERAGE_THRESHOLD = float(os.getenv("ALGO_4_THRESHOLD", "1.0"))  # Always run (quality over cost)
-ALGO_6_COVERAGE_THRESHOLD = float(os.getenv("ALGO_6_THRESHOLD", "1.0"))  # Always run (quality over cost)
+ALGO_3_COVERAGE_THRESHOLD = _settings.algo_3_threshold
+ALGO_4_COVERAGE_THRESHOLD = _settings.algo_4_threshold
+ALGO_6_COVERAGE_THRESHOLD = _settings.algo_6_threshold
 
 
 def check_extraction_coverage(

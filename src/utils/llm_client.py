@@ -28,11 +28,15 @@ Usage:
 import os
 import asyncio
 import logging
+
+from src.core.exceptions import LLMError
 from typing import Optional, List, Dict, Any, Type, TypeVar
 
 import instructor
 from openai import AsyncOpenAI
 from pydantic import BaseModel
+
+from src.core import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -67,14 +71,15 @@ async def call_llm_async(
     Returns:
         LLM response text
     """
+    settings = get_settings()
     if model is None:
         # Default to reasoning model for inference/post-processing tasks (grok-4-1 series)
-        model = os.getenv("REASONING_LLM_NAME", "grok-4-1-fast-reasoning")
+        model = settings.reasoning_llm_name
     
-    # Create AsyncOpenAI client with xAI endpoint (env vars, no hardcoding)
+    # Create AsyncOpenAI client with xAI endpoint
     client = AsyncOpenAI(
-        api_key=os.getenv("LLM_BINDING_API_KEY"),
-        base_url=os.getenv("LLM_BINDING_HOST", "https://api.x.ai/v1")
+        api_key=settings.llm_api_key,
+        base_url=settings.llm_host
     )
     
     # Build messages array
@@ -101,7 +106,7 @@ async def call_llm_async(
         return response.choices[0].message.content
     except Exception as e:
         logger.error(f"LLM API call failed: {e}")
-        raise
+        raise LLMError(f"LLM API call failed", cause=e, model=model)
 
 
 async def call_llm_batch(
@@ -126,8 +131,9 @@ async def call_llm_batch(
     Returns:
         List of LLM responses (same order as prompts)
     """
+    settings = get_settings()
     if max_concurrent is None:
-        max_concurrent = int(os.getenv("MAX_ASYNC", "8"))
+        max_concurrent = settings.get_effective_post_processing_max_async()
     
     # Create semaphore for rate limiting
     semaphore = asyncio.Semaphore(max_concurrent)
@@ -192,16 +198,17 @@ async def call_llm_structured(
     Raises:
         Exception: If all retries fail
     """
+    settings = get_settings()
     if model is None:
-        model = os.getenv("REASONING_LLM_NAME", "grok-4-1-fast-reasoning")
+        model = settings.reasoning_llm_name
     
     if max_tokens is None:
-        max_tokens = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "128000"))
+        max_tokens = settings.llm_max_output_tokens
     
     # Create OpenAI client wrapped with Instructor
     openai_client = AsyncOpenAI(
-        api_key=os.getenv("LLM_BINDING_API_KEY"),
-        base_url=os.getenv("LLM_BINDING_HOST", "https://api.x.ai/v1")
+        api_key=settings.llm_api_key,
+        base_url=settings.llm_host
     )
     
     # MD_JSON mode: automatically extracts JSON from markdown code blocks
@@ -228,15 +235,17 @@ async def call_llm_structured(
 
 def get_llm_config() -> Dict[str, Any]:
     """
-    Get current LLM configuration from environment variables.
+    Get current LLM configuration from centralized settings.
     Useful for logging configuration at startup.
     """
+    settings = get_settings()
     return {
-        "model": os.getenv("REASONING_LLM_NAME", "grok-4-1-fast-reasoning"),
-        "extraction_model": os.getenv("EXTRACTION_LLM_NAME", "grok-4-1-fast-non-reasoning"),
-        "api_host": os.getenv("LLM_BINDING_HOST", "https://api.x.ai/v1"),
-        "api_key_set": bool(os.getenv("LLM_BINDING_API_KEY")),
-        "max_async": int(os.getenv("MAX_ASYNC", "8")),
-        "max_retries": int(os.getenv("LLM_MAX_RETRIES", "5"))
+        "model": settings.reasoning_llm_name,
+        "extraction_model": settings.extraction_llm_name,
+        "api_host": settings.llm_host,
+        "api_key_set": bool(settings.llm_api_key),
+        "llm_max_async": settings.get_effective_llm_max_async(),
+        "post_processing_max_async": settings.get_effective_post_processing_max_async(),
+        "max_retries": settings.llm_max_retries
     }
 

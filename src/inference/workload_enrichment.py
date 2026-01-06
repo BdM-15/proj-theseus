@@ -37,6 +37,7 @@ from typing import Dict, List, Callable, Awaitable, Optional
 from pathlib import Path
 from pydantic import ValidationError
 
+from src.core import get_settings
 from src.inference.neo4j_graph_io import Neo4jGraphIO
 from src.ontology.schema import (
     BOECategory, 
@@ -77,9 +78,10 @@ async def enrich_workload_metadata(
     Returns:
         Dict with enrichment statistics
     """
+    settings = get_settings()
     if model is None:
         # Use reasoning model for inference/enrichment tasks (grok-4-1 series)
-        model = os.getenv("REASONING_LLM_NAME", "grok-4-1-fast-reasoning")
+        model = settings.reasoning_llm_name
     
     logger.info("🔧 Starting workload enrichment...")
     
@@ -123,7 +125,7 @@ async def enrich_workload_metadata(
     
     # PHASE 3A: Parallel batch processing with semaphore control
     # With batch_size=25, we can run more workers in parallel (8 vs extraction's 16)
-    max_workers = int(os.getenv("WORKLOAD_MAX_WORKERS", os.getenv("MAX_ASYNC", "8")))
+    max_workers = settings.get_effective_workload_max_workers()
     if max_workers < 1:
         max_workers = 4
     
@@ -247,8 +249,8 @@ Return JSON object with {len(batch)} items (one per requirement above):
             # Instructor handles: JSON extraction, schema validation, retries with error feedback
             batch_enriched = 0
             try:
-                max_output_tokens = int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "128000"))
-                max_retries = int(os.getenv("LLM_MAX_RETRIES", "3"))
+                max_output_tokens = settings.llm_max_output_tokens
+                max_retries = settings.llm_max_retries
                 
                 # Use Instructor's call_llm_structured for schema-enforced output
                 # This eliminates manual JSON parsing and adds error feedback to LLM on retry

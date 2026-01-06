@@ -30,14 +30,10 @@ import json
 from typing import Dict, Callable, Awaitable, List
 from pydantic import ValidationError
 
+from src.core import get_settings
 from src.inference.neo4j_graph_io import Neo4jGraphIO, group_entities_by_type
-from src.inference.schema_prompts import (
-    get_instruction_evaluation_guidance,
-    get_evaluation_hierarchy_guidance,
-    get_document_hierarchy_guidance
-)
 from src.inference.algorithms import run_all_algorithms_parallel
-from src.ontology.schema import VALID_ENTITY_TYPES, InferredRelationship, InferredRelationshipBatch
+from src.ontology.schema import VALID_ENTITY_TYPES, InferredRelationship
 from src.utils.llm_client import call_llm_async
 from src.utils.llm_parsing import extract_json_from_response, parse_with_pydantic
 
@@ -46,11 +42,25 @@ logger = logging.getLogger(__name__)
 # Convert set to list for prompt generation
 ALLOWED_TYPES = list(VALID_ENTITY_TYPES)
 
-# Configuration for semantic post-processing optimization (Issue #30)
-MAX_CONCURRENT_LLM_CALLS = int(os.getenv("MAX_ASYNC", "8"))
-BATCH_SIZE_ALGO3 = int(os.getenv("BATCH_SIZE_ALGORITHM_3", 100))
-BATCH_OVERLAP_ALGO3 = int(os.getenv("BATCH_OVERLAP_ALGORITHM_3", 20))
-BATCH_SIZE_ALGO4 = int(os.getenv("BATCH_SIZE_ALGORITHM_4", 50))
+
+def get_semantic_post_processing_config():
+    """Get semantic post-processing configuration from centralized settings."""
+    settings = get_settings()
+    return {
+        'max_concurrent_llm_calls': settings.get_effective_post_processing_max_async(),
+        'batch_size_algo3': settings.batch_size_algorithm_3,
+        'batch_overlap_algo3': settings.batch_overlap_algorithm_3,
+        'batch_size_algo4': settings.batch_size_algorithm_4,
+    }
+
+
+# Legacy constants for backward compatibility (use get_semantic_post_processing_config() instead)
+# These are evaluated at import time for modules that depend on them
+_settings = get_settings()
+MAX_CONCURRENT_LLM_CALLS = _settings.get_effective_post_processing_max_async()
+BATCH_SIZE_ALGO3 = _settings.batch_size_algorithm_3
+BATCH_OVERLAP_ALGO3 = _settings.batch_overlap_algorithm_3
+BATCH_SIZE_ALGO4 = _settings.batch_size_algorithm_4
 
 
 def _heuristic_table_type_mapping(entity: Dict) -> str:
@@ -594,9 +604,10 @@ async def _semantic_post_processor_neo4j(
     Returns:
         Dict with processing statistics
     """
+    settings = get_settings()
     if llm_model_name is None:
         # Use REASONING model for post-processing (grok-4-1 series)
-        llm_model_name = os.getenv("REASONING_LLM_NAME", "grok-4-1-fast-reasoning")
+        llm_model_name = settings.reasoning_llm_name
     
     logger.info("🔧 Starting Neo4j semantic post-processing...")
     start_time = time.time()
@@ -879,9 +890,10 @@ async def enhance_knowledge_graph(
     logger.info("🧠 SEMANTIC POST-PROCESSING: LLM-Powered Graph Enhancement (Neo4j)")
     logger.info("=" * 80)
     
-    # Get LLM model from environment - use REASONING model for post-processing
-    llm_model = os.getenv("REASONING_LLM_NAME", "grok-4-1-fast-reasoning")
-    llm_temp = float(os.getenv("LLM_MODEL_TEMPERATURE", "0.1"))
+    # Get LLM model from centralized settings - use REASONING model for post-processing
+    settings = get_settings()
+    llm_model = settings.reasoning_llm_name
+    llm_temp = settings.llm_model_temperature
     
     return await _semantic_post_processor_neo4j(
         llm_model_name=llm_model,
