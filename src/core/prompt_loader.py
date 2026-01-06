@@ -14,6 +14,8 @@ from pathlib import Path
 from typing import Dict
 import logging
 
+from src.core.exceptions import PromptError
+
 logger = logging.getLogger(__name__)
 
 # Cache for loaded prompts (in-memory)
@@ -69,7 +71,7 @@ def load_prompt(prompt_name: str, use_cache: bool = True) -> str:
         
     except Exception as e:
         logger.error(f"Error loading prompt {prompt_name}: {e}")
-        raise
+        raise PromptError(f"Failed to load prompt: {prompt_name}", cause=e, prompt_name=prompt_name)
 
 
 def list_available_prompts() -> Dict[str, list]:

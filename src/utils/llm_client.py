@@ -28,6 +28,8 @@ Usage:
 import os
 import asyncio
 import logging
+
+from src.core.exceptions import LLMError
 from typing import Optional, List, Dict, Any, Type, TypeVar
 
 import instructor
@@ -104,7 +106,7 @@ async def call_llm_async(
         return response.choices[0].message.content
     except Exception as e:
         logger.error(f"LLM API call failed: {e}")
-        raise
+        raise LLMError(f"LLM API call failed", cause=e, model=model)
 
 
 async def call_llm_batch(
