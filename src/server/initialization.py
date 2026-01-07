@@ -169,10 +169,6 @@ async def initialize_raganything():
         return any(marker.lower() in combined for marker in EXTRACTION_MARKERS)
     
     async def base_llm_model_func(prompt, system_prompt=None, history_messages=[], **kwargs):
-        # Explicitly disable streaming if not already set
-        if 'stream' not in kwargs:
-            kwargs['stream'] = False
-        
         # Route to appropriate model based on task type
         if is_extraction_task(prompt, system_prompt):
             model = extraction_model
@@ -210,13 +206,9 @@ async def initialize_raganything():
     logger.info(f"   Sanitizer:  Fixes malformed delimiters (#|type → type)")
     
     # Define vision function (multimodal Grok wrapper)
-    # CRITICAL: stream=False explicitly disables streaming for vision models too
     # NOTE: Vision/multimodal processing is extraction (generating descriptions for tables/images)
     #       so it uses the extraction model for literal format compliance
     async def vision_model_func(prompt, system_prompt=None, history_messages=[], image_data=None, messages=None, **kwargs):
-        # Explicitly disable streaming if not already set
-        if 'stream' not in kwargs:
-            kwargs['stream'] = False
         if messages:
             return await openai_complete_if_cache(
                 extraction_model, "", system_prompt=None, history_messages=[],
