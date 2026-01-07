@@ -219,7 +219,20 @@ class Settings(BaseSettings):
         default=None,
         description="Max workers for workload enrichment (defaults to post_processing_max_async)"
     )
-    
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # DOMAIN ONTOLOGY BOOTSTRAP
+    # ═══════════════════════════════════════════════════════════════════════════
+    auto_bootstrap_ontology: bool = Field(
+        default=True,
+        description="Automatically bootstrap GovCon domain ontology on workspace creation. "
+                    "Set to False for testing or when manual control is needed."
+    )
+    ontology_bootstrap_force: bool = Field(
+        default=False,
+        description="Force re-bootstrap even if already done. Useful for ontology updates."
+    )
+
     # ═══════════════════════════════════════════════════════════════════════════
     # MINERU CONFIGURATION
     # ═══════════════════════════════════════════════════════════════════════════
