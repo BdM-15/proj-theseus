@@ -798,13 +798,32 @@ async def _semantic_post_processor_neo4j(
         if category_distribution:
             logger.info(f"  BOE categories used:   {', '.join([f'{k}:{v}' for k,v in category_distribution.items() if v > 0])}")
         
+        # Step 5: Sync inferred relationships to LightRAG VDBs (Issue #65 - Critical Fix)
+        # Without this, agent queries via /query miss algorithm-discovered relationships
+        logger.info("\n🔄 Step 5: Syncing inferred relationships to LightRAG VDBs...")
+        from src.inference.vdb_sync import sync_discoveries_to_vdb
+        
+        vdb_sync_stats = await sync_discoveries_to_vdb(
+            neo4j_io=neo4j_io,
+            relationships_inferred=relationships_inferred
+        )
+        
+        relationships_synced = vdb_sync_stats.get("relationships_synced", 0)
+        if vdb_sync_stats.get("status") == "success":
+            logger.info(f"✅ VDB sync complete: {relationships_synced} relationships now queryable")
+        elif vdb_sync_stats.get("status") == "skipped":
+            logger.warning(f"⚠️ VDB sync skipped: {vdb_sync_stats.get('reason', 'unknown')}")
+        else:
+            logger.error(f"❌ VDB sync failed: {vdb_sync_stats.get('error', 'unknown')}")
+        
         # Summary statistics
         processing_time = time.time() - start_time
         logger.info("\n" + "="*80)
-        logger.info("✅ SEMANTIC POST-PROCESSING COMPLETE (Neo4j)")
+        logger.info("✅ SEMANTIC POST-PROCESSING COMPLETE (Neo4j + VDB)")
         logger.info("="*80)
         logger.info(f"  Entities corrected:      {entities_corrected}")
         logger.info(f"  Relationships inferred:  {relationships_inferred}")
+        logger.info(f"  Relationships synced:    {relationships_synced}")
         logger.info(f"  Requirements enriched:   {requirements_enriched}")
         logger.info(f"  Processing time:         {processing_time:.2f}s")
         logger.info("="*80)
@@ -828,6 +847,7 @@ async def _semantic_post_processor_neo4j(
         logger.info(f"  Main Processing Entities:      {initial_entity_count}")
         logger.info(f"  Main Processing Relationships: {initial_rel_count}")
         logger.info(f"  Post-Processing Added Rels:    {relationships_inferred}")
+        logger.info(f"  VDB Synced Relationships:      {relationships_synced}")
         logger.info(f"  ─────────────────────────────────────")
         logger.info(f"  Final Entity Count:            {final_entity_count}")
         logger.info(f"  Final Relationship Count:      {final_relationship_count}")
@@ -837,11 +857,13 @@ async def _semantic_post_processor_neo4j(
             "status": "success",
             "entities_corrected": entities_corrected,
             "relationships_inferred": relationships_inferred,
+            "relationships_synced": relationships_synced,
             "requirements_enriched": requirements_enriched,
             "enrichment_rate": enrichment_rate,
             "category_distribution": category_distribution,
             "processing_time": processing_time,
-            "entity_type_counts": type_counts
+            "entity_type_counts": type_counts,
+            "vdb_sync_status": vdb_sync_stats.get("status", "unknown")
         }
         
     except Exception as e:
