@@ -82,7 +82,16 @@ async def initialize_raganything():
     # Ensure it's set in the current process environment so MinerU subprocess inherits it
     os.environ["MINERU_DEVICE_MODE"] = device
     
-    # Note: All other MinerU variables (MINERU_LANG, MINERU_FORMULA_ENABLE, MINERU_TABLE_MERGE_ENABLE,
+    # CRITICAL: Disable MinerU cross-page table merging (Issue #65, MinerU #4311)
+    # When tables span multiple pages, MinerU's merge logic keeps only the first page's
+    # img_path and table_body, resulting in EMPTY data for continuation pages.
+    # Per MinerU maintainer @myhloli: Set MINERU_TABLE_MERGE_ENABLE=0 to preserve per-page data.
+    # Our context-aware processing + semantic inference will connect related tables via CHILD_OF.
+    table_merge_value = "1" if settings.mineru_table_merge_enable else "0"
+    os.environ["MINERU_TABLE_MERGE_ENABLE"] = table_merge_value
+    logger.info(f"✅ MinerU table merge: {'ENABLED' if settings.mineru_table_merge_enable else 'DISABLED (preserves per-page data)'}")
+    
+    # Note: All other MinerU variables (MINERU_LANG, MINERU_FORMULA_ENABLE,
     # MINERU_PDF_RENDER_TIMEOUT, CUDA_VISIBLE_DEVICES, HF_TOKEN, HF_HUB_DISABLE_SYMLINKS_WARNING, etc.)
     # are automatically inherited by MinerU subprocess from os.environ after dotenv loads .env
     

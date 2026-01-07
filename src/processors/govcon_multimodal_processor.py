@@ -137,10 +137,29 @@ class GovconMultimodalProcessor(BaseModalProcessor):
         surrounding_context = self._extract_surrounding_context(page_idx, content_type)
         context_section = ""
         if surrounding_context:
+            # Detect if this is a continuation of a table from a previous page
+            # Look for continuation indicators in context
+            context_lower = surrounding_context.lower()
+            is_continuation = any(indicator in context_lower for indicator in [
+                "continued", "(cont)", "(cont'd)", "continuation",
+                # Also check if previous page has same table header/structure
+            ])
+            
+            continuation_instruction = ""
+            if is_continuation or (content_type == "table" and page_idx > 0):
+                continuation_instruction = """
+MULTI-PAGE TABLE DETECTION:
+If this appears to be a CONTINUATION of a table from the previous page:
+1. Start description with "CONTINUATION of [Parent Table Name] from page [N]:"
+2. Reference the parent table's section/appendix (e.g., "Appendix K - PSAB Workload Data")
+3. This enables automatic PART_OF relationship inference in the knowledge graph
+
+"""
+            
             context_section = f"""
 DOCUMENT CONTEXT (from surrounding pages):
 {surrounding_context[:2000]}
-
+{continuation_instruction}
 Use this context to understand what SECTION, APPENDIX, or ATTACHMENT this {content_type} belongs to.
 Include the parent section name in your description (e.g., "This table from Appendix H - Workload Data...").
 
@@ -156,6 +175,7 @@ Include the parent section name in your description (e.g., "This table from Appe
 {context_section}
 Focus on extracting:
 - DOCUMENT LOCATION: Section, Appendix, or Attachment this table belongs to
+- TABLE CONTINUITY: If this continues from a previous page, state "CONTINUATION of [table name] from page X"
 - WORKLOAD DRIVERS: Frequencies, quantities, hours, coverage, service rates
 - REQUIREMENTS: Specifications, standards, performance criteria, modal verbs (shall/must/will)
 - PERFORMANCE METRICS: KPIs, thresholds, SLAs, measurement methods
@@ -163,13 +183,17 @@ Focus on extracting:
 - DELIVERABLES: Reports, data items, CDRLs
 
 Caption: {caption_text}
+Page: {page_idx}
 
 Table Content:
 {table_body}
 
-IMPORTANT: Start your description with the section/appendix location if known from context.
-Include ALL quantitative data (numbers, rates, frequencies, dollar amounts).
-Include exact values - never generalize "100 times per year" to "frequent"."""
+CRITICAL INSTRUCTIONS:
+1. Start your description with the section/appendix location if known from context.
+2. If this is a CONTINUATION table (no header row, data continues from previous page), explicitly state:
+   "CONTINUATION of [Parent Table Name] from page [N]: ..."
+3. Include ALL quantitative data (numbers, rates, frequencies, dollar amounts).
+4. Include exact values - never generalize "100 times per year" to "frequent"."""
 
             # Use modal_caption_func to generate description
             try:

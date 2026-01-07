@@ -251,6 +251,12 @@ class Settings(BaseSettings):
         default=True,
         description="Enable equation extraction from documents"
     )
+    mineru_table_merge_enable: bool = Field(
+        default=False,
+        description="Enable MinerU cross-page table merging. DISABLED by default to preserve "
+                    "per-page table images and data (prevents data loss on continuation pages). "
+                    "Context-aware processing connects related tables via semantic inference."
+    )
     
     # ═══════════════════════════════════════════════════════════════════════════
     # ALGORITHM THRESHOLDS
