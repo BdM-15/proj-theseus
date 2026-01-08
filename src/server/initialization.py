@@ -581,9 +581,13 @@ async def initialize_raganything():
         try:
             from src.ontology.bootstrap import bootstrap_govcon_ontology
             
+            # CRITICAL: Use workspace-specific path, not base working_dir
+            # working_dir is ./rag_storage, but workspace data is in ./rag_storage/{workspace}
+            workspace_path = os.path.join(working_dir, settings.workspace)
+            
             bootstrap_result = await bootstrap_govcon_ontology(
                 lightrag=_rag_anything.lightrag,
-                working_dir=working_dir,
+                working_dir=workspace_path,
                 force=settings.ontology_bootstrap_force,
             )
             
