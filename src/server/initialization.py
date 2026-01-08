@@ -566,6 +566,41 @@ async def initialize_raganything():
     # ═══════════════════════════════════════════════════════════════════════════════
     await warmup_mineru_model()
     
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # DOMAIN ONTOLOGY BOOTSTRAP (Issue #68)
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Pre-load curated GovCon domain knowledge into the workspace. This provides:
+    # - Zero-document queries: "What is a Color Team review?" works immediately
+    # - Enhanced retrieval: Domain concepts (Shipley, FAR, BOE) connect to extracted entities
+    # - Evaluation grounding: Rating scales, compliance patterns available for analysis
+    #
+    # Bootstrap happens ONCE per workspace (marker file prevents re-run).
+    # Set AUTO_BOOTSTRAP_ONTOLOGY=False in .env to disable for testing.
+    # ═══════════════════════════════════════════════════════════════════════════════
+    if settings.auto_bootstrap_ontology:
+        try:
+            from src.ontology.bootstrap import bootstrap_govcon_ontology
+            
+            bootstrap_result = await bootstrap_govcon_ontology(
+                lightrag=_rag_anything.lightrag,
+                working_dir=working_dir,
+                force=settings.ontology_bootstrap_force,
+            )
+            
+            if bootstrap_result["status"] == "success":
+                logger.info(f"✅ GovCon ontology bootstrapped: {bootstrap_result['entities_added']} entities, "
+                          f"{bootstrap_result['relationships_added']} relationships")
+            elif bootstrap_result["status"] == "already_bootstrapped":
+                logger.info(f"📚 GovCon ontology already bootstrapped ({bootstrap_result['bootstrapped_at']})")
+            else:
+                logger.warning(f"⚠️ Ontology bootstrap: {bootstrap_result.get('error', 'unknown issue')}")
+                
+        except Exception as e:
+            # Non-fatal - ontology is enhancement, not required for core functionality
+            logger.warning(f"⚠️ Ontology bootstrap failed: {e} - continuing without domain knowledge")
+    else:
+        logger.info("📚 Ontology auto-bootstrap DISABLED (AUTO_BOOTSTRAP_ONTOLOGY=False)")
+    
     return _rag_anything
 
 
