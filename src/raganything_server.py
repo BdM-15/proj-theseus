@@ -47,7 +47,6 @@ from src.server.initialization import initialize_raganything, get_rag_instance
 from src.server.routes import (
     create_insert_endpoint,
     create_documents_upload_endpoint,
-    create_query_structured_endpoint,
 )
 
 # Set up logging
@@ -107,9 +106,9 @@ async def main():
     # Add our custom endpoints with RAG-Anything multimodal processing + semantic inference
     create_insert_endpoint(app, rag_instance)
     create_documents_upload_endpoint(app, rag_instance)
-    create_query_structured_endpoint(app, rag_instance)
     
-    logger.info("✅ Custom endpoints registered: /insert, /documents/upload, /query/structured")
+    logger.info("✅ Custom endpoints registered: /insert, /documents/upload")
+    logger.info("✅ Use LightRAG's native /query/data endpoint for structured data retrieval (agent workflows)")
     
     # Print startup summary with pipeline flow
     chunk_size = settings.chunk_size or 4096

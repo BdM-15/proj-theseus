@@ -248,7 +248,8 @@ docker run -d --name neo4j \
 | ------------------- | ------ | ------------------------------------------- |
 | `/documents/upload` | POST   | Upload RFP (triggers full pipeline)         |
 | `/insert`           | POST   | Alternative upload with workspace selection |
-| `/query`            | POST   | Query knowledge graph                       |
+| `/query`            | POST   | Query knowledge graph (natural language)    |
+| `/query/data`       | POST   | Structured data retrieval (entities, relationships, chunks) for agent workflows |
 | `/health`           | GET    | Server health check                         |
 
 ### LightRAG WebUI (Built-in)
