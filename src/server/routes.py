@@ -4,7 +4,9 @@ FastAPI Routes Module
 Custom endpoints for RAG-Anything + LightRAG server:
 - /insert: Document upload with automatic semantic post-processing
 - /documents/upload: WebUI document upload (also triggers post-processing)
-- /query/structured: Structured data retrieval (entities, relationships, sources)
+
+Note: Use LightRAG's native /query/data endpoint for structured data retrieval (entities, relationships, chunks).
+This endpoint is built into LightRAG and provides the same functionality without requiring a custom implementation.
 
 Architecture (Issue #54 - Back to Basics with Native LightRAG):
 1. Document Upload → process_document_with_semantic_inference()
@@ -16,9 +18,6 @@ Architecture (Issue #54 - Back to Basics with Native LightRAG):
 
 Key Innovation: Queue-aware processing detects batch completion automatically,
 triggering cumulative semantic enhancement only after all documents are uploaded.
-
-Issue #65 P1: /query/structured endpoint provides structured JSON output for agents,
-returning entities, relationships, and sources directly without prose generation.
 """
 
 import os
@@ -449,128 +448,6 @@ def create_documents_upload_endpoint(app, rag_instance):
     app.add_api_route(
         "/documents/upload",
         documents_upload_with_raganything,
-        methods=["POST"],
-        response_class=JSONResponse
-    )
-
-
-def create_query_structured_endpoint(app, rag_instance):
-    """
-    Create /query/structured endpoint for structured data retrieval (Issue #65 P1)
-    
-    Provides structured JSON output (entities, relationships, chunks) for programmatic
-    agent access to the knowledge graph WITHOUT requiring LLM prose generation.
-    
-    Implementation Note:
-    LightRAG's native aquery_data() uses structured output parsing which has compatibility
-    issues with xAI's API. This implementation uses a hybrid approach:
-    - Chunks: Retrieved via naive mode (VDB similarity search)
-    - Entities: Retrieved via direct VDB query
-    - Relationships: Retrieved via direct VDB query
-    
-    This provides the same structured output without the keyword extraction step.
-    """
-    from lightrag import QueryParam
-    from pydantic import BaseModel
-    from typing import Optional, List
-    
-    class StructuredQueryRequest(BaseModel):
-        """Request model for structured query endpoint"""
-        query: str
-        top_k: int = 20
-        entity_top_k: int = 10
-        relationship_top_k: int = 10
-    
-    async def query_structured(request: StructuredQueryRequest):
-        """
-        Return structured entity/relationship data instead of prose.
-        
-        This endpoint queries all three VDBs (chunks, entities, relationships) directly,
-        avoiding the keyword extraction step that has xAI compatibility issues.
-        
-        Args:
-            request: StructuredQueryRequest with query and top_k parameters
-        
-        Returns:
-            JSON with status, data (entities, relationships, chunks)
-        """
-        logger.info(f"🔍 Structured query: '{request.query}'")
-        
-        try:
-            lightrag = rag_instance.lightrag
-            
-            # Query all three VDBs in parallel
-            import asyncio
-            
-            # 1. Query chunks VDB (text content)
-            chunks_task = lightrag.chunks_vdb.query(request.query, top_k=request.top_k)
-            
-            # 2. Query entities VDB
-            entities_task = lightrag.entities_vdb.query(request.query, top_k=request.entity_top_k)
-            
-            # 3. Query relationships VDB
-            relationships_task = lightrag.relationships_vdb.query(request.query, top_k=request.relationship_top_k)
-            
-            # Execute all queries in parallel
-            chunks_raw, entities_raw, relationships_raw = await asyncio.gather(
-                chunks_task, entities_task, relationships_task
-            )
-            
-            # Format results
-            chunks = []
-            for c in (chunks_raw or []):
-                chunks.append({
-                    "id": c.get("id", ""),
-                    "content": c.get("content", ""),
-                    "file_path": c.get("file_path", ""),
-                    "source_id": c.get("source_id", "")
-                })
-            
-            entities = []
-            for e in (entities_raw or []):
-                entities.append({
-                    "entity_name": e.get("entity_name", ""),
-                    "entity_type": e.get("entity_type", ""),
-                    "description": e.get("description", ""),
-                    "source_id": e.get("source_id", "")
-                })
-            
-            relationships = []
-            for r in (relationships_raw or []):
-                relationships.append({
-                    "src_id": r.get("src_id", ""),
-                    "tgt_id": r.get("tgt_id", ""),
-                    "description": r.get("description", ""),
-                    "keywords": r.get("keywords", ""),
-                    "source_id": r.get("source_id", "")
-                })
-            
-            logger.info(f"✅ Structured query returned: {len(entities)} entities, {len(relationships)} relationships, {len(chunks)} chunks")
-            
-            return JSONResponse({
-                "status": "success",
-                "message": "Query executed successfully",
-                "data": {
-                    "entities": entities,
-                    "relationships": relationships,
-                    "chunks": chunks
-                }
-            })
-            
-        except Exception as e:
-            logger.error(f"❌ Structured query failed: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
-            return JSONResponse({
-                "status": "error",
-                "message": str(e),
-                "data": {"entities": [], "relationships": [], "chunks": []}
-            }, status_code=500)
-    
-    # Register the route
-    app.add_api_route(
-        "/query/structured",
-        query_structured,
         methods=["POST"],
         response_class=JSONResponse
     )

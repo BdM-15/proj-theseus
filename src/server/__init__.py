@@ -9,7 +9,7 @@ This module provides:
 Usage:
     from src.server.config import configure_raganything_args
     from src.server.initialization import initialize_raganything
-    from src.server.routes import create_insert_endpoint, create_query_structured_endpoint
+    from src.server.routes import create_insert_endpoint, create_documents_upload_endpoint
 """
 
 __all__ = [
@@ -18,5 +18,4 @@ __all__ = [
     "get_rag_instance",
     "create_insert_endpoint",
     "create_documents_upload_endpoint",
-    "create_query_structured_endpoint",
 ]
