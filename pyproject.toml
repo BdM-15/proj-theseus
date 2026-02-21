@@ -6,9 +6,14 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     # Core RAG functionality (includes lightrag-hku, MinerU, and document parsers)
-    "raganything[all]>=1.2.8",
+    # v1.2.9: MinerU 2.7.x filepath compat (PR #188), status case-mismatch fix,
+    #         full file_path metadata, init/parsing bug fixes, folder-complete enhancement
+    "raganything[all]>=1.2.9",
     # MinerU document parser - EXPLICIT constraint to prevent downgrade
-    "mineru[core]>=2.7.0",
+    # v2.7.6: hybrid-auto-engine backend (direct text extraction for text-layer PDFs),
+    #         cross-page table merge fix (see initialization.py MINERU_TABLE_MERGE_ENABLE),
+    #         CVE-2025-64512 pdfminer.six patch, EXIF orientation fix, timeout fix
+    "mineru[core]>=2.7.6",
     # MinerU runtime dependencies not properly declared in mineru[core]
     # (MinerU OCR postprocess imports these directly.)
     "shapely>=2.0.0",
@@ -20,17 +25,16 @@ dependencies = [
     "doclayout-yolo>=0.0.4",
     # MinerU pipeline backend imports ultralytics.YOLO
     "ultralytics>=8.0.0",
-    # LightRAG with RAG-Anything compatibility (REQUIRED: >= 1.4.9.7)
-    # v1.4.9.7 includes:
-    # - Enhanced Neo4j workspace isolation and performance
-    # - APOC subgraph query optimizations for multi-depth traversal
-    # - Improved connection pooling and retry logic
-    # - Full-text search improvements (CJK analyzer support)
-    "lightrag-hku>=1.4.9.7",
+    # LightRAG with RAG-Anything compatibility
+    # v1.4.9.11: hot-fix (OpenAI binding env vars), WebUI token auto-renewal,
+    #            DOCX table whitespace via HTML tags
+    "lightrag-hku>=1.4.9.11",
     # Cloud LLM access (xAI Grok via OpenAI-compatible API)
-    # Pinned <2.0.0 for compatibility with instructor.
+    # TODO (#77): openai==2.8.1 is currently installed despite <2.0.0 pin.
+    # Pending investigation of instructor + LightRAG compatibility before
+    # deciding to pin v1 strictly or migrate to v2 API.
     "openai>=1.70.0,<2.0.0",
-    # xAI SDK for native Grok integration (updated to 1.5.0)
+    # xAI SDK for native Grok integration
     "xai-sdk>=1.5.0",
     # Instructor for Pydantic-validated LLM extraction with automatic retry
     "instructor>=1.3.2",
@@ -67,12 +71,12 @@ dependencies = [
 # Use PyTorch CUDA 12.4 index for GPU acceleration
 
 # Override resolution to force compatible versions
-# LightRAG 1.4.9.10 has numpy<2.0.0 constraint but MinerU 2.6.4+ needs numpy>=2.1.0
+# LightRAG 1.4.9.11 has numpy<2.0.0 constraint but MinerU 2.7.6+ needs numpy>=2.1.0
 # LightRAG only uses numpy for simple ndarray returns, works fine with numpy 2.x
 override-dependencies = [
-    "lightrag-hku>=1.4.9.10",
-    "mineru>=2.7.0",
-    "numpy>=2.1.0,<2.3.0",  # Override LightRAG's <2.0.0 constraint (also keep OpenCV compatible)
+    "lightrag-hku>=1.4.9.11",
+    "mineru>=2.7.6",
+    "numpy>=2.1.0,<2.4.0",  # Override LightRAG's <2.0.0 constraint (also keep OpenCV compatible)
 ]
 
 [[tool.uv.index]]
@@ -91,6 +95,6 @@ torchvision = { index = "pytorch-cu124" }
 # - pypdf, python-docx, python-pptx, openpyxl (document parsers)
 # - pydantic, tiktoken, nest-asyncio (utilities)
 # - ollama (local LLM support)
-# 
+#
 # torch/torchvision are explicitly declared above with [tool.uv.sources] to ensure
 # CUDA 12.4 builds are installed from the PyTorch index instead of CPU-only PyPI versions.
