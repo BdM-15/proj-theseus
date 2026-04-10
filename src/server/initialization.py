@@ -615,11 +615,18 @@ async def initialize_raganything():
 
 
 async def warmup_mineru_model():
-    """Pre-download MinerU VLM model at startup to avoid delays during document processing"""
+    """Pre-download MinerU models at startup to avoid delays and symlink issues.
+    
+    MinerU 3.0 launches a subprocess API service that calls snapshot_download
+    internally. On Windows without Developer Mode, symlink creation fails
+    (WinError 1314). By pre-downloading both models in our main process with
+    HF_HUB_DISABLE_SYMLINKS=1, the subprocess finds cached real files and
+    skips the download entirely.
+    """
     import asyncio
     import os
     
-    logger.info("🔄 Warming up MinerU VLM model (downloading if needed)...")
+    logger.info("🔄 Warming up MinerU models (downloading if needed)...")
     
     try:
         # CRITICAL: Set env vars BEFORE importing huggingface_hub
@@ -629,15 +636,23 @@ async def warmup_mineru_model():
         
         from huggingface_hub import snapshot_download
         
-        model_path = await asyncio.to_thread(
+        # 1. Pipeline backend model (layout detection, OCR, table recognition)
+        # Required by MinerU 3.0 "pipeline" backend for PDF processing
+        pipeline_path = await asyncio.to_thread(
+            snapshot_download,
+            "opendatalab/PDF-Extract-Kit-1.0"
+        )
+        logger.info(f"✅ MinerU pipeline model ready: {pipeline_path}")
+        
+        # 2. VLM model (vision-language for image/table understanding)
+        vlm_path = await asyncio.to_thread(
             snapshot_download,
             "opendatalab/MinerU2.5-2509-1.2B"
         )
-        logger.info(f"✅ MinerU VLM model ready: {model_path}")
+        logger.info(f"✅ MinerU VLM model ready: {vlm_path}")
         
     except Exception as e:
-        # Non-fatal - model files are downloaded, symlink just failed
-        # MinerU will still work as the blobs are present
+        # Non-fatal - MinerU will attempt download on first document
         logger.warning(f"⚠️ MinerU warmup: {e} - will download on first document")
 
 
