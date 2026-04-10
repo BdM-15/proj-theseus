@@ -176,8 +176,8 @@ async def process_document_with_semantic_inference(
     logger.info(f"🔧 Using RAG-Anything + LLM semantic inference (format-agnostic)")
     
     # Step 1: Parse document with MinerU (multimodal extraction)
-    # Backend selection: MinerU 2.7.0 defaults to slow "hybrid-auto-engine"
-    # Use "pipeline" for fast ONNX-based parsing (same as MinerU 2.6.x behavior)
+    # Backend selection: MinerU 3.0 defaults to "hybrid-auto-engine" (high accuracy, more compute)
+    # Use "pipeline" for fast ONNX-based parsing (86.2 OmniDocBench, supports pure CPU)
     settings = get_settings()
     mineru_backend = settings.mineru_backend
     

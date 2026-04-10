@@ -22,6 +22,10 @@ from lightrag.llm.openai import openai_complete_if_cache, openai_embed
 from lightrag.utils import EmbeddingFunc
 from raganything import RAGAnything, RAGAnythingConfig
 
+# Apply MinerU 3.0 compatibility patch (removes -d and --source CLI flags)
+from tools.patches.raganything_mineru3_compat import apply_patch as _apply_mineru3_patch
+_apply_mineru3_patch()
+
 # V3 unified prompt loaded directly from file - no prompt_loader needed
 from src.ontology.schema import VALID_ENTITY_TYPES
 from src.core import get_settings
@@ -80,6 +84,8 @@ async def initialize_raganything():
     
     # CRITICAL: MinerU reads MINERU_DEVICE_MODE from environment, NOT from RAGAnythingConfig
     # Ensure it's set in the current process environment so MinerU subprocess inherits it
+    # NOTE: MinerU 3.0 removed the -d CLI flag; device is managed internally by the API service.
+    # The environment variable is still read by MinerU's internal configuration.
     os.environ["MINERU_DEVICE_MODE"] = device
     
     # CRITICAL: Disable MinerU cross-page table merging (Issue #65, MinerU #4311)

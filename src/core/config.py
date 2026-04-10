@@ -250,7 +250,8 @@ class Settings(BaseSettings):
     )
     mineru_backend: str = Field(
         default="pipeline",
-        description="MinerU backend: pipeline (fast ONNX) or hybrid-auto-engine (slow)"
+        description="MinerU 3.0 backend: pipeline | hybrid-auto-engine | vlm-auto-engine | hybrid-http-client | vlm-http-client. "
+                    "MUST be explicit — 3.0 default changed from pipeline to hybrid-auto-engine."
     )
     enable_image_processing: bool = Field(
         default=True,

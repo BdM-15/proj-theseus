@@ -56,7 +56,7 @@ def log_banner(
         
         log_banner("🎯 CONFIGURATION", [
             ("Entity Types", "18 specialized"),
-            ("Parser", "MinerU 2.6.4"),
+            ("Parser", "MinerU 3.0.9"),
         ])
     
     Args:
