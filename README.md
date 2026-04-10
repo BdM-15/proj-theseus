@@ -21,15 +21,15 @@ An **Ontology-Based RAG system** for federal RFP analysis that transforms generi
 
 ### Architecture Stack
 
-| Component             | Technology                                                       | Purpose                                               |
-| --------------------- | ---------------------------------------------------------------- | ----------------------------------------------------- |
-| **Document Parsing**  | [MinerU](https://github.com/opendatalab/MinerU) via RAG-Anything | Multimodal PDF extraction (tables, images, equations) |
-| **RAG Orchestration** | [RAG-Anything](https://github.com/HKUDS/RAG-Anything) v1.2.8+    | Document processing pipeline coordination             |
-| **Knowledge Graph**   | [LightRAG](https://github.com/HKUDS/LightRAG) v1.4.9.7+          | Graph construction with WebUI (pip: `lightrag-hku`)   |
-| **LLM**               | xAI Grok-4.1-fast (dual-model routing)                           | Extraction: non-reasoning, Query: reasoning (~$2/RFP) |
-| **Embeddings**        | OpenAI text-embedding-3-large                                    | 3072-dimensional vector similarity                    |
-| **Graph Storage**     | Neo4j 5.25 Community / NetworkX                                  | Enterprise graph with APOC or local fallback          |
-| **Structured Output** | [Instructor](https://github.com/jxnl/instructor) + Pydantic      | Schema-enforced LLM responses                         |
+| Component             | Technology                                                            | Purpose                                               |
+| --------------------- | --------------------------------------------------------------------- | ----------------------------------------------------- |
+| **Document Parsing**  | [MinerU](https://github.com/opendatalab/MinerU) 3.0+ via RAG-Anything | Multimodal PDF extraction (tables, images, equations) |
+| **RAG Orchestration** | [RAG-Anything](https://github.com/HKUDS/RAG-Anything) v1.2.10+        | Document processing pipeline coordination             |
+| **Knowledge Graph**   | [LightRAG](https://github.com/HKUDS/LightRAG) v1.4.13+                | Graph construction with WebUI (pip: `lightrag-hku`)   |
+| **LLM**               | xAI Grok-4.1-fast (dual-model routing)                                | Extraction: non-reasoning, Query: reasoning (~$2/RFP) |
+| **Embeddings**        | OpenAI text-embedding-3-large                                         | 3072-dimensional vector similarity                    |
+| **Graph Storage**     | Neo4j 5.25 Community / NetworkX                                       | Enterprise graph with APOC or local fallback          |
+| **Structured Output** | [Instructor](https://github.com/jxnl/instructor) + Pydantic           | Schema-enforced LLM responses                         |
 
 **Why Generic RAG Fails for Government Contracting:**
 
@@ -163,8 +163,7 @@ govcon-capture-vibe/
 │   ├── server/
 │   │   ├── config.py           # 18 entity types, LightRAG global_args
 │   │   └── routes.py           # Custom /insert, /documents/upload endpoints
-│   ├── extraction/
-│   │   └── json_extractor.py   # Pydantic schema extraction with Instructor
+│   ├── extraction/             # Entity extraction with Instructor + Pydantic
 │   ├── inference/
 │   │   ├── semantic_post_processor.py  # 8 relationship algorithms
 │   │   └── workload_enrichment.py      # BOE category tagging
@@ -179,8 +178,7 @@ govcon-capture-vibe/
 ├── rag_storage/                # Per-workspace knowledge graphs
 ├── inputs/                     # RFP document uploads
 ├── docs/                       # Architecture, Neo4j guides, roadmaps
-├── tests/                      # Test suite
-└── tools/                      # Diagnostics, validation scripts
+└── tools/                      # Neo4j workspace management, validation scripts
 ```
 
 ---
@@ -195,7 +193,7 @@ govcon-capture-vibe/
 # ============================================================================
 LLM_BINDING=openai
 LLM_BINDING_HOST=https://api.x.ai/v1
-LLM_MODEL=grok-4-fast-reasoning
+LLM_MODEL=grok-4-1-fast-reasoning
 LLM_BINDING_API_KEY=xai-your-key-here
 LLM_MODEL_TEMPERATURE=0.1
 
@@ -220,8 +218,9 @@ NEO4J_PASSWORD=your-password
 # Processing Configuration
 # ============================================================================
 CHUNK_SIZE=4096                     # Tokens per chunk
-CHUNK_OVERLAP=600                   # 15% overlap
-MAX_ASYNC=32                        # Parallel processing
+CHUNK_OVERLAP_SIZE=600              # 15% overlap
+LLM_MAX_ASYNC=16                    # LLM extraction concurrency
+EMBEDDING_MAX_ASYNC=16              # Embedding API concurrency
 ```
 
 ### Neo4j Setup (Recommended)
@@ -244,13 +243,13 @@ docker run -d --name neo4j \
 
 ### Document Processing
 
-| Endpoint            | Method | Description                                 |
-| ------------------- | ------ | ------------------------------------------- |
-| `/documents/upload` | POST   | Upload RFP (triggers full pipeline)         |
-| `/insert`           | POST   | Alternative upload with workspace selection |
-| `/query`            | POST   | Query knowledge graph (natural language)    |
+| Endpoint            | Method | Description                                                                     |
+| ------------------- | ------ | ------------------------------------------------------------------------------- |
+| `/documents/upload` | POST   | Upload RFP (triggers full pipeline)                                             |
+| `/insert`           | POST   | Alternative upload with workspace selection                                     |
+| `/query`            | POST   | Query knowledge graph (natural language)                                        |
 | `/query/data`       | POST   | Structured data retrieval (entities, relationships, chunks) for agent workflows |
-| `/health`           | GET    | Server health check                         |
+| `/health`           | GET    | Server health check                                                             |
 
 ### LightRAG WebUI (Built-in)
 
@@ -264,11 +263,11 @@ docker run -d --name neo4j \
 
 ### Processing Speed
 
-| RFP Size              | Processing Time | Cost   | Entities Extracted |
-| --------------------- | --------------- | ------ | ------------------ |
-| 71 pages (Navy MBOS)  | 15-20 minutes   | ~$1.00 | 594 entities       |
-| 425 pages (MCPP II)   | 38 minutes      | $2.12  | 1,500+ entities    |
-| 500+ pages            | 45-60 minutes   | ~$3.00 | 2,500+ entities    |
+| RFP Size             | Processing Time | Cost   | Entities Extracted |
+| -------------------- | --------------- | ------ | ------------------ |
+| 71 pages (Navy MBOS) | 15-20 minutes   | ~$1.00 | 594 entities       |
+| 425 pages (MCPP II)  | 38 minutes      | $2.12  | 1,500+ entities    |
+| 500+ pages           | 45-60 minutes   | ~$3.00 | 2,500+ entities    |
 
 ### Cost Breakdown (per RFP)
 
@@ -335,12 +334,12 @@ python -m pytest tests/test_json_extraction.py -v
 ```toml
 # From pyproject.toml
 dependencies = [
-    "raganything[all]>=1.2.8",      # RAG-Anything + MinerU
-    "lightrag-hku>=1.4.9.7",        # LightRAG with WebUI
-    "xai-sdk>=1.4.0",               # xAI Grok client
-    "instructor>=1.13.0",           # Pydantic LLM validation
-    "neo4j>=6.0.3",                 # Graph database
-    "pydantic>=2.10.6",             # Schema models
+    "raganything[all]>=1.2.10",     # RAG-Anything + MinerU 3.0
+    "lightrag-hku>=1.4.13",         # LightRAG with WebUI
+    "openai>=2.0.0,<3.0.0",         # OpenAI-compatible API client
+    "xai-sdk>=1.5.0",               # xAI Grok client
+    "instructor>=1.15.0",           # Pydantic LLM validation
+    "neo4j>=5.0.0",                 # Graph database
 ]
 ```
 
@@ -404,7 +403,7 @@ MIT License - See [LICENSE](LICENSE) for details.
 
 ---
 
-**Last Updated**: November 2025  
+**Last Updated**: April 2026  
 **Version**: 0.3.0  
 **Status**: Production-ready with Neo4j enterprise storage  
-**Processing**: ~$2/RFP with xAI Grok + OpenAI embeddings (38 min for 425-page RFP)
+**Processing**: ~$2/RFP with xAI Grok + OpenAI embeddings

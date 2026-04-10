@@ -23,16 +23,14 @@
 ### Supporting Documentation
 
 - `docs/ARCHITECTURE.md` - Overall system architecture, technology stack, and performance metrics
-- `docs/capture-intelligence/FEATURE_ROADMAP.md` - Future features and agent-powered proposal development workflows
-- `docs/inference/SEMANTIC_POST_PROCESSING.md` - LLM relationship inference algorithms
-- `docs/neo4j/NEO4J_USER_GUIDE.md` - Graph database workspace management
-- `tests/TEST_SCRIPTS_README.md` - Guide for running validation scripts
+- `docs/ENHANCEMENT_FRAMEWORK.md` - Upstream library enhancement mapping
+- `docs/MINERU_3X_INTEGRATION_ASSESSMENT.md` - MinerU 3.0 upgrade notes
+- `docs/PROJECT_THESEUS_USE_CASE.md` - Project Theseus use case
 
 ### Root Folders
 
 - `src/` - Python source code organized by domain
 - `prompts/` - LLM prompt templates for extraction and inference
-- `tests/` - Validation scripts and pytest suite
 - `tools/` - Neo4j workspace management and validation utilities
 - `docs/` - Architecture documentation and feature roadmaps
 - `inputs/` - RFP document staging (uploaded/ and **enqueued**/ subdirs)
@@ -59,7 +57,7 @@ This project wraps **LightRAG** and **RAGAnything** to provide specialized gover
 
 1. **Document Upload** → `/insert` or `/documents/upload` endpoints
 2. **MinerU Parsing** → Tables, images, text extraction (GPU-accelerated)
-3. **LightRAG Chunking** → 8,192 tokens/chunk, 15% overlap
+3. **LightRAG Chunking** → Configurable tokens/chunk (set via CHUNK_SIZE in .env), 15% overlap
 4. **Entity Extraction** → 18 govcon types via xAI Grok + Pydantic validation
 5. **Relationship Extraction** → LightRAG native inference
 6. **Semantic Post-Processing** → 8 LLM algorithms (auto-triggered after batch)
@@ -111,7 +109,6 @@ CONTEXT_FILTER_CONTENT_TYPES=text  # Content types in context
 - **State Modeling**: Use `dataclasses` or Pydantic models.
 - **Type Hinting**: Annotate functions and variables.
 - **Imports**:
-
   - **CRITICAL**: Load `.env` (`load_dotenv()`) **BEFORE** importing any LightRAG modules. LightRAG evaluates defaults (like `CHUNK_SIZE`) at import time.
   - **Pattern**:
 
@@ -189,7 +186,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 ```bash
 # LLM - xAI Grok (OpenAI-compatible API)
 LLM_BINDING_HOST=https://api.x.ai/v1
-LLM_MODEL=grok-4-fast-reasoning
+LLM_MODEL=grok-4-1-fast-reasoning
 LLM_BINDING_API_KEY=xai-xxx
 
 # Embeddings - OpenAI (MUST use OpenAI endpoint, not xAI)

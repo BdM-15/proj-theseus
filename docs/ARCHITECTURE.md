@@ -2,7 +2,7 @@
 
 **Project**: Government Contracting RAG System  
 **Status**: Living Document  
-**Last Updated**: December 6, 2025  
+**Last Updated**: April 2026  
 **Current Branch**: main (production-ready)
 
 ---
@@ -36,7 +36,7 @@ GovCon Capture Vibe is an **ontology-modified RAG system** for federal RFP analy
 
 ### **Technology Stack**
 
-**Active Codebase** (December 2025):
+**Active Codebase** (April 2026):
 
 - **Total Lines**: ~4,700 lines (22 Python files in src/)
 - **Core Modules**:
@@ -49,8 +49,9 @@ GovCon Capture Vibe is an **ontology-modified RAG system** for federal RFP analy
 
 **External Dependencies**:
 
-- **RAG-Anything** (`raganything[all]`) - Multimodal PDF parsing via MinerU
-- **LightRAG** (`lightrag-hku`) - Knowledge graph construction + WebUI
+- **RAG-Anything** (`raganything[all]>=1.2.10`) - Multimodal PDF parsing via MinerU
+- **LightRAG** (`lightrag-hku>=1.4.13`) - Knowledge graph construction + WebUI
+- **MinerU** (`mineru[core]>=3.0.0`) - PDF/DOCX/XLSX document parsing (GPU-accelerated)
 - **xAI Grok** - Cloud LLM (Dual: `grok-4-1-fast-non-reasoning` extraction, `grok-4-1-fast-reasoning` queries)
 - **OpenAI Embeddings** - text-embedding-3-large (3072-dim)
 - **Neo4j 5.25** - Primary graph storage with workspace isolation
@@ -58,24 +59,24 @@ GovCon Capture Vibe is an **ontology-modified RAG system** for federal RFP analy
 
 ### **Strategic Value**
 
-| Capability             | Current Production (Dec 2025) | Notes                                |
+| Capability             | Current Production (Apr 2026) | Notes                                |
 | ---------------------- | ----------------------------- | ------------------------------------ |
 | **Entity Types**       | 18 specialized types          | Government contracting ontology      |
 | **Graph Storage**      | Neo4j (primary)               | Workspace isolation, Cypher queries  |
 | **Extraction Quality** | 1,522 entities (425-page RFP) | Pydantic validation, 5x retry        |
 | **Privacy**            | Public RFPs → cloud           | Queries → 100% local                 |
-| **Chunk Size**         | 4,096 tokens                  | Optimized for extraction quality |
-| **LLM Model**          | grok-4-1-fast-* (dual)        | Extraction + Reasoning models |
+| **Chunk Size**         | 4,096 tokens                  | Optimized for extraction quality     |
+| **LLM Model**          | grok-4-1-fast-\* (dual)       | Extraction + Reasoning models        |
 | **Multimodal**         | Tables, images, text          | MinerU parsing with ontology mapping |
 
 ---
 
 ## Architecture Overview
 
-### **Production Processing Flow** (December 2025)
+### **Production Processing Flow** (April 2026)
 
 ```
-Public RFP Upload (PDF)
+Public RFP Upload (PDF/DOCX/XLSX)
     ↓
 RAG-Anything Multimodal Pipeline
     ├─ MinerU Document Parsing
@@ -319,7 +320,7 @@ result = client.chat.completions.create(
 
 **Rationale**:
 
-- ✅ **Preserve ontology**: 12 entity types remain intact
+- ✅ **Preserve ontology**: 18 entity types remain intact
 - ✅ **Multimodal capabilities**: MinerU parsing for tables/images
 - ✅ **Non-invasive**: Pass LightRAG instance via `lightrag=govcon_rag` parameter
 - ✅ **Maintainable**: `pip install --upgrade` gets updates without merge conflicts
@@ -377,6 +378,8 @@ multimodal_rag = RAGAnything(
 - ✅ **Maintainability**: Only 2 files in `src/` to maintain
 - ✅ **Safety**: All deleted code preserved in git history
 - ✅ **Clarity**: No confusion about what's actually used
+
+**Note**: ADR-004 reflects the October 2025 cleanup. The codebase has since grown to ~4,700+ lines across 22+ Python files in `src/` with dedicated modules for extraction, inference, ontology, and processors.
 
 **What Was Deleted** (Phase 1):
 
@@ -561,7 +564,7 @@ VALID_RELATIONSHIPS = {
 
 ### **Production Performance Summary**
 
-| Metric                  | Current Production (Dec 2025) | Notes                                     |
+| Metric                  | Current Production (Apr 2026) | Notes                                     |
 | ----------------------- | ----------------------------- | ----------------------------------------- |
 | **Processing Time**     | 38 minutes (425-page RFP)     | MCPP II DRAFT RFP baseline ($2.12 cost)   |
 | **Entities Extracted**  | 1,522 entities                | 18 specialized govcon types               |
@@ -569,7 +572,7 @@ VALID_RELATIONSHIPS = {
 | **Entity Density**      | ~3.6 entities/page            | Comprehensive coverage                    |
 | **Chunk Size**          | 4,096 tokens                  | Optimized for extraction quality          |
 | **Storage**             | Neo4j (primary)               | Workspace-isolated, Cypher queries        |
-| **LLM Model**           | grok-4-1-fast-* (dual)        | 2M context, temp=0.0/0.1 extraction/query |
+| **LLM Model**           | grok-4-1-fast-\* (dual)       | 2M context, temp=0.0/0.1 extraction/query |
 | **Validation**          | Pydantic + 5x retry           | Zero malformed entities                   |
 
 ### **Quality Indicators**
@@ -682,6 +685,6 @@ VALID_RELATIONSHIPS = {
 
 ---
 
-**Last Updated**: December 6, 2025  
-**Document Version**: 2.0.0  
+**Last Updated**: April 2026  
+**Document Version**: 2.1.0  
 **Status**: ✅ Documentation Updated to Reflect Current Production State
