@@ -64,6 +64,9 @@ pythonenv*/
 .vscode/
 *.code-workspace
 
+# Cursor (agent scratch/analysis files)
+.cursor/
+
 # PyCharm / IntelliJ
 .idea/
 *.iml
@@ -122,6 +125,7 @@ logs/*.log.*
 *.tmp
 *.temp
 *.bak
+*.backup
 *.swp
 *.cache
 
