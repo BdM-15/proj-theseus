@@ -195,6 +195,10 @@ class Settings(BaseSettings):
         default=None,
         description="Chunk overlap in tokens (required - no safe default)"
     )
+    max_extract_input_tokens: int = Field(
+        default=100000,
+        description="Max tokens per extraction LLM call (Grok supports 131K context)"
+    )
     
     # ═══════════════════════════════════════════════════════════════════════════
     # BATCH PROCESSING

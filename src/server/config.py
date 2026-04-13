@@ -85,10 +85,10 @@ def configure_raganything_args():
     global_args.embedding_api_key = settings.embedding_binding_api_key
     global_args.embedding_dim = settings.embedding_dim
     
-    # Government contracting entity types (18 specialized types - consolidated for flexibility)
-    # Semantic-first detection: Content determines entity type, not section labels
-    # NOTE: LightRAG normalizes to lowercase internally - use lowercase for consistency
-    global_args.entity_types = [
+    # Government contracting entity types (18 specialized types)
+    # LightRAG reads entity_types ONLY from addon_params (operate.py line 2908).
+    # Single source of truth — no dual injection needed.
+    entity_types = [
         # Core entities
         "organization",
         "concept",
@@ -126,12 +126,10 @@ def configure_raganything_args():
         "performance_metric",       # Distinct from requirements: accuracy, frequency, response times
     ]
     
-    # CRITICAL: Set addon_params with our entity types
-    # LightRAG's extract_entities() reads from addon_params.entity_types, NOT global_args.entity_types
-    # Without this, text extraction uses LightRAG's generic types (Person, Organization, Location, etc.)
+    # addon_params is the sole path LightRAG uses for entity_types in extraction
     global_args.addon_params = {
         "language": "English",
-        "entity_types": global_args.entity_types,  # Use our govcon ontology for ALL extraction
+        "entity_types": entity_types,
     }
     
     # ═══════════════════════════════════════════════════════════════════════════
@@ -170,6 +168,9 @@ def configure_raganything_args():
     settings.validate_required_settings()
     global_args.chunk_token_size = settings.chunk_size
     global_args.chunk_overlap_token_size = settings.chunk_overlap_size
+    
+    # Extraction input token limit (Grok supports 131K, default 100K for headroom)
+    global_args.max_extract_input_tokens = settings.max_extract_input_tokens
     
     # Multimodal support
     global_args.enable_multimodal = True
