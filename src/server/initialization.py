@@ -180,7 +180,14 @@ async def initialize_raganything():
         # Ensure max_tokens is always set — without it the API falls back to the model's
         # conservative default (~4K for grok-4-1-fast-non-reasoning), which truncates
         # large PWS chunks mid-output, resulting in 0 relationships extracted.
-        kwargs.setdefault('max_tokens', settings.llm_max_output_tokens)
+        # Exception: structured output calls (response_format present) are small JSON
+        # responses — keyword extraction only needs ~200 tokens. Passing 128k causes
+        # HTTP 500 on grok-4-1 endpoints for structured format requests.
+        # Force-assign (not setdefault) so we override any max_tokens LightRAG passes in.
+        if 'response_format' in kwargs:
+            kwargs['max_tokens'] = 4096
+        else:
+            kwargs.setdefault('max_tokens', settings.llm_max_output_tokens)
 
         return await openai_complete_if_cache(
             model,
@@ -381,7 +388,7 @@ async def initialize_raganything():
     logger.info("   - IMAGE_ANALYSIS_SYSTEM: org charts, facility layouts, CDRL hierarchies")
     logger.info("   - vision_prompt(_with_context): all visible text + contractual element extraction")
     logger.info("   - EQUATION prompts: performance formulas, incentive calculations")
-    logger.info("   - QUERY_TABLE/IMAGE prompts: govcon framing for aquery_vlm_enhanced")
+    logger.info("   - QUERY_TABLE/IMAGE prompts: govcon analyst framing for query-time VLM")
 
     # ═══════════════════════════════════════════════════════════════════════════════
     # Register library-native modal processors (TableModalProcessor etc.)
