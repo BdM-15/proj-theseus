@@ -359,49 +359,69 @@ async def initialize_raganything():
     logger.info(f"✅ Extended relationships_vdb.meta_fields: {extended_rel_meta}")
     
     # ═══════════════════════════════════════════════════════════════════════════════
-    # Register GovconMultimodalProcessor for tables/images/equations
+    # Register GovCon multimodal prompts via RAGAnything's prompt registry (Branch #072)
     # ═══════════════════════════════════════════════════════════════════════════════
-    # Issue #54 Architecture (Back to Basics - Native LightRAG):
-    # 
-    # MULTIMODAL Flow:
-    # 1. MinerU: Parses table images → textualized HTML (table_body)
-    # 2. GovconProcessor: Generates govcon-focused text description
-    # 3. LightRAG: Native tuple-delimited extraction
-    # 
-    # TEXT Flow:
-    # 1. RAG-Anything: Chunks text content
-    # 2. LightRAG: Native extraction with our entity_types + injected domain knowledge
-    # 
-    # Key Points:
-    # - Native LightRAG tuple-delimited format: entity<|#|>name<|#|>type<|#|>desc
-    # - Our ontology injected via PROMPTS["entity_extraction_system_prompt"]
-    # - Post-processing Step 2 cleans up any malformed entity types
+    # RAGAnything 1.2.10 introduced register_prompt_language() / set_prompt_language()
+    # (GitHub issue #85 — prompt language support). This allows atomic, thread-safe
+    # replacement of all multimodal analysis prompts without subclassing processors.
+    #
+    # We register a "govcon" language that overrides TABLE/IMAGE/EQUATION system prompts
+    # and the processing prompts used by TableModalProcessor, ImageModalProcessor, and
+    # EquationModalProcessor. Native library processors then use these govcon prompts
+    # automatically — no custom processor subclass required.
     # ═══════════════════════════════════════════════════════════════════════════════
-    from src.processors import GovconMultimodalProcessor
-    
+    from raganything.prompt_manager import register_prompt_language, set_prompt_language
+    from prompts.multimodal.govcon_multimodal_prompts import GOVCON_MULTIMODAL_PROMPTS
+
+    register_prompt_language("govcon", GOVCON_MULTIMODAL_PROMPTS)
+    set_prompt_language("govcon")
+    logger.info(f"✅ Registered and activated 'govcon' prompt language ({len(GOVCON_MULTIMODAL_PROMPTS)} prompt overrides)")
+    logger.info("   - TABLE_ANALYSIS_SYSTEM: federal acquisition analyst + workload/CLIN/CDRL focus")
+    logger.info("   - table_prompt(_with_context): multi-page continuation detection, govcon directives")
+    logger.info("   - IMAGE_ANALYSIS_SYSTEM: org charts, facility layouts, CDRL hierarchies")
+    logger.info("   - vision_prompt(_with_context): all visible text + contractual element extraction")
+    logger.info("   - EQUATION prompts: performance formulas, incentive calculations")
+    logger.info("   - QUERY_TABLE/IMAGE prompts: govcon framing for aquery_vlm_enhanced")
+
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Register library-native modal processors (TableModalProcessor etc.)
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Now that govcon prompts are active, the library's native processors use them
+    # automatically. No custom subclass needed — GovconMultimodalProcessor removed.
+    #
+    # Native processor benefits over custom subclass:
+    # - Structured JSON response → named entity (not generic "table_p53")
+    # - separate entity_info.summary → richer VDB embedding
+    # - _parse_table_response / _parse_response fallback handling
+    # - context_extractor wired via BaseModalProcessor._get_context_for_item()
+    # ═══════════════════════════════════════════════════════════════════════════════
+    from raganything.modalprocessors import (
+        TableModalProcessor,
+        ImageModalProcessor,
+        EquationModalProcessor,
+    )
+
     # Get the context_extractor that RAGAnything created during _ensure_lightrag_initialized()
-    # This is properly configured with the context settings from RAGAnythingConfig
     context_extractor = _rag_anything.context_extractor
     if context_extractor:
         logger.info(f"✅ Context extractor available: window={context_extractor.config.context_window}, mode={context_extractor.config.context_mode}")
     else:
         logger.warning("⚠️ Context extractor not available - tables will be processed without section context")
-    
-    govcon_processor = GovconMultimodalProcessor(
-        lightrag=_rag_anything.lightrag,
-        modal_caption_func=llm_model_func_wrapped,
-        context_extractor=context_extractor
+
+    _rag_anything.modal_processors["table"] = TableModalProcessor(
+        _rag_anything.lightrag, llm_model_func_wrapped, context_extractor
     )
-    
-    # Override RAG-Anything's default processors with our ontology-aware processor
-    _rag_anything.modal_processors["table"] = govcon_processor
-    _rag_anything.modal_processors["image"] = govcon_processor
-    _rag_anything.modal_processors["equation"] = govcon_processor
-    
-    logger.info("✅ GovconMultimodalProcessor registered (Issue #54 - Native LightRAG)")
-    logger.info("   - MinerU: table images → textualized HTML")
-    logger.info("   - Processor: Generates govcon-focused text descriptions")
-    logger.info("   - LightRAG: Native tuple-delimited entity extraction")
+    _rag_anything.modal_processors["image"] = ImageModalProcessor(
+        _rag_anything.lightrag, vision_model_func, context_extractor
+    )
+    _rag_anything.modal_processors["equation"] = EquationModalProcessor(
+        _rag_anything.lightrag, llm_model_func_wrapped, context_extractor
+    )
+
+    logger.info("✅ Native RAGAnything modal processors registered with govcon prompts")
+    logger.info("   table    → TableModalProcessor    (govcon TABLE_ANALYSIS_SYSTEM + table_prompt)")
+    logger.info("   image    → ImageModalProcessor    (govcon IMAGE_ANALYSIS_SYSTEM + vision_prompt)")
+    logger.info("   equation → EquationModalProcessor (govcon EQUATION_ANALYSIS_SYSTEM + equation_prompt)")
     
     # ═══════════════════════════════════════════════════════════════════════════════
     # CRITICAL: REPLACE LightRAG's ENTIRE prompt system with GovCon versions
