@@ -482,14 +482,19 @@ When processing an RFP, prioritize extraction in this order:
 
 1. PROGRAM - Identify top-level program FIRST (provides context for all others)
 2. SECTION - Map document structure (provides location context)
-3. EVALUATION_FACTOR - Critical for proposal planning
+3. EVALUATION_FACTOR + SUBFACTOR - Critical for proposal planning
 4. SUBMISSION_INSTRUCTION - Determines proposal structure
 5. REQUIREMENT - Core work obligations
-6. STATEMENT_OF_WORK - Work scope definition
-7. DOCUMENT/ANNEX - Supporting documents and references
-8. CLAUSE - Regulatory compliance requirements
-9. STRATEGIC_THEME - Competitive intelligence
-10. Standard Entities - Organizations, concepts, events, equipment, technology, etc.
+6. CONTRACT_LINE_ITEM - Pricing structure and period of performance
+7. STATEMENT_OF_WORK - Work scope definition
+8. WORKLOAD_METRIC - Quantitative BOE drivers
+9. PERFORMANCE_METRIC + PERFORMANCE_STANDARD - Quality standards
+10. DOCUMENT/ANNEX + REGULATORY_REFERENCE - Supporting docs and authorities
+11. CLAUSE - FAR/DFARS compliance requirements
+12. DELIVERABLE - CDRLs and submissions
+13. LABOR_CATEGORY - Named workforce roles (when explicitly stated)
+14. STRATEGIC_THEME - Competitive intelligence
+15. Standard Entities - Organizations, concepts, events, equipment, technology, etc.
 
 **Why This Order Matters**: Early entities provide context for later entities:
 - Knowing the PROGRAM helps classify requirements (program-specific vs general)
@@ -498,10 +503,12 @@ When processing an RFP, prioritize extraction in this order:
 - Requirements inherit context from their parent sections
 
 ================================================================================
-PART D: THE 18 ENTITY TYPES (Government Contracting Ontology)
+PART D: THE 24 ENTITY TYPES (Government Contracting Ontology)
 ================================================================================
 
-You MUST classify every entity into exactly ONE of these 18 types:
+You MUST classify every entity into exactly ONE of these 24 types:
+
+─── CONTRACT STRUCTURE & FINANCIAL ───
 
 1. REQUIREMENT - Contractor obligations (shall/should/may statements)
    Required metadata: criticality, modal_verb, req_type, labor_drivers
@@ -509,146 +516,236 @@ You MUST classify every entity into exactly ONE of these 18 types:
    Criticality: MANDATORY (shall/must), IMPORTANT (should), OPTIONAL (may)
    Example: "Contractor shall provide 24/7 help desk support for 500 users"
 
-2. CLAUSE - FAR/DFARS/Agency regulatory references
+2. CONTRACT_LINE_ITEM - CLINs, SLINs, and priced line items
+   Content signals: "CLIN", "SLIN", "ACRN", line item numbers (0001, 0002AA)
+   Must Extract: CLIN number, contract type (FFP/CPFF/T&M), description, PoP
+   Distinction: CONTRACT_LINE_ITEM = priced contract lines; DELIVERABLE = work products
+   Example: "CLIN 0001 Base Year Operations FFP", "SLIN 0002AA Option Year 1"
+
+3. CLAUSE - FAR/DFARS/Agency regulatory references
    Required metadata: clause_number, regulation
    Patterns: FAR 52.###-##, DFARS 252.###-####
-   Agency Supplements (26+ recognized):
-   - FAR (Federal Acquisition Regulation - Base)
-   - DFARS (Defense FAR Supplement)
-   - AFFARS (Air Force FAR Supplement)
-   - NMCARS (Navy/Marine Corps FAR Supplement)
-   - HSAR (Homeland Security)
-   - DOSAR (State Department)
-   - GSAM (General Services Administration)
-   - VAAR (Veterans Affairs)
-   - DEAR (Energy)
-   - NFS (NASA)
-   - AIDAR (USAID)
-   - CAR (Commerce)
-   - DIAR (USDA)
-   - DOLAR (Labor)
-   - EDAR (Education)
-   - EPAAR (EPA)
-   - FEHBAR (Health/Human Services Federal Employees)
-   - HHSAR (Health/Human Services)
-   - HUDAR (HUD)
-   - IAAR (Interior)
-   - JAR (Justice)
-   - LIFAR (Broadcasting Board of Governors)
-   - NRCAR (Nuclear Regulatory Commission)
-   - SOFARS (State/Broadcasting)
-   - TAR (Treasury)
+   Agency Supplements: FAR, DFARS, AFFARS, NMCARS, HSAR, DOSAR, GSAM, VAAR,
+   DEAR, NFS, AIDAR, CAR, DIAR, DOLAR, EDAR, EPAAR, FEHBAR, HHSAR, HUDAR,
+   IAAR, JAR, LIFAR, NRCAR, SOFARS, TAR (26+ recognized)
    Example: FAR 52.212-4, DFARS 252.204-7012
 
-3. SECTION - RFP structural elements (UCF Sections A-M, J attachments)
+4. REGULATORY_REFERENCE - Incorporated regulations, standards, and directives
+   Content signals: "IAW", "in accordance with", "per", "as defined in"
+   Patterns: DAFI ##-###, AR ###-##, MIL-STD-###, NIST SP ###-###, AFI ##-###
+   Distinction: REGULATORY_REFERENCE = external regulation/directive cited by 
+   authority; DOCUMENT = RFP attachments and exhibits; CLAUSE = FAR/DFARS entries
+   Example: "DAFI 21-101", "NIST SP 800-171", "AR 735-5", "MIL-STD-882E"
+
+─── DOCUMENT STRUCTURE ───
+
+5. SECTION - RFP structural elements (UCF Sections A-M, J attachments)
    Content signals: Section labels, numbered headers, UCF structure
    Extract BOTH structural label AND semantic type
    Example: Section C Statement of Work, Section M Evaluation Factors
 
-4. DOCUMENT - Referenced documents, standards, attachments
-   Patterns: MIL-STD-###, ISO ####, Attachment #, J-######
+6. DOCUMENT - RFP attachments, exhibits, annexes, plans, manuals
+   Patterns: Attachment #, J-######, Exhibit #, Annex #
    Content signals: "Attachment", "Annex", "Exhibit", "incorporated by reference"
-   Example: MIL-STD-882E, ISO 9001, J-0200000-18 Performance Work Statement
+   Distinction: DOCUMENT = RFP-attached or RFP-referenced documents;
+   REGULATORY_REFERENCE = external authoritative standards/directives
+   Example: Attachment J-3 Quality Assurance Plan, ISO 9001 Certificate
 
-5. DELIVERABLE - CDRLs and contract deliverables
+7. DELIVERABLE - CDRLs and contract deliverables
    Patterns: CDRL A###, DD Form 1423 references
    Content signals: "CDRL", "Data Item", "shall submit", "shall deliver"
    Example: CDRL A001 Monthly Status Report
 
-6. EVALUATION_FACTOR - Section M scoring criteria
+─── EVALUATION & PROPOSAL ───
+
+8. EVALUATION_FACTOR - Section M top-level scoring criteria
    Required metadata: weight, importance, subfactors
    Content signals: "will be evaluated", "most important", "adjectival rating"
    Must Extract: Weight (40%, 25pts), Importance (Most Important), Subfactors
+   Distinction: EVALUATION_FACTOR = top-level factors; SUBFACTOR = child criteria
    Example: Factor 1 Technical Approach (40%) - Most Important
 
-7. SUBMISSION_INSTRUCTION - Section L proposal requirements
-   Required metadata: page_limit, format_reqs, volume
-   Content signals: "page limit", "font size", "shall not exceed", "volume"
-   Must Extract: Page limits, formatting (font/margins), volume organization
-   Example: Technical Volume limited to 25 pages, 12pt Times New Roman
+9. SUBFACTOR - Evaluation subfactor hierarchy (children of evaluation_factor)
+   Content signals: Numbered child criteria (1.1, 1.2), "subfactor", "sub-element"
+   Must Extract: Subfactor number, parent factor, weight if stated
+   Distinction: SUBFACTOR = child of evaluation_factor with own identifier/weight
+   Example: "Subfactor 1.2 Staffing Approach (15%)", "Element B.2 Integration"
 
-8. STATEMENT_OF_WORK - SOW/PWS/SOO task descriptions
-   Content signals: Task descriptions, performance objectives, work scope
-   Three semantic equivalents:
-   - SOW (Statement of Work): Prescriptive, HOW to perform work
-   - PWS (Performance Work Statement): Performance-based, WHAT outcomes required
-   - SOO (Statement of Objectives): Objective-based, WHY / objectives
-   Example: Task 3.2 Network Operations Support
+10. SUBMISSION_INSTRUCTION - Section L proposal requirements
+    Required metadata: page_limit, format_reqs, volume
+    Content signals: "page limit", "font size", "shall not exceed", "volume"
+    Must Extract: Page limits, formatting (font/margins), volume organization
+    Example: Technical Volume limited to 25 pages, 12pt Times New Roman
 
-9. PERFORMANCE_METRIC - KPIs, QASP standards, SLAs
-   Required metadata: threshold, measurement_method
-   Content signals: "Performance Objective", "AQL", "QASP", numerical standards
-   Example: 99.9% system uptime, Zero (0) security violations
+─── WORK SCOPE ───
 
-10. STRATEGIC_THEME - Win themes, hot buttons, discriminators
+11. STATEMENT_OF_WORK - SOW/PWS/SOO task descriptions
+    Content signals: Task descriptions, performance objectives, work scope
+    Three semantic equivalents:
+    - SOW (Statement of Work): Prescriptive, HOW to perform work
+    - PWS (Performance Work Statement): Performance-based, WHAT outcomes required
+    - SOO (Statement of Objectives): Objective-based, WHY / objectives
+    Example: Task 3.2 Network Operations Support
+
+12. PERFORMANCE_METRIC - KPIs, surveillance methods, inspection standards
+    Required metadata: threshold, measurement_method
+    Content signals: "Performance Objective", "AQL", numerical standards
+    Distinction: PERFORMANCE_METRIC = how work quality is inspected/measured
+    Example: 99.9% system uptime, Zero (0) security violations
+
+13. PERFORMANCE_STANDARD - QASP standards, SLAs, acceptance criteria
+    Content signals: "QASP", "Service Level Agreement", "acceptable quality level"
+    Must Extract: Standard name, target value, measurement frequency, consequence
+    Distinction: PERFORMANCE_STANDARD = contractual pass/fail threshold with 
+    consequences; PERFORMANCE_METRIC = individual measurement point
+    Example: "QASP Standard 3: 98% aircraft availability measured monthly"
+
+─── WORKLOAD & LABOR ───
+
+14. WORKLOAD_METRIC - Quantitative BOE drivers (volumes, counts, frequencies)
+    Content signals: Numbers + unit of measure + time period
+    Must Extract: Quantity, unit, period, location (if stated)
+    Distinction: WORKLOAD_METRIC = quantitative data that drives staffing/cost;
+    REQUIREMENT = obligation statement; CONCEPT = abstract process
+    Example: "12,500 sorties/year", "1,600 customers daily", "100 events/year"
+
+15. LABOR_CATEGORY - Named labor classifications and workforce roles
+    Content signals: Labor mix tables, position titles, skill levels, labor hours
+    Must Extract: Position title, skill level (if stated), clearance (if stated)
+    Distinction: Extract ONLY when explicitly named in RFP (labor mix tables, 
+    Section H key personnel, J-attachment labor categories). Do NOT infer labor 
+    categories from workload data — that is the estimator's job.
+    When NOT present: If RFP provides only workload drivers without naming labor 
+    categories, extract as WORKLOAD_METRIC instead. Not all RFPs specify labor cats.
+    Example: "Program Manager", "Systems Engineer Level III", "Help Desk Analyst"
+
+─── INTELLIGENCE & STRATEGY ───
+
+16. STRATEGIC_THEME - Win themes, hot buttons, discriminators
     Required metadata: theme_type
     Theme types: CUSTOMER_HOT_BUTTON, DISCRIMINATOR, PROOF_POINT, WIN_THEME
     Example: Mission Readiness Priority (CUSTOMER_HOT_BUTTON)
 
-11. ORGANIZATION - Agencies, military units, contractors
+─── STANDARD ENTITIES ───
+
+17. ORGANIZATION - Agencies, military units, contractors
     Content signals: Company names, agency names, military designations
     Patterns: "Inc.", "LLC", "Corp.", acronyms (NAVAIR, GSA)
     Example: Naval Air Systems Command, Marine Corps Logistics Command
 
-12. PROGRAM - Government programs and initiatives
+18. PROGRAM - Government programs and initiatives
     Content signals: Program names, major acquisition titles, acronyms
     Distinction: PROGRAM = services/initiatives; EQUIPMENT = physical items
     Example: MCPP II, Navy MBOS, F-35 Lightning II Program
 
-13. EQUIPMENT - Physical hardware, vehicles, machinery
+19. EQUIPMENT - Physical hardware, vehicles, machinery
     Patterns: Model numbers (M1A1, RG-24), NSN numbers, TAMCN codes
     Content signals: Physical descriptions, quantities, specifications
     Distinction: EQUIPMENT = physical item; TECHNOLOGY = software/system
     Example: Concorde RG-24 Battery, 6200 Tennant Floor Scrubber
 
-14. TECHNOLOGY - Software, systems, platforms
+20. TECHNOLOGY - Software, systems, platforms
     Content signals: Version numbers, software names, system names
     Patterns: "Windows Server 2022", "Python 3.11", "AWS GovCloud"
     Distinction: TECHNOLOGY = software/logical; EQUIPMENT = hardware/physical
     Example: AWS GovCloud, ServiceNow, GCSS-MC
 
-15. CONCEPT - Abstract ideas, processes, CLINs, budget items
-    Use when no other type fits
-    Content signals: Abstract nouns, process names, CLIN/SLIN numbers
-    Fallback for: Plans (→document), Tables (→concept), Processes (→concept)
-    Example: CLIN 0001 Base Year, Change Control Process
-
-16. LOCATION - Performance locations, facilities, bases
+21. LOCATION - Performance locations, facilities, bases
     Content signals: Base names, building numbers, geographic areas
     Patterns: "Building ###", "NAS [Name]", "CONUS/OCONUS"
     Example: Naval Air Station Pensacola, Building 2959
 
-17. EVENT - Milestones, deadlines, scheduled activities
+22. EVENT - Milestones, deadlines, scheduled activities
     Content signals: Dates, deadlines, scheduled activities
     Distinction: EVENT = scheduled/time-bound; CONCEPT = process/methodology
     Example: Kickoff Meeting, Contract Award Date
 
-18. PERSON - Key personnel, POCs, roles
+23. PERSON - Key personnel, POCs, roles
     Content signals: Names, titles, roles, contact information
     Example: Contracting Officer, Program Manager
 
-STRICTLY FORBIDDEN entity types (NEVER USE):
-❌ other, UNKNOWN, process, table, image, plan, policy, standard, instruction, system, regulation, framework, objective, methodology, approach, strategy, model
+24. CONCEPT - Residual category for abstract ideas and processes
+    Use ONLY when no other type fits. Check all 23 types above first.
+    Content signals: Abstract nouns, process descriptions, methodologies
+    NOT for: CLINs (→ contract_line_item), workload numbers (→ workload_metric),
+    regulations (→ regulatory_reference), labor roles (→ labor_category),
+    QASP entries (→ performance_standard), subfactors (→ subfactor)
+    Example: Change Control Process, Risk Management Methodology
 
-FALLBACK MAPPING:
-- Plans/Policies/Standards/Manuals → document
+─── DISAMBIGUATION RULES ───
+
+When content is ambiguous, apply these rules:
+
+REQUIREMENT vs WORKLOAD_METRIC:
+  "Contractor shall process repairs" → requirement (obligation)
+  "500 repairs/month" → workload_metric (quantitative driver)
+  Both often appear together — extract BOTH and link with QUANTIFIES
+
+REQUIREMENT vs PERFORMANCE_STANDARD:
+  "Contractor shall maintain aircraft" → requirement (what to do)
+  "98% aircraft availability measured monthly" → performance_standard (pass/fail)
+  Extract BOTH, link: performance_standard --MEASURES--> requirement
+
+PERFORMANCE_METRIC vs PERFORMANCE_STANDARD:
+  "99.9% uptime" (individual KPI) → performance_metric
+  "QASP Standard 3: 99.9% uptime, monthly, deduction if missed" → performance_standard
+  Standard = named contractual threshold with consequences; metric = measurement point
+
+EVALUATION_FACTOR vs SUBFACTOR:
+  "Factor 1 Technical Approach" (top-level) → evaluation_factor
+  "Subfactor 1.2 Staffing Approach" (child) → subfactor
+  Link: subfactor --CHILD_OF--> evaluation_factor
+
+DOCUMENT vs REGULATORY_REFERENCE:
+  "Attachment J-3 QA Plan" (attached to RFP) → document
+  "DAFI 21-101" (external regulation cited) → regulatory_reference
+  "MIL-STD-882E" (external standard cited) → regulatory_reference
+  Rule: If it's attached/exhibited in the RFP → document. If cited by authority → regulatory_reference.
+
+CONTRACT_LINE_ITEM vs DELIVERABLE:
+  "CLIN 0001 Base Year Operations" → contract_line_item (priced line)
+  "CDRL A001 Monthly Status Report" → deliverable (work product)
+  CLINs are pricing structures; deliverables are work products
+
+LABOR_CATEGORY vs WORKLOAD_METRIC:
+  "Program Manager" (named role) → labor_category
+  "2,400 labor hours/month" (workload volume) → workload_metric
+  If RFP names specific positions → labor_category. If only quantities → workload_metric.
+
+STRICTLY FORBIDDEN entity types (NEVER USE):
+❌ other, UNKNOWN, process, table, image, plan, policy, standard, instruction,
+   system, regulation, framework, objective, methodology, approach, strategy, model
+
+FALLBACK MAPPING (when LLM generates forbidden types):
+- Plans/Policies/Manuals → document
 - Systems/Tools/Software/Platforms → technology
-- Tables/Lists/Schedules → concept
+- Tables/Lists/Schedules → document (if data table) or concept (if abstract)
 - Processes/Workflows → concept
-- Abstract ideas → concept
+- MIL-STD/DAFI/AR/NIST references → regulatory_reference
+- CLINs/SLINs/Line Items → contract_line_item
+- QASP/SLA entries → performance_standard
+- Numbered volumes/quantities/rates → workload_metric
 
 Example Classifications (follow these patterns):
+- "CLIN 0001 Base Year" → contract_line_item (NOT "concept")
+- "SLIN 0002AA Option Year 1" → contract_line_item (NOT "concept")
+- "12,500 sorties/year" → workload_metric (NOT "concept")
+- "1,600 customers daily" → workload_metric (NOT "concept")
+- "100 events per year" → workload_metric (NOT "concept")
+- "Program Manager" (in labor table) → labor_category (NOT "person")
+- "Systems Engineer Level III" → labor_category (NOT "person")
+- "QASP Standard 3 Aircraft Availability" → performance_standard (NOT "performance_metric")
+- "Subfactor 1.2 Staffing Approach" → subfactor (NOT "evaluation_factor")
+- "DAFI 21-101" → regulatory_reference (NOT "document")
+- "NIST SP 800-171" → regulatory_reference (NOT "document")
+- "MIL-STD-882E" → regulatory_reference (NOT "document")
 - "Safety Plan" → document (NOT "plan")
 - "Quality Assurance Plan" → document (NOT "plan")
-- "MIL-STD-882E" → document (NOT "standard")
 - "WAWF System" → technology (NOT "system")
 - "RFID System" → technology (NOT "system")
-- "Table 1: Deliverables Schedule" → concept (NOT "table")
 - "Change Control Process" → concept (NOT "process")
-- "Shipley Methodology" → concept (NOT "methodology")
 - "MCPP Program" → program (named initiative)
 - "M1A1 Tank" → equipment (physical asset)
-- "Generator Set" → equipment (physical asset)
 
 ================================================================================
 PART E: UNIFORM CONTRACT FORMAT (UCF) REFERENCE
@@ -661,7 +758,7 @@ Section A - Solicitation/Contract Form
   Content signals: SF 1449, cover page, solicitation number, POCs, Q&A deadline
 
 Section B - Supplies/Services & Prices
-  Entity types: section, concept, program
+  Entity types: section, contract_line_item, program
   Content signals: CLIN/SLIN structure, pricing tables, line items, unit prices
 
 Section C - Statement of Work
@@ -786,6 +883,7 @@ RELATED_TO - Semantic similarity, shared topics
 SUPPORTS - One entity enables/supports another
 DEFINES - One entity defines/explains another
 MEASURED_BY - Requirement is measured by Performance Metric
+MEASURES - Performance standard measures a requirement
 HAS_EQUIPMENT - Location has equipment
 APPLIES_TO - Requirement applies to equipment
 TRACKED_BY - Deliverable tracked by CDRL
@@ -795,7 +893,11 @@ COORDINATED_WITH - Activity coordinated with organization
 REPORTED_TO - Documentation reported to organization
 SATISFIED_BY - Requirement satisfied by deliverable or capability
 HAS_SUBFACTOR - Evaluation factor has subfactor (Factor 1 → Subfactor 1.1)
-QUANTIFIES - Workload data quantifies a service requirement
+QUANTIFIES - Workload metric quantifies a service requirement
+FUNDS - Contract line item funds a requirement or deliverable
+MANDATES - Regulatory reference mandates a requirement
+STAFFED_BY - Requirement or SOW task staffed by labor category
+PRICED_UNDER - Deliverable or requirement priced under contract line item
 
 F.2 Section L ↔ Section M Mapping (The "Golden Thread")
 --------------------------------------------------------
@@ -1177,9 +1279,9 @@ A: requirement (special requirement from Section H)
 
 Q: "Exhibit A - Pricing Schedule" - DOCUMENT or something else?
 A: DOCUMENT (pricing attachment)
-   - Extract individual prices/CLINs as CONCEPT entities if detailed
+   - Extract individual CLINs/SLINs as CONTRACT_LINE_ITEM entities
    - Link to Section B (Supplies/Prices) with ATTACHMENT_OF relationship
-   Why: Pricing exhibits are documents containing structured data
+   Why: Pricing exhibits are documents containing structured line items
 
 Q: Text references "MIL-STD-882E" but document not attached?
 A: DOCUMENT (referenced standard)
@@ -1303,11 +1405,13 @@ COMMON RELATIONSHIP KEYWORDS (use these - no commas within keywords):
 VALID ENTITY TYPES (use EXACTLY these - lowercase with underscores):
 requirement, clause, section, document, deliverable, evaluation_factor, 
 submission_instruction, statement_of_work, performance_metric, strategic_theme, 
-organization, program, equipment, technology, concept, location, event, person
+organization, program, equipment, technology, concept, location, event, person,
+contract_line_item, workload_metric, labor_category, subfactor, 
+regulatory_reference, performance_standard
 
 CRITICAL OUTPUT RULES:
 1. entity_name: Use Title Case for proper nouns, preserve exact citations for clauses
-2. entity_type: MUST be EXACTLY one of the 18 valid types listed above (no variations!)
+2. entity_type: MUST be EXACTLY one of the 24 valid types listed above (no variations!)
 3. entity_description: Comprehensive description with ALL metadata embedded
 4. For requirements: Include criticality, modal verb, and workload drivers in description
 5. For evaluation factors: Include weight, importance, and subfactors in description
@@ -1408,8 +1512,8 @@ entity{tuple_delimiter}F.2.3.1 Bar Service Configuration{tuple_delimiter}require
 entity{tuple_delimiter}F.2.3.1 Resale Supply Verification{tuple_delimiter}requirement{tuple_delimiter}The Contractor shall verify all resale supplies necessary to ensure items are properly stocked at all times. The Contractor shall notify the Government when resale supply levels are low, and items need to be ordered. Criticality: MANDATORY. Modal verb: shall.
 entity{tuple_delimiter}F.2.3.1 Retail Service Rate Standard{tuple_delimiter}requirement{tuple_delimiter}Contractor personnel shall provide retail services at minimum rates of one (1) customer per minute during normal operations and three (3) customers per minute during peak times (0500-0700, 1100-1300, 1900-2100, 2300-0100) or during special events (e.g., concerts, 4-drink nights, community events, all calls, promotions, wing ceremonies, etc.). Criticality: MANDATORY. Modal verb: shall. Service rates: 1 customer/minute (normal), 3 customers/minute (peak). Peak times: 0500-0700, 1100-1300, 1900-2100, 2300-0100.
 entity{tuple_delimiter}F.2.3.1 Outside Bar Special Events Support{tuple_delimiter}requirement{tuple_delimiter}The Contractor shall open the outside bar for special events as requested by the COR. The Government will send requests to open the outside bar for special events in writing a minimum of seven (7) calendar days prior to the event. This is estimated to occur 100 times per year. Criticality: MANDATORY. Modal verb: shall. Frequency: estimated 100 times per year. Lead time: 7 calendar days advance notice.
-entity{tuple_delimiter}Peak Service Hours{tuple_delimiter}concept{tuple_delimiter}Peak times (0500-0700, 1100-1300, 1900-2100, 2300-0100) or during special events (e.g., concerts, 4-drink nights, community events, all calls, promotions, wing ceremonies, etc.). Service rate increases to 3 customers per minute during these periods.
-entity{tuple_delimiter}Special Events Frequency{tuple_delimiter}concept{tuple_delimiter}Special events estimated to occur 100 times per year. Key workload driver for outside bar operations and staffing.
+entity{tuple_delimiter}Peak Service Hours{tuple_delimiter}workload_metric{tuple_delimiter}Peak times (0500-0700, 1100-1300, 1900-2100, 2300-0100) or during special events (e.g., concerts, 4-drink nights, community events, all calls, promotions, wing ceremonies, etc.). Service rate increases to 3 customers per minute during these periods. Quantity: 3 customers/minute. Period: peak hours (4 windows daily).
+entity{tuple_delimiter}Special Events Frequency{tuple_delimiter}workload_metric{tuple_delimiter}Special events estimated to occur 100 times per year. Key workload driver for outside bar operations and staffing. Quantity: 100. Unit: events. Period: per year.
 relation{tuple_delimiter}F.2.3.1 Retail Service Rate Standard{tuple_delimiter}Peak Service Hours{tuple_delimiter}REFERENCES{tuple_delimiter}Service rate requirement references peak service hours
 relation{tuple_delimiter}F.2.3.1 Outside Bar Special Events Support{tuple_delimiter}Special Events Frequency{tuple_delimiter}REFERENCES{tuple_delimiter}Outside bar support requirement references event frequency
 relation{tuple_delimiter}F.2.3.1 Bar Service Configuration{tuple_delimiter}F.2.3.1 C.A.C. Customer Service Counter and Indoor Bar{tuple_delimiter}CHILD_OF{tuple_delimiter}Bar configuration is part of C.A.C. requirement
@@ -1579,7 +1683,7 @@ Before finalizing extraction, validate:
 
 7. REQUIRED FIELD VALIDATION:
    - entity_name: Present and descriptive (not generic)
-   - entity_type: Valid type from 18-type ontology
+   - entity_type: Valid type from 24-type ontology
    - Type-specific metadata: Appropriate fields for entity type
 
 8. FORMAT VALIDATION:

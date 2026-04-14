@@ -16,7 +16,9 @@ EntityType = Literal[
     "organization", "concept", "event", "technology", "person", "location",
     "requirement", "clause", "section", "document", "deliverable",
     "evaluation_factor", "submission_instruction", "program", "equipment",
-    "strategic_theme", "statement_of_work", "performance_metric"
+    "strategic_theme", "statement_of_work", "performance_metric",
+    "contract_line_item", "workload_metric", "labor_category",
+    "subfactor", "regulatory_reference", "performance_standard"
 ]
 
 # Set for fast validation lookups (Branch 040 pattern)
@@ -24,7 +26,9 @@ VALID_ENTITY_TYPES = {
     "organization", "concept", "event", "technology", "person", "location",
     "requirement", "clause", "section", "document", "deliverable",
     "evaluation_factor", "submission_instruction", "program", "equipment",
-    "strategic_theme", "statement_of_work", "performance_metric"
+    "strategic_theme", "statement_of_work", "performance_metric",
+    "contract_line_item", "workload_metric", "labor_category",
+    "subfactor", "regulatory_reference", "performance_standard"
 }
 
 
