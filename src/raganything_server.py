@@ -106,7 +106,6 @@ async def main():
     # Add our custom endpoints with RAG-Anything multimodal processing + semantic inference
     create_insert_endpoint(app, rag_instance)
     create_documents_upload_endpoint(app, rag_instance)
-    
     logger.info("✅ Custom endpoints registered: /insert, /documents/upload")
     logger.info("✅ Use LightRAG's native /query/data endpoint for structured data retrieval (agent workflows)")
     

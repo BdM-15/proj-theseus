@@ -260,7 +260,7 @@ RULES: Return ONLY the JSON object.\
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# QUERY-TIME VLM PROMPTS (used by aquery_vlm_enhanced)
+# QUERY-TIME VLM PROMPTS
 # ═══════════════════════════════════════════════════════════════════════════════
 
 QUERY_TABLE_ANALYST_SYSTEM = (
@@ -326,7 +326,7 @@ GOVCON_MULTIMODAL_PROMPTS: dict = {
     "vision_prompt_with_context": VISION_PROMPT_WITH_CONTEXT,
     "equation_prompt": EQUATION_PROMPT,
     "equation_prompt_with_context": EQUATION_PROMPT_WITH_CONTEXT,
-    # Query-time VLM prompts (used by aquery_vlm_enhanced)
+    # Query-time VLM prompts
     "QUERY_TABLE_ANALYST_SYSTEM": QUERY_TABLE_ANALYST_SYSTEM,
     "QUERY_TABLE_ANALYSIS": QUERY_TABLE_ANALYSIS,
     "QUERY_IMAGE_ANALYST_SYSTEM": QUERY_IMAGE_ANALYST_SYSTEM,
