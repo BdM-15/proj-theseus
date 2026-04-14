@@ -3,29 +3,17 @@ LLM Client Utilities - Centralized async LLM wrapper for xAI Grok
 =================================================================
 
 Single source of truth for all LLM calls in the system.
-Based on Branch 040 pattern but adapted for current architecture.
-
-Key Features:
-- Environment variable configuration (no hardcoding)
-- Async support with optional batching
-- JSON mode for structured outputs
-- Instructor integration for Pydantic-enforced responses (post-processing)
-- Consistent error handling
+Uses RAG-Anything's resilience infrastructure (@async_retry, CircuitBreaker)
+for automatic retry with exponential backoff and cascade failure prevention.
 
 Usage:
     from src.utils.llm_client import call_llm_async, call_llm_batch, call_llm_structured
     
-    # Simple text response
     response = await call_llm_async("What is 2+2?")
-    
-    # Batch processing with parallelization
     responses = await call_llm_batch(prompts, max_concurrent=8)
-    
-    # Pydantic-enforced structured output (uses Instructor)
     result = await call_llm_structured(prompt, MyPydanticModel, max_retries=3)
 """
 
-import os
 import asyncio
 import logging
 
@@ -35,15 +23,34 @@ from typing import Optional, List, Dict, Any, Type, TypeVar
 import instructor
 from openai import AsyncOpenAI
 from pydantic import BaseModel
+from raganything.resilience import async_retry, CircuitBreaker
 
 from src.core import get_settings
 
 logger = logging.getLogger(__name__)
 
-# Type variable for Pydantic model generic
 T = TypeVar('T', bound=BaseModel)
 
+# Shared circuit breaker for xAI API endpoint
+_xai_breaker = CircuitBreaker(failure_threshold=5, reset_timeout=60.0, name="xai-grok")
 
+# Lazy-initialized shared client (created on first use)
+_shared_client: Optional[AsyncOpenAI] = None
+
+
+def _get_client() -> AsyncOpenAI:
+    """Get or create the shared AsyncOpenAI client."""
+    global _shared_client
+    if _shared_client is None:
+        settings = get_settings()
+        _shared_client = AsyncOpenAI(
+            api_key=settings.llm_api_key,
+            base_url=settings.llm_host
+        )
+    return _shared_client
+
+
+@async_retry(max_attempts=3, base_delay=1.0, max_delay=30.0)
 async def call_llm_async(
     prompt: str,
     system_prompt: Optional[str] = None,
@@ -53,18 +60,13 @@ async def call_llm_async(
     json_mode: bool = False
 ) -> str:
     """
-    Call xAI Grok LLM asynchronously.
-    
-    Uses environment variables for configuration (Branch 040 pattern):
-    - LLM_BINDING_API_KEY: API key
-    - LLM_BINDING_HOST: API endpoint (default: https://api.x.ai/v1)
-    - REASONING_LLM_NAME: Model name for inference tasks (default: grok-4-1-fast-reasoning)
+    Call xAI Grok LLM asynchronously with automatic retry and circuit breaker.
     
     Args:
         prompt: User prompt text
-        system_prompt: Optional system prompt (instructions)
-        model: LLM model name (default: from LLM_MODEL env var)
-        temperature: Sampling temperature 0.0-2.0 (default: 0.1 for deterministic)
+        system_prompt: Optional system prompt
+        model: LLM model name (default: REASONING_LLM_NAME)
+        temperature: Sampling temperature (default: 0.1)
         max_tokens: Maximum tokens in response
         json_mode: Force JSON output mode
     
@@ -73,23 +75,16 @@ async def call_llm_async(
     """
     settings = get_settings()
     if model is None:
-        # Default to reasoning model for inference/post-processing tasks (grok-4-1 series)
         model = settings.reasoning_llm_name
     
-    # Create AsyncOpenAI client with xAI endpoint
-    client = AsyncOpenAI(
-        api_key=settings.llm_api_key,
-        base_url=settings.llm_host
-    )
+    client = _get_client()
     
-    # Build messages array
     messages = []
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})
     messages.append({"role": "user", "content": prompt})
     
-    # Build API call kwargs
-    call_kwargs = {
+    call_kwargs: dict[str, Any] = {
         "model": model,
         "messages": messages,
         "temperature": temperature
@@ -101,11 +96,14 @@ async def call_llm_async(
     if json_mode:
         call_kwargs["response_format"] = {"type": "json_object"}
     
+    # Circuit breaker wraps the actual API call
+    _xai_breaker._acquire_permission()
     try:
         response = await client.chat.completions.create(**call_kwargs)
+        _xai_breaker.record_success()
         return response.choices[0].message.content
     except Exception as e:
-        logger.error(f"LLM API call failed: {e}")
+        _xai_breaker.record_failure()
         raise LLMError(f"LLM API call failed", cause=e, model=model)
 
 
@@ -175,28 +173,8 @@ async def call_llm_structured(
     """
     Call LLM with Pydantic schema enforcement using Instructor library.
     
-    Uses Instructor's MD_JSON mode which:
-    - Automatically strips markdown code blocks (```json...```)
-    - Enforces Pydantic schema at API level (not post-validation)
-    - Provides error feedback to LLM for self-correction on retry
-    
-    This is the RECOMMENDED approach for post-processing tasks that need
-    structured JSON output (workload enrichment, relationship inference, etc.)
-    
-    Args:
-        prompt: User prompt text
-        response_model: Pydantic model class to enforce (e.g., WorkloadEnrichmentResponse)
-        system_prompt: Optional system prompt
-        model: LLM model name (default: REASONING_LLM_NAME for post-processing)
-        temperature: Sampling temperature (default: 0.1 for deterministic)
-        max_tokens: Maximum output tokens (default: LLM_MAX_OUTPUT_TOKENS)
-        max_retries: Number of retries with error feedback (default: 3)
-    
-    Returns:
-        Validated Pydantic model instance
-    
-    Raises:
-        Exception: If all retries fail
+    Uses Instructor's MD_JSON mode for automatic JSON extraction + Pydantic validation.
+    Instructor handles retries with error feedback internally.
     """
     settings = get_settings()
     if model is None:
@@ -205,29 +183,20 @@ async def call_llm_structured(
     if max_tokens is None:
         max_tokens = settings.llm_max_output_tokens
     
-    # Create OpenAI client wrapped with Instructor
-    openai_client = AsyncOpenAI(
-        api_key=settings.llm_api_key,
-        base_url=settings.llm_host
-    )
+    client = instructor.from_openai(_get_client(), mode=instructor.Mode.MD_JSON)
     
-    # MD_JSON mode: automatically extracts JSON from markdown code blocks
-    client = instructor.from_openai(openai_client, mode=instructor.Mode.MD_JSON)
-    
-    # Build messages
     messages = []
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})
     messages.append({"role": "user", "content": prompt})
     
-    # Use Instructor with built-in retry and error feedback
     result = await client.chat.completions.create(
         model=model,
         response_model=response_model,
         messages=messages,
         temperature=temperature,
         max_tokens=max_tokens,
-        max_retries=max_retries,  # Instructor handles retries with error feedback
+        max_retries=max_retries,
     )
     
     return result

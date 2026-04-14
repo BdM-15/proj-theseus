@@ -22,10 +22,6 @@ from lightrag.llm.openai import openai_complete_if_cache, openai_embed
 from lightrag.utils import EmbeddingFunc
 from raganything import RAGAnything, RAGAnythingConfig
 
-# Apply MinerU 3.0 compatibility patch (removes -d and --source CLI flags)
-from tools.patches.raganything_mineru3_compat import apply_patch as _apply_mineru3_patch
-_apply_mineru3_patch()
-
 # V3 unified prompt loaded directly from file - no prompt_loader needed
 from src.ontology.schema import VALID_ENTITY_TYPES
 from src.core import get_settings
@@ -180,7 +176,12 @@ async def initialize_raganything():
             model = extraction_model
         else:
             model = reasoning_model
-        
+
+        # Ensure max_tokens is always set — without it the API falls back to the model's
+        # conservative default (~4K for grok-4-1-fast-non-reasoning), which truncates
+        # large PWS chunks mid-output, resulting in 0 relationships extracted.
+        kwargs.setdefault('max_tokens', settings.llm_max_output_tokens)
+
         return await openai_complete_if_cache(
             model,
             prompt,
@@ -216,6 +217,7 @@ async def initialize_raganything():
     #       so it uses the extraction model for literal format compliance
     async def vision_model_func(prompt, system_prompt=None, history_messages=[], image_data=None, messages=None, **kwargs):
         if messages:
+            kwargs.setdefault('max_tokens', settings.llm_max_output_tokens)
             return await openai_complete_if_cache(
                 extraction_model, "", system_prompt=None, history_messages=[],
                 messages=messages, api_key=xai_api_key, base_url=xai_base_url, **kwargs
@@ -232,6 +234,7 @@ async def initialize_raganything():
             ]
             if system_prompt:
                 messages.insert(0, {"role": "system", "content": system_prompt})
+            kwargs.setdefault('max_tokens', settings.llm_max_output_tokens)
             return await openai_complete_if_cache(
                 extraction_model, "", system_prompt=None, history_messages=[],
                 messages=messages,
@@ -241,43 +244,25 @@ async def initialize_raganything():
             # Use base function (which auto-routes based on task)
             return await base_llm_model_func(prompt, system_prompt, history_messages, **kwargs)
     
-    # Define embedding function with safety truncation (chunks can slightly exceed 8192 embedding limit)
-    async def safe_embed_func(texts):
-        """Truncate texts to 8192 tokens before embedding to handle edge cases"""
-        import tiktoken
-        enc = tiktoken.get_encoding("cl100k_base")  # OpenAI tokenizer
-        
-        truncated_texts = []
-        for text in texts:
-            tokens = enc.encode(text)
-            if len(tokens) > 8192:
-                # Truncate to 8192 tokens and decode back to text
-                truncated_tokens = tokens[:8192]
-                truncated_text = enc.decode(truncated_tokens)
-                truncated_texts.append(truncated_text)
-            else:
-                truncated_texts.append(text)
-        
-        # IMPORTANT: lightrag's `openai_embed` symbol is wrapped with default attrs
-        # (embedding_dim=1536 for text-embedding-3-small). When our `.env` uses
-        # `text-embedding-3-large` (3072 dims) and dimensions are not explicitly sent,
-        # the wrapper can mis-validate and raise a "Vector count mismatch".
-        #
-        # Use the unwrapped function (`openai_embed.func`) to avoid that mismatch.
-        embed_impl = getattr(openai_embed, "func", openai_embed)
-        return await embed_impl(
-            truncated_texts,
-            model=settings.embedding_model,
-            api_key=openai_api_key,
-        )
-    
-    # Get embedding dimension from centralized settings
+    # Embedding function: use LightRAG's native openai_embed with built-in truncation
+    # LightRAG 1.4.13 openai_embed.func accepts max_token_size for auto-truncation.
+    # Use .func (unwrapped) to avoid @wrap_embedding_func_with_attrs dimension mismatch
+    # when using text-embedding-3-large (3072 dims) vs default text-embedding-3-small (1536).
+    from functools import partial
+    embed_impl = getattr(openai_embed, "func", openai_embed)
+    embed_fn = partial(
+        embed_impl,
+        model=settings.embedding_model,
+        api_key=openai_api_key,
+        max_token_size=8192,
+    )
+
     embedding_dim = settings.embedding_dim
-    
+
     embedding_func = EmbeddingFunc(
         embedding_dim=embedding_dim,
-        max_token_size=8192,  # OpenAI text-embedding-3-large limit
-        func=safe_embed_func,
+        max_token_size=8192,
+        func=embed_fn,
     )
     
     # ═══════════════════════════════════════════════════════════════════════════════
@@ -341,14 +326,23 @@ async def initialize_raganything():
         raise RuntimeError(f"LightRAG initialization failed: {error_msg}")
     
     # ═══════════════════════════════════════════════════════════════════════════════
+    # Register GovConProcessingCallback with RAG-Anything's callback system
+    # ═══════════════════════════════════════════════════════════════════════════════
+    from src.server.routes import get_processing_callback
+    
+    processing_callback = get_processing_callback()
+    processing_callback.set_llm_func(llm_model_func_wrapped)
+    _rag_anything.callback_manager.register(processing_callback)
+    logger.info("✅ GovConProcessingCallback registered with RAG-Anything callback_manager")
+    
+    # ═══════════════════════════════════════════════════════════════════════════════
     # CRITICAL FIX: Extend VDB meta_fields to preserve entity_type and description
     # ═══════════════════════════════════════════════════════════════════════════════
-    # LightRAG's default meta_fields only includes: {entity_name, source_id, content, file_path}
-    # Our GovCon ontology requires entity_type and description for proper filtering and retrieval.
-    # Without this fix, entity_type and description are stripped during VDB storage!
-    # 
-    # Root cause: lightrag.py line 598 hardcodes meta_fields without entity_type/description
-    # Fix: Extend meta_fields AFTER LightRAG initialization but BEFORE document processing
+    # LightRAG 1.4.13 stores entity_type/description in VDB data (operate.py line 1153)
+    # but lightrag.py line 720 meta_fields = {entity_name, source_id, content, file_path}
+    # doesn't include them. nano_vector_db filters on meta_fields during upsert (line 112),
+    # so entity_type/description get stripped without this extension.
+    # TODO: Submit PR upstream to add entity_type/description to default meta_fields.
     # ═══════════════════════════════════════════════════════════════════════════════
     lightrag_instance = _rag_anything.lightrag
     

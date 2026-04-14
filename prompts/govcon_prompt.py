@@ -9,7 +9,7 @@ domain-specific government contracting intelligence for RFP analysis.
 Architecture:
 -------------
 - FULL domain intelligence loaded from govcon_lightrag_native.txt (~35K tokens, 1300+ lines)
-- Contains: 8 user personas, 18 entity types, 50+ relationship rules, 12 examples
+- Contains: 8 user personas, 18 entity types, 50+ relationship rules, 8 examples
 - LightRAG-compatible format with entity/relation tuple output
 
 Philosophy:
@@ -36,7 +36,7 @@ Domain Intelligence Included:
 - Part H: Decision Tree for Ambiguous Cases
 - Part I: Metadata Extraction Requirements
 - Part J: Output Format
-- Part K: 12 Annotated RFP Examples
+- Part K: 8 Annotated RFP Examples
 - Part L: Quality Checks
 
 Version: 2.4.0 (KG Consultation + Reference Enhancement)
@@ -100,7 +100,7 @@ GOVCON_PROMPTS["DEFAULT_COMPLETION_DELIMITER"] = "<|COMPLETE|>"
 # - 50+ quantitative preservation rules
 # - 26+ agency clause supplements (FAR, DFARS, AFFARS, NMCARS, etc.)
 # - 50+ relationship inference patterns
-# - 12 annotated examples (not 7)
+# - 8 annotated examples
 # - Decision trees, metadata requirements, quality checks
 
 def _load_extraction_prompt() -> str:

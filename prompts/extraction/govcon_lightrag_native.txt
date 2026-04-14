@@ -793,6 +793,9 @@ SUBMITTED_TO - Deliverable submitted to organization
 GOVERNED_BY - Requirement governed by policy/document
 COORDINATED_WITH - Activity coordinated with organization
 REPORTED_TO - Documentation reported to organization
+SATISFIED_BY - Requirement satisfied by deliverable or capability
+HAS_SUBFACTOR - Evaluation factor has subfactor (Factor 1 → Subfactor 1.1)
+QUANTIFIES - Workload data quantifies a service requirement
 
 F.2 Section L ↔ Section M Mapping (The "Golden Thread")
 --------------------------------------------------------
@@ -1314,7 +1317,7 @@ CRITICAL OUTPUT RULES:
 9. NEVER combine multiple fields - each field separated by EXACTLY one delimiter
 
 ================================================================================
-PART K: ANNOTATED RFP EXAMPLES (Full Domain Intelligence - 12 Examples)
+PART K: ANNOTATED RFP EXAMPLES (Full Domain Intelligence - 8 Examples)
 ================================================================================
 
 EXAMPLE 1: Section L ↔ Section M Mapping
@@ -1360,31 +1363,7 @@ relation{tuple_delimiter}F.2 CRP 24/7 Support{tuple_delimiter}F.2 Community Recr
 
 ---
 
-EXAMPLE 3: PWS Appendix Structure
-
-Input Text:
-1.1. SCOPE. The Contractor shall provide support as specified in this PWS for an average base population of 1,600 personnel of various categories, to include transient, permanent party, and rotational personnel during the year. During rotational periods, the base population can increase up to 4,000 personnel. This Performance Work Statement (PWS) addresses the following requirements:
-
-1.1.1. Appendix F – Recreational Services
-1.1.2. Appendix G – Lodging Logistics Operations and Linen Support
-1.1.3. Appendix H - Equipment and Appliance Maintenance
-1.1.4. Appendix I – Water Delivery
-
-Output:
-entity{tuple_delimiter}PWS Scope{tuple_delimiter}statement_of_work{tuple_delimiter}1.1. SCOPE. The Contractor shall provide support as specified in this PWS for an average base population of 1,600 personnel of various categories, to include transient, permanent party, and rotational personnel during the year. During rotational periods, the base population can increase up to 4,000 personnel. Workload drivers: 1,600 average population, up to 4,000 during rotations.
-entity{tuple_delimiter}Appendix F Recreational Services{tuple_delimiter}document{tuple_delimiter}Appendix F – Recreational Services. PWS appendix addressing morale, welfare, and recreation requirements.
-entity{tuple_delimiter}Appendix G Lodging Logistics{tuple_delimiter}document{tuple_delimiter}Appendix G – Lodging Logistics Operations and Linen Support. PWS appendix addressing lodging and linen services.
-entity{tuple_delimiter}Appendix H Equipment Maintenance{tuple_delimiter}document{tuple_delimiter}Appendix H - Equipment and Appliance Maintenance. PWS appendix addressing equipment maintenance requirements.
-entity{tuple_delimiter}Appendix I Water Delivery{tuple_delimiter}document{tuple_delimiter}Appendix I – Water Delivery. PWS appendix addressing water delivery services.
-entity{tuple_delimiter}Base Population Workload{tuple_delimiter}concept{tuple_delimiter}Average base population of 1,600 personnel of various categories, to include transient, permanent party, and rotational personnel during the year. During rotational periods, the base population can increase up to 4,000 personnel. Key workload driver for all services.
-relation{tuple_delimiter}Appendix F Recreational Services{tuple_delimiter}PWS Scope{tuple_delimiter}CHILD_OF{tuple_delimiter}Appendix is part of PWS scope
-relation{tuple_delimiter}Appendix G Lodging Logistics{tuple_delimiter}PWS Scope{tuple_delimiter}CHILD_OF{tuple_delimiter}Appendix is part of PWS scope
-relation{tuple_delimiter}Appendix H Equipment Maintenance{tuple_delimiter}PWS Scope{tuple_delimiter}CHILD_OF{tuple_delimiter}Appendix is part of PWS scope
-relation{tuple_delimiter}Appendix I Water Delivery{tuple_delimiter}PWS Scope{tuple_delimiter}CHILD_OF{tuple_delimiter}Appendix is part of PWS scope
-
----
-
-EXAMPLE 4: FAR and DFARS Clauses
+EXAMPLE 3: FAR and DFARS Clauses
 
 Input Text:
 SECTION I - CONTRACT CLAUSES
@@ -1413,25 +1392,7 @@ relation{tuple_delimiter}DFARS 252.225-7001 Buy American{tuple_delimiter}Section
 
 ---
 
-EXAMPLE 5: Deliverables and CDRL Linkage
-
-Input Text:
-PWS Section 3.4: Reporting Requirements
-
-The Contractor shall provide monthly status reports to the Contracting Officer Representative (COR) no later than the 10th calendar day following each month. Reports shall include program metrics, performance issues, and corrective actions.
-
-The Contractor shall maintain all documentation in the Government-provided electronic management system IAW CDRL A001 through CDRL A005.
-
-Output:
-entity{tuple_delimiter}Section 3.4 Monthly Status Reports{tuple_delimiter}deliverable{tuple_delimiter}The Contractor shall provide monthly status reports to the Contracting Officer Representative (COR) no later than the 10th calendar day following each month. Reports shall include program metrics, performance issues, and corrective actions. Criticality: MANDATORY. Modal verb: shall. Due date: NLT 10th calendar day following each month.
-entity{tuple_delimiter}CDRL A001{tuple_delimiter}deliverable{tuple_delimiter}CDRL A001. Part of CDRL A001 through CDRL A005 documentation requirements.
-entity{tuple_delimiter}Contracting Officer Representative{tuple_delimiter}organization{tuple_delimiter}The Contracting Officer Representative (COR). Receives monthly status reports from contractor.
-relation{tuple_delimiter}Section 3.4 Monthly Status Reports{tuple_delimiter}CDRL A001{tuple_delimiter}TRACKED_BY{tuple_delimiter}Report deliverable tracked by CDRL item
-relation{tuple_delimiter}Section 3.4 Monthly Status Reports{tuple_delimiter}Contracting Officer Representative{tuple_delimiter}SUBMITTED_TO{tuple_delimiter}Reports submitted to COR
-
----
-
-EXAMPLE 6: Operational Requirements with Workload Metrics (CRITICAL EXAMPLE)
+EXAMPLE 4: Operational Requirements with Workload Metrics (CRITICAL EXAMPLE)
 
 Input Text:
 F.2.3.1. C.A.C Customer Service Counter and Indoor Bar: The Contractor shall handle resale requirements to include alcohol sales. The Contractor shall service:
@@ -1459,7 +1420,7 @@ relation{tuple_delimiter}F.2.3.1 C.A.C. Customer Service Counter and Indoor Bar{
 
 ---
 
-EXAMPLE 7: Equipment Inventory Tables with Building-Level Data
+EXAMPLE 5: Equipment Inventory Tables with Building-Level Data
 
 Input Text (TABLE + Narrative):
 H.1.4.6. Preventive Maintenance: The Contractor shall ensure machines are maintained according to the manufacturer's recommendations by performing preventive maintenance tasks. The Contractor shall perform weekly operational/electrical checks to ensure all machines operate safely, are clean, and are free of corrosion.
@@ -1504,7 +1465,7 @@ relation{tuple_delimiter}H.1.4.6 Preventive Maintenance Requirement{tuple_delimi
 
 ---
 
-EXAMPLE 8: Special Events and Training Requirements
+EXAMPLE 6: Special Events and Training Requirements
 
 Input Text:
 F.2.4. Special Events: The Contractor shall arrange special events including live bands, shows, Armed Forces Entertainment, game shows, theme nights, and other similar events. Special events may require coordination through the 380 AEW. The COR must be notified of special events at least two (2) weeks prior to each planned event to ensure proper coordination.
@@ -1531,7 +1492,7 @@ relation{tuple_delimiter}F.2.3.2 Alcohol Policy Compliance{tuple_delimiter}F.2.3
 
 ---
 
-EXAMPLE 9: GFP and CDRL Requirements
+EXAMPLE 7: GFP and CDRL Requirements
 
 Input Text:
 Government Furnished Property Reporting – The Contractor shall report GFP to the Contracting Officer within the task order specific time limits and using the current version of Government-furnished forms. [CDRL A016]. The Contractor shall report GFP: within 30 calendar days after the start of the period of performance, not later than 30 calendar days prior to the end of the period of performance, and at a minimum annually. The Contractor shall base reports on physical inventories.
@@ -1552,92 +1513,7 @@ relation{tuple_delimiter}Government Furnished Property Reporting{tuple_delimiter
 
 ---
 
-EXAMPLE 10: Quality Requirements with Performance Standards
-
-Input Text:
-PWS Section 4.2: Quality Control Requirements
-
-The Contractor shall maintain a Quality Control Program (QCP) that ensures all services meet the performance standards specified herein. The QCP shall include deficiency identification, corrective action procedures, and root cause analysis methodology.
-
-The Contractor shall achieve a minimum 95% customer satisfaction rating as measured by quarterly surveys. Response time for emergency work orders shall not exceed 4 hours.
-
-Output:
-entity{tuple_delimiter}Section 4.2 Quality Control Program{tuple_delimiter}requirement{tuple_delimiter}The Contractor shall maintain a Quality Control Program (QCP) that ensures all services meet the performance standards specified herein. Criticality: MANDATORY. Modal verb: shall.
-entity{tuple_delimiter}Section 4.2 Deficiency Identification Procedures{tuple_delimiter}requirement{tuple_delimiter}The QCP shall include deficiency identification, corrective action procedures, and root cause analysis methodology. Criticality: MANDATORY. Modal verb: shall. Components: deficiency identification, corrective action, root cause analysis.
-entity{tuple_delimiter}Customer Satisfaction Rating Standard{tuple_delimiter}performance_metric{tuple_delimiter}The Contractor shall achieve a minimum 95% customer satisfaction rating as measured by quarterly surveys. Threshold: 95% minimum. Measurement: quarterly surveys.
-entity{tuple_delimiter}Emergency Response Time Standard{tuple_delimiter}performance_metric{tuple_delimiter}Response time for emergency work orders shall not exceed 4 hours. Threshold: 4 hours maximum. Applies to: emergency work orders.
-relation{tuple_delimiter}Section 4.2 Deficiency Identification Procedures{tuple_delimiter}Section 4.2 Quality Control Program{tuple_delimiter}CHILD_OF{tuple_delimiter}Deficiency procedures are part of QCP
-relation{tuple_delimiter}Customer Satisfaction Rating Standard{tuple_delimiter}Section 4.2 Quality Control Program{tuple_delimiter}MEASURED_BY{tuple_delimiter}QCP performance measured by customer satisfaction
-
----
-
-EXAMPLE 11: Hierarchical Document Structure (Relationship Example)
-
-Input Text:
-Section C Statement of Work
-Section C.3 Technical Requirements
-Section C.3.2 System Architecture
-Section C.3.2.1 Integration Methodology
-
-Output:
-entity{tuple_delimiter}Section C Statement of Work{tuple_delimiter}section{tuple_delimiter}Section C Statement of Work. Top-level section containing technical requirements.
-entity{tuple_delimiter}Section C.3 Technical Requirements{tuple_delimiter}section{tuple_delimiter}Section C.3 Technical Requirements. Subsection of Section C.
-entity{tuple_delimiter}Section C.3.2 System Architecture{tuple_delimiter}section{tuple_delimiter}Section C.3.2 System Architecture. Subsection of C.3.
-entity{tuple_delimiter}Section C.3.2.1 Integration Methodology{tuple_delimiter}section{tuple_delimiter}Section C.3.2.1 Integration Methodology. Subsection of C.3.2.
-relation{tuple_delimiter}Section C.3 Technical Requirements{tuple_delimiter}Section C Statement of Work{tuple_delimiter}CHILD_OF{tuple_delimiter}Subsection C.3 is hierarchically contained within Section C
-relation{tuple_delimiter}Section C.3.2 System Architecture{tuple_delimiter}Section C.3 Technical Requirements{tuple_delimiter}CHILD_OF{tuple_delimiter}Subsection C.3.2 is hierarchically contained within Section C.3
-relation{tuple_delimiter}Section C.3.2.1 Integration Methodology{tuple_delimiter}Section C.3.2 System Architecture{tuple_delimiter}CHILD_OF{tuple_delimiter}Subsection C.3.2.1 is hierarchically contained within Section C.3.2
-
----
-
-EXAMPLE 12: Fitness Equipment Preventive Maintenance Schedule (TABLE)
-
-Input Text:
-TABLE H.1 PREVENTIVE MAINTENANCE AND REPAIRS SCHEDULES OF FITNESS EQUIPMENT:
-
-GENERAL:
-Task Requirements | Weekly | Monthly | Quarterly | Yearly
-Visually inspect all machines | X | | |
-Clean machine housing | X | | |
-Inspect mechanical parts | X | | |
-Lubricate all moving parts semiannually | | | | 2x Year
-Evaluate repairs/replacement annually | | | X |
-
-TREADMILLS:
-Task Requirements | Weekly | Monthly | Quarterly | Yearly
-Clean bed and frame with damp cloth | X | | |
-Inspect belt alignment | X | | |
-Inspect belt brushings | | X | |
-Lubricate bed | | | X |
-
-STATIONARY CYCLES:
-Task Requirements | Weekly | Monthly | Quarterly | Yearly
-Clean housing with mild cleanser | X | | |
-Clean & lubricate pedals/shaft with 30W oil | | X | |
-Clean and lubricate seat post | | X | |
-Inspect crank bearings | X | | |
-
-Output:
-entity{tuple_delimiter}Table H.1 Fitness Equipment Maintenance Schedule{tuple_delimiter}document{tuple_delimiter}TABLE H.1 PREVENTIVE MAINTENANCE AND REPAIRS SCHEDULES OF FITNESS EQUIPMENT. Defines maintenance frequency by equipment type.
-entity{tuple_delimiter}H.1 General Equipment Weekly Inspection{tuple_delimiter}requirement{tuple_delimiter}Weekly: Visually inspect all machines, Clean machine housing, Inspect mechanical parts. Criticality: MANDATORY. Labor drivers: weekly visual inspection, weekly housing cleaning, weekly mechanical inspection.
-entity{tuple_delimiter}H.1 General Equipment Semiannual Lubrication{tuple_delimiter}requirement{tuple_delimiter}Lubricate all moving parts semiannually (2x per year). Criticality: MANDATORY. Frequency: 2 times per year.
-entity{tuple_delimiter}H.1 Treadmill Preventive Maintenance{tuple_delimiter}requirement{tuple_delimiter}Treadmills: Weekly - clean bed/frame, inspect belt alignment; Monthly - inspect belt brushings; Quarterly - lubricate bed. Criticality: MANDATORY. Labor drivers: weekly bed cleaning, weekly belt alignment check, monthly belt brushing inspection, quarterly bed lubrication.
-entity{tuple_delimiter}H.1 Stationary Cycle Preventive Maintenance{tuple_delimiter}requirement{tuple_delimiter}Stationary Cycles: Weekly - clean housing, inspect crank bearings; Monthly - lubricate pedals/shaft with 30W oil, lubricate seat post. Criticality: MANDATORY. Labor drivers: weekly housing cleaning, weekly crank bearing inspection, monthly pedal lubrication, monthly seat post lubrication.
-entity{tuple_delimiter}Treadmills{tuple_delimiter}equipment{tuple_delimiter}Treadmills requiring weekly cleaning, monthly belt inspection, quarterly lubrication.
-entity{tuple_delimiter}Stationary Cycles{tuple_delimiter}equipment{tuple_delimiter}Stationary Cycles requiring weekly cleaning, monthly lubrication per manufacturer specifications.
-entity{tuple_delimiter}Equipment Lubrication Schedule{tuple_delimiter}concept{tuple_delimiter}Lubricate all moving parts semiannually (2x per year) per manufacturer recommendations. Key maintenance workload driver.
-relation{tuple_delimiter}H.1 Treadmill Preventive Maintenance{tuple_delimiter}Treadmills{tuple_delimiter}APPLIES_TO{tuple_delimiter}Maintenance requirement applies to treadmill equipment
-relation{tuple_delimiter}H.1 Stationary Cycle Preventive Maintenance{tuple_delimiter}Stationary Cycles{tuple_delimiter}APPLIES_TO{tuple_delimiter}Maintenance requirement applies to stationary cycle equipment
-relation{tuple_delimiter}Table H.1 Fitness Equipment Maintenance Schedule{tuple_delimiter}Appendix H Equipment Maintenance{tuple_delimiter}CHILD_OF{tuple_delimiter}Table H.1 is contained within Appendix H
-relation{tuple_delimiter}H.1 General Equipment Weekly Inspection{tuple_delimiter}Appendix H Equipment Maintenance{tuple_delimiter}CHILD_OF{tuple_delimiter}H.1 requirement is contained within Appendix H
-relation{tuple_delimiter}H.1 General Equipment Semiannual Lubrication{tuple_delimiter}Appendix H Equipment Maintenance{tuple_delimiter}CHILD_OF{tuple_delimiter}H.1 requirement is contained within Appendix H
-relation{tuple_delimiter}H.1 Treadmill Preventive Maintenance{tuple_delimiter}Appendix H Equipment Maintenance{tuple_delimiter}CHILD_OF{tuple_delimiter}H.1 requirement is contained within Appendix H
-relation{tuple_delimiter}H.1 Stationary Cycle Preventive Maintenance{tuple_delimiter}Appendix H Equipment Maintenance{tuple_delimiter}CHILD_OF{tuple_delimiter}H.1 requirement is contained within Appendix H
-relation{tuple_delimiter}Table H.1 Fitness Equipment Maintenance Schedule{tuple_delimiter}Appendix H Equipment Maintenance{tuple_delimiter}CHILD_OF{tuple_delimiter}Table is part of Appendix H
-
----
-
-EXAMPLE 13: ANTI-PATTERN - NOT Extracting Forced Relationships
+EXAMPLE 8: ANTI-PATTERN - NOT Extracting Forced Relationships
 
 When entities have NO semantic connection, do NOT create relationships just to connect them.
 
