@@ -18,6 +18,7 @@ import asyncio
 import logging
 import tempfile
 import shutil
+import threading
 from datetime import datetime
 from fastapi import UploadFile, File
 from fastapi.responses import JSONResponse
@@ -53,7 +54,7 @@ class GovConProcessingCallback(ProcessingCallback):
         self.last_completion_time: datetime | None = None
         self.enhancement_pending = False
         self.enhancement_running = False
-        self.lock = asyncio.Lock()
+        self.lock = threading.Lock()
         self._batch_timer: asyncio.TimerHandle | None = None
         self._llm_func = None  # Set during initialization
     
@@ -63,7 +64,7 @@ class GovConProcessingCallback(ProcessingCallback):
     
     async def register_request_start(self, filename: str):
         """Register that an upload request has started (HTTP layer)."""
-        async with self.lock:
+        with self.lock:
             self.pending_uploads.add(filename)
             self.enhancement_pending = True
             self._cancel_batch_timer()
@@ -71,16 +72,16 @@ class GovConProcessingCallback(ProcessingCallback):
 
     async def register_request_end(self, filename: str):
         """Register that an upload request has finished (HTTP layer)."""
-        async with self.lock:
+        with self.lock:
             self.pending_uploads.discard(filename)
             logger.info(f"🏁 Upload request finished: {filename} (pending: {len(self.pending_uploads)})")
 
     # --- RAG-Anything ProcessingCallback overrides ---
     
-    async def on_document_complete(self, file_path: str, doc_id: str = '', 
-                                    duration_seconds: float = 0.0, **kwargs):
-        """Called when a document finishes processing."""
-        async with self.lock:
+    def on_document_complete(self, file_path: str, doc_id: str = '', 
+                              duration_seconds: float = 0.0, **kwargs):
+        """Called when a document finishes processing (sync — called by dispatch)."""
+        with self.lock:
             self.processing_docs.discard(doc_id)
             self.completed_docs.add(doc_id)
             self.last_completion_time = datetime.now()
@@ -88,17 +89,17 @@ class GovConProcessingCallback(ProcessingCallback):
                         f"queue: {len(self.processing_docs)} remaining)")
             self._schedule_batch_check()
 
-    async def on_parse_complete(self, file_path: str, content_blocks: int = 0,
-                                 doc_id: str = '', duration_seconds: float = 0.0, **kwargs):
-        """Called when MinerU parsing completes for a document."""
-        async with self.lock:
+    def on_parse_complete(self, file_path: str, content_blocks: int = 0,
+                           doc_id: str = '', duration_seconds: float = 0.0, **kwargs):
+        """Called when MinerU parsing completes (sync — called by dispatch)."""
+        with self.lock:
             self.processing_docs.add(doc_id)
             logger.info(f"⚙️ Parse complete: {doc_id} ({content_blocks} blocks, {duration_seconds:.1f}s)")
 
-    async def on_document_error(self, file_path: str, error: str = '',
-                                 doc_id: str = '', **kwargs):
-        """Called when document processing fails."""
-        async with self.lock:
+    def on_document_error(self, file_path: str, error: str = '',
+                           doc_id: str = '', **kwargs):
+        """Called when document processing fails (sync — called by dispatch)."""
+        with self.lock:
             self.processing_docs.discard(doc_id)
             self.completed_docs.add(doc_id)  # Count as completed to not block batch
             self.last_completion_time = datetime.now()
@@ -124,7 +125,8 @@ class GovConProcessingCallback(ProcessingCallback):
 
     async def _check_batch_complete(self):
         """Check if batch is complete and trigger enhancement."""
-        async with self.lock:
+        settings = get_settings()
+        with self.lock:
             if (
                 len(self.pending_uploads) == 0
                 and len(self.processing_docs) == 0
@@ -136,8 +138,20 @@ class GovConProcessingCallback(ProcessingCallback):
             else:
                 return
 
-        # Run enhancement outside the lock
         doc_count = len(self.completed_docs)
+
+        if not settings.enable_post_processing:
+            logger.info(f"🎯 BATCH COMPLETE - {doc_count} documents, "
+                         f"{self.batch_timeout_seconds}s idle")
+            logger.info("⏭️ Post-processing DISABLED (ENABLE_POST_PROCESSING=false). "
+                         "Skipping semantic enhancement.")
+            with self.lock:
+                self.completed_docs.clear()
+                self.enhancement_pending = False
+                self.enhancement_running = False
+            return
+
+        # Run enhancement outside the lock (async from here)
         logger.info(f"🎯 BATCH COMPLETE - {doc_count} documents, "
                      f"{self.batch_timeout_seconds}s idle")
         
@@ -161,7 +175,7 @@ class GovConProcessingCallback(ProcessingCallback):
             logger.error(traceback.format_exc())
         
         finally:
-            async with self.lock:
+            with self.lock:
                 self.completed_docs.clear()
                 self.enhancement_pending = False
                 self.enhancement_running = False
@@ -169,7 +183,7 @@ class GovConProcessingCallback(ProcessingCallback):
 
     async def get_stats(self) -> dict:
         """Get current queue statistics."""
-        async with self.lock:
+        with self.lock:
             return {
                 "pending_uploads": len(self.pending_uploads),
                 "processing": len(self.processing_docs),
@@ -220,8 +234,8 @@ async def process_document_with_semantic_inference(
     
     parse_duration = (datetime.now() - start_time).total_seconds()
     
-    # Dispatch parse_complete event
-    await rag_instance.callback_manager.dispatch(
+    # Dispatch parse_complete event (sync — dispatch calls handlers synchronously)
+    rag_instance.callback_manager.dispatch(
         "on_parse_complete",
         file_path=file_path,
         content_blocks=len(content_list),
@@ -263,8 +277,8 @@ async def process_document_with_semantic_inference(
         total_duration = (datetime.now() - start_time).total_seconds()
         logger.info("✅ RAG-Anything processing complete")
         
-        # Dispatch document_complete event — triggers batch detection
-        await rag_instance.callback_manager.dispatch(
+        # Dispatch document_complete event — triggers batch detection (sync)
+        rag_instance.callback_manager.dispatch(
             "on_document_complete",
             file_path=file_path,
             doc_id=doc_id,
@@ -282,8 +296,8 @@ async def process_document_with_semantic_inference(
         }
     
     except Exception as e:
-        # Dispatch error event so batch detection still works
-        await rag_instance.callback_manager.dispatch(
+        # Dispatch error event so batch detection still works (sync)
+        rag_instance.callback_manager.dispatch(
             "on_document_error",
             file_path=file_path,
             doc_id=doc_id,

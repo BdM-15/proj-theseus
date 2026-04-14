@@ -174,3 +174,5 @@ def create_sanitizing_wrapper(base_llm_func):
             return sanitized
 
         return raw_output
+
+    return sanitizing_llm_func

@@ -203,6 +203,10 @@ class Settings(BaseSettings):
     # ═══════════════════════════════════════════════════════════════════════════
     # BATCH PROCESSING
     # ═══════════════════════════════════════════════════════════════════════════
+    enable_post_processing: bool = Field(
+        default=True,
+        description="Enable semantic post-processing after batch completion (entity cleanup, relationship algorithms, workload enrichment)"
+    )
     batch_timeout_seconds: int = Field(
         default=30,
         description="Seconds to wait after last document before triggering semantic enhancement"
