@@ -176,7 +176,12 @@ async def initialize_raganything():
             model = extraction_model
         else:
             model = reasoning_model
-        
+
+        # Ensure max_tokens is always set — without it the API falls back to the model's
+        # conservative default (~4K for grok-4-1-fast-non-reasoning), which truncates
+        # large PWS chunks mid-output, resulting in 0 relationships extracted.
+        kwargs.setdefault('max_tokens', settings.llm_max_output_tokens)
+
         return await openai_complete_if_cache(
             model,
             prompt,
@@ -212,6 +217,7 @@ async def initialize_raganything():
     #       so it uses the extraction model for literal format compliance
     async def vision_model_func(prompt, system_prompt=None, history_messages=[], image_data=None, messages=None, **kwargs):
         if messages:
+            kwargs.setdefault('max_tokens', settings.llm_max_output_tokens)
             return await openai_complete_if_cache(
                 extraction_model, "", system_prompt=None, history_messages=[],
                 messages=messages, api_key=xai_api_key, base_url=xai_base_url, **kwargs
@@ -228,6 +234,7 @@ async def initialize_raganything():
             ]
             if system_prompt:
                 messages.insert(0, {"role": "system", "content": system_prompt})
+            kwargs.setdefault('max_tokens', settings.llm_max_output_tokens)
             return await openai_complete_if_cache(
                 extraction_model, "", system_prompt=None, history_messages=[],
                 messages=messages,

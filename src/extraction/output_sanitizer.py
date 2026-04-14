@@ -171,6 +171,34 @@ def create_sanitizing_wrapper(base_llm_func):
             sanitized = sanitize_extraction_output(raw_output)
             if sanitized != raw_output:
                 _stats.sanitized += 1
+
+            # Detect truncated output: completion delimiter absent AND no relationship records.
+            # This happens when the LLM hits its token limit mid-entity-output before
+            # producing any relationship tuples. Root cause: max_tokens not explicitly set
+            # in the API call (now fixed in base_llm_model_func via kwargs.setdefault).
+            COMPLETION_DELIMITER = "<|COMPLETE|>"
+            if COMPLETION_DELIMITER not in sanitized:
+                lines = sanitized.splitlines()
+                has_entity = any(l.lower().startswith("entity") for l in lines if l.strip())
+                has_relation = any(l.lower().startswith("relation") for l in lines if l.strip())
+                if has_entity and not has_relation:
+                    logger.warning(
+                        f"⚠️  TRUNCATED OUTPUT detected: entities present but no relationships "
+                        f"and no <|COMPLETE|> marker. Output is {len(sanitized)} chars. "
+                        f"Cause: LLM hit token limit before reaching relationship section. "
+                        f"All relationships from this chunk will be LOST. "
+                        f"Fix: ensure max_tokens is set in LLM call (see initialization.py)."
+                    )
+                elif not has_entity and not has_relation:
+                    logger.warning(
+                        f"⚠️  EMPTY OUTPUT detected: no entity or relation records found "
+                        f"and no <|COMPLETE|> marker. Output: {sanitized[:200]!r}"
+                    )
+                else:
+                    logger.debug(
+                        f"ℹ️  Missing <|COMPLETE|> but has both entities and relations — likely model skipped marker."
+                    )
+
             return sanitized
 
         return raw_output
