@@ -335,7 +335,7 @@ IF technical annex with task descriptions → Section J or parent section
 "Section H Special Requirements" → Section H ✅
 ```
 
-**Key Principle**: Extract work statements as STATEMENT_OF_WORK type regardless of physical location
+**Key Principle**: Extract work statements as WORK_SCOPE_ITEM type regardless of physical location
 
 ---
 

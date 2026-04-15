@@ -138,7 +138,7 @@ async def main():
     logger.info(f"{c.YELLOW}5.{c.RESET} {c.BOLD}Semantic Post-Processing{c.RESET} {c.GREEN}(Auto-triggered){c.RESET}")
     logger.info(f"   {c.CYAN}├─>{c.RESET} 8 LLM inference algorithms (~3,500 lines prompts)")
     logger.info(f"   {c.CYAN}├─>{c.RESET} Relationship inference (Section L↔M, Annex linkage)")
-    logger.info(f"   {c.CYAN}└─>{c.RESET} Workload enrichment + description generation")
+    logger.info(f"   {c.CYAN}└─>{c.RESET} Optional workload enrichment + description generation")
     logger.info("")
     logger.info(f"{c.YELLOW}6.{c.RESET} {c.BOLD}Knowledge Graph Storage{c.RESET} {c.CYAN}({graph_storage}){c.RESET}")
     if graph_storage == "Neo4JStorage":

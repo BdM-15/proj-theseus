@@ -205,7 +205,11 @@ class Settings(BaseSettings):
     # ═══════════════════════════════════════════════════════════════════════════
     enable_post_processing: bool = Field(
         default=True,
-        description="Enable semantic post-processing after batch completion (entity cleanup, relationship algorithms, workload enrichment)"
+        description="Enable semantic post-processing after batch completion (relationship algorithms and optional enrichment)"
+    )
+    enable_workload_enrichment: bool = Field(
+        default=False,
+        description="Enable workload enrichment during semantic post-processing. Defaults to false so ontology extraction can be evaluated without BOE metadata augmentation."
     )
     batch_timeout_seconds: int = Field(
         default=30,

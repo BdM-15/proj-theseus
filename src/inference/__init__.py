@@ -4,16 +4,16 @@ Relationship Inference Module
 LLM-powered semantic relationship inference for Neo4j knowledge graphs.
 Implements core algorithms for government contracting RFPs:
 
-1. Instruction-Evaluation Linking: SUBMISSION_INSTRUCTION → EVALUATION_FACTOR (GUIDES)
+1. Instruction-Evaluation Linking: PROPOSAL_INSTRUCTION → EVALUATION_FACTOR (GUIDES)
 2. Evaluation Hierarchy: EVALUATION_FACTOR → EVALUATION_FACTOR (CHILD_OF)
 3. Deliverable Traceability: DELIVERABLE → REQUIREMENT/EVALUATION_FACTOR (FULFILLS/EVALUATED_BY)
 4. Requirement Clustering: REQUIREMENT → REQUIREMENT (RELATED_TO)
 5. Annex/Attachment Linking: DOCUMENT → REQUIREMENT/CLAUSE (DEFINES/PROVIDES_CONTEXT)
 6. Orphan Resolution: Unconnected entities → related entities
-7. PWS Workload Enrichment: BOE metadata extraction for requirements
+7. Optional workload enrichment: BOE metadata extraction for requirements when enabled
 
 Architecture (Issue #54 - Back to Basics):
-- Entity extraction uses native LightRAG with 18 govcon types
+- Entity extraction uses native LightRAG with the govcon ontology
 - Post-processing uses Pydantic for relationship validation (InferredRelationship)
 - No LLM-based entity type correction needed - native extraction handles it
 

@@ -24,11 +24,11 @@ async def algo_4_deliverable_trace(
     Algorithm 4: Deliverable Traceability
     
     Pattern 1: Requirement → Deliverable (SATISFIED_BY)
-    Pattern 2: Work Statement → Deliverable (PRODUCES)
+    Pattern 2: Work Scope Item → Deliverable (PRODUCES)
     """
     requirements = entities_by_type.get('requirement', [])
     work_statements = (
-        entities_by_type.get('statement_of_work', []) + 
+        entities_by_type.get('work_scope_item', []) + 
         entities_by_type.get('pws', []) + 
         entities_by_type.get('soo', [])
     )

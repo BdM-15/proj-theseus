@@ -1,4 +1,4 @@
-# Work to Deliverables: STATEMENT_OF_WORK → DELIVERABLE
+# Work to Deliverables: WORK_SCOPE_ITEM → DELIVERABLE
 
 ## ⚠️ CRITICAL: Entity ID Usage
 
@@ -74,13 +74,11 @@ Understanding these relationships enables work planning and CDRL mapping regardl
 ## Detection Rules
 
 1. **Direct References**: Search for deliverable names/IDs in work statement text
-
    - CDRL numbers (A001, B002)
    - Report names (Status Report, Technical Manual)
    - Works across Section C, attachments, and Section H content
 
 2. **Semantic Overlap**: Match work scope to deliverable descriptions
-
    - Task keywords → Deliverable type
    - Example: "testing" → "Test Report"
 
@@ -98,7 +96,7 @@ Understanding these relationships enables work planning and CDRL mapping regardl
 
 Each relationship must include:
 
-- `source_id`: STATEMENT_OF_WORK entity ID
+- `source_id`: WORK_SCOPE_ITEM entity ID
 - `target_id`: DELIVERABLE entity ID
 - `relationship_type`: "PRODUCES"
 - `confidence`: Float 0.0-1.0

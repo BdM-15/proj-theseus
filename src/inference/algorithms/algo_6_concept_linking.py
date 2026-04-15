@@ -26,7 +26,7 @@ async def algo_6_concept_linking(
     Links concepts and strategic themes to high-value entities
     with INFORMS, IMPACTS, GUIDES relationships.
     """
-    concepts = entities_by_type.get('concept', [])[:500]  # Increased from 100 for 24-type ontology
+    concepts = entities_by_type.get('concept', [])[:500]  # Increased from 100 for expanded 33-type ontology
     strategic_themes = entities_by_type.get('strategic_theme', [])
     eval_factors = entities_by_type.get('evaluation_factor', [])
     requirements = entities_by_type.get('requirement', [])

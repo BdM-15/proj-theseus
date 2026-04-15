@@ -10,13 +10,13 @@ Pattern: Use Pydantic field descriptions as semantic hints for LLM reasoning.
 
 Usage:
     from src.inference.schema_prompts import get_schema_guidance, get_multi_schema_guidance
-    from src.ontology.schema import EvaluationFactor, SubmissionInstruction
+    from src.ontology.schema import EvaluationFactor, ProposalInstruction
     
     # Single schema guidance
     guidance = get_schema_guidance(EvaluationFactor)
     
     # Multiple schemas combined
-    guidance = get_multi_schema_guidance(EvaluationFactor, SubmissionInstruction)
+    guidance = get_multi_schema_guidance(EvaluationFactor, ProposalInstruction)
     
     # Use in prompt
     prompt = f'''
@@ -41,7 +41,7 @@ def get_schema_guidance(model_class: Type[BaseModel], include_examples: bool = T
     understand entity structure and semantics without relying on hardcoded keywords.
     
     Args:
-        model_class: Pydantic model class (e.g., EvaluationFactor, SubmissionInstruction)
+        model_class: Pydantic model class (e.g., EvaluationFactor, ProposalInstruction)
         include_examples: Whether to include example values from descriptions
         
     Returns:
@@ -91,7 +91,7 @@ def get_schema_guidance(model_class: Type[BaseModel], include_examples: bool = T
             "- Rating scales (Outstanding, Good, etc.) are NOT main factors",
             "- Processes/analyses (assessment, realism) are supporting entities",
         ])
-    elif model_name == 'SubmissionInstruction':
+    elif model_name == 'ProposalInstruction':
         guidance_lines.extend([
             "",
             "IDENTIFICATION HINTS:",
@@ -126,8 +126,8 @@ def get_multi_schema_guidance(*model_classes: Type[BaseModel]) -> str:
         Combined schema guidance string
         
     Example:
-        >>> from src.ontology.schema import EvaluationFactor, SubmissionInstruction
-        >>> guidance = get_multi_schema_guidance(EvaluationFactor, SubmissionInstruction)
+        >>> from src.ontology.schema import EvaluationFactor, ProposalInstruction
+        >>> guidance = get_multi_schema_guidance(EvaluationFactor, ProposalInstruction)
     """
     guidance_parts = []
     
@@ -155,17 +155,18 @@ def get_entity_type_guidance(include_descriptions: bool = True) -> str:
         >>> print(guidance)
         VALID ENTITY TYPES (from ontology schema):
         ==========================================
-        Document Types: document, section, attachment, clause
+        Document Types: document, document_section, amendment, clause
         ...
     """
     # Categorize entity types for better LLM understanding
     type_categories = {
-        'Document Structure': ['document', 'section'],
+        'Document Structure': ['document', 'document_section', 'amendment'],
         'Attachments': ['attachment'],  # exhibit, annex handled via entity names
-        'Regulatory': ['clause'],
-        'Work Items': ['requirement', 'deliverable', 'statement_of_work'],
-        'Evaluation': ['evaluation_factor', 'submission_instruction', 'performance_metric'],
-        'Strategic': ['strategic_theme', 'program'],
+        'Regulatory': ['clause', 'regulatory_reference', 'technical_specification'],
+        'Work Items': ['requirement', 'deliverable', 'work_scope_item', 'transition_activity'],
+        'Evaluation': ['evaluation_factor', 'subfactor', 'proposal_instruction', 'proposal_volume', 'performance_standard'],
+        'Strategic': ['strategic_theme', 'customer_priority', 'pain_point', 'program'],
+        'Commercial': ['contract_line_item', 'pricing_element', 'workload_metric', 'labor_category', 'past_performance_reference'],
         'Resources': ['organization', 'person', 'equipment', 'technology', 'location'],
         'Other': ['concept', 'event'],
     }
@@ -184,10 +185,10 @@ def get_entity_type_guidance(include_descriptions: bool = True) -> str:
     guidance_lines.extend([
         "",
         "HIERARCHY PATTERNS:",
-        "- CHILD_OF: Section 1.1 → Section 1 (subsection to section)",
-        "- ATTACHMENT_OF: Exhibit A → Section C (attachment to document)",
+        "- CHILD_OF: Document Section 1.1 → Document Section 1 (subsection to section)",
+        "- ATTACHMENT_OF: Exhibit A → Document Section C (attachment to document)",
         "- AMENDS: Amendment 001 → base document",
-        "- REFERENCES: Section L → Section M (cross-references)",
+        "- REFERENCES: Document Section L → Document Section M (cross-references)",
     ])
     
     return "\n".join(guidance_lines)
@@ -209,18 +210,18 @@ def get_document_hierarchy_guidance() -> str:
         "=" * 35,
         "",
         "DOCUMENT ENTITY TYPES (from schema):",
-        f"- Valid types: {', '.join(sorted([t for t in VALID_ENTITY_TYPES if t in ['document', 'section', 'clause', 'attachment']]))}",
+        f"- Valid types: {', '.join(sorted([t for t in VALID_ENTITY_TYPES if t in ['document', 'document_section', 'clause', 'amendment', 'attachment']]))}",
         "- Attachments may be labeled: Exhibit, Annex, Appendix, Enclosure",
         "- Amendments modify base documents",
         "",
         "HIERARCHY RELATIONSHIP TYPES:",
-        "- CHILD_OF: Nested structure (Section 1.1 is CHILD_OF Section 1)",
-        "- ATTACHMENT_OF: Document attachments (Exhibit A ATTACHMENT_OF Section C)",
+        "- CHILD_OF: Nested structure (Document Section 1.1 is CHILD_OF Document Section 1)",
+        "- ATTACHMENT_OF: Document attachments (Exhibit A ATTACHMENT_OF Document Section C)",
         "- AMENDS: Modifications (Amendment 001 AMENDS base RFP)",
         "- INCORPORATES: Standard references (Contract INCORPORATES FAR clause)",
         "",
         "IDENTIFICATION PATTERNS:",
-        "- Section numbering: 1, 1.1, 1.1.1, A, B, C, I, II, III",
+        "- Heading numbering: 1, 1.1, 1.1.1, A, B, C, I, II, III",
         "- Attachment naming: Exhibit/Annex/Appendix + letter/number",
         "- Amendment references: 'Amendment', 'Modification', 'Change'",
         "- Cross-references: 'See Section X', 'per Attachment Y'",
@@ -278,20 +279,20 @@ def get_instruction_evaluation_guidance() -> str:
     """
     Generate specialized guidance for instruction-evaluation linking.
     
-    Provides schema-aware guidance for Algorithm 1 to link submission
+    Provides schema-aware guidance for Algorithm 1 to link proposal
     instructions to evaluation factors without hardcoded keyword matching.
     
     Returns:
         Instruction-evaluation linking guidance string
     """
     # Import here to avoid circular dependency
-    from src.ontology.schema import SubmissionInstruction, EvaluationFactor
+    from src.ontology.schema import ProposalInstruction, EvaluationFactor
     
-    guidance = get_multi_schema_guidance(SubmissionInstruction, EvaluationFactor)
+    guidance = get_multi_schema_guidance(ProposalInstruction, EvaluationFactor)
     
     additional_guidance = """
 INSTRUCTION-EVALUATION LINKING PATTERNS:
-- Submission instructions GUIDE evaluation factors
+- Proposal instructions GUIDE evaluation factors
 - Page limits, format requirements affect how proposals are evaluated
 - Volume assignments (Volume I, II, III) map to specific factors
 

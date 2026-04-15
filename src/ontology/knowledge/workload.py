@@ -7,7 +7,7 @@ Evergreen knowledge about BOE and staffing:
 - Common workload drivers
 - Labor category patterns
 
-Entity types: concept, requirement, performance_metric
+Entity types: concept, requirement, performance_standard
 Source: Industry benchmarks, GSA rates, common patterns
 
 Note: These are PATTERNS and FORMULAS, not specific pricing.
@@ -60,7 +60,7 @@ ENTITIES = [
     },
     {
         "entity_name": "Utilization Rate Standards",
-        "entity_type": "performance_metric",
+        "entity_type": "performance_standard",
         "description": (
             "Utilization rates convert calendar time to productive hours. Industry standards: "
             "Annual calendar hours: 2,080 (40hr × 52wks). Deductions: Federal holidays (10 days = 80hrs), "

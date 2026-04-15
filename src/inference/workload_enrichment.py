@@ -112,7 +112,7 @@ async def enrich_workload_metadata(
     # Get all requirement entities
     all_entities = neo4j_io.get_all_entities()
     # STRICTLY filter for 'requirement' type.
-    # 'performance_metric' entities (QASP thresholds) are intentionally EXCLUDED
+    # 'performance_standard' entities (QASP/SLA thresholds) are intentionally EXCLUDED
     # as they represent standards/constraints, not the workload itself.
     requirements = [e for e in all_entities if e.get('entity_type') == 'requirement']
     

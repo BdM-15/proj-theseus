@@ -215,7 +215,7 @@ Reasoning: "Adjacent factors in Section M may share evaluation criteria"
 ```
 FOR each EVALUATION_FACTOR (ordered by weight DESC):
   1. Find all REQUIREMENT --EVALUATED_BY--> FACTOR
-  2. Find all SUBMISSION_INSTRUCTION --GUIDES--> FACTOR
+  2. Find all PROPOSAL_INSTRUCTION --GUIDES--> FACTOR
   3. Find all STRATEGIC_THEME --ADDRESSED_BY--> FACTOR
   4. Group by requirement_classification (TECHNICAL, MANAGEMENT, etc.)
   5. Generate outline section with page allocation

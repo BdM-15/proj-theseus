@@ -372,7 +372,7 @@ class Neo4jGraphIO:
                 n.importance = entity.importance,
                 n.subfactors = entity.subfactors
         )
-        FOREACH (_ IN CASE WHEN entity.entity_type = 'submission_instruction' THEN [1] ELSE [] END |
+        FOREACH (_ IN CASE WHEN entity.entity_type = 'proposal_instruction' THEN [1] ELSE [] END |
             SET n.page_limit = entity.page_limit,
                 n.format_reqs = entity.format_reqs,
                 n.volume = entity.volume
@@ -381,7 +381,7 @@ class Neo4jGraphIO:
             SET n.clause_number = entity.clause_number,
                 n.regulation = entity.regulation
         )
-        FOREACH (_ IN CASE WHEN entity.entity_type = 'performance_metric' THEN [1] ELSE [] END |
+        FOREACH (_ IN CASE WHEN entity.entity_type = 'performance_standard' THEN [1] ELSE [] END |
             SET n.threshold = entity.threshold,
                 n.measurement_method = entity.measurement_method
         )

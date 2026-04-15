@@ -123,14 +123,14 @@ TYPING GUIDELINES:
 - location: Bases, facilities, geographic locations
 - requirement: Must/should/may obligations from RFP
 - clause: FAR/DFARS/agency supplement clauses
-- section: RFP sections (A-M, J attachments)
+- document_section: Numbered or titled structural sections, paragraphs, appendices
 - program: Government programs (e.g., MCPP II)
 - event: Milestones, deadlines, reviews
 - evaluation_factor: Section M scoring criteria
-- submission_instruction: Section L instructions (page limits, format)
+- proposal_instruction: Proposal instructions (page limits, format, submission)
 - strategic_theme: High-level themes, objectives
-- statement_of_work: SOW/PWS sections
-- performance_metric: QASP thresholds, AQLs, error rates, inspection criteria
+- work_scope_item: SOW/PWS/SOO tasks, objectives, work packages
+- performance_standard: QASP thresholds, AQLs, error rates, inspection criteria
 
 ENTITIES TO RETYPE:
 """

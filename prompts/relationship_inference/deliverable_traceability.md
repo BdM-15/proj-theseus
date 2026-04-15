@@ -14,7 +14,7 @@
 **Relationship Types**:
 
 - REQUIREMENT --SATISFIED_BY--> DELIVERABLE (primary traceability)
-- STATEMENT_OF_WORK --PRODUCES--> DELIVERABLE (work planning)
+- WORK_SCOPE_ITEM --PRODUCES--> DELIVERABLE (work planning)
   **Last Updated**: November 12, 2025 (Branch 013b4 - Deliverable Traceability Fix)
 
 ---
@@ -81,14 +81,12 @@ Link performance/functional/technical requirements to deliverables that provide 
 ### Detection Rules
 
 1. **Semantic Overlap**: Match requirement domain to deliverable type
-
    - Testing requirements → Test reports/results
    - Performance requirements → Performance/uptime reports
    - Security requirements → Security plans/assessments
    - Training requirements → Training materials/records
 
 2. **Keyword Correlation**: Match requirement verbs to deliverable evidence
-
    - "shall maintain" → monitoring/status reports
    - "shall implement" → design documents/implementation plans
    - "shall demonstrate" → test results/demonstrations
@@ -155,13 +153,11 @@ Link SOW/PWS/SOO tasks to explicitly mentioned work products for work planning a
 ### Detection Rules
 
 1. **Direct CDRL References**: Search for deliverable names/IDs in work statement text
-
    - CDRL numbers (A001, B002, 6022)
    - Report names matching deliverable entities
    - Explicit "contractor shall deliver X" language
 
 2. **Work-Product Correlation**: Match work activities to produced outputs
-
    - "testing" tasks → Test reports
    - "training" tasks → Training materials
    - "maintenance" tasks → Maintenance logs
@@ -181,7 +177,7 @@ Link SOW/PWS/SOO tasks to explicitly mentioned work products for work planning a
 
 ```json
 {
-  "source_id": "statement_of_work_entity_id",
+  "source_id": "work_scope_item_entity_id",
   "target_id": "deliverable_entity_id",
   "relationship_type": "PRODUCES",
   "confidence": 0.50-0.96,
@@ -202,7 +198,7 @@ Link SOW/PWS/SOO tasks to explicitly mentioned work products for work planning a
 **Relationships Created**:
 
 1. REQUIREMENT "maintain facility infrastructure" --SATISFIED_BY--> DELIVERABLE "Facility Maintenance Logs"
-2. STATEMENT_OF_WORK "PWS Section 3.2" --PRODUCES--> DELIVERABLE "Facility Maintenance Logs" (if explicit CDRL reference exists)
+2. WORK_SCOPE_ITEM "PWS Section 3.2" --PRODUCES--> DELIVERABLE "Facility Maintenance Logs" (if explicit CDRL reference exists)
 
 ### FAR 16 Task Order Example (Non-UCF)
 

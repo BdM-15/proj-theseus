@@ -5,10 +5,10 @@ Semantic Post-Processing for Government Contracting RFPs
 Neo4j-native LLM-powered enhancements to the extracted knowledge graph:
 
 1. **Relationship Inference**: Infer missing semantic relationships using 8 algorithms
-2. **Workload Enrichment**: Add BOE metadata to requirements
+2. **Optional Workload Enrichment**: Add BOE metadata to requirements when explicitly enabled
 
 Architecture (Issue #54 - Back to Basics):
-- Entity extraction uses native LightRAG with govcon ontology (18 types)
+- Entity extraction uses native LightRAG with the govcon ontology
 - Pydantic validation is used for POST-PROCESSING only (InferredRelationship)
 - No Pydantic validation during extraction - LightRAG handles it natively
 
@@ -90,9 +90,9 @@ def _heuristic_table_type_mapping(entity: Dict) -> str:
     if any(kw in text for kw in ['evaluation', 'rating', 'scoring', 'assessment', 'criteria', 'factor']):
         return 'evaluation_factor'
     
-    # Performance/Metrics tables → performance_metric
-    if any(kw in text for kw in ['performance', 'metric', 'sla', 'kpi', 'threshold', 'standard']):
-        return 'performance_metric'
+    # Performance/Surveillance tables → performance_standard
+    if any(kw in text for kw in ['performance', 'metric', 'sla', 'kpi', 'threshold', 'standard', 'qasp', 'aql']):
+        return 'performance_standard'
     
     # Workload data tables → requirement (CRITICAL for BOE/workload enrichment)
     # Must come BEFORE the general 'work' pattern to catch workload-specific tables
@@ -103,17 +103,17 @@ def _heuristic_table_type_mapping(entity: Dict) -> str:
     if any(kw in text for kw in ['requirement', 'shall', 'must', 'sow', 'pws', 'task', 'work']):
         return 'requirement'
     
-    # Submission/Proposal tables → submission_instruction
+    # Submission/Proposal tables → proposal_instruction
     if any(kw in text for kw in ['submission', 'proposal', 'volume', 'page limit', 'format']):
-        return 'submission_instruction'
+        return 'proposal_instruction'
     
     # Clause/Regulation tables → clause
     if any(kw in text for kw in ['far ', 'dfars', 'clause', 'provision', '52.2']):
         return 'clause'
     
-    # Section/Document reference tables → section or document
-    if any(kw in text for kw in ['section', 'attachment', 'annex', 'exhibit', 'appendix']):
-        return 'section'
+    # Section/Document reference tables → document_section or document
+    if any(kw in text for kw in ['section', 'paragraph', 'attachment', 'annex', 'exhibit', 'appendix']):
+        return 'document_section'
     
     # Organization/Personnel tables → organization or person
     if any(kw in text for kw in ['organization', 'contractor', 'government', 'agency']):
@@ -122,7 +122,9 @@ def _heuristic_table_type_mapping(entity: Dict) -> str:
         return 'person'
     
     # Equipment/Material tables → equipment
-    if any(kw in text for kw in ['equipment', 'material', 'supply', 'asset', 'gfe', 'gfp']):
+    if any(kw in text for kw in ['gfe', 'gfp', 'gfi', 'government furnished', 'government-furnished']):
+        return 'government_furnished_item'
+    if any(kw in text for kw in ['equipment', 'material', 'supply', 'asset']):
         return 'equipment'
     
     # Schedule/Timeline tables → concept (general information)
@@ -292,10 +294,10 @@ REQUIREMENT-CENTRIC:
 STRUCTURAL:
 - PART_OF: Sub-component → Parent component
 - FIELD_IN: Table field → Table/Document containing it
-- REFERENCES: Document/Section → Another document/section
+- REFERENCES: Document/Document Section → Another document/section
 
 REGULATORY:
-- EVALUATES: Section M evaluation criteria → Section L requirements
+- EVALUATES: Evaluation criteria → proposal instructions and requirements
 - APPLIES_TO: Clause/Regulation → Program/Contract
 
 SPECIAL PATTERNS TO CATCH:
@@ -491,8 +493,8 @@ async def _resolve_orphan_patterns(
         entities_by_type[etype].append(e)
     
     # Gather candidate entities for linking (focus on high-value types)
-    candidate_types = ['requirement', 'deliverable', 'document', 'clause', 'section', 
-                      'work_statement', 'evaluation_factor', 'technology', 'equipment']
+    candidate_types = ['requirement', 'deliverable', 'document', 'clause', 'document_section',
+                      'work_scope_item', 'evaluation_factor', 'proposal_instruction', 'technology', 'equipment']
     
     candidates = []
     for etype in candidate_types:
@@ -777,26 +779,29 @@ async def _semantic_post_processor_neo4j(
         else:
             logger.info("\n✅ No new relationships inferred")
         
-        # Step 4: Workload Enrichment (BOE metadata for requirements)
-        logger.info("\n🏗️ Step 4: Enriching requirements with workload metadata...")
-        from src.inference.workload_enrichment import enrich_workload_metadata
-        
-        workload_stats = await enrich_workload_metadata(
-            neo4j_io=neo4j_io,
-            batch_size=5,  # Small batches, NO truncation - full detail for quality (~94K tokens max)
-            model=llm_model_name,
-            temperature=temperature
-        )
-        
-        requirements_enriched = workload_stats.get("requirements_enriched", 0)
-        enrichment_rate = workload_stats.get("enrichment_rate", 0)
-        category_distribution = workload_stats.get("category_distribution", {})
-        
-        logger.info(f"\n✅ Workload enrichment complete:")
-        logger.info(f"  Requirements enriched: {requirements_enriched}")
-        logger.info(f"  Enrichment rate:       {enrichment_rate:.1f}%")
-        if category_distribution:
-            logger.info(f"  BOE categories used:   {', '.join([f'{k}:{v}' for k,v in category_distribution.items() if v > 0])}")
+        requirements_enriched = 0
+        if settings.enable_workload_enrichment:
+            logger.info("\n🏗️ Step 4: Enriching requirements with workload metadata...")
+            from src.inference.workload_enrichment import enrich_workload_metadata
+
+            workload_stats = await enrich_workload_metadata(
+                neo4j_io=neo4j_io,
+                batch_size=5,  # Small batches, NO truncation - full detail for quality (~94K tokens max)
+                model=llm_model_name,
+                temperature=temperature
+            )
+
+            requirements_enriched = workload_stats.get("requirements_enriched", 0)
+            enrichment_rate = workload_stats.get("enrichment_rate", 0)
+            category_distribution = workload_stats.get("category_distribution", {})
+
+            logger.info(f"\n✅ Workload enrichment complete:")
+            logger.info(f"  Requirements enriched: {requirements_enriched}")
+            logger.info(f"  Enrichment rate:       {enrichment_rate:.1f}%")
+            if category_distribution:
+                logger.info(f"  BOE categories used:   {', '.join([f'{k}:{v}' for k,v in category_distribution.items() if v > 0])}")
+        else:
+            logger.info("\n⏭️ Step 4: Workload enrichment skipped (ENABLE_WORKLOAD_ENRICHMENT=false)")
         
         # Step 5: Sync inferred relationships to LightRAG VDBs (Issue #65 - Critical Fix)
         # Without this, agent queries via /query miss algorithm-discovered relationships

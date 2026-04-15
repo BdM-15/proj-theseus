@@ -68,8 +68,8 @@ async def algo_8_orphan_resolution(
     non_orphan_entities = [e for e in entities if e['id'] not in orphan_ids]
     
     # Prioritize high-value target types
-    priority_order = ['requirement', 'section', 'deliverable', 'document', 'clause', 
-                      'statement_of_work', 'evaluation_factor']
+    priority_order = ['requirement', 'document_section', 'deliverable', 'document', 'clause',
+                      'work_scope_item', 'evaluation_factor', 'proposal_instruction']
     
     def get_priority(entity):
         etype = entity.get('entity_type', 'zzz')

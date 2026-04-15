@@ -9,7 +9,7 @@ domain-specific government contracting intelligence for RFP analysis.
 Architecture:
 -------------
 - FULL domain intelligence loaded from govcon_lightrag_native.txt (~35K tokens, 1300+ lines)
-- Contains: 8 user personas, 24 entity types, 50+ relationship rules, 8 examples
+- Contains: 8 user personas, 33 entity types, 50+ relationship rules, 8 examples
 - LightRAG-compatible format with entity/relation tuple output
 
 Philosophy:
@@ -29,7 +29,7 @@ Domain Intelligence Included:
 - Part A: Role Definition (8 Shipley user personas)
 - Part B: Quantitative Detail Preservation (BOE development)
 - Part C: Critical Distinctions (requirement vs metric, strategic themes)
-- Part D: 24 Entity Types with metadata requirements
+- Part D: 33 Entity Types with metadata requirements
 - Part E: UCF Reference (Sections A-M guidance)
 - Part F: 50+ Relationship Inference Rules (L↔M mapping, clause clustering)
 - Part G: Entity Naming Normalization
@@ -681,8 +681,8 @@ def _validate_prompts():
         "PART A: ROLE DEFINITION",
         "PART B: QUANTITATIVE DETAIL PRESERVATION",
         "PART C: CRITICAL DISTINCTIONS",
-        "PART D: THE 24 ENTITY TYPES",
-        "PART E: UNIFORM CONTRACT FORMAT",
+        "PART D: THE 33 ENTITY TYPES",
+        "PART E: COMMON SOLICITATION STRUCTURE PATTERNS",
         "PART F: RELATIONSHIP PATTERNS",
         "PART K: ANNOTATED RFP EXAMPLES",
     ]

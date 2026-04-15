@@ -2,7 +2,7 @@
 Algorithm 7: Heuristic Pattern Matching
 
 CDRL/DID cross-reference detection using regex patterns.
-Also detects section cross-references and requirement-deliverable links.
+Also detects document-section cross-references and requirement-deliverable links.
 Numbered hierarchy detection (F.1.5.7 → F.1.5 → F.1).
 No LLM calls - instant execution.
 """
@@ -55,7 +55,7 @@ def algo_7_heuristic(entities: List[Dict], entities_by_type: Dict) -> List[Dict]
     
     Detects:
     - CDRL, DID, DD Form 1423 references
-    - Section cross-references (e.g., "see Section 3.1")
+    - Document-section cross-references (e.g., "see Section 3.1")
     - PWS paragraph references
     - Attachment/Appendix references
     - **Numbered hierarchy** (F.1.5.7 → F.1.5 → F.1) via CHILD_OF
@@ -71,7 +71,7 @@ def algo_7_heuristic(entities: List[Dict], entities_by_type: Dict) -> List[Dict]
     seen_pairs: Set[Tuple[str, str]] = set()
     
     deliverables = entities_by_type.get('deliverable', [])
-    sections = entities_by_type.get('section', [])
+    sections = entities_by_type.get('document_section', [])
     documents = entities_by_type.get('document', [])
     requirements = entities_by_type.get('requirement', [])
     
@@ -136,7 +136,7 @@ def algo_7_heuristic(entities: List[Dict], entities_by_type: Dict) -> List[Dict]
     # =========================================================================
     # Build lookup indexes for fast matching
     cdrl_index = {}  # "CDRLA001" -> deliverable
-    section_index = {}  # "3.1" -> section entity
+    section_index = {}  # "3.1" -> document_section entity
     doc_index = {}  # "ATTACHMENT A" -> document
     
     for deliv in deliverables:

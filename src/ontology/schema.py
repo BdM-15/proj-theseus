@@ -14,21 +14,25 @@ RequirementType = Literal["FUNCTIONAL", "PERFORMANCE", "SECURITY", "TECHNICAL", 
 ThemeType = Literal["CUSTOMER_HOT_BUTTON", "DISCRIMINATOR", "PROOF_POINT", "WIN_THEME"]
 EntityType = Literal[
     "organization", "concept", "event", "technology", "person", "location",
-    "requirement", "clause", "section", "document", "deliverable",
-    "evaluation_factor", "submission_instruction", "program", "equipment",
-    "strategic_theme", "statement_of_work", "performance_metric",
-    "contract_line_item", "workload_metric", "labor_category",
-    "subfactor", "regulatory_reference", "performance_standard"
+    "requirement", "clause", "document_section", "document", "deliverable",
+    "evaluation_factor", "proposal_instruction", "proposal_volume", "program", "equipment",
+    "strategic_theme", "work_scope_item", "contract_line_item", "workload_metric",
+    "labor_category", "subfactor", "regulatory_reference", "performance_standard",
+    "pricing_element", "government_furnished_item", "compliance_artifact",
+    "transition_activity", "technical_specification", "past_performance_reference",
+    "customer_priority", "pain_point", "amendment"
 ]
 
 # Set for fast validation lookups (Branch 040 pattern)
 VALID_ENTITY_TYPES = {
     "organization", "concept", "event", "technology", "person", "location",
-    "requirement", "clause", "section", "document", "deliverable",
-    "evaluation_factor", "submission_instruction", "program", "equipment",
-    "strategic_theme", "statement_of_work", "performance_metric",
-    "contract_line_item", "workload_metric", "labor_category",
-    "subfactor", "regulatory_reference", "performance_standard"
+    "requirement", "clause", "document_section", "document", "deliverable",
+    "evaluation_factor", "proposal_instruction", "proposal_volume", "program", "equipment",
+    "strategic_theme", "work_scope_item", "contract_line_item", "workload_metric",
+    "labor_category", "subfactor", "regulatory_reference", "performance_standard",
+    "pricing_element", "government_furnished_item", "compliance_artifact",
+    "transition_activity", "technical_specification", "past_performance_reference",
+    "customer_priority", "pain_point", "amendment"
 }
 
 
@@ -153,8 +157,8 @@ class EvaluationFactor(BaseEntity):
     importance: Optional[str] = Field(None, description="Relative importance (e.g., 'Most Important').")
     subfactors: List[str] = Field(default_factory=list, description="List of sub-criteria or subfactors.")
 
-class SubmissionInstruction(BaseEntity):
-    entity_type: Literal["submission_instruction"] = "submission_instruction"
+class ProposalInstruction(BaseEntity):
+    entity_type: Literal["proposal_instruction"] = "proposal_instruction"
     page_limit: Optional[str] = Field(None, description="Page count constraints.")
     format_reqs: Optional[str] = Field(None, description="Font, margin, or file format requirements.")
     volume: Optional[str] = Field(None, description="The proposal volume this applies to (e.g., 'Volume I').")
@@ -168,8 +172,8 @@ class Clause(BaseEntity):
     clause_number: str = Field(..., description="The FAR/DFARS citation (e.g., 'FAR 52.212-1').")
     regulation: str = Field(..., description="FAR, DFARS, AFFARS, etc.")
 
-class PerformanceMetric(BaseEntity):
-    entity_type: Literal["performance_metric"] = "performance_metric"
+class PerformanceStandard(BaseEntity):
+    entity_type: Literal["performance_standard"] = "performance_standard"
     threshold: str = Field(..., description="The specific value/limit (e.g., '99.9%', '< 2 errors').")
     measurement_method: Optional[str] = Field(None, description="How the metric is calculated or inspected.")
 
@@ -352,8 +356,8 @@ class WorkloadEnrichmentResponse(BaseModel):
 class ExtractionResult(BaseModel):
     """The root object expected from the LLM."""
     entities: List[
-        Requirement | EvaluationFactor | SubmissionInstruction | 
-        StrategicTheme | Clause | PerformanceMetric | BaseEntity
+        Requirement | EvaluationFactor | ProposalInstruction |
+        StrategicTheme | Clause | PerformanceStandard | BaseEntity
     ] = Field(..., description="List of all extracted entities.")
     relationships: List[Relationship] = Field(default_factory=list, description="List of relationships between entities.")
 

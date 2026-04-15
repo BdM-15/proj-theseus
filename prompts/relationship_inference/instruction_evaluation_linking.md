@@ -1,4 +1,4 @@
-# Submission Instructions ↔ Evaluation Criteria Linking
+# Proposal Instructions ↔ Evaluation Criteria Linking
 
 ## ⚠️ CRITICAL: Entity ID Usage
 
@@ -10,8 +10,8 @@
 
 ---
 
-**Purpose**: Link submission instructions to their corresponding evaluation factors/criteria  
-**Entity Types**: SUBMISSION_INSTRUCTION --GUIDES--> EVALUATION_FACTOR  
+**Purpose**: Link proposal instructions to their corresponding evaluation factors/criteria  
+**Entity Types**: PROPOSAL_INSTRUCTION --GUIDES--> EVALUATION_FACTOR  
 **Why This Matters**: Proposal teams need to know which format requirements (page limits, volumes, fonts)
 apply to which evaluation factors to optimize compliance and scoring.
 
@@ -29,7 +29,7 @@ apply to which evaluation factors to optimize compliance and scoring.
 ## Core Relationship Pattern
 
 ```
-SUBMISSION_INSTRUCTION --GUIDES--> EVALUATION_FACTOR
+PROPOSAL_INSTRUCTION --GUIDES--> EVALUATION_FACTOR
 ```
 
 **Meaning**: This submission instruction guides how to respond to this evaluation factor
@@ -37,7 +37,7 @@ SUBMISSION_INSTRUCTION --GUIDES--> EVALUATION_FACTOR
 **Example**:
 
 ```
-SUBMISSION_INSTRUCTION "Technical Volume Format" (25 pages, 12pt font)
+PROPOSAL_INSTRUCTION "Technical Volume Format" (25 pages, 12pt font)
   --GUIDES-->
 EVALUATION_FACTOR "Factor 1: Technical Approach"
 ```
@@ -60,7 +60,7 @@ EVALUATION_FACTOR "Factor 1: Technical Approach"
 
 ```json
 {
-  "source_id": "submission_instruction_tech_volume",
+  "source_id": "proposal_instruction_tech_volume",
   "target_id": "evaluation_factor_m2",
   "relationship_type": "GUIDES",
   "confidence": 0.95,
@@ -86,7 +86,7 @@ The Management Volume shall not exceed 15 pages.
 
 ```json
 {
-  "source_id": "submission_instruction_mgmt_volume",
+  "source_id": "proposal_instruction_mgmt_volume",
   "target_id": "evaluation_factor_m2",
   "relationship_type": "GUIDES",
   "confidence": 0.8,
@@ -113,7 +113,7 @@ Section M.1: Technical Approach
 
 ```json
 {
-  "source_id": "submission_instruction_tech_volume",
+  "source_id": "proposal_instruction_tech_volume",
   "target_id": "evaluation_factor_m1",
   "relationship_type": "GUIDES",
   "confidence": 0.7,
@@ -182,8 +182,8 @@ IMPORTANT: Instructions appear in multiple forms across different RFP structures
 - Agnostic: Any entity with submission verbs (shall submit, must provide) and
   format terms (page limit, font size, volume)
 
-SUBMISSION INSTRUCTIONS (and instruction-like entities):
-{json_list_of_submission_instructions}
+PROPOSAL INSTRUCTIONS (and instruction-like entities):
+{json_list_of_proposal_instructions}
 
 EVALUATION CRITERIA/FACTORS:
 {json_list_of_evaluation_factors}
@@ -214,7 +214,7 @@ Return JSON array of relationships with confidence ≥ 0.70:
 
 [
   {
-    "source_id": "submission_instruction_id",
+    "source_id": "proposal_instruction_id",
     "target_id": "evaluation_factor_id",
     "relationship_type": "GUIDES",
     "confidence": 0.70-0.95,
@@ -260,9 +260,9 @@ The Management Volume shall be limited to 15 pages...
 
 **Solution**:
 
-1. Extract SUBMISSION_INSTRUCTION entity "Management Volume Format"
+1. Extract PROPOSAL_INSTRUCTION entity "Management Volume Format"
 2. Create GUIDES relationship to Factor M.2
-3. Mark section M.2 with `contains_submission_instructions: true`
+3. Mark section M.2 with `contains_proposal_instructions: true`
 
 ### Case 3: No Clear Mapping
 
@@ -321,14 +321,14 @@ The Technical Volume shall address Evaluation Factors 1 and 2
 ```json
 [
   {
-    "source_id": "submission_instruction_tech_volume",
+    "source_id": "proposal_instruction_tech_volume",
     "target_id": "evaluation_factor_m1_technical",
     "relationship_type": "GUIDES",
     "confidence": 0.95,
     "reasoning": "Explicit: 'shall address Evaluation Factor 1'"
   },
   {
-    "source_id": "submission_instruction_tech_volume",
+    "source_id": "proposal_instruction_tech_volume",
     "target_id": "evaluation_factor_m2_maintenance",
     "relationship_type": "GUIDES",
     "confidence": 0.95,
@@ -353,12 +353,12 @@ Offerors shall limit the Management Volume to 15 pages, 12-point font.
 **Extraction**:
 
 1. Create EVALUATION_FACTOR "Factor M.2: Management Approach"
-2. Create SUBMISSION_INSTRUCTION "Management Volume Format"
+2. Create PROPOSAL_INSTRUCTION "Management Volume Format"
 3. Create relationship:
 
 ```json
 {
-  "source_id": "submission_instruction_mgmt_volume",
+  "source_id": "proposal_instruction_mgmt_volume",
   "target_id": "evaluation_factor_m2_management",
   "relationship_type": "GUIDES",
   "confidence": 0.8,
@@ -381,7 +381,7 @@ Section M.3: Past Performance
 
 ```json
 {
-  "source_id": "submission_instruction_past_perf_volume",
+  "source_id": "proposal_instruction_past_perf_volume",
   "target_id": "evaluation_factor_m3_past_perf",
   "relationship_type": "GUIDES",
   "confidence": 0.7,

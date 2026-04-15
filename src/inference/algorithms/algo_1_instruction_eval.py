@@ -1,7 +1,7 @@
 """
 Algorithm 1: Instruction-Evaluation Linking
 
-Maps submission instructions → evaluation factors using GUIDES relationships.
+Maps proposal instructions → evaluation factors using GUIDES relationships.
 """
 import json
 import logging
@@ -24,14 +24,15 @@ async def algo_1_instruction_eval(
     Algorithm 1: Instruction-Evaluation Linking
     
     Finds instruction-like entities regardless of type:
-    - Traditional submission_instruction entities (UCF Section L)
+    - Traditional proposal_instruction entities
     - Deliverables with submission requirements
     - Requirements with submission verbs
     """
     # Gather all instruction sources
     instructions = (
         entities_by_type.get('instruction', []) + 
-        entities_by_type.get('submission_instruction', [])
+        entities_by_type.get('proposal_instruction', []) +
+        entities_by_type.get('proposal_volume', [])
     )
     
     deliverables_with_instructions = [
@@ -75,7 +76,7 @@ async def algo_1_instruction_eval(
     
     prompt = f"""{prompt_instructions}
 
-SUBMISSION INSTRUCTIONS (and instruction-like entities):
+PROPOSAL INSTRUCTIONS (and instruction-like entities):
 {inst_json}
 
 EVALUATION CRITERIA/FACTORS:

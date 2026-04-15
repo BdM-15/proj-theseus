@@ -102,8 +102,9 @@ def configure_raganything_args():
         
         # Structural entities
         "clause",                   # FAR/DFARS/AFFARS patterns, will cluster by parent section
-        "section",                  # Stores both structural_label + semantic_type
+        "document_section",         # Numbered/heading-based structural units regardless of UCF
         "document",                 # References: specs, standards, manuals, regulations, attachments, annexes
+        "amendment",                # Solicitation changes, modifications, and updates
         "deliverable",
         
         # Hierarchical program entities
@@ -114,16 +115,30 @@ def configure_raganything_args():
         
         # Evaluation entities (semantic detection, may be embedded in non-standard sections)
         "evaluation_factor",        # Scoring criteria (Section M content)
-        "submission_instruction",   # Format/page limits (Section L content, may be IN Section M)
+        "proposal_instruction",     # Format/page limits and submission mechanics regardless of section
+        "proposal_volume",          # Volume containers and named proposal parts
         
         # Strategic entities (Capture planning patterns)
         "strategic_theme",          # Win themes, hot buttons, discriminators, proof points
+        "customer_priority",        # Explicit importance signals from government language
+        "pain_point",               # Problems, deficiencies, and issues government wants solved
         
         # Work scope (Semantic detection regardless of location)
-        "statement_of_work",        # PWS/SOW/SOO content (may be Section C or attachment)
+        "work_scope_item",          # PWS/SOW/SOO tasks, objectives, and work packages
+        "transition_activity",      # Phase-in / phase-out work items
         
-        # Performance standards (QASP, surveillance, metrics)
-        "performance_metric",       # Distinct from requirements: accuracy, frequency, response times
+        # Performance, pricing, and execution structure
+        "performance_standard",     # KPIs, SLAs, QASP thresholds, acceptance criteria
+        "contract_line_item",       # CLINs/SLINs and priced line items
+        "pricing_element",          # Rates, fees, escalation, indirect pricing logic
+        "workload_metric",          # Quantitative BOE drivers
+        "labor_category",           # Named labor roles when explicitly stated
+        "subfactor",                # Child evaluation criteria
+        "regulatory_reference",     # DAFI, NIST, MIL-STD, AR, etc.
+        "technical_specification",  # ICDs, drawings, MIL-DTL, TDPs, engineering specs
+        "government_furnished_item",# GFE/GFP/GFI/GOTS provided by customer
+        "compliance_artifact",      # Certifications, accreditations, authorizations
+        "past_performance_reference"# Reference contracts, PPQs, CPARS artifacts
     ]
     
     # addon_params is the sole path LightRAG uses for entity_types in extraction

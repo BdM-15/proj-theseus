@@ -24,11 +24,11 @@ async def algo_5_doc_hierarchy(
     Algorithm 5: Document Hierarchy
     
     Identifies parent-child relationships between documents,
-    sections, attachments, annexes, clauses, standards.
+    document sections, attachments, annexes, clauses, and amendments.
     """
     document_types = [
-        'document', 'section', 'attachment', 'annex', 'amendment', 
-        'clause', 'standard', 'specification', 'regulation', 'exhibit'
+        'document', 'document_section', 'amendment',
+        'clause', 'regulatory_reference', 'technical_specification'
     ]
     
     documents = [e for e in entities if e.get('entity_type') in document_types]
