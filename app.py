@@ -169,12 +169,10 @@ def stop_neo4j():
 def manage_neo4j_startup():
     """Manage Neo4j container startup if Neo4JStorage is configured."""
     if not is_neo4j_enabled():
-        print("ℹ️  Neo4j not enabled (GRAPH_STORAGE != Neo4JStorage)")
-        print("   Using local storage. To enable Neo4j, update .env:\n")
-        print("   GRAPH_STORAGE=Neo4JStorage\n")
+        print("ℹ️  NetworkXStorage mode (set GRAPH_STORAGE=Neo4JStorage to enable Neo4j)")
         return True
-    
-    print("🔍 Neo4j storage enabled, checking Docker...\n")
+
+    print("🔍 Checking Neo4j...")
     
     # Check if Docker is available
     if not check_docker_available():
@@ -219,13 +217,16 @@ if __name__ == "__main__":
 """)
     
     # Now initialize logging (after banner is displayed)
+    from src.core.config import get_settings as _get_settings
     from src.utils.logging_config import setup_logging
+    _settings = _get_settings()
     log_info = setup_logging(
         log_level="INFO",
         log_dir="logs",
+        workspace_dir=_settings.working_dir,
         max_file_size=10 * 1024 * 1024,  # 10MB per file
-        backup_count=5,  # Keep 5 backup files per log
-        console_output=True  # Also show in terminal (filtered)
+        backup_count=5,
+        console_output=True
     )
     
     neo4j_started_by_us = False

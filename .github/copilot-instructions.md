@@ -186,7 +186,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 ```bash
 # LLM - xAI Grok (OpenAI-compatible API)
 LLM_BINDING_HOST=https://api.x.ai/v1
-LLM_MODEL=grok-4-1-fast-reasoning
+LLM_MODEL=grok-4.20-0309-reasoning
 LLM_BINDING_API_KEY=xai-xxx
 
 # Embeddings - OpenAI (MUST use OpenAI endpoint, not xAI)

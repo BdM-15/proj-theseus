@@ -51,8 +51,8 @@ class Settings(BaseSettings):
         description="Non-reasoning model for extraction (literal format compliance)"
     )
     reasoning_llm_name: str = Field(
-        default="grok-4-1-fast-reasoning",
-        description="Reasoning model for queries and semantic inference"
+        default="grok-4.20-0309-reasoning",
+        description="Reasoning model for queries and semantic inference (grok-4.20 = lowest hallucination + strict prompt adherence)"
     )
     llm_timeout: int = Field(
         default=600,

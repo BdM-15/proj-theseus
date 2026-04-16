@@ -79,7 +79,11 @@ def log_banner(
     
     if items:
         for label, value in items:
-            logger.info(f"{c.GREEN}{label}:{c.RESET} {value}")
+            # Empty label = divider row
+            if not label:
+                logger.info(f"{c.CYAN}{'─' * (width // 2)}{c.RESET}")
+            else:
+                logger.info(f"{c.GREEN}{label}:{c.RESET} {value}")
     
     logger.info(separator)
     logger.info("")
@@ -171,37 +175,40 @@ class ServerFilter(logging.Filter):
 def setup_logging(
     log_level: str = "INFO",
     log_dir: str = "logs",
+    workspace_dir: Optional[str] = None,
     max_file_size: int = 10 * 1024 * 1024,  # 10MB
     backup_count: int = 5,
     console_output: bool = True
 ):
     """
-    Set up comprehensive logging with clean separation of concerns.
-    
+    Set up logging with per-workspace processing logs and a central server log.
+
     Log Files:
-        - processing.log: RFP extraction, entities, relationships, semantic inference details
-        - server.log: Server startup, initialization, API endpoints
-        - errors.log: All errors from any source
-    
-    Console Output:
-        - Filtered to show important messages (no health check spam)
-        - Shows RFP processing progress
-        - Shows errors and warnings
-    
+        - {workspace_dir}/processing.log  — RFP extraction, entity/relation counts,
+          semantic inference progress (one log per workspace, never shared)
+        - {workspace_dir}/errors.log      — all errors for this workspace
+        - {log_dir}/server.log            — server startup and API calls (central)
+
     Args:
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR)
-        log_dir: Directory for log files (default: "logs")
-        max_file_size: Maximum size per log file before rotation (default: 10MB)
-        backup_count: Number of backup files to keep (default: 5)
+        log_dir: Central log directory for server.log (default: "logs")
+        workspace_dir: Workspace storage path for processing.log + errors.log.
+                       Defaults to log_dir when not set (backward compat).
+        max_file_size: Max bytes per log file before rotation (default: 10 MB)
+        backup_count: Backup files to keep per log (default: 5)
         console_output: Whether to output to console (default: True)
-    
+
     Returns:
-        dict: Paths to created log files
+        dict: Paths to all created log files
     """
     
-    # Create logs directory
+    # Central log directory (server.log)
     log_path = Path(log_dir)
     log_path.mkdir(parents=True, exist_ok=True)
+
+    # Per-workspace log directory (processing.log + errors.log)
+    workspace_log_path = Path(workspace_dir) if workspace_dir else log_path
+    workspace_log_path.mkdir(parents=True, exist_ok=True)
     
     # Configure root logger
     root_logger = logging.getLogger()
@@ -219,9 +226,9 @@ def setup_logging(
     )
     
     # ========================================================================
-    # 1. PROCESSING.LOG - RFP processing details
+    # 1. PROCESSING.LOG - RFP processing details (per workspace)
     # ========================================================================
-    processing_log_file = log_path / "processing.log"
+    processing_log_file = workspace_log_path / "processing.log"
     processing_handler = logging.handlers.RotatingFileHandler(
         processing_log_file,
         maxBytes=max_file_size,
@@ -258,9 +265,9 @@ def setup_logging(
     root_logger.addHandler(server_handler)
     
     # ========================================================================
-    # 3. ERRORS.LOG - All errors
+    # 3. ERRORS.LOG - All errors (per workspace)
     # ========================================================================
-    error_log_file = log_path / "errors.log"
+    error_log_file = workspace_log_path / "errors.log"
     error_handler = logging.handlers.RotatingFileHandler(
         error_log_file,
         maxBytes=max_file_size,
@@ -281,24 +288,22 @@ def setup_logging(
         console_handler.addFilter(HTTPFilter())
         root_logger.addHandler(console_handler)
     
-    # Log startup message using centralized banner utility
-    logger = logging.getLogger(__name__)
-    c = Colors
-    
-    log_banner("📋 LOGGING INFRASTRUCTURE", logger=logger)
-    logger.info(f"{c.YELLOW}Directory:{c.RESET}        {log_path.absolute()}")
-    logger.info(f"{c.GREEN}Processing Log:{c.RESET}   {processing_log_file.name} {c.CYAN}(RFP extraction, semantic inference){c.RESET}")
-    logger.info(f"{c.GREEN}Server Log:{c.RESET}       {server_log_file.name} {c.CYAN}(startup, API calls){c.RESET}")
-    logger.info(f"{c.GREEN}Error Log:{c.RESET}        {error_log_file.name} {c.CYAN}(all errors){c.RESET}")
-    logger.info(f"{c.YELLOW}Max File Size:{c.RESET}    {max_file_size / 1024 / 1024:.1f}MB per file")
-    logger.info(f"{c.YELLOW}Backup Count:{c.RESET}     {backup_count} files per log")
-    logger.info(f"{c.YELLOW}Console Output:{c.RESET}   {'Enabled' if console_output else 'Disabled'} (filtered)")
-    logger.info(f"{c.YELLOW}Log Level:{c.RESET}        {log_level.upper()}")
-    logger.info(f"{c.CYAN}{'═' * 80}{c.RESET}")
-    logger.info("")
-    
+    # Write session-start marker directly to processing log for run auditability
+    from datetime import datetime as _dt
+    _session_marker = (
+        f"\n{'─' * 38} SESSION START {_dt.now().strftime('%Y-%m-%d %H:%M:%S')} {'─' * 38}\n"
+        f"Workspace: {workspace_log_path.name}  |  Log: {processing_log_file}\n"
+        f"{'─' * 94}\n"
+    )
+    try:
+        processing_handler.stream.write(_session_marker)
+        processing_handler.flush()
+    except Exception:
+        pass  # Non-critical
+
     return {
         "log_dir": str(log_path.absolute()),
+        "workspace_log_dir": str(workspace_log_path.absolute()),
         "processing_log": str(processing_log_file),
         "server_log": str(server_log_file),
         "error_log": str(error_log_file),

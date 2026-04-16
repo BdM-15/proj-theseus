@@ -52,22 +52,22 @@ GovCon Capture Vibe is an **ontology-modified RAG system** for federal RFP analy
 - **RAG-Anything** (`raganything[all]>=1.2.10`) - Multimodal PDF parsing via MinerU
 - **LightRAG** (`lightrag-hku>=1.4.13`) - Knowledge graph construction + WebUI
 - **MinerU** (`mineru[core]>=3.0.0`) - PDF/DOCX/XLSX document parsing (GPU-accelerated)
-- **xAI Grok** - Cloud LLM (Dual: `grok-4-1-fast-non-reasoning` extraction, `grok-4-1-fast-reasoning` queries)
+- **xAI Grok** - Cloud LLM (Dual: `grok-4-1-fast-non-reasoning` extraction, `grok-4.20-0309-reasoning` queries)
 - **OpenAI Embeddings** - text-embedding-3-large (3072-dim)
 - **Neo4j 5.25** - Primary graph storage with workspace isolation
 - **Instructor** - Pydantic-enforced LLM outputs with retry logic
 
 ### **Strategic Value**
 
-| Capability             | Current Production (Apr 2026) | Notes                                |
-| ---------------------- | ----------------------------- | ------------------------------------ |
-| **Entity Types**       | 33 specialized types          | Government contracting ontology      |
-| **Graph Storage**      | Neo4j (primary)               | Workspace isolation, Cypher queries  |
-| **Extraction Quality** | 1,522 entities (425-page RFP) | Pydantic validation, 5x retry        |
-| **Privacy**            | Public RFPs → cloud           | Queries → 100% local                 |
-| **Chunk Size**         | 4,096 tokens                  | Optimized for extraction quality     |
-| **LLM Model**          | grok-4-1-fast-\* (dual)       | Extraction + Reasoning models        |
-| **Multimodal**         | Tables, images, text          | MinerU parsing with ontology mapping |
+| Capability             | Current Production (Apr 2026)    | Notes                                |
+| ---------------------- | -------------------------------- | ------------------------------------ |
+| **Entity Types**       | 33 specialized types             | Government contracting ontology      |
+| **Graph Storage**      | Neo4j (primary)                  | Workspace isolation, Cypher queries  |
+| **Extraction Quality** | 1,522 entities (425-page RFP)    | Pydantic validation, 5x retry        |
+| **Privacy**            | Public RFPs → cloud              | Queries → 100% local                 |
+| **Chunk Size**         | 4,096 tokens                     | Optimized for extraction quality     |
+| **LLM Model**          | grok-4.20 / grok-4-1-fast (dual) | Extraction + Reasoning models        |
+| **Multimodal**         | Tables, images, text             | MinerU parsing with ontology mapping |
 
 ---
 
@@ -86,7 +86,7 @@ RAG-Anything Multimodal Pipeline
     │   └─ Layout analysis (headers, footers, captions)
     ↓
 Cloud Processing (xAI Grok-4.1)
-    ├─ LLM: grok-4-1-fast-non-reasoning (extraction) + grok-4-1-fast-reasoning (queries)
+    ├─ LLM: grok-4-1-fast-non-reasoning (extraction) + grok-4.20-0309-reasoning (queries)
     ├─ Embeddings: OpenAI text-embedding-3-large (3072-dim)
     ├─ Chunk size: 4,096 tokens with 15% overlap (~614 tokens)
     ├─ Concurrency: 16 workers (MAX_ASYNC, prevents rate limit errors)
@@ -142,9 +142,9 @@ Query Processing (100% Local)
 # LLM Settings
 LLM_BINDING_API_KEY=xai-your-key-here
 LLM_BINDING_HOST=https://api.x.ai/v1
-LLM_MODEL=grok-4-1-fast-reasoning
+LLM_MODEL=grok-4.20-0309-reasoning
 EXTRACTION_LLM_NAME=grok-4-1-fast-non-reasoning
-REASONING_LLM_NAME=grok-4-1-fast-reasoning
+REASONING_LLM_NAME=grok-4.20-0309-reasoning
 LLM_MODEL_TEMPERATURE=0.1
 
 # Embedding Settings
@@ -208,7 +208,7 @@ BATCH_TIMEOUT_SECONDS=30  # Wait before triggering post-processing
 **Rationale**:
 
 - ✅ **Immediate availability**: xAI Grok production-ready (vs 6-month fine-tuning)
-- ✅ **Large model capability**: grok-4-1-fast-reasoning with 2M context window
+- ✅ **Large model capability**: grok-4.20-0309-reasoning with 2M context window
 - ✅ **Privacy maintained**: Proprietary queries stay 100% local
 - ✅ **Minimal cost**: ~$0.85 per large RFP
 
@@ -684,7 +684,7 @@ VALID_RELATIONSHIPS = {
 
 - **xAI Grok**: https://docs.x.ai
   - grok-4-1-fast-non-reasoning: Extraction (deterministic)
-  - grok-4-1-fast-reasoning: Queries (synthesis)
+  - grok-4.20-0309-reasoning: Queries (synthesis)
   - API: OpenAI-compatible (https://api.x.ai/v1)
 - **OpenAI Embeddings**: https://platform.openai.com/docs/guides/embeddings
   - text-embedding-3-large: 3072-dim, 8K token limit
