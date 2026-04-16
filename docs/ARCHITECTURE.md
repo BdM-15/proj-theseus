@@ -59,15 +59,15 @@ GovCon Capture Vibe is an **ontology-modified RAG system** for federal RFP analy
 
 ### **Strategic Value**
 
-| Capability             | Current Production (Apr 2026) | Notes                                |
-| ---------------------- | ----------------------------- | ------------------------------------ |
-| **Entity Types**       | 33 specialized types          | Government contracting ontology      |
-| **Graph Storage**      | Neo4j (primary)               | Workspace isolation, Cypher queries  |
-| **Extraction Quality** | 1,522 entities (425-page RFP) | Pydantic validation, 5x retry        |
-| **Privacy**            | Public RFPs → cloud           | Queries → 100% local                 |
-| **Chunk Size**         | 4,096 tokens                  | Optimized for extraction quality     |
+| Capability             | Current Production (Apr 2026)    | Notes                                |
+| ---------------------- | -------------------------------- | ------------------------------------ |
+| **Entity Types**       | 33 specialized types             | Government contracting ontology      |
+| **Graph Storage**      | Neo4j (primary)                  | Workspace isolation, Cypher queries  |
+| **Extraction Quality** | 1,522 entities (425-page RFP)    | Pydantic validation, 5x retry        |
+| **Privacy**            | Public RFPs → cloud              | Queries → 100% local                 |
+| **Chunk Size**         | 4,096 tokens                     | Optimized for extraction quality     |
 | **LLM Model**          | grok-4.20 / grok-4-1-fast (dual) | Extraction + Reasoning models        |
-| **Multimodal**         | Tables, images, text          | MinerU parsing with ontology mapping |
+| **Multimodal**         | Tables, images, text             | MinerU parsing with ontology mapping |
 
 ---
 
