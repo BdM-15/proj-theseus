@@ -88,10 +88,7 @@ async def main():
     # LightRAG's API server passes `args.llm_model` directly into openai_complete_if_cache(...)
     # (see: lightrag/api/lightrag_server.py -> create_optimized_openai_llm_func).
     settings = get_settings()
-    logger.info(f"✅ WebUI Query Model (effective): {getattr(global_args, 'llm_model', None)}")
-    logger.info(f"   - Extraction model (env EXTRACTION_LLM_NAME): {settings.extraction_llm_name}")
-    logger.info(f"   - Reasoning model (env REASONING_LLM_NAME):  {settings.reasoning_llm_name}")
-    
+
     # Step 4: Override endpoints to use RAG-Anything + semantic post-processing
     # Remove original LightRAG endpoints that don't support multimodal processing
     new_routes = []
@@ -108,67 +105,26 @@ async def main():
     create_documents_upload_endpoint(app, rag_instance)
     logger.info("✅ Custom endpoints registered: /insert, /documents/upload")
     logger.info("✅ Use LightRAG's native /query/data endpoint for structured data retrieval (agent workflows)")
-    
-    # Print startup summary with pipeline flow
-    chunk_size = settings.chunk_size or 4096
+
+    # Compact startup banner — full pipeline detail in docs/ARCHITECTURE.md
     graph_storage = global_args.graph_storage if hasattr(global_args, 'graph_storage') else "NetworkXStorage"
-    
-    # Use centralized color codes from logging_config
-    from src.utils.logging_config import Colors
+    from src.utils.logging_config import log_banner, Colors
     c = Colors
-    
-    logger.info("")
-    logger.info(f"{c.CYAN}{'═' * 80}{c.RESET}")
-    logger.info(f"{c.BOLD}{c.MAGENTA}🔄 PROCESSING PIPELINE FLOW{c.RESET}")
-    logger.info(f"{c.CYAN}{'═' * 80}{c.RESET}")
-    logger.info(f"{c.YELLOW}1.{c.RESET} {c.BOLD}Document Upload{c.RESET}")
-    logger.info(f"   {c.CYAN}└─>{c.RESET} MinerU multimodal parser (images/tables/equations)")
-    logger.info("")
-    logger.info(f"{c.YELLOW}2.{c.RESET} {c.BOLD}LightRAG Chunking{c.RESET} {c.CYAN}({chunk_size} tokens, 15% overlap){c.RESET}")
-    logger.info(f"   {c.CYAN}└─>{c.RESET} Multiple focused extraction passes (prevents attention decay)")
-    logger.info("")
-    logger.info(f"{c.YELLOW}3.{c.RESET} {c.BOLD}Entity Extraction{c.RESET} {c.CYAN}(33 custom types){c.RESET}")
-    logger.info(f"   {c.CYAN}├─>{c.RESET} Native LightRAG extraction (~22K tokens FULL govcon prompt)")
-    logger.info(f"   {c.CYAN}├─>{c.RESET} LLM (query model): {getattr(global_args, 'llm_model', settings.reasoning_llm_name)}")
-    logger.info(f"   {c.CYAN}└─>{c.RESET} Tuple-delimited output (Issue #54 - Back to Basics)")
-    logger.info("")
-    logger.info(f"{c.YELLOW}4.{c.RESET} {c.BOLD}Relationship Extraction{c.RESET}")
-    logger.info(f"   {c.CYAN}└─>{c.RESET} LightRAG automatic relationship inference")
-    logger.info("")
-    logger.info(f"{c.YELLOW}5.{c.RESET} {c.BOLD}Semantic Post-Processing{c.RESET} {c.GREEN}(Auto-triggered){c.RESET}")
-    logger.info(f"   {c.CYAN}├─>{c.RESET} 8 LLM inference algorithms (~3,500 lines prompts)")
-    logger.info(f"   {c.CYAN}├─>{c.RESET} Relationship inference (Section L↔M, Annex linkage)")
-    logger.info(f"   {c.CYAN}└─>{c.RESET} Optional workload enrichment + description generation")
-    logger.info("")
-    logger.info(f"{c.YELLOW}6.{c.RESET} {c.BOLD}Knowledge Graph Storage{c.RESET} {c.CYAN}({graph_storage}){c.RESET}")
+
+    startup_items = [
+        ("Workspace",  f"{c.BOLD}{settings.workspace}{c.RESET}"),
+        ("Storage",    f"{graph_storage}  |  {global_args.working_dir}"),
+        ("Extraction", settings.extraction_llm_name),
+        ("Reasoning",  settings.reasoning_llm_name),
+        ("Embeddings", f"{settings.embedding_model} ({settings.embedding_dim}D)"),
+        ("WebUI",      f"{c.BLUE}http://{host}:{port}/webui{c.RESET}"),
+        ("API Docs",   f"{c.BLUE}http://{host}:{port}/docs{c.RESET}"),
+    ]
     if graph_storage == "Neo4JStorage":
-        logger.info(f"   {c.CYAN}├─>{c.RESET} Neo4j enterprise graph database")
-        logger.info(f"   {c.CYAN}├─>{c.RESET} Multi-workspace isolation")
-        logger.info(f"   {c.CYAN}└─>{c.RESET} APOC subgraph queries for cross-RFP intelligence")
-    else:
-        logger.info(f"   {c.CYAN}└─>{c.RESET} Local GraphML files")
-    logger.info(f"{c.CYAN}{'═' * 80}{c.RESET}")
-    logger.info("")
-    
-    logger.info(f"{c.CYAN}{'═' * 80}{c.RESET}")
-    logger.info(f"{c.BOLD}{c.MAGENTA}🌐 SERVER ENDPOINTS{c.RESET}")
-    logger.info(f"{c.CYAN}{'═' * 80}{c.RESET}")
-    logger.info(f"{c.GREEN}WebUI:{c.RESET}              {c.BLUE}http://{host}:{port}/webui{c.RESET}")
-    logger.info(f"{c.GREEN}API Docs:{c.RESET}           {c.BLUE}http://{host}:{port}/docs{c.RESET}")
-    if graph_storage == "Neo4JStorage":
-        logger.info(f"{c.GREEN}Neo4j Browser:{c.RESET}      {c.BLUE}http://localhost:7474{c.RESET}")
-        logger.info(f"{c.GREEN}Neo4j Aura:{c.RESET}         {c.BLUE}https://console.neo4j.io{c.RESET} {c.YELLOW}(recommended){c.RESET}")
-    logger.info("")
-    logger.info(f"{c.YELLOW}Working Directory:{c.RESET}  {global_args.working_dir}")
-    logger.info(f"{c.YELLOW}Current Workspace:{c.RESET}  {c.BOLD}{settings.workspace}{c.RESET}")
-    logger.info("")
-    logger.info(f"{c.GREEN}▸ LLM Configuration (Dual-Model):{c.RESET}")
-    logger.info(f"  {c.CYAN}Extraction:{c.RESET}       {settings.extraction_llm_name} {c.YELLOW}(non-reasoning){c.RESET}")
-    logger.info(f"  {c.CYAN}Reasoning:{c.RESET}        {settings.reasoning_llm_name} {c.GREEN}(reasoning){c.RESET}")
-    logger.info(f"  {c.CYAN}Embeddings:{c.RESET}       {settings.embedding_model} ({settings.embedding_dim}D)")
-    logger.info(f"{c.CYAN}{'═' * 80}{c.RESET}")
-    logger.info("")
-    
+        startup_items.append(("Neo4j", f"{c.BLUE}http://localhost:7474{c.RESET}"))
+
+    log_banner("✅ GOVCON RAG — READY", items=startup_items, logger=logger)
+
     # Step 5: Start server
     config = uvicorn.Config(app=app, host=host, port=port, log_level="info")
     server_instance = uvicorn.Server(config)
