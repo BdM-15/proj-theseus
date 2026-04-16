@@ -2,7 +2,7 @@ GOVCON ONTOLOGY - LIGHTRAG NATIVE FORMAT (FULL INTELLIGENCE RESTORED)
 ======================================================================
 Model: xAI Grok-4-fast-reasoning (2M context window)
 Output: LightRAG tuple-delimited format (entity/relation lines)
-Version: 6.2 (Branch 078 - Shipley Definition Enrichment)
+Version: 6.3 (Branch 079 - Entity Extraction Quality + Structural Bridges)
 Source: Complete restoration from Branch 040 modular prompts
 Total Size: ~35K tokens (comprehensive domain intelligence)
 
@@ -374,17 +374,21 @@ entity{tuple_delimiter}Daily Equipment Cleaning{tuple_delimiter}requirement{tupl
 entity{tuple_delimiter}Equipment Cleaning Defect Threshold{tuple_delimiter}performance_standard{tuple_delimiter}No more than 2 defects per month for equipment cleaning. Threshold: No more than 2 defects per month. Measurement: Periodic Inspection (Monthly).
 relation{tuple_delimiter}Daily Equipment Cleaning{tuple_delimiter}Equipment Cleaning Defect Threshold{tuple_delimiter}MEASURED_BY{tuple_delimiter}Cleaning requirement performance is measured by defect threshold
 
-C.2 STRATEGIC_THEME Detection (Shipley Capture Intelligence)
--------------------------------------------------------------
-Strategic themes are competitive intelligence extracted from RFP language. They reveal customer priorities and proposal positioning opportunities.
+C.2 STRATEGIC_THEME + CUSTOMER_PRIORITY Detection (Shipley Capture Intelligence)
+----------------------------------------------------------------------------------
+Capture intelligence has TWO extraction targets:
+- CUSTOMER_PRIORITY = what the customer EXPLICITLY states is important
+- STRATEGIC_THEME = what the proposer INFERS from patterns in the RFP
 
-Theme Types (ThemeType enum):
-1. CUSTOMER_HOT_BUTTON: Government's explicit emphasis or priority concern
-2. DISCRIMINATOR: Key differentiator between competitors
-3. PROOF_POINT: Evidence/past performance that validates capability
-4. WIN_THEME: Overarching proposal messaging/positioning
+STRATEGIC_THEME Types (ThemeType enum):
+1. DISCRIMINATOR: Key differentiator between competitors (INFERRED)
+2. PROOF_POINT: Evidence/past performance that validates capability (INFERRED)
+3. WIN_THEME: Overarching proposal messaging/positioning (INFERRED)
 
-CUSTOMER_HOT_BUTTON Detection Signals:
+*** NOTE: CUSTOMER_HOT_BUTTON is NO LONGER a STRATEGIC_THEME subtype.
+    Hot buttons are now extracted as CUSTOMER_PRIORITY entities. ***
+
+CUSTOMER_PRIORITY Detection Signals (extract as customer_priority):
 - "The Government places emphasis on..."
 - "Critical to mission success is..."
 - "Of paramount importance..."
@@ -393,32 +397,43 @@ CUSTOMER_HOT_BUTTON Detection Signals:
 - "Key to award decision..."
 - Evaluation factor weighted >30% (signals priority)
 - "Key to success is..."
-- "Offerors must demonstrate..."
 - "Past performance demonstrating [X] is essential"
 - Repeated emphasis on specific capability areas
+- "Significantly more important than..."
+- Adjectival rating comparisons between factors
 
-WIN_THEME / DISCRIMINATOR Detection:
+DISCRIMINATOR Detection (extract as strategic_theme, theme_type=DISCRIMINATOR):
 - Unique capability requirements that favor specific approaches
 - Technology or methodology preferences stated in RFP
+- Requirements where a specific approach would stand out
+- Ghost language ("contractors without X may struggle to...")
+
+WIN_THEME Detection (extract as strategic_theme, theme_type=WIN_THEME):
+- Intersection of customer priorities + pain points + evaluation weights
 - Emphasis on innovation, cost savings, or efficiency
 - References to lessons learned from previous contracts
 
-PROOF_POINT Detection:
+PROOF_POINT Detection (extract as strategic_theme, theme_type=PROOF_POINT):
 - Specific past performance requirements
 - CPARS rating references
 - Certification requirements (CMMI, ISO, etc.)
 - Quantified experience (years, contract values, staff size)
 - Similar contract references
 
-Example - From Evaluation Weighting:
+Example - Explicit Customer Statement → CUSTOMER_PRIORITY:
 "Factor 1: Mission Readiness (50%) - Most Important"
-Extract as: strategic_theme with theme_type CUSTOMER_HOT_BUTTON
-Name: "Mission Readiness Priority"
+Extract as: customer_priority
+Name: "Mission Readiness Is Top Priority"
 
-Example - From PWS Emphasis:
+Example - Explicit Customer Emphasis → CUSTOMER_PRIORITY:
 "Cultural sensitivity in host nation operations is essential to contract success."
-Extract as: strategic_theme with theme_type CUSTOMER_HOT_BUTTON
-Name: "Host Nation Cultural Sensitivity"
+Extract as: customer_priority
+Name: "Host Nation Cultural Sensitivity Priority"
+
+Example - Inferred Discriminator → STRATEGIC_THEME:
+"Contractor must maintain TS/SCI cleared personnel on-site at all times."
+Extract as: strategic_theme with theme_type DISCRIMINATOR
+Name: "Cleared Personnel On-Site Requirement (DISCRIMINATOR)"
 
 C.3 Requirement Criticality Classification
 -------------------------------------------
@@ -524,6 +539,7 @@ You MUST classify every entity into exactly ONE of these 33 types:
    Example: "CLIN 0001 Base Year Operations FFP", "SLIN 0002AA Option Year 1"
 
 3. PRICING_ELEMENT - Rates, fees, escalation, burden, or pricing methodology components
+   Required metadata: pricing_type (rate/fee/escalation/burden), value_or_percentage, basis_of_application
    Content signals: indirect rate, fee, burden, escalation, plug rate, wrap rate
    Distinction: PRICING_ELEMENT = pricing logic component; CONTRACT_LINE_ITEM = priced line
    Example: "Award Fee Pool 7%", "Escalation 2.5% annually", "Overhead rate 18%"
@@ -546,8 +562,8 @@ You MUST classify every entity into exactly ONE of these 33 types:
    Example: "12,500 sorties/year", "1,600 customers daily", "100 events/year"
 
 7. LABOR_CATEGORY - Named labor classifications and workforce roles
+   Required metadata: position_title, skill_level, clearance_level
    Content signals: Labor mix tables, position titles, skill levels, labor hours
-   Must Extract: Position title, skill level (if stated), clearance (if stated)
    Distinction: Extract ONLY when explicitly named in RFP. If only quantities exist, use WORKLOAD_METRIC.
    Example: "Program Manager", "Systems Engineer Level III", "Help Desk Analyst"
 
@@ -558,6 +574,7 @@ You MUST classify every entity into exactly ONE of these 33 types:
    Example: "99.9% system uptime", "No more than 2 defects per month", "QASP Standard 3"
 
 9. TRANSITION_ACTIVITY - Phase-in, phase-out, turnover, incumbent handoff tasks
+   Required metadata: phase (phase-in/phase-out/overlap), duration, dependencies
    Content signals: transition, phase-in, phase-out, turnover, mobilization, stand-up
    Distinction: TRANSITION_ACTIVITY = temporary transition work; WORK_SCOPE_ITEM = steady-state work scope
    Example: "30-Day Transition Plan", "Incumbent Knowledge Transfer", "Phase-In Staffing Ramp"
@@ -602,6 +619,7 @@ You MUST classify every entity into exactly ONE of these 33 types:
    Example: "MIL-DTL-38999", "Interface Control Document ICD-001", "Drawing 12345 Rev C"
 
 16. WORK_SCOPE_ITEM - PWS/SOW/SOO tasks, objectives, service packages, or work elements regardless of location
+   Required metadata: task_number, scope_description, period_of_performance
    Content signals: task descriptions, objectives, performance work, scope items, work packages
    Distinction: WORK_SCOPE_ITEM = semantic work package; DOCUMENT_SECTION = structural container; REQUIREMENT = obligation sentence
    Example: "Task 3.2 Network Operations Support", "Objective 4 Airfield Readiness", "Work Package 2 Depot Maintenance"
@@ -636,6 +654,7 @@ You MUST classify every entity into exactly ONE of these 33 types:
     Example: Technical Volume limited to 25 pages, 12pt Times New Roman
 
 20. PROPOSAL_VOLUME - Named proposal containers or response volumes
+   Required metadata: volume_id, purpose (technical/management/past_performance/cost/other), associated_factors
    Content signals: Volume I, Volume II, Oral Presentation Volume, Annex B Response Volume
    Distinction: PROPOSAL_VOLUME = container; PROPOSAL_INSTRUCTION = rule/constraint applying to it
    Example: "Volume I Technical", "Volume III Past Performance"
@@ -652,36 +671,58 @@ You MUST classify every entity into exactly ONE of these 33 types:
 
 ─── STRATEGIC AND ANALYTICAL SIGNAL ───
 
-22. STRATEGIC_THEME - Win themes, discriminators, proof points, or hot buttons
+22. STRATEGIC_THEME - Capture strategy signals INFERRED from document patterns
     Required metadata: theme_type
-    Theme types: CUSTOMER_HOT_BUTTON, DISCRIMINATOR, PROOF_POINT, WIN_THEME
+    Theme types: DISCRIMINATOR, PROOF_POINT, WIN_THEME
+    *** EXTRACTION RULE: STRATEGIC_THEME captures insights the PROPOSER synthesizes
+    from reading between the lines. These are NOT explicitly stated by the customer —
+    they are strategic conclusions drawn from patterns, emphasis, requirements structure,
+    and evaluation criteria. If the customer EXPLICITLY states importance, use
+    CUSTOMER_PRIORITY instead. ***
     Shipley definitions (use these for classification):
-    - DISCRIMINATOR: Feature that (1) differs from competitors AND (2) the customer
-      acknowledges as important. Both conditions required. Look for unique requirements
-      where a specific approach would stand out.
-    - WIN_THEME: Links a customer benefit to a discriminating feature. Themes tell
-      evaluators why they should select you. "Strategies are things to do. Themes
-      are things to say."
-    - CUSTOMER_HOT_BUTTON: What keeps the customer up at night — worry items, core
-      needs, hidden agendas, reasons behind requirements. Look for repeated emphasis,
-      unusual specificity, enhanced surveillance language.
-    - PROOF_POINT: Evidence backing a claim — certifications, metrics, past
-      performance results. Part of the FAB chain (Feature → Advantage → Benefit).
-    Content signals: emphasis language, repeated themes, "critical", "paramount",
-    "key objective", unique requirements, Ghost language ("contractors without X
-    may struggle to...")
-    Example: Mission Readiness Priority (CUSTOMER_HOT_BUTTON)
+    - DISCRIMINATOR: A capability or approach that (1) differs from competitors AND
+      (2) the customer acknowledges as important. Both conditions required. Inferred
+      from unique requirements, unusual specificity, or evaluation criteria that favor
+      a particular approach. The RFP won't say "this is a discriminator" — you infer it.
+    - WIN_THEME: A proposal message that links a customer benefit to a discriminating
+      feature. Win themes are CRAFTED by the proposer, not stated by the customer.
+      "Strategies are things to do. Themes are things to say." Inferred from the
+      intersection of customer priorities + pain points + evaluation weights.
+    - PROOF_POINT: Evidence that backs a discriminator claim — certifications, metrics,
+      past performance results, staffing credentials. Part of the FAB chain
+      (Feature → Advantage → Benefit). Inferred when the RFP creates an opportunity
+      to demonstrate capability (e.g., "demonstrate experience with..." signals a
+      proof point opportunity).
+    Content signals: Ghost language ("contractors without X may struggle to..."),
+    unusual specificity in requirements, evaluation criteria that favor niche capabilities,
+    repeated emphasis on a theme across multiple sections, requirements that align with
+    known incumbent weaknesses
+    Example: "Integrated Logistics Approach (WIN_THEME)", "CMMI Level 3 Maturity (PROOF_POINT)"
 
-23. CUSTOMER_PRIORITY - Explicit importance language or weighting signal from the customer
-   Content signals: paramount, critical, essential, significantly more important, highest priority,
-   "of utmost importance", "overriding concern", "cannot be overstated"
-   Distinction: CUSTOMER_PRIORITY = importance/emphasis signal; STRATEGIC_THEME = broader strategic message
-   Shipley: Customer priorities are Hot Buttons — what keeps decision-makers up at night.
-   They drive Executive Summary organization and should appear in every volume's theme
-   statements. Repeated emphasis across multiple sections signals a true hot button.
-   Example: "Cybersecurity Is Paramount", "Mission Readiness Is the Top Priority"
+23. CUSTOMER_PRIORITY - What the customer EXPLICITLY states matters most
+    Required metadata: priority_signal (stated/weighted), source_section
+    Content signals: paramount, critical, essential, significantly more important, highest
+    priority, "of utmost importance", "overriding concern", "cannot be overstated",
+    evaluation factor weights, adjectival ratings ("most important", "significantly
+    more important than"), repeated emphasis across multiple sections
+    *** EXTRACTION RULE: CUSTOMER_PRIORITY captures what the customer DIRECTLY tells
+    you is important — through explicit language, weighting, or emphasis. If you must
+    READ BETWEEN THE LINES, use STRATEGIC_THEME instead. ***
+    Two sub-patterns:
+    - STATED PRIORITY: Direct importance language ("Cybersecurity is paramount",
+      "Mission readiness is the overriding concern")
+    - WEIGHTED PRIORITY: Evaluation factor emphasis ("Technical Approach is
+      significantly more important than Cost", "Past Performance and Technical
+      are equal and more important than Price")
+    Shipley: Customer priorities are Hot Buttons — what keeps decision-makers up at
+    night. They drive Executive Summary organization and should appear in every
+    volume's theme statements. Repeated emphasis across multiple sections signals
+    a true hot button vs. boilerplate.
+    Example: "Cybersecurity Is Paramount", "Mission Readiness Is the Top Priority",
+    "Technical Approach is significantly more important than Cost"
 
 24. PAIN_POINT - Problem statements, deficiencies, shortfalls, or issues the government wants resolved
+   Required metadata: severity (critical/moderate/minor), source_evidence
    Content signals: deficiencies, current contract lacks, shortfall, lessons learned, challenge, issue,
    "incumbent failed", "historically problematic", "area of concern"
    Distinction: PAIN_POINT = problem to solve; REQUIREMENT = action/solution expected
@@ -693,33 +734,39 @@ You MUST classify every entity into exactly ONE of these 33 types:
 ─── STANDARD ENTITIES ───
 
 25. ORGANIZATION - Agencies, military units, contractors
+    Required metadata: role (customer/contractor/subcontractor/partner), org_type (agency/military_unit/company)
     Content signals: Company names, agency names, military designations
     Patterns: "Inc.", "LLC", "Corp.", acronyms (NAVAIR, GSA)
     Example: Naval Air Systems Command, Marine Corps Logistics Command
 
 26. PROGRAM - Government programs and initiatives
+    Required metadata: program_name, sponsoring_agency, contract_type_if_stated
     Content signals: Program names, major acquisition titles, acronyms
     Distinction: PROGRAM = services/initiatives; EQUIPMENT = physical items
     Example: MCPP II, Navy MBOS, F-35 Lightning II Program
 
 27. EQUIPMENT - Physical hardware, vehicles, machinery
+    Required metadata: quantity, model_or_nsn, condition_or_status
     Patterns: Model numbers (M1A1, RG-24), NSN numbers, TAMCN codes
     Content signals: Physical descriptions, quantities, specifications
     Distinction: EQUIPMENT = physical item; TECHNOLOGY = software/system
     Example: Concorde RG-24 Battery, 6200 Tennant Floor Scrubber
 
 28. TECHNOLOGY - Software, systems, platforms
+    Required metadata: version, vendor_or_provider, purpose
     Content signals: Version numbers, software names, system names
     Patterns: "Windows Server 2022", "Python 3.11", "AWS GovCloud"
     Distinction: TECHNOLOGY = software/logical; EQUIPMENT = hardware/physical
     Example: AWS GovCloud, ServiceNow, GCSS-MC
 
 29. LOCATION - Performance locations, facilities, bases
+    Required metadata: site_name, region (CONUS/OCONUS/specific), classification (base/building/facility)
     Content signals: Base names, building numbers, geographic areas
     Patterns: "Building ###", "NAS [Name]", "CONUS/OCONUS"
     Example: Naval Air Station Pensacola, Building 2959
 
 30. EVENT - Milestones, deadlines, scheduled activities
+    Required metadata: date_or_timeframe, event_type (milestone/deadline/recurring)
     Content signals: Dates, deadlines, scheduled activities
     Distinction: EVENT = scheduled/time-bound; CONCEPT = process/methodology
     Example: Kickoff Meeting, Contract Award Date
@@ -733,14 +780,31 @@ You MUST classify every entity into exactly ONE of these 33 types:
    Distinction: COMPLIANCE_ARTIFACT = maintained evidence/compliance object; DELIVERABLE = one-time submission
    Example: "ISO 9001:2015 Certification", "Authority to Operate (ATO)"
 
-33. CONCEPT - Residual category for abstract ideas and processes
-   Use ONLY when no other type fits. Check all 32 types above first.
-    Content signals: Abstract nouns, process descriptions, methodologies
-   NOT for: CLINs (→ contract_line_item), workload numbers (→ workload_metric),
-   regulations (→ regulatory_reference), labor roles (→ labor_category),
-   proposal rules (→ proposal_instruction), work packages (→ work_scope_item),
-   QASP entries (→ performance_standard), subfactors (→ subfactor)
-    Example: Change Control Process, Risk Management Methodology
+33. CONCEPT - Named methodologies, frameworks, and abstract domain processes
+    *** EXTRACTION RULE: CONCEPT is NOT a catch-all. It captures NAMED methodologies
+    and abstract processes that don't fit the 32 types above. Before using CONCEPT,
+    verify the entity doesn't fit: WORK_SCOPE_ITEM (task/deliverable scope),
+    REQUIREMENT (obligation), PERFORMANCE_STANDARD (threshold/SLA), TECHNOLOGY
+    (software/platform), REGULATORY_REFERENCE (external standard), or
+    TECHNICAL_SPECIFICATION (engineering authority). ***
+    VALID CONCEPT examples (named methodologies/frameworks):
+    - "Earned Value Management" (methodology, not a requirement or standard)
+    - "Risk Management Framework" (abstract process, not a regulation like NIST SP 800-37)
+    - "Condition-Based Maintenance" (approach, not a specific work task)
+    - "Lean Six Sigma" (methodology, not a technology or specification)
+    - "Agile Development Methodology" (approach, not a software platform)
+    INVALID CONCEPT examples (use correct type instead):
+    - "Contractor shall implement EVM" → REQUIREMENT (obligation verb = requirement)
+    - "NIST SP 800-37 RMF" → REGULATORY_REFERENCE (external standard)
+    - "ServiceNow ITSM Platform" → TECHNOLOGY (software)
+    - "Task 3.2 Network Monitoring" → WORK_SCOPE_ITEM (scoped task)
+    - "99.9% system uptime" → PERFORMANCE_STANDARD (measurable threshold)
+    - "Monthly Status Report" → DELIVERABLE (submission artifact)
+    Government obligation pattern:
+    - "Government shall provide..." → CONCEPT (NOT a contractor requirement)
+    Content signals: Named processes, "-ology"/"-ment" suffixes, "approach", "methodology",
+    "framework", "process", "model", "strategy" (when describing HOW, not WHAT)
+    Example: "Earned Value Management", "Condition-Based Maintenance Plus (CBM+)"
 
 ─── DISAMBIGUATION RULES ───
 
@@ -803,10 +867,12 @@ LABOR_CATEGORY vs WORKLOAD_METRIC:
   If RFP names specific positions → labor_category. If only quantities → workload_metric.
 
 STRATEGIC_THEME vs CUSTOMER_PRIORITY vs PAIN_POINT:
-   "Mission readiness" emphasized as the proposal message → strategic_theme
-   "Mission readiness is the highest priority" → customer_priority
-   "Current readiness shortfalls delay sortie generation" → pain_point
-   Theme = strategy, priority = weighting/emphasis, pain point = problem to solve
+   "Technical Approach is significantly more important than Cost" → customer_priority (EXPLICIT weighting)
+   "Mission readiness is the highest priority" → customer_priority (EXPLICIT statement)
+   "Contractors without cleared personnel may face access delays" → strategic_theme (INFERRED ghost language → discriminator opportunity)
+   "Integrated logistics approach reduces transition risk" → strategic_theme (INFERRED win theme)
+   "Current readiness shortfalls delay sortie generation" → pain_point (problem statement)
+   *** KEY RULE: If the CUSTOMER says it → customer_priority. If the PROPOSER infers it → strategic_theme. ***
 
 STRICTLY FORBIDDEN entity types (NEVER USE):
 ❌ other, UNKNOWN, process, table, image, plan, policy, standard, instruction,
@@ -815,8 +881,8 @@ STRICTLY FORBIDDEN entity types (NEVER USE):
 FALLBACK MAPPING (when LLM generates forbidden types):
 - Plans/Policies/Manuals → document
 - Systems/Tools/Software/Platforms → technology
-- Tables/Lists/Schedules → document (if data table) or concept (if abstract)
-- Processes/Workflows → concept
+- Tables/Lists/Schedules → document (if data table) or concept (if named methodology)
+- Named Processes/Methodologies/Frameworks → concept (only if not a regulation, technology, or work task)
 - Amendments/Revisions/Mods → amendment
 - MIL-STD/DAFI/AR/NIST references → regulatory_reference
 - MIL-DTL/MIL-PRF/ICD/TDP/drawings → technical_specification
@@ -849,7 +915,8 @@ Example Classifications (follow these patterns):
 - "Quality Assurance Plan" → document (NOT "plan")
 - "WAWF System" → technology (NOT "system")
 - "RFID System" → technology (NOT "system")
-- "Change Control Process" → concept (NOT "process")
+- "Change Control Process" → concept (named methodology, NOT "process")
+- "Earned Value Management" → concept (named methodology, NOT "requirement")
 - "MCPP Program" → program (named initiative)
 - "M1A1 Tank" → equipment (physical asset)
 
@@ -964,7 +1031,7 @@ REFERENCES - Entity mentions another entity by name
 
 ─── EVALUATION & PROPOSAL ───
 GUIDES - Proposal instructions or volumes that guide evaluation responses
-EVALUATED_BY - Requirements/deliverables/past performance evaluated in factors
+EVALUATED_BY - Requirements/deliverables/past performance/work scope items evaluated in factors
 HAS_SUBFACTOR - Evaluation factor has subfactor (Factor 1 → Subfactor 1.1)
 MEASURED_BY - Requirement is measured by performance standard
 EVIDENCES - Past performance reference or compliance artifact evidences a theme, factor, or requirement
@@ -984,7 +1051,7 @@ GOVERNED_BY - Requirement governed by policy/document
 MANDATES - Regulatory reference mandates a requirement
 CONSTRAINED_BY - Work scope or pricing element constrained by authority/spec
 DEFINES - One entity defines/explains another
-APPLIES_TO - Requirement applies to equipment
+APPLIES_TO - Requirement/standard applies to equipment; instruction applies to volume
 
 ─── RESOURCE & OPERATIONAL ───
 HAS_EQUIPMENT - Location has equipment
@@ -1273,6 +1340,80 @@ clearance, SECRET, TOP SECRET, SCI, SAP, compartmented, background check, access
 FINANCIAL keywords:
 price, cost, CLIN, option, ODC, labor rate, overhead, G&A, fee, profit, invoice, billing, payment, progress payment, retention, withholding, remittance, budget, funding, obligation, expenditure, burn rate, cost control, variance, FFP, CPFF, T&M, fixed price, cost plus, time and materials, hybrid, incentive
 
+F.9 Structural Bridge Rules (CRITICAL FOR GRAPH TRAVERSAL)
+------------------------------------------------------------
+These rules create edges that connect typed entities back to their structural
+context. Without them, graph queries hit dead-ends — the knowledge exists but
+the traversal path is broken.
+
+Rule 1: Section Provenance for Non-Numbered Entities
+=====================================================
+PROBLEM: Entities like "Volume I Technical", "Factor 1: Technical Approach", and
+"Technical Volume limited to 25 pages" do NOT have X.Y.Z numbering, so the
+universal numbered hierarchy rule (F.5 Rule 6) never fires. They become orphans
+disconnected from the document structure they belong to.
+
+ACTION: When extracting proposal_volume, evaluation_factor, or proposal_instruction
+entities, ALWAYS create a CHILD_OF relationship to their parent document_section.
+
+  proposal_volume --CHILD_OF--> document_section (Section L or equivalent)
+  evaluation_factor --CHILD_OF--> document_section (Section M or equivalent)
+  proposal_instruction --CHILD_OF--> document_section (Section L or equivalent)
+
+Non-UCF equivalents:
+  "Proposal Instructions" / "Submission Requirements" → parent for volumes + instructions
+  "Evaluation Criteria" / "Selection Criteria" / "Award Methodology" → parent for factors
+  "Basis for Award" / "Source Selection" → parent for factors
+
+EXAMPLES:
+  "Volume I Technical" --CHILD_OF--> "Section L Proposal Instructions"
+  "Factor 1 Technical Approach" --CHILD_OF--> "Section M Evaluation Criteria"
+  "Technical Volume limited to 25 pages" --CHILD_OF--> "Section L"
+  "Subfactor 1.1 TOMP" --CHILD_OF--> "Factor 1 Technical Approach" (via HAS_SUBFACTOR)
+
+Confidence: 0.90 (high - entity appears within the section text)
+WHY THIS MATTERS: Queries like "What does Section M evaluate?" cannot traverse
+from document_section → evaluation_factor without this edge.
+
+Rule 2: Proposal Instruction → Proposal Volume (APPLIES_TO)
+=============================================================
+PROBLEM: Instructions prescribe rules FOR volumes (page limits, formatting, what
+to address). Both connect to evaluation_factor via GUIDES, but there is no direct
+edge between them. To answer "What are the rules for Volume II?" requires vector
+search only — the graph path is broken.
+
+ACTION: When a proposal_instruction mentions a specific volume, create:
+  proposal_instruction --APPLIES_TO--> proposal_volume
+
+PATTERNS:
+  "Technical Volume shall not exceed 25 pages" → instruction APPLIES_TO "Volume I Technical"
+  "Management Volume limited to 15 pages, 12pt font" → instruction APPLIES_TO "Volume II Management"
+  "Cost Volume shall include completed pricing schedules" → instruction APPLIES_TO "Cost Volume"
+  "All volumes shall use 1-inch margins" → instruction APPLIES_TO EACH volume
+
+Confidence: 0.85-0.95 depending on explicitness
+WHY THIS MATTERS: The compliance matrix needs instruction→volume→factor paths.
+
+Rule 3: Work Scope Item → Evaluation Factor (EVALUATED_BY)
+============================================================
+PROBLEM: RFPs say "Factor 1 evaluates the offeror's approach to tasks 3.1–3.5"
+but EVALUATED_BY only connected requirements and deliverables to factors. Work
+scope items (task packages) were disconnected from what factor evaluates them.
+
+ACTION: When evaluation factor text references work scope tasks, SOW sections,
+or task areas, create:
+  work_scope_item --EVALUATED_BY--> evaluation_factor
+
+PATTERNS:
+  Factor text: "Technical Approach to PWS tasks 3.1 through 3.5" → each WSI EVALUATED_BY factor
+  Factor text: "Maintenance operations as described in Section C.4" → WSI EVALUATED_BY factor
+  Factor text: "Evaluate logistics support plan" → logistics WSIs EVALUATED_BY factor
+
+Confidence: 0.80-0.90 depending on explicitness
+WHY THIS MATTERS: "Which tasks does Technical Factor evaluate?" is critical for
+Shipley compliance matrix and proposal outlining. Without this edge, the answer
+requires vector search across disconnected graph neighborhoods.
+
 ================================================================================
 PART G: ENTITY NAMING NORMALIZATION RULES
 ================================================================================
@@ -1512,7 +1653,7 @@ REFERENCES         Source entity mentions or cites target entity by name
 
 ─── EVALUATION & PROPOSAL (Section L↔M Golden Thread) ───
 GUIDES             Source instruction/volume guides response to target evaluation factor
-EVALUATED_BY       Source requirement/deliverable is evaluated under target factor
+EVALUATED_BY       Source requirement/deliverable/work_scope_item is evaluated under target factor
 HAS_SUBFACTOR      Source evaluation factor has target as a subfactor
 MEASURED_BY        Source requirement is measured by target performance standard
 EVIDENCES          Source past performance/compliance artifact evidences target theme/factor
@@ -1532,7 +1673,7 @@ GOVERNED_BY        Source requirement is governed by target policy/document/regu
 MANDATES           Source clause/regulation mandates target requirement
 CONSTRAINED_BY     Source work scope/pricing is constrained by target authority/spec
 DEFINES            Source entity defines or explains target entity
-APPLIES_TO         Source requirement/standard applies to target equipment/entity
+APPLIES_TO         Source requirement/standard applies to target equipment; source instruction applies to target volume
 
 ─── RESOURCE & OPERATIONAL ───
 HAS_EQUIPMENT      Source location has target equipment
@@ -1550,7 +1691,7 @@ SOURCE → TARGET CONSTRAINTS (enforce directionality):
   CHILD_OF:        child_entity → parent_entity (sub-section → section)
   ATTACHMENT_OF:   attachment → parent_section/document
   GUIDES:          proposal_instruction/proposal_volume → evaluation_factor
-  EVALUATED_BY:    requirement/deliverable/past_performance_reference → evaluation_factor
+  EVALUATED_BY:    requirement/deliverable/past_performance_reference/work_scope_item → evaluation_factor
   HAS_SUBFACTOR:   evaluation_factor → subfactor
   MEASURED_BY:     requirement → performance_standard
   PRODUCES:        work_scope_item/transition_activity → deliverable
@@ -1567,6 +1708,7 @@ SOURCE → TARGET CONSTRAINTS (enforce directionality):
   HAS_EQUIPMENT:   location → equipment
   PROVIDED_BY:     government_furnished_item → organization
   EVIDENCES:       past_performance_reference/compliance_artifact → strategic_theme/evaluation_factor
+  APPLIES_TO:      requirement/standard → equipment; proposal_instruction → proposal_volume
   ADDRESSES:       requirement/work_scope_item → customer_priority/pain_point
   RESOLVES:        requirement/deliverable/transition_activity → pain_point
 
@@ -1869,7 +2011,7 @@ Before finalizing extraction, validate:
 
 10. ENUM VALIDATION:
     - criticality ∈ MANDATORY, IMPORTANT, OPTIONAL, INFORMATIONAL
-    - theme_type ∈ CUSTOMER_HOT_BUTTON, DISCRIMINATOR, PROOF_POINT, WIN_THEME
+    - theme_type ∈ DISCRIMINATOR, PROOF_POINT, WIN_THEME
     - modal_verb ∈ shall, should, may, must, will, can, encouraged
     - work_type ∈ SOW, PWS, SOO
 
