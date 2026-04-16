@@ -2,7 +2,7 @@ GOVCON ONTOLOGY - LIGHTRAG NATIVE FORMAT (FULL INTELLIGENCE RESTORED)
 ======================================================================
 Model: xAI Grok-4-fast-reasoning (2M context window)
 Output: LightRAG tuple-delimited format (entity/relation lines)
-Version: 6.2 (Branch 078 - Shipley Definition Enrichment)
+Version: 6.3 (Branch 079 - Entity Extraction Quality + Structural Bridges)
 Source: Complete restoration from Branch 040 modular prompts
 Total Size: ~35K tokens (comprehensive domain intelligence)
 
@@ -1019,7 +1019,7 @@ REFERENCES - Entity mentions another entity by name
 
 ─── EVALUATION & PROPOSAL ───
 GUIDES - Proposal instructions or volumes that guide evaluation responses
-EVALUATED_BY - Requirements/deliverables/past performance evaluated in factors
+EVALUATED_BY - Requirements/deliverables/past performance/work scope items evaluated in factors
 HAS_SUBFACTOR - Evaluation factor has subfactor (Factor 1 → Subfactor 1.1)
 MEASURED_BY - Requirement is measured by performance standard
 EVIDENCES - Past performance reference or compliance artifact evidences a theme, factor, or requirement
@@ -1039,7 +1039,7 @@ GOVERNED_BY - Requirement governed by policy/document
 MANDATES - Regulatory reference mandates a requirement
 CONSTRAINED_BY - Work scope or pricing element constrained by authority/spec
 DEFINES - One entity defines/explains another
-APPLIES_TO - Requirement applies to equipment
+APPLIES_TO - Requirement/standard applies to equipment; instruction applies to volume
 
 ─── RESOURCE & OPERATIONAL ───
 HAS_EQUIPMENT - Location has equipment
@@ -1328,6 +1328,80 @@ clearance, SECRET, TOP SECRET, SCI, SAP, compartmented, background check, access
 FINANCIAL keywords:
 price, cost, CLIN, option, ODC, labor rate, overhead, G&A, fee, profit, invoice, billing, payment, progress payment, retention, withholding, remittance, budget, funding, obligation, expenditure, burn rate, cost control, variance, FFP, CPFF, T&M, fixed price, cost plus, time and materials, hybrid, incentive
 
+F.9 Structural Bridge Rules (CRITICAL FOR GRAPH TRAVERSAL)
+------------------------------------------------------------
+These rules create edges that connect typed entities back to their structural
+context. Without them, graph queries hit dead-ends — the knowledge exists but
+the traversal path is broken.
+
+Rule 1: Section Provenance for Non-Numbered Entities
+=====================================================
+PROBLEM: Entities like "Volume I Technical", "Factor 1: Technical Approach", and
+"Technical Volume limited to 25 pages" do NOT have X.Y.Z numbering, so the
+universal numbered hierarchy rule (F.5 Rule 6) never fires. They become orphans
+disconnected from the document structure they belong to.
+
+ACTION: When extracting proposal_volume, evaluation_factor, or proposal_instruction
+entities, ALWAYS create a CHILD_OF relationship to their parent document_section.
+
+  proposal_volume --CHILD_OF--> document_section (Section L or equivalent)
+  evaluation_factor --CHILD_OF--> document_section (Section M or equivalent)
+  proposal_instruction --CHILD_OF--> document_section (Section L or equivalent)
+
+Non-UCF equivalents:
+  "Proposal Instructions" / "Submission Requirements" → parent for volumes + instructions
+  "Evaluation Criteria" / "Selection Criteria" / "Award Methodology" → parent for factors
+  "Basis for Award" / "Source Selection" → parent for factors
+
+EXAMPLES:
+  "Volume I Technical" --CHILD_OF--> "Section L Proposal Instructions"
+  "Factor 1 Technical Approach" --CHILD_OF--> "Section M Evaluation Criteria"
+  "Technical Volume limited to 25 pages" --CHILD_OF--> "Section L"
+  "Subfactor 1.1 TOMP" --CHILD_OF--> "Factor 1 Technical Approach" (via HAS_SUBFACTOR)
+
+Confidence: 0.90 (high - entity appears within the section text)
+WHY THIS MATTERS: Queries like "What does Section M evaluate?" cannot traverse
+from document_section → evaluation_factor without this edge.
+
+Rule 2: Proposal Instruction → Proposal Volume (APPLIES_TO)
+=============================================================
+PROBLEM: Instructions prescribe rules FOR volumes (page limits, formatting, what
+to address). Both connect to evaluation_factor via GUIDES, but there is no direct
+edge between them. To answer "What are the rules for Volume II?" requires vector
+search only — the graph path is broken.
+
+ACTION: When a proposal_instruction mentions a specific volume, create:
+  proposal_instruction --APPLIES_TO--> proposal_volume
+
+PATTERNS:
+  "Technical Volume shall not exceed 25 pages" → instruction APPLIES_TO "Volume I Technical"
+  "Management Volume limited to 15 pages, 12pt font" → instruction APPLIES_TO "Volume II Management"
+  "Cost Volume shall include completed pricing schedules" → instruction APPLIES_TO "Cost Volume"
+  "All volumes shall use 1-inch margins" → instruction APPLIES_TO EACH volume
+
+Confidence: 0.85-0.95 depending on explicitness
+WHY THIS MATTERS: The compliance matrix needs instruction→volume→factor paths.
+
+Rule 3: Work Scope Item → Evaluation Factor (EVALUATED_BY)
+============================================================
+PROBLEM: RFPs say "Factor 1 evaluates the offeror's approach to tasks 3.1–3.5"
+but EVALUATED_BY only connected requirements and deliverables to factors. Work
+scope items (task packages) were disconnected from what factor evaluates them.
+
+ACTION: When evaluation factor text references work scope tasks, SOW sections,
+or task areas, create:
+  work_scope_item --EVALUATED_BY--> evaluation_factor
+
+PATTERNS:
+  Factor text: "Technical Approach to PWS tasks 3.1 through 3.5" → each WSI EVALUATED_BY factor
+  Factor text: "Maintenance operations as described in Section C.4" → WSI EVALUATED_BY factor
+  Factor text: "Evaluate logistics support plan" → logistics WSIs EVALUATED_BY factor
+
+Confidence: 0.80-0.90 depending on explicitness
+WHY THIS MATTERS: "Which tasks does Technical Factor evaluate?" is critical for
+Shipley compliance matrix and proposal outlining. Without this edge, the answer
+requires vector search across disconnected graph neighborhoods.
+
 ================================================================================
 PART G: ENTITY NAMING NORMALIZATION RULES
 ================================================================================
@@ -1567,7 +1641,7 @@ REFERENCES         Source entity mentions or cites target entity by name
 
 ─── EVALUATION & PROPOSAL (Section L↔M Golden Thread) ───
 GUIDES             Source instruction/volume guides response to target evaluation factor
-EVALUATED_BY       Source requirement/deliverable is evaluated under target factor
+EVALUATED_BY       Source requirement/deliverable/work_scope_item is evaluated under target factor
 HAS_SUBFACTOR      Source evaluation factor has target as a subfactor
 MEASURED_BY        Source requirement is measured by target performance standard
 EVIDENCES          Source past performance/compliance artifact evidences target theme/factor
@@ -1587,7 +1661,7 @@ GOVERNED_BY        Source requirement is governed by target policy/document/regu
 MANDATES           Source clause/regulation mandates target requirement
 CONSTRAINED_BY     Source work scope/pricing is constrained by target authority/spec
 DEFINES            Source entity defines or explains target entity
-APPLIES_TO         Source requirement/standard applies to target equipment/entity
+APPLIES_TO         Source requirement/standard applies to target equipment; source instruction applies to target volume
 
 ─── RESOURCE & OPERATIONAL ───
 HAS_EQUIPMENT      Source location has target equipment
@@ -1605,7 +1679,7 @@ SOURCE → TARGET CONSTRAINTS (enforce directionality):
   CHILD_OF:        child_entity → parent_entity (sub-section → section)
   ATTACHMENT_OF:   attachment → parent_section/document
   GUIDES:          proposal_instruction/proposal_volume → evaluation_factor
-  EVALUATED_BY:    requirement/deliverable/past_performance_reference → evaluation_factor
+  EVALUATED_BY:    requirement/deliverable/past_performance_reference/work_scope_item → evaluation_factor
   HAS_SUBFACTOR:   evaluation_factor → subfactor
   MEASURED_BY:     requirement → performance_standard
   PRODUCES:        work_scope_item/transition_activity → deliverable
@@ -1622,6 +1696,7 @@ SOURCE → TARGET CONSTRAINTS (enforce directionality):
   HAS_EQUIPMENT:   location → equipment
   PROVIDED_BY:     government_furnished_item → organization
   EVIDENCES:       past_performance_reference/compliance_artifact → strategic_theme/evaluation_factor
+  APPLIES_TO:      requirement/standard → equipment; proposal_instruction → proposal_volume
   ADDRESSES:       requirement/work_scope_item → customer_priority/pain_point
   RESOLVES:        requirement/deliverable/transition_activity → pain_point
 
