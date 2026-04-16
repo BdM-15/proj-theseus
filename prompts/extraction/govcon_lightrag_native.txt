@@ -539,6 +539,7 @@ You MUST classify every entity into exactly ONE of these 33 types:
    Example: "CLIN 0001 Base Year Operations FFP", "SLIN 0002AA Option Year 1"
 
 3. PRICING_ELEMENT - Rates, fees, escalation, burden, or pricing methodology components
+   Required metadata: pricing_type (rate/fee/escalation/burden), value_or_percentage, basis_of_application
    Content signals: indirect rate, fee, burden, escalation, plug rate, wrap rate
    Distinction: PRICING_ELEMENT = pricing logic component; CONTRACT_LINE_ITEM = priced line
    Example: "Award Fee Pool 7%", "Escalation 2.5% annually", "Overhead rate 18%"
@@ -561,8 +562,8 @@ You MUST classify every entity into exactly ONE of these 33 types:
    Example: "12,500 sorties/year", "1,600 customers daily", "100 events/year"
 
 7. LABOR_CATEGORY - Named labor classifications and workforce roles
+   Required metadata: position_title, skill_level, clearance_level
    Content signals: Labor mix tables, position titles, skill levels, labor hours
-   Must Extract: Position title, skill level (if stated), clearance (if stated)
    Distinction: Extract ONLY when explicitly named in RFP. If only quantities exist, use WORKLOAD_METRIC.
    Example: "Program Manager", "Systems Engineer Level III", "Help Desk Analyst"
 
@@ -573,6 +574,7 @@ You MUST classify every entity into exactly ONE of these 33 types:
    Example: "99.9% system uptime", "No more than 2 defects per month", "QASP Standard 3"
 
 9. TRANSITION_ACTIVITY - Phase-in, phase-out, turnover, incumbent handoff tasks
+   Required metadata: phase (phase-in/phase-out/overlap), duration, dependencies
    Content signals: transition, phase-in, phase-out, turnover, mobilization, stand-up
    Distinction: TRANSITION_ACTIVITY = temporary transition work; WORK_SCOPE_ITEM = steady-state work scope
    Example: "30-Day Transition Plan", "Incumbent Knowledge Transfer", "Phase-In Staffing Ramp"
@@ -617,6 +619,7 @@ You MUST classify every entity into exactly ONE of these 33 types:
    Example: "MIL-DTL-38999", "Interface Control Document ICD-001", "Drawing 12345 Rev C"
 
 16. WORK_SCOPE_ITEM - PWS/SOW/SOO tasks, objectives, service packages, or work elements regardless of location
+   Required metadata: task_number, scope_description, period_of_performance
    Content signals: task descriptions, objectives, performance work, scope items, work packages
    Distinction: WORK_SCOPE_ITEM = semantic work package; DOCUMENT_SECTION = structural container; REQUIREMENT = obligation sentence
    Example: "Task 3.2 Network Operations Support", "Objective 4 Airfield Readiness", "Work Package 2 Depot Maintenance"
@@ -651,6 +654,7 @@ You MUST classify every entity into exactly ONE of these 33 types:
     Example: Technical Volume limited to 25 pages, 12pt Times New Roman
 
 20. PROPOSAL_VOLUME - Named proposal containers or response volumes
+   Required metadata: volume_id, purpose (technical/management/past_performance/cost/other), associated_factors
    Content signals: Volume I, Volume II, Oral Presentation Volume, Annex B Response Volume
    Distinction: PROPOSAL_VOLUME = container; PROPOSAL_INSTRUCTION = rule/constraint applying to it
    Example: "Volume I Technical", "Volume III Past Performance"
@@ -696,6 +700,7 @@ You MUST classify every entity into exactly ONE of these 33 types:
     Example: "Integrated Logistics Approach (WIN_THEME)", "CMMI Level 3 Maturity (PROOF_POINT)"
 
 23. CUSTOMER_PRIORITY - What the customer EXPLICITLY states matters most
+    Required metadata: priority_signal (stated/weighted), source_section
     Content signals: paramount, critical, essential, significantly more important, highest
     priority, "of utmost importance", "overriding concern", "cannot be overstated",
     evaluation factor weights, adjectival ratings ("most important", "significantly
@@ -717,6 +722,7 @@ You MUST classify every entity into exactly ONE of these 33 types:
     "Technical Approach is significantly more important than Cost"
 
 24. PAIN_POINT - Problem statements, deficiencies, shortfalls, or issues the government wants resolved
+   Required metadata: severity (critical/moderate/minor), source_evidence
    Content signals: deficiencies, current contract lacks, shortfall, lessons learned, challenge, issue,
    "incumbent failed", "historically problematic", "area of concern"
    Distinction: PAIN_POINT = problem to solve; REQUIREMENT = action/solution expected
@@ -728,33 +734,39 @@ You MUST classify every entity into exactly ONE of these 33 types:
 ─── STANDARD ENTITIES ───
 
 25. ORGANIZATION - Agencies, military units, contractors
+    Required metadata: role (customer/contractor/subcontractor/partner), org_type (agency/military_unit/company)
     Content signals: Company names, agency names, military designations
     Patterns: "Inc.", "LLC", "Corp.", acronyms (NAVAIR, GSA)
     Example: Naval Air Systems Command, Marine Corps Logistics Command
 
 26. PROGRAM - Government programs and initiatives
+    Required metadata: program_name, sponsoring_agency, contract_type_if_stated
     Content signals: Program names, major acquisition titles, acronyms
     Distinction: PROGRAM = services/initiatives; EQUIPMENT = physical items
     Example: MCPP II, Navy MBOS, F-35 Lightning II Program
 
 27. EQUIPMENT - Physical hardware, vehicles, machinery
+    Required metadata: quantity, model_or_nsn, condition_or_status
     Patterns: Model numbers (M1A1, RG-24), NSN numbers, TAMCN codes
     Content signals: Physical descriptions, quantities, specifications
     Distinction: EQUIPMENT = physical item; TECHNOLOGY = software/system
     Example: Concorde RG-24 Battery, 6200 Tennant Floor Scrubber
 
 28. TECHNOLOGY - Software, systems, platforms
+    Required metadata: version, vendor_or_provider, purpose
     Content signals: Version numbers, software names, system names
     Patterns: "Windows Server 2022", "Python 3.11", "AWS GovCloud"
     Distinction: TECHNOLOGY = software/logical; EQUIPMENT = hardware/physical
     Example: AWS GovCloud, ServiceNow, GCSS-MC
 
 29. LOCATION - Performance locations, facilities, bases
+    Required metadata: site_name, region (CONUS/OCONUS/specific), classification (base/building/facility)
     Content signals: Base names, building numbers, geographic areas
     Patterns: "Building ###", "NAS [Name]", "CONUS/OCONUS"
     Example: Naval Air Station Pensacola, Building 2959
 
 30. EVENT - Milestones, deadlines, scheduled activities
+    Required metadata: date_or_timeframe, event_type (milestone/deadline/recurring)
     Content signals: Dates, deadlines, scheduled activities
     Distinction: EVENT = scheduled/time-bound; CONCEPT = process/methodology
     Example: Kickoff Meeting, Contract Award Date
