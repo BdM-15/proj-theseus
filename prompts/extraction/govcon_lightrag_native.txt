@@ -2,7 +2,7 @@ GOVCON ONTOLOGY - LIGHTRAG NATIVE FORMAT (FULL INTELLIGENCE RESTORED)
 ======================================================================
 Model: xAI Grok-4-fast-reasoning (2M context window)
 Output: LightRAG tuple-delimited format (entity/relation lines)
-Version: 6.3 (Branch 079 - Entity Extraction Quality + Structural Bridges)
+Version: 6.4 (Branch 080 - Extraction Prompt Holistic Pass)
 Source: Complete restoration from Branch 040 modular prompts
 Total Size: ~35K tokens (comprehensive domain intelligence)
 
@@ -555,8 +555,8 @@ You MUST classify every entity into exactly ONE of these 33 types:
    Example: CDRL A001 Monthly Status Report
 
 6. WORKLOAD_METRIC - Quantitative BOE drivers (volumes, counts, frequencies)
+   Required metadata: quantity, unit, period, location_if_stated
    Content signals: Numbers + unit of measure + time period
-   Must Extract: Quantity, unit, period, location (if stated)
    Distinction: WORKLOAD_METRIC = quantitative data that drives staffing/cost;
    REQUIREMENT = obligation statement; CONCEPT = abstract process
    Example: "12,500 sorties/year", "1,600 customers daily", "100 events/year"
@@ -638,8 +638,8 @@ You MUST classify every entity into exactly ONE of these 33 types:
    Example: Factor 1 Technical Approach (40%) - Most Important
 
 18. SUBFACTOR - Evaluation subfactor hierarchy (children of evaluation_factor)
+   Required metadata: parent_factor, subfactor_number, weight_if_stated
    Content signals: Numbered child criteria (1.1, 1.2), "subfactor", "sub-element"
-   Must Extract: Subfactor number, parent factor, weight if stated
    Distinction: SUBFACTOR = child of evaluation_factor with own identifier/weight
    Example: "Subfactor 1.2 Staffing Approach (15%)", "Element B.2 Integration"
 
@@ -1595,6 +1595,48 @@ FOR EVERY WORK_SCOPE_ITEM entity:
 ✓ Functional description of the work included
 ✓ Not converted into a requirement unless the text is an actual obligation statement
 
+FOR EVERY WORKLOAD_METRIC entity:
+✓ Numeric quantity extracted (exact number, not paraphrase)
+✓ Unit of measure preserved (sorties/year, customers/hour, events/month, etc.)
+✓ Time period stated (daily, monthly, annually, per shift, etc.)
+✓ Location captured if specific to a site or facility
+
+Examples of CORRECT workload metric descriptions:
+✅ "12,500 sorties per year across all 3 installations. Quantity: 12,500. Unit: sorties. Period: per year."
+✅ "1,600 customers daily at peak service windows. Quantity: 1,600. Unit: customers. Period: per day."
+❌ "High sortie volume annually" (missing exact quantity and unit)
+
+FOR EVERY SUBFACTOR entity:
+✓ Parent evaluation factor clearly identified by name
+✓ Subfactor identifier preserved (1.1, B.2, Element 2, etc.)
+✓ Weight or points extracted if stated
+✓ CHILD_OF relationship created linking to parent evaluation_factor
+
+Examples of CORRECT subfactor descriptions:
+✅ "Subfactor 1.2 Staffing Approach under Factor 1 Technical Approach. Parent: Factor 1 Technical Approach. Identifier: 1.2. Weight: 15%."
+✅ "Element B.2 System Integration under Factor B Technical. Parent: Factor B Technical. Identifier: B.2. Weight: Not stated."
+❌ "Staffing subfactor" (missing parent factor and identifier)
+
+FOR EVERY LABOR_CATEGORY entity:
+✓ Position title extracted exactly as named in RFP
+✓ Skill level captured (Junior/Mid/Senior/Expert/Level I/II/III, etc.)
+✓ Clearance requirement noted if specified (None, Secret, TS, TS/SCI, etc.)
+
+Examples of CORRECT labor category descriptions:
+✅ "Systems Engineer Level III requiring TS/SCI clearance. Position: Systems Engineer. Skill Level: Level III/Senior. Clearance: TS/SCI."
+✅ "Program Manager with PMP certification required. Position: Program Manager. Skill Level: Senior. Clearance: Secret."
+❌ "Senior engineer" (missing exact title and clearance)
+
+FOR EVERY TRANSITION_ACTIVITY entity:
+✓ Phase identified (phase-in, phase-out, or overlap period)
+✓ Duration or timeline captured (30-day, 90-day, per PWS schedule, etc.)
+✓ Key dependencies noted (incumbent cooperation, GFE transfer, security clearance processing)
+
+FOR EVERY PRICING_ELEMENT entity:
+✓ Pricing type identified (indirect rate, fee, escalation factor, wrap rate, plug rate)
+✓ Numeric value or percentage captured exactly
+✓ Basis of application stated (on direct labor, per contract year, on subcontractor costs, etc.)
+
 Common Extraction Errors to AVOID:
 ❌ Missing weights: "Factor 1 Technical Approach" → Should include "worth 40%"
 ❌ Missing page limits: "Technical Volume" → Should include "limited to 25 pages"
@@ -1729,8 +1771,14 @@ CRITICAL OUTPUT RULES:
 5. For evaluation factors: Include weight, importance, and subfactors in description
 6. For proposal instructions: Include page limit, format requirements in description
 7. For performance standards: Include threshold and measurement method in description
-8. ALWAYS end with {completion_delimiter} marker
-9. NEVER combine multiple fields - each field separated by EXACTLY one delimiter
+8. For labor categories: Include position_title, skill_level, and clearance_level in description
+9. For workload metrics: Include quantity, unit, and period in description
+10. For subfactors: Include parent_factor, subfactor_number, and weight in description
+11. For work scope items: Include task_number and scope_description in description
+12. For proposal volumes: Include volume_id and purpose in description
+13. For pricing elements: Include pricing_type, value_or_percentage, and basis in description
+14. ALWAYS end with {completion_delimiter} marker
+15. NEVER combine multiple fields - each field separated by EXACTLY one delimiter
 
 ================================================================================
 PART K: ANNOTATED RFP EXAMPLES (Full Domain Intelligence - 8 Examples)
