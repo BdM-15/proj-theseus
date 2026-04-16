@@ -109,16 +109,29 @@ async def main():
     # Compact startup banner — full pipeline detail in docs/ARCHITECTURE.md
     graph_storage = global_args.graph_storage if hasattr(global_args, 'graph_storage') else "NetworkXStorage"
     from src.utils.logging_config import log_banner, Colors
+    from importlib.metadata import version as _pkg_version, PackageNotFoundError
     c = Colors
 
+    def _ver(pkg: str) -> str:
+        try:
+            return _pkg_version(pkg)
+        except PackageNotFoundError:
+            return "unknown"
+
     startup_items = [
-        ("Workspace",  f"{c.BOLD}{settings.workspace}{c.RESET}"),
-        ("Storage",    f"{graph_storage}  |  {global_args.working_dir}"),
-        ("Extraction", settings.extraction_llm_name),
-        ("Reasoning",  settings.reasoning_llm_name),
-        ("Embeddings", f"{settings.embedding_model} ({settings.embedding_dim}D)"),
-        ("WebUI",      f"{c.BLUE}http://{host}:{port}/webui{c.RESET}"),
-        ("API Docs",   f"{c.BLUE}http://{host}:{port}/docs{c.RESET}"),
+        ("Workspace",    f"{c.BOLD}{settings.workspace}{c.RESET}"),
+        ("Storage",      f"{graph_storage}  |  {global_args.working_dir}"),
+        ("", ""),
+        ("Extraction",   settings.extraction_llm_name),
+        ("Reasoning",    settings.reasoning_llm_name),
+        ("Embeddings",   f"{settings.embedding_model} ({settings.embedding_dim}D)"),
+        ("", ""),
+        ("LightRAG",     _ver("lightrag-hku")),
+        ("RAG-Anything", _ver("raganything")),
+        ("MinerU",       _ver("mineru")),
+        ("", ""),
+        ("WebUI",        f"{c.BLUE}http://{host}:{port}/webui{c.RESET}"),
+        ("API Docs",     f"{c.BLUE}http://{host}:{port}/docs{c.RESET}"),
     ]
     if graph_storage == "Neo4JStorage":
         startup_items.append(("Neo4j", f"{c.BLUE}http://localhost:7474{c.RESET}"))

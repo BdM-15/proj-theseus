@@ -79,7 +79,11 @@ def log_banner(
     
     if items:
         for label, value in items:
-            logger.info(f"{c.GREEN}{label}:{c.RESET} {value}")
+            # Empty label = divider row
+            if not label:
+                logger.info(f"{c.CYAN}{'─' * (width // 2)}{c.RESET}")
+            else:
+                logger.info(f"{c.GREEN}{label}:{c.RESET} {value}")
     
     logger.info(separator)
     logger.info("")
