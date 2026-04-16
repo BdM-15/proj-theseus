@@ -768,14 +768,31 @@ You MUST classify every entity into exactly ONE of these 33 types:
    Distinction: COMPLIANCE_ARTIFACT = maintained evidence/compliance object; DELIVERABLE = one-time submission
    Example: "ISO 9001:2015 Certification", "Authority to Operate (ATO)"
 
-33. CONCEPT - Residual category for abstract ideas and processes
-   Use ONLY when no other type fits. Check all 32 types above first.
-    Content signals: Abstract nouns, process descriptions, methodologies
-   NOT for: CLINs (→ contract_line_item), workload numbers (→ workload_metric),
-   regulations (→ regulatory_reference), labor roles (→ labor_category),
-   proposal rules (→ proposal_instruction), work packages (→ work_scope_item),
-   QASP entries (→ performance_standard), subfactors (→ subfactor)
-    Example: Change Control Process, Risk Management Methodology
+33. CONCEPT - Named methodologies, frameworks, and abstract domain processes
+    *** EXTRACTION RULE: CONCEPT is NOT a catch-all. It captures NAMED methodologies
+    and abstract processes that don't fit the 32 types above. Before using CONCEPT,
+    verify the entity doesn't fit: WORK_SCOPE_ITEM (task/deliverable scope),
+    REQUIREMENT (obligation), PERFORMANCE_STANDARD (threshold/SLA), TECHNOLOGY
+    (software/platform), REGULATORY_REFERENCE (external standard), or
+    TECHNICAL_SPECIFICATION (engineering authority). ***
+    VALID CONCEPT examples (named methodologies/frameworks):
+    - "Earned Value Management" (methodology, not a requirement or standard)
+    - "Risk Management Framework" (abstract process, not a regulation like NIST SP 800-37)
+    - "Condition-Based Maintenance" (approach, not a specific work task)
+    - "Lean Six Sigma" (methodology, not a technology or specification)
+    - "Agile Development Methodology" (approach, not a software platform)
+    INVALID CONCEPT examples (use correct type instead):
+    - "Contractor shall implement EVM" → REQUIREMENT (obligation verb = requirement)
+    - "NIST SP 800-37 RMF" → REGULATORY_REFERENCE (external standard)
+    - "ServiceNow ITSM Platform" → TECHNOLOGY (software)
+    - "Task 3.2 Network Monitoring" → WORK_SCOPE_ITEM (scoped task)
+    - "99.9% system uptime" → PERFORMANCE_STANDARD (measurable threshold)
+    - "Monthly Status Report" → DELIVERABLE (submission artifact)
+    Government obligation pattern:
+    - "Government shall provide..." → CONCEPT (NOT a contractor requirement)
+    Content signals: Named processes, "-ology"/"-ment" suffixes, "approach", "methodology",
+    "framework", "process", "model", "strategy" (when describing HOW, not WHAT)
+    Example: "Earned Value Management", "Condition-Based Maintenance Plus (CBM+)"
 
 ─── DISAMBIGUATION RULES ───
 
@@ -852,8 +869,8 @@ STRICTLY FORBIDDEN entity types (NEVER USE):
 FALLBACK MAPPING (when LLM generates forbidden types):
 - Plans/Policies/Manuals → document
 - Systems/Tools/Software/Platforms → technology
-- Tables/Lists/Schedules → document (if data table) or concept (if abstract)
-- Processes/Workflows → concept
+- Tables/Lists/Schedules → document (if data table) or concept (if named methodology)
+- Named Processes/Methodologies/Frameworks → concept (only if not a regulation, technology, or work task)
 - Amendments/Revisions/Mods → amendment
 - MIL-STD/DAFI/AR/NIST references → regulatory_reference
 - MIL-DTL/MIL-PRF/ICD/TDP/drawings → technical_specification
@@ -886,7 +903,8 @@ Example Classifications (follow these patterns):
 - "Quality Assurance Plan" → document (NOT "plan")
 - "WAWF System" → technology (NOT "system")
 - "RFID System" → technology (NOT "system")
-- "Change Control Process" → concept (NOT "process")
+- "Change Control Process" → concept (named methodology, NOT "process")
+- "Earned Value Management" → concept (named methodology, NOT "requirement")
 - "MCPP Program" → program (named initiative)
 - "M1A1 Tank" → equipment (physical asset)
 
