@@ -29,6 +29,8 @@ ARCHITECTURE:
 import logging
 from typing import Dict, List, Optional
 
+from src.ontology.schema import normalize_relationship_type
+
 logger = logging.getLogger(__name__)
 
 
@@ -118,7 +120,9 @@ async def sync_discoveries_to_vdb(
                     "src_id": rel["source_name"],
                     "tgt_id": rel["target_name"],
                     "description": rel.get("reasoning", f"{rel['relationship_type']} relationship"),
-                    "keywords": rel.get("relationship_type", "INFERRED"),
+                    "keywords": normalize_relationship_type(
+                        rel.get("relationship_type", "RELATED_TO")
+                    ),
                     "weight": rel.get("confidence", 1.0),
                     "source_id": source_label,  # Must match chunk label for lookup
                     "file_path": "semantic_inference"  # Marks provenance as algorithm-derived
@@ -250,7 +254,9 @@ async def sync_all_relationships_to_vdb(neo4j_io) -> Dict:
                     "src_id": source_name,
                     "tgt_id": target_name,
                     "description": rel.get("description", ""),
-                    "keywords": rel.get("keywords", rel.get("type", "")),
+                    "keywords": normalize_relationship_type(
+                        rel.get("keywords", rel.get("type", "RELATED_TO"))
+                    ),
                     "weight": rel.get("weight", 1.0),
                     "source_id": source_label
                 })

@@ -95,7 +95,7 @@ class CustomRelationship(TypedDict, total=False):
     src_id: str           # Required: source entity name
     tgt_id: str           # Required: target entity name
     description: str      # Required: relationship description
-    keywords: str         # Required: relationship keywords for edge types
+    keywords: str         # Required: MUST be a valid type from VALID_RELATIONSHIP_TYPES
     weight: float         # Optional: relationship strength (0-1)
     source_id: str        # Optional: source identifier
     file_path: str        # Optional: file path reference

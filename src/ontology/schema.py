@@ -35,6 +35,60 @@ VALID_ENTITY_TYPES = {
     "customer_priority", "pain_point", "amendment"
 }
 
+# Valid relationship types - canonical set matching extraction prompt Part F.1/J
+# These are the ONLY valid values for the relationship_type / keywords field.
+# Organized by functional group for clarity.
+VALID_RELATIONSHIP_TYPES = {
+    # Structural (Document Hierarchy & Cross-References)
+    "CHILD_OF", "ATTACHMENT_OF", "CONTAINS", "AMENDS", "SUPERSEDED_BY", "REFERENCES",
+    # Evaluation & Proposal (Section L↔M Golden Thread)
+    "GUIDES", "EVALUATED_BY", "HAS_SUBFACTOR", "MEASURED_BY", "EVIDENCES",
+    # Work & Deliverables (Traceability Chain)
+    "PRODUCES", "SATISFIED_BY", "TRACKED_BY", "SUBMITTED_TO", "STAFFED_BY",
+    "PRICED_UNDER", "FUNDS", "QUANTIFIES",
+    # Authority & Governance
+    "GOVERNED_BY", "MANDATES", "CONSTRAINED_BY", "DEFINES", "APPLIES_TO",
+    # Resource & Operational
+    "HAS_EQUIPMENT", "PROVIDED_BY", "COORDINATED_WITH", "REPORTED_TO",
+    # Strategic & Capture Intelligence
+    "ADDRESSES", "RESOLVES", "SUPPORTS", "RELATED_TO",
+    # Inference-only types (produced by post-processing algorithms, not extraction)
+    "HAS_RATING_SCALE", "HAS_THRESHOLD", "EVALUATED_USING", "DEFINES_SCALE",
+    "INFORMS", "IMPACTS", "DETERMINES", "ADDRESSED_BY",
+    "REQUIRES", "ENABLED_BY", "RESPONSIBLE_FOR",
+}
+
+
+def normalize_relationship_type(rel_type: str, fallback: str = "RELATED_TO") -> str:
+    """
+    Normalize a relationship type string to a valid canonical type.
+
+    GRACEFUL HANDLING: Never returns None - always maps to a valid type.
+    Unknown types are mapped to fallback (default: RELATED_TO) and logged as WARNING.
+    """
+    normalized = rel_type.strip().upper().replace(" ", "_")
+    if normalized in VALID_RELATIONSHIP_TYPES:
+        return normalized
+
+    # Common rogue type mappings (from old prompts / LLM drift)
+    _ROGUE_MAPPINGS = {
+        "MEASURES": "MEASURED_BY",
+        "PART_OF": "CHILD_OF",
+        "LOCATED_AT": "RELATED_TO",
+        "SPECIFIES": "DEFINES",
+        "FIELD_IN": "CHILD_OF",
+        "INFERRED": "RELATED_TO",
+    }
+    if normalized in _ROGUE_MAPPINGS:
+        mapped = _ROGUE_MAPPINGS[normalized]
+        logger.info(f"Mapped rogue relationship type '{rel_type}' → '{mapped}'")
+        return mapped
+
+    logger.warning(
+        f"⚠️ Unknown relationship type '{rel_type}' → defaulting to '{fallback}'"
+    )
+    return fallback
+
 
 # ==========================================
 # BOE Category Enum (Workload Enrichment)
@@ -199,8 +253,14 @@ class Relationship(BaseModel):
     """
     source_entity: RelationshipEntity = Field(..., description="Source entity with name, type, and description")
     target_entity: RelationshipEntity = Field(..., description="Target entity with name, type, and description")
-    relationship_type: str = Field(..., description="Type of relationship (e.g., EVALUATED_BY, GUIDES, CHILD_OF, ATTACHMENT_OF, PRODUCES).")
+    relationship_type: str = Field(..., description="Type of relationship - MUST be one of the valid relationship types (e.g., EVALUATED_BY, GUIDES, CHILD_OF).")
     description: str = Field(..., description="Explanation of the relationship (20-50 words)")
+
+    @field_validator('relationship_type')
+    @classmethod
+    def validate_relationship_type(cls, v: str) -> str:
+        """Normalize and validate relationship type against canonical set."""
+        return normalize_relationship_type(v)
 
 # ==========================================
 # Container for LLM Output
@@ -229,9 +289,9 @@ class InferredRelationship(BaseModel):
     
     @field_validator('relationship_type')
     @classmethod
-    def normalize_relationship_type(cls, v: str) -> str:
-        """Normalize relationship type to uppercase for consistency."""
-        return v.strip().upper()
+    def validate_inferred_relationship_type(cls, v: str) -> str:
+        """Normalize and validate relationship type against canonical set."""
+        return normalize_relationship_type(v)
     
     @field_validator('reasoning')
     @classmethod
