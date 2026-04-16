@@ -3,7 +3,7 @@ RAG-Anything Server with LightRAG WebUI
 Multimodal RAG system for government contracting documents
 
 Architecture:
-- src/server/config.py: Configuration (18 entity types, API credentials, chunking)
+- src/server/config.py: Configuration (33 entity types, API credentials, chunking)
 - src/server/initialization.py: RAGAnything initialization (dual LLM, custom prompts)
 - src/server/routes.py: FastAPI endpoints + semantic post-processing
 - This file: Main entry point + server orchestration
@@ -11,7 +11,7 @@ Architecture:
 Workflow:
 1. Document Upload → /insert endpoint → UCF detection
 2. Dual-Path Processing → Section-aware OR standard extraction
-3. Entity Extraction → 18 custom types (extraction LLM: non-reasoning)
+3. Entity Extraction → 33 custom types (extraction LLM: non-reasoning)
 4. Semantic Post-Processing → 8 LLM inference algorithms (reasoning LLM)
 5. Knowledge Graph Storage → Neo4j or local GraphML
 """
@@ -127,7 +127,7 @@ async def main():
     logger.info(f"{c.YELLOW}2.{c.RESET} {c.BOLD}LightRAG Chunking{c.RESET} {c.CYAN}({chunk_size} tokens, 15% overlap){c.RESET}")
     logger.info(f"   {c.CYAN}└─>{c.RESET} Multiple focused extraction passes (prevents attention decay)")
     logger.info("")
-    logger.info(f"{c.YELLOW}3.{c.RESET} {c.BOLD}Entity Extraction{c.RESET} {c.CYAN}(18 custom types){c.RESET}")
+    logger.info(f"{c.YELLOW}3.{c.RESET} {c.BOLD}Entity Extraction{c.RESET} {c.CYAN}(33 custom types){c.RESET}")
     logger.info(f"   {c.CYAN}├─>{c.RESET} Native LightRAG extraction (~22K tokens FULL govcon prompt)")
     logger.info(f"   {c.CYAN}├─>{c.RESET} LLM (query model): {getattr(global_args, 'llm_model', settings.reasoning_llm_name)}")
     logger.info(f"   {c.CYAN}└─>{c.RESET} Tuple-delimited output (Issue #54 - Back to Basics)")

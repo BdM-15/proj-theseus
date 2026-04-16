@@ -15,6 +15,10 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
+# Apply compatibility patches BEFORE raganything imports
+from tools.patches.raganything_libreoffice_windows import apply_patch as _apply_lo_patch
+_apply_lo_patch()
+
 # Now safe to import LightRAG and related modules
 import logging
 from lightrag.api.config import global_args

@@ -45,7 +45,7 @@ GovCon Capture Vibe is an **ontology-modified RAG system** for federal RFP analy
   - `src/server/` - FastAPI routing, configuration, initialization
   - `src/extraction/` - Custom entity extraction (Instructor + Pydantic)
   - `src/inference/` - Semantic post-processing algorithms
-  - `src/ontology/` - Pydantic schema validation (18 entity types)
+  - `src/ontology/` - Pydantic schema validation (33 entity types)
 
 **External Dependencies**:
 
@@ -61,7 +61,7 @@ GovCon Capture Vibe is an **ontology-modified RAG system** for federal RFP analy
 
 | Capability             | Current Production (Apr 2026) | Notes                                |
 | ---------------------- | ----------------------------- | ------------------------------------ |
-| **Entity Types**       | 18 specialized types          | Government contracting ontology      |
+| **Entity Types**       | 33 specialized types          | Government contracting ontology      |
 | **Graph Storage**      | Neo4j (primary)               | Workspace isolation, Cypher queries  |
 | **Extraction Quality** | 1,522 entities (425-page RFP) | Pydantic validation, 5x retry        |
 | **Privacy**            | Public RFPs → cloud           | Queries → 100% local                 |
@@ -92,14 +92,12 @@ Cloud Processing (xAI Grok-4.1)
     ├─ Concurrency: 16 workers (MAX_ASYNC, prevents rate limit errors)
     └─ Temperature: 0.1 (deterministic extraction)
          ↓
-Custom Ontology Extraction (18 entity types)
-    ├─ Core: organization, concept, technology, person, location, event
-    ├─ Requirements: requirement (with criticality_level, requirement_type)
-    ├─ Structural: clause, section, document, deliverable
-    ├─ Program: program, equipment
-    ├─ Evaluation: evaluation_factor, submission_instruction
-    ├─ Strategic: strategic_theme (win themes, hot buttons)
-    ├─ Performance: statement_of_work, performance_metric
+Custom Ontology Extraction (33 entity types)
+    ├─ Contract/Commercial: requirement, contract_line_item, pricing_element, government_furnished_item, deliverable, workload_metric, labor_category, performance_standard, transition_activity
+    ├─ Document/Authorities: document_section, document, amendment, clause, regulatory_reference, technical_specification, work_scope_item
+    ├─ Proposal/Evaluation: evaluation_factor, subfactor, proposal_instruction, proposal_volume, past_performance_reference
+    ├─ Strategic Signals: strategic_theme, customer_priority, pain_point
+    ├─ Standard: organization, program, equipment, technology, location, event, person, compliance_artifact, concept
     └─ Pydantic validation: Instructor library with 5x retry
          ↓
 Semantic Post-Processing (8 LLM algorithms)
@@ -114,7 +112,7 @@ Semantic Post-Processing (8 LLM algorithms)
          ↓
 Knowledge Graph Storage (Neo4j)
     ├─ Workspace isolation: Each RFP gets unique label (e.g., mcpp_drfp_2025)
-    ├─ Entities: ~1,500 per large RFP (18 types)
+    ├─ Entities: ~1,500 per large RFP (33 types)
     ├─ Relationships: ~1,000 per RFP (5 types: CHILD_OF, EVALUATED_BY, GUIDES, REQUIRES, RELATED_TO)
     ├─ Storage: Neo4j database (http://localhost:7474)
     └─ Query: Cypher + LightRAG hybrid search
@@ -320,7 +318,7 @@ result = client.chat.completions.create(
 
 **Rationale**:
 
-- ✅ **Preserve ontology**: 18 entity types remain intact
+- ✅ **Preserve ontology**: 33 entity types remain intact
 - ✅ **Multimodal capabilities**: MinerU parsing for tables/images
 - ✅ **Non-invasive**: Pass LightRAG instance via `lightrag=govcon_rag` parameter
 - ✅ **Maintainable**: `pip install --upgrade` gets updates without merge conflicts
@@ -408,49 +406,76 @@ multimodal_rag = RAGAnything(
 
 ## Ontology Design
 
-### **Government Contracting Entity Types (18 Types)**
+### **Government Contracting Entity Types (33 Types)**
 
-**Source**: `src/server/config.py` (lines 75-93)
+**Source**: `prompts/extraction/govcon_lightrag_native.txt` (Part D)
 
-```python
-class EntityType(str, Enum):
-    # Core Business Entities
-    ORGANIZATION = "organization"      # Contractors, agencies, departments
-    PERSON = "person"                  # POCs, contracting officers
-    LOCATION = "location"              # Delivery sites, performance locations
+Organized into four functional groups to minimize `concept` bucket spillover and maximize typed retrieval precision:
 
-    # Technical & Conceptual
-    CONCEPT = "concept"                # CLINs, technical concepts, budget/pricing
-    TECHNOLOGY = "technology"          # Systems, tools, platforms
+**Group 1 — Contract, Execution & Commercial Structure (9 types)**
 
-    # Temporal
-    EVENT = "event"                    # Milestones, deliveries, reviews
+| Type                        | Purpose                                            |
+| --------------------------- | -------------------------------------------------- |
+| `requirement`               | Contractor obligations with criticality/modal_verb |
+| `contract_line_item`        | CLINs, SLINs, priced line items (FFP/CPFF/T&M)     |
+| `pricing_element`           | Rates, fees, escalation, wrap rates                |
+| `government_furnished_item` | GFE/GFP/GFI/GOTS customer-provided assets          |
+| `deliverable`               | CDRLs, DD Form 1423, contract deliverables         |
+| `workload_metric`           | Quantitative BOE drivers (sorties, users, events)  |
+| `labor_category`            | Named labor classifications, clearance levels      |
+| `performance_standard`      | KPIs, SLAs, AQLs, QASP thresholds                  |
+| `transition_activity`       | Phase-in/out, turnover, mobilization tasks         |
 
-    # Requirements Domain
-    REQUIREMENT = "requirement"        # Explicit shall/must/should/may requirements
-                                       # Fields: requirement_type, criticality_level, compliance_method
+**Group 2 — Document Structure, Authorities & Work Patterns (7 types)**
 
-    # Document Structure
-    SECTION = "section"                # RFP sections (A-M, J-attachments)
-    CLAUSE = "clause"                  # FAR clauses, contract provisions
-    DOCUMENT = "document"              # Referenced documents, attachments
+| Type                      | Purpose                                            |
+| ------------------------- | -------------------------------------------------- |
+| `document_section`        | Numbered/titled hierarchical structural units      |
+| `document`                | Attachments, exhibits, annexes, standalone docs    |
+| `amendment`               | Solicitation modifications, Q&A amendments         |
+| `clause`                  | FAR/DFARS/Agency clauses (26+ recognized agencies) |
+| `regulatory_reference`    | IAW citations: DAFI, AR, MIL-STD, NIST SP, AFI     |
+| `technical_specification` | ICDs, TDPs, MIL-DTL/MIL-PRF, drawings              |
+| `work_scope_item`         | PWS/SOW/SOO tasks, objectives, work packages       |
 
-    # Deliverables & Work Products
-    DELIVERABLE = "deliverable"        # Contract deliverables, CDRLs, reports
-    STATEMENT_OF_WORK = "statement_of_work"  # Section C statements of work
+**Group 3 — Proposal & Evaluation Structure (5 types)**
 
-    # Program Management
-    PROGRAM = "program"                # Programs, subprograms, initiatives
-    EQUIPMENT = "equipment"            # Physical equipment, assets, tools
+| Type                         | Purpose                                        |
+| ---------------------------- | ---------------------------------------------- |
+| `evaluation_factor`          | Top-level Section M criteria with weights      |
+| `subfactor`                  | Evaluation subfactor hierarchy (children)      |
+| `proposal_instruction`       | Page limits, format requirements, volume rules |
+| `proposal_volume`            | Named proposal containers (Volume I, II, etc.) |
+| `past_performance_reference` | Reference contracts, PPQs, CPARS records       |
 
-    # Evaluation Domain (Section L↔M mapping)
-    EVALUATION_FACTOR = "evaluation_factor"  # Section M factors with weights
-    SUBMISSION_INSTRUCTION = "submission_instruction"  # Section L instructions
+**Group 4 — Strategic & Analytical Signals (3 types)**
 
-    # Strategic & Performance
-    STRATEGIC_THEME = "strategic_theme"      # Win themes, hot buttons, pain points
-    PERFORMANCE_METRIC = "performance_metric"  # KPIs, metrics, SLAs
-```
+| Type                | Purpose                                          |
+| ------------------- | ------------------------------------------------ |
+| `strategic_theme`   | Win themes, discriminators, proof points         |
+| `customer_priority` | Explicit importance/emphasis language            |
+| `pain_point`        | Problem statements the government wants resolved |
+
+**Standard Entities (9 types)**
+
+| Type                  | Purpose                                         |
+| --------------------- | ----------------------------------------------- |
+| `organization`        | Agencies, military units, contractors           |
+| `program`             | Government programs and major acquisitions      |
+| `equipment`           | Physical hardware, vehicles, machinery          |
+| `technology`          | Software, systems, platforms                    |
+| `location`            | Performance locations, facilities, bases        |
+| `event`               | Milestones, deadlines, scheduled activities     |
+| `person`              | Key personnel, POCs, named roles                |
+| `compliance_artifact` | Certifications, ATOs, accreditations, ISO certs |
+| `concept`             | Residual abstract ideas (last-resort bucket)    |
+
+**Design Rationale — Scaling Properties**:
+
+- Generic bucket (`concept` + `document` + `section`) was 30–59% of all nodes in real workspaces with the 18-type ontology
+- With 33 types: generic% drops to ~18%, HHI improves 0.16→0.11, Shannon entropy 3.23→3.94
+- Graph traversal (2-hop paths) is 23x more efficient at all scales due to elimination of hub supernodes
+- Critical threshold: ~5,000 nodes where generic type supernodes become dominant in 18-type graph
 
 ### **Constrained Relationship Schema**
 
@@ -489,14 +514,16 @@ VALID_RELATIONSHIPS = {
 
 ### **Multimodal Content Mapping**
 
-| Multimodal Content          | RAG-Anything Type | Govcon Entity Type  | Example                          |
-| --------------------------- | ----------------- | ------------------- | -------------------------------- |
-| Section M evaluation matrix | `table`           | `EVALUATION_FACTOR` | Evaluation criteria with weights |
-| CLIN pricing table          | `table`           | `CONCEPT`           | Contract line item pricing       |
-| Organizational chart        | `image`           | `ORGANIZATION`      | Prime-sub relationships          |
-| Technical architecture      | `image`           | `TECHNOLOGY`        | System architecture diagram      |
-| Delivery schedule           | `table`           | `EVENT`             | Milestone dates                  |
-| Requirements matrix         | `table`           | `REQUIREMENT`       | Traceability matrix              |
+| Multimodal Content          | RAG-Anything Type | Govcon Entity Type     | Example                          |
+| --------------------------- | ----------------- | ---------------------- | -------------------------------- |
+| Section M evaluation matrix | `table`           | `evaluation_factor`    | Evaluation criteria with weights |
+| CLIN pricing table          | `table`           | `contract_line_item`   | Contract line item pricing       |
+| Organizational chart        | `image`           | `organization`         | Prime-sub relationships          |
+| Technical architecture      | `image`           | `technology`           | System architecture diagram      |
+| Delivery schedule           | `table`           | `event`                | Milestone dates                  |
+| Requirements matrix         | `table`           | `requirement`          | Traceability matrix              |
+| BOE workload tables         | `table`           | `workload_metric`      | Sorties, users, labor hours      |
+| QASP surveillance plan      | `table`           | `performance_standard` | AQL thresholds, inspection freq  |
 
 ---
 
@@ -512,7 +539,7 @@ VALID_RELATIONSHIPS = {
 - ✅ OpenAI embeddings (text-embedding-3-large, 3072-dim)
 - ✅ Neo4j primary storage with workspace isolation
 - ✅ Pydantic schema enforcement (Instructor library)
-- ✅ 18 entity types with semantic detection
+- ✅ 33 entity types with semantic detection
 - ✅ 8 semantic post-processing algorithms
 - ✅ Custom agents framework (.github/agents/)
 
@@ -567,7 +594,7 @@ VALID_RELATIONSHIPS = {
 | Metric                  | Current Production (Apr 2026) | Notes                                     |
 | ----------------------- | ----------------------------- | ----------------------------------------- |
 | **Processing Time**     | 38 minutes (425-page RFP)     | MCPP II DRAFT RFP baseline ($2.12 cost)   |
-| **Entities Extracted**  | 1,522 entities                | 18 specialized govcon types               |
+| **Entities Extracted**  | 1,522 entities                | 33 specialized govcon types               |
 | **Relationships Found** | ~1,000 relationships          | 5 relationship types + semantic inference |
 | **Entity Density**      | ~3.6 entities/page            | Comprehensive coverage                    |
 | **Chunk Size**          | 4,096 tokens                  | Optimized for extraction quality          |
@@ -579,7 +606,7 @@ VALID_RELATIONSHIPS = {
 
 **Entity Extraction**:
 
-- ✅ 18 entity types properly classified
+- ✅ 33 entity types properly classified
 - ✅ Pydantic validation enforced (Instructor library)
 - ✅ 5x retry with exponential backoff
 - ✅ Failed chunk tracking for post-mortem analysis

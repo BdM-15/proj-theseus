@@ -116,27 +116,67 @@ python app.py
 
 ## Government Contracting Ontology
 
-### 18 Entity Types
+### 33 Entity Types
 
-| Entity Type              | Description                                  | Example                                 |
-| ------------------------ | -------------------------------------------- | --------------------------------------- |
-| `requirement`            | Contractual obligations (shall/should/may)   | "Contractor shall provide 24/7 support" |
-| `clause`                 | FAR/DFARS regulatory references              | "FAR 52.212-4"                          |
-| `section`                | RFP structural elements (A-M, J attachments) | "Section L.3.2"                         |
-| `document`               | Referenced documents and standards           | "MIL-STD-882E"                          |
-| `deliverable`            | CDRLs and contract deliverables              | "Monthly Status Report"                 |
-| `program`                | Government program names                     | "AFCAPV ADAB ISS"                       |
-| `equipment`              | GFE/CFE items                                | "Government-furnished vehicles"         |
-| `evaluation_factor`      | Section M scoring criteria                   | "Technical Approach (40%)"              |
-| `submission_instruction` | Section L requirements                       | "Volume I: 50 pages max"                |
-| `strategic_theme`        | Win themes and hot buttons                   | "Mission-critical reliability"          |
-| `statement_of_work`      | SOW/PWS task descriptions                    | "Task 3.2 Network Operations"           |
-| `performance_metric`     | KPIs and QASP standards                      | "99.9% uptime SLA"                      |
-| `concept`                | Domain terminology                           | "CONUS operations"                      |
-| `organization`           | Agencies and contractors                     | "Naval Air Systems Command"             |
-| `location`               | Performance locations                        | "Joint Base Andrews"                    |
-| `event`                  | Milestone events                             | "Contract award: Q2 FY25"               |
-| `technology`             | Technical systems                            | "AWS GovCloud"                          |
+The ontology is organized into four functional groups for maximum extraction precision:
+
+**Contract, Execution & Commercial Structure**
+
+| Entity Type                 | Description                                       | Example                                 |
+| --------------------------- | ------------------------------------------------- | --------------------------------------- |
+| `requirement`               | Contractor obligations (shall/should/may)         | "Contractor shall provide 24/7 support" |
+| `contract_line_item`        | CLINs, SLINs, and priced line items               | "CLIN 0001 Base Year Operations FFP"    |
+| `pricing_element`           | Rates, fees, escalation, pricing methodology      | "Award Fee Pool 7%"                     |
+| `government_furnished_item` | GFE/GFP/GFI/GOTS assets                           | "Government Furnished Vehicle Fleet"    |
+| `deliverable`               | CDRLs and contract deliverables                   | "CDRL A001 Monthly Status Report"       |
+| `workload_metric`           | Quantitative BOE drivers (volumes, counts)        | "12,500 sorties/year"                   |
+| `labor_category`            | Named labor classifications and workforce roles   | "Systems Engineer Level III"            |
+| `performance_standard`      | KPIs, SLAs, AQLs, QASP inspection standards       | "99.9% system uptime"                   |
+| `transition_activity`       | Phase-in, phase-out, turnover, mobilization tasks | "30-Day Transition Plan"                |
+
+**Document Structure, Authorities & Work Patterns**
+
+| Entity Type               | Description                                         | Example                                 |
+| ------------------------- | --------------------------------------------------- | --------------------------------------- |
+| `document_section`        | Numbered/titled hierarchical structural units       | "Section C Statement of Work"           |
+| `document`                | RFP attachments, exhibits, annexes, standalone docs | "Attachment J-3 Quality Assurance Plan" |
+| `amendment`               | Solicitation modifications and Q&A amendments       | "Amendment 0003"                        |
+| `clause`                  | FAR/DFARS/Agency acquisition clauses (26+ agencies) | "FAR 52.212-4"                          |
+| `regulatory_reference`    | IAW citations: DAFI, AR, MIL-STD, NIST SP, AFI      | "NIST SP 800-171"                       |
+| `technical_specification` | ICDs, TDPs, MIL-DTL/MIL-PRF, engineering standards  | "MIL-DTL-38999"                         |
+| `work_scope_item`         | PWS/SOW/SOO tasks, objectives, work elements        | "Task 3.2 Network Operations Support"   |
+
+**Proposal & Evaluation Structure**
+
+| Entity Type                  | Description                                          | Example                                 |
+| ---------------------------- | ---------------------------------------------------- | --------------------------------------- |
+| `evaluation_factor`          | Top-level Section M scoring criteria with weights    | "Technical Approach (40%)"              |
+| `subfactor`                  | Evaluation subfactor hierarchy (children of factors) | "Subfactor 1.2 Staffing Approach (15%)" |
+| `proposal_instruction`       | Proposal format, page limits, volume requirements    | "Technical Volume limited to 25 pages"  |
+| `proposal_volume`            | Named proposal containers/response volumes           | "Volume I Technical"                    |
+| `past_performance_reference` | Reference contracts, PPQs, CPARS records             | "Contract W912-1234 CPARS Exceptional"  |
+
+**Strategic & Analytical Signals**
+
+| Entity Type         | Description                                                  | Example                      |
+| ------------------- | ------------------------------------------------------------ | ---------------------------- |
+| `strategic_theme`   | Win themes, discriminators, proof points                     | "Mission Readiness Priority" |
+| `customer_priority` | Explicit importance/weighting signals from the customer      | "Cybersecurity Is Paramount" |
+| `pain_point`        | Problem statements, deficiencies the government wants solved | "Current Turnaround Delays"  |
+
+**Standard Entities**
+
+| Entity Type           | Description                                 | Example                       |
+| --------------------- | ------------------------------------------- | ----------------------------- |
+| `organization`        | Agencies, military units, contractors       | "Naval Air Systems Command"   |
+| `program`             | Government programs and initiatives         | "MCPP II"                     |
+| `equipment`           | Physical hardware, vehicles, machinery      | "M1A1 Tank"                   |
+| `technology`          | Software, systems, platforms                | "AWS GovCloud"                |
+| `location`            | Performance locations, facilities, bases    | "Joint Base Andrews"          |
+| `event`               | Milestones, deadlines, scheduled activities | "Contract Award Q2 FY25"      |
+| `person`              | Key personnel, POCs, named roles            | "Contracting Officer"         |
+| `compliance_artifact` | Certifications, ATOs, accreditations        | "ISO 9001:2015 Certification" |
+| `concept`             | Residual abstract ideas and processes       | "CONUS operations"            |
 
 ### 8 Semantic Post-Processing Algorithms
 
@@ -161,7 +201,7 @@ govcon-capture-vibe/
 ├── src/
 │   ├── raganything_server.py   # Main server (RAG-Anything + LightRAG WebUI)
 │   ├── server/
-│   │   ├── config.py           # 18 entity types, LightRAG global_args
+│   │   ├── config.py           # 33 entity types, LightRAG global_args
 │   │   └── routes.py           # Custom /insert, /documents/upload endpoints
 │   ├── extraction/             # Entity extraction with Instructor + Pydantic
 │   ├── inference/

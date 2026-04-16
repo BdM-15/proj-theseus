@@ -18,7 +18,7 @@
 
 **Ontology-based RAG system** for federal RFP analysis. Uses **RAG-Anything** (multimodal PDF parsing via MinerU) + **LightRAG** (knowledge graph/queries) with **xAI Grok** cloud processing.
 
-**Core Innovation**: 18 government contracting entity types + 8 LLM-powered relationship inference algorithms enable Section L↔M mapping, requirement traceability, and Shipley methodology compliance.
+**Core Innovation**: 33 government contracting entity types + 8 LLM-powered relationship inference algorithms enable Section L↔M mapping, requirement traceability, and Shipley methodology compliance.
 
 ### Supporting Documentation
 
@@ -50,7 +50,7 @@ This project wraps **LightRAG** and **RAGAnything** to provide specialized gover
   - `routes.py` - Custom endpoints with batch completion detection
   - `initialization.py` - RAGAnything wrapper initialization
 - `src/inference/` - Semantic post-processing algorithms (8 LLM relationship inference algorithms)
-- `src/ontology/` - Domain schema validation (Pydantic models for 18 entity types)
+- `src/ontology/` - Domain schema validation (Pydantic models for 33 entity types)
 - `src/extraction/` - Custom entity extraction logic
 
 ### Processing Pipeline

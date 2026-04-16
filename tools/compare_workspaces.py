@@ -325,8 +325,17 @@ def print_stats_comparison(ws_a_stats: dict, ws_b_stats: dict, ws_a_label: str, 
 
 # ─── LightRAG instance factory ────────────────────────────────────────────────
 
-async def create_lightrag_instance(working_dir: str) -> LightRAG:
-    """Create a read-only LightRAG instance for querying a workspace."""
+async def create_lightrag_instance(workspace_name: str) -> LightRAG:
+    """Create a read-only LightRAG instance for querying a workspace.
+
+    Uses the server's canonical pattern:
+      working_dir = rag_storage/ (parent)
+      workspace   = workspace_name  (e.g. "afcapv_bos_i_t4")
+
+    NanoVectorDB resolves data at rag_storage/<workspace_name>/vdb_*.json
+    Neo4JStorage uses the workspace name as a Cypher label for isolation.
+    Passing workspace explicitly overrides the WORKSPACE env-var.
+    """
     settings = get_settings()
 
     xai_api_key = settings.llm_binding_api_key
@@ -358,24 +367,54 @@ async def create_lightrag_instance(working_dir: str) -> LightRAG:
 
     llm_func = create_sanitizing_wrapper(base_llm_func)
 
+    # Use openai_embed.func (unwrapped) to avoid @wrap_embedding_func_with_attrs
+    # dimension mismatch: openai_embed has embedding_dim=1536 hardcoded but we use
+    # text-embedding-3-large (3072 dims). The inner EmbeddingFunc would see 3072/1536=2
+    # vectors and raise "expected 1 got 2". Matches initialization.py pattern.
+    from functools import partial
+    embed_impl = getattr(openai_embed, "func", openai_embed)
+    embed_fn = partial(
+        embed_impl,
+        model=settings.embedding_model,
+        api_key=openai_api_key,
+        base_url=settings.embedding_binding_host,
+        max_token_size=8192,
+    )
     embedding_func = EmbeddingFunc(
         embedding_dim=settings.embedding_dim,
         max_token_size=8192,
-        func=lambda texts: openai_embed(
-            texts,
-            model=settings.embedding_model,
-            api_key=openai_api_key,
-            base_url=settings.embedding_binding_host,
-        ),
+        func=embed_fn,
     )
 
-    rag = LightRAG(
-        working_dir=working_dir,
+    # Parent dir — each workspace is a subdirectory of rag_storage/
+    parent_dir = str(PROJECT_ROOT / "rag_storage")
+
+    lightrag_kwargs: dict = dict(
+        working_dir=parent_dir,
+        workspace=workspace_name,  # Overrides WORKSPACE env-var; used by both NanoVectorDB
+                                   # (path suffix) and Neo4JStorage (Cypher label)
         llm_model_func=llm_func,
         embedding_func=embedding_func,
     )
+    # Wire graph storage to match server configuration (Neo4J or NetworkX).
+    # If the configured storage is Neo4JStorage but the server is not running,
+    # fall back to NetworkXStorage so the tool remains usable offline.
+    use_graph_storage = settings.graph_storage or "NetworkXStorage"
+    if use_graph_storage == "Neo4JStorage":
+        try:
+            import socket
+            neo4j_host = (os.getenv("NEO4J_URI") or "bolt://localhost:7687").split("://")[-1].split(":")[0]
+            neo4j_port = int((os.getenv("NEO4J_URI") or "bolt://localhost:7687").rsplit(":", 1)[-1].split("/")[0])
+            with socket.create_connection((neo4j_host, neo4j_port), timeout=2):
+                pass
+        except (OSError, ValueError):
+            logger.warning("Neo4J not reachable — falling back to NetworkXStorage (graph queries will use naive mode)")
+            use_graph_storage = "NetworkXStorage"
+    lightrag_kwargs["graph_storage"] = use_graph_storage
+
+    rag = LightRAG(**lightrag_kwargs)
     await rag.initialize_storages()
-    return rag
+    return rag, use_graph_storage
 
 
 # ─── Query comparison ─────────────────────────────────────────────────────────
@@ -402,6 +441,7 @@ async def run_query_comparison(
     ws_b_label: str,
     queries: list,
     output_path: Optional[Path] = None,
+    naive_fallback: bool = False,
 ):
     """Run all test queries against both workspaces and compare results."""
     results = []
@@ -412,14 +452,17 @@ async def run_query_comparison(
         mode = q["mode"]
         query_text = q["query"]
 
-        print(f"\n  [{qid}] {cat}: {query_text[:60]}...", end="", flush=True)
+        print(f"\n  [{qid}] {cat}: {query_text[:60]}...")
 
-        # Run both in parallel
-        res_a, res_b = await asyncio.gather(
-            run_query_on_instance(rag_a, query_text, mode, ws_a_label),
-            run_query_on_instance(rag_b, query_text, mode, ws_b_label),
-        )
-        print(f" done ({res_a['elapsed']:.1f}s / {res_b['elapsed']:.1f}s)")
+        # Run sequentially to avoid EmbeddingFunc batch cross-contamination
+        # (two concurrent LightRAG instances on the same event loop share the
+        # embedding worker pool, causing "expected N vectors but got 2N" errors)
+        print(f"    [{ws_a_label}] querying...", end="", flush=True)
+        res_a = await run_query_on_instance(rag_a, query_text, mode, ws_a_label)
+        print(f" done ({res_a['elapsed']:.1f}s)")
+        print(f"    [{ws_b_label}] querying...", end="", flush=True)
+        res_b = await run_query_on_instance(rag_b, query_text, mode, ws_b_label)
+        print(f" done ({res_b['elapsed']:.1f}s)")
 
         results.append({
             "query": q,
@@ -431,21 +474,31 @@ async def run_query_comparison(
     if output_path is None:
         output_path = PROJECT_ROOT / f"tools/comparison_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
 
-    write_markdown_report(results, ws_a_label, ws_b_label, output_path)
+    write_markdown_report(results, ws_a_label, ws_b_label, output_path, naive_fallback=naive_fallback)
     print(f"\n  Report saved: {output_path}")
     return results
 
 
-def write_markdown_report(results: list, ws_a_label: str, ws_b_label: str, output_path: Path):
+def write_markdown_report(results: list, ws_a_label: str, ws_b_label: str, output_path: Path, naive_fallback: bool = False):
     """Write comparison results to a Markdown file."""
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     lines = [
         f"# Workspace Query Comparison Report",
         f"",
         f"**Generated:** {ts}  ",
-        f"**Workspace A (baseline):** `{ws_a_label}` — with semantic post-processing  ",
-        f"**Workspace B (library):** `{ws_b_label}` — library-only (no post-processing)  ",
+        f"**Workspace A:** `{ws_a_label}`  ",
+        f"**Workspace B:** `{ws_b_label}`  ",
         f"",
+    ]
+    if naive_fallback:
+        lines += [
+            f"> ⚠️ **Limitation:** Neo4J was not available. All queries ran in `naive` mode, which retrieves",
+            f"> the same raw text chunks from both workspaces. Answer length differences reflect LLM",
+            f"> temperature variance, **not** ontology quality differences. Rerun with Neo4J running",
+            f"> to get meaningful `local`/`global`/`hybrid` comparisons using the entity graph.",
+            f"",
+        ]
+    lines += [
         f"## Executive Summary",
         f"",
         f"| ID | Category | Mode | A Length | B Length | Winner |",
@@ -488,7 +541,7 @@ def write_markdown_report(results: list, ws_a_label: str, ws_b_label: str, outpu
             f"",
             f"**Query ({q['mode']} mode):** {q['query']}",
             f"",
-            f"### {ws_a_label} (with post-processing)",
+            f"### {ws_a_label}",
             f"",
         ]
 
@@ -502,7 +555,7 @@ def write_markdown_report(results: list, ws_a_label: str, ws_b_label: str, outpu
             f"",
             f"*Response time: {a_res.get('elapsed', 0):.1f}s*",
             f"",
-            f"### {ws_b_label} (library-only)",
+            f"### {ws_b_label}",
             f"",
         ]
 
@@ -530,12 +583,12 @@ async def main():
     parser.add_argument(
         "--ws-a",
         default="afcapv_bos_i",
-        help="Workspace A name (default: afcapv_bos_i — with post-processing)",
+        help="Workspace A name (default: afcapv_bos_i)",
     )
     parser.add_argument(
         "--ws-b",
         default="afcapv_bos_i_t2",
-        help="Workspace B name (default: afcapv_bos_i_t2 — library-only)",
+        help="Workspace B name (default: afcapv_bos_i_t2)",
     )
     parser.add_argument(
         "--stats-only",
@@ -577,21 +630,39 @@ async def main():
 
     # ── Query comparison ──
     print(f"\n🔍 Initializing LightRAG instances...")
-    rag_a = await create_lightrag_instance(str(ws_a_path))
-    rag_b = await create_lightrag_instance(str(ws_b_path))
-    print(f"  ✅ {args.ws_a} ready")
+    rag_a, graph_storage_a = await create_lightrag_instance(args.ws_a)
+    rag_b, graph_storage_b = await create_lightrag_instance(args.ws_b)
+    graph_storage_used = graph_storage_a  # Both use the same setting
+    print(f"  ✅ {args.ws_a} ready  (graph: {graph_storage_used})")
     print(f"  ✅ {args.ws_b} ready")
 
+    # When graph storage is NetworkX with an empty graphml, local/global/hybrid
+    # queries all return 0 context because the graph was never persisted there
+    # (production uses Neo4J). Fall back to naive mode so queries return real answers.
+    use_naive_fallback = (graph_storage_used == "NetworkXStorage")
+    if use_naive_fallback:
+        print("  ⚠️  Graph storage is NetworkX (no persisted graph) — query modes downgraded to 'naive'")
+        print("  ℹ️  NOTE: naive mode retrieves identical text chunks from both workspaces.")
+        print("       Answer differences reflect LLM variance, not ontology quality.")
+        print("       Start Neo4J and rerun to get meaningful local/global/hybrid comparisons.")
+
     if args.query:
-        # Single custom query
-        custom_q = [{"id": "CQ", "category": "Custom", "mode": args.mode, "query": args.query}]
+        mode = args.mode if not use_naive_fallback else "naive"
+        custom_q = [{"id": "CQ", "category": "Custom", "mode": mode, "query": args.query}]
         queries = custom_q
     else:
-        queries = TEST_QUERIES
+        if use_naive_fallback:
+            queries = [{**q, "mode": "naive"} for q in TEST_QUERIES]
+        else:
+            queries = TEST_QUERIES
 
     output_path = Path(args.output) if args.output else None
     print(f"\n⚡ Running {len(queries)} queries against both workspaces...")
-    await run_query_comparison(rag_a, rag_b, args.ws_a, args.ws_b, queries, output_path)
+    try:
+        await run_query_comparison(rag_a, rag_b, args.ws_a, args.ws_b, queries, output_path, naive_fallback=use_naive_fallback)
+    finally:
+        await rag_a.finalize_storages()
+        await rag_b.finalize_storages()
 
 
 if __name__ == "__main__":
