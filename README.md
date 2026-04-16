@@ -233,7 +233,7 @@ govcon-capture-vibe/
 # ============================================================================
 LLM_BINDING=openai
 LLM_BINDING_HOST=https://api.x.ai/v1
-LLM_MODEL=grok-4-1-fast-reasoning
+LLM_MODEL=grok-4.20-0309-reasoning
 LLM_BINDING_API_KEY=xai-your-key-here
 LLM_MODEL_TEMPERATURE=0.1
 

@@ -160,7 +160,7 @@ Evaluate both answers using the rubric. Respond ONLY with valid JSON."""
 
     api_key = os.environ.get("LLM_BINDING_API_KEY", "")
     base_url = os.environ.get("LLM_BINDING_HOST", "https://api.x.ai/v1")
-    model = os.environ.get("REASONING_LLM_NAME", os.environ.get("LLM_MODEL", "grok-4-1-fast-reasoning"))
+    model = os.environ.get("REASONING_LLM_NAME", os.environ.get("LLM_MODEL", "grok-4.20-0309-reasoning"))
 
     try:
         from openai import AsyncOpenAI

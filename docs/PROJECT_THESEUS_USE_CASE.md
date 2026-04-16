@@ -183,7 +183,7 @@ Different tasks require different model characteristics:
 | Task Type | Model Used | Why |
 |-----------|------------|-----|
 | **Entity Extraction** | `grok-4-1-fast-non-reasoning` | Literal format compliance, 98+% extraction rate |
-| **Query/Reasoning** | `grok-4-1-fast-reasoning` | Nuanced synthesis, complex inference |
+| **Query/Reasoning** | `grok-4.20-0309-reasoning` | Nuanced synthesis, complex inference, lowest hallucination rate |
 | **Embeddings** | `text-embedding-3-large` (3072-dim) | High-fidelity semantic similarity |
 
 This dual-model approach reduces extraction hallucination by **66%** (12% → 4%) compared to using reasoning models for extraction.
@@ -252,7 +252,7 @@ ROI BREAKEVEN:                    ~4.5 months
 
 ### Brainstorming & Idea Generation with Reasoning Models
 
-The knowledge graph doesn't just answer questions—it becomes a **strategic thinking partner**. Once the RFP is loaded, the reasoning model (`grok-4-1-fast-reasoning`) can:
+The knowledge graph doesn't just answer questions—it becomes a **strategic thinking partner**. Once the RFP is loaded, the reasoning model (`grok-4.20-0309-reasoning`) can:
 
 **Win Theme Development**
 > *"Based on the evaluation factors and customer pain points in this RFP, suggest 5 discriminating win themes that align with our past performance in logistics operations."*
