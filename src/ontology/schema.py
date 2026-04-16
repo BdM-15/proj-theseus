@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 CriticalityLevel = Literal["MANDATORY", "IMPORTANT", "OPTIONAL", "INFORMATIONAL"]
 RequirementType = Literal["FUNCTIONAL", "PERFORMANCE", "SECURITY", "TECHNICAL", "INTERFACE", "MANAGEMENT", "DESIGN", "QUALITY", "OTHER"]
-ThemeType = Literal["CUSTOMER_HOT_BUTTON", "DISCRIMINATOR", "PROOF_POINT", "WIN_THEME"]
+ThemeType = Literal["DISCRIMINATOR", "PROOF_POINT", "WIN_THEME"]
 EntityType = Literal[
     "organization", "concept", "event", "technology", "person", "location",
     "requirement", "clause", "document_section", "document", "deliverable",

@@ -82,7 +82,7 @@ ENTITIES = [
     # -------------------------------------------------------------------------
     {
         "entity_name": "Customer Hot Button Identification",
-        "entity_type": "strategic_theme",
+        "entity_type": "customer_priority",
         "description": (
             "Hot buttons are customer's highest-priority concerns driving evaluation decisions. "
             "Identification methods: (1) RFP emphasis analysis - words like 'critical', "
@@ -95,8 +95,7 @@ ENTITIES = [
             "customer engagement."
         ),
         "source_id": SOURCE_ID,
-        "file_path": FILE_PATH,
-        "theme_type": "CUSTOMER_HOT_BUTTON"
+        "file_path": FILE_PATH
     },
     {
         "entity_name": "Discriminator Development",

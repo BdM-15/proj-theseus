@@ -374,17 +374,21 @@ entity{tuple_delimiter}Daily Equipment Cleaning{tuple_delimiter}requirement{tupl
 entity{tuple_delimiter}Equipment Cleaning Defect Threshold{tuple_delimiter}performance_standard{tuple_delimiter}No more than 2 defects per month for equipment cleaning. Threshold: No more than 2 defects per month. Measurement: Periodic Inspection (Monthly).
 relation{tuple_delimiter}Daily Equipment Cleaning{tuple_delimiter}Equipment Cleaning Defect Threshold{tuple_delimiter}MEASURED_BY{tuple_delimiter}Cleaning requirement performance is measured by defect threshold
 
-C.2 STRATEGIC_THEME Detection (Shipley Capture Intelligence)
--------------------------------------------------------------
-Strategic themes are competitive intelligence extracted from RFP language. They reveal customer priorities and proposal positioning opportunities.
+C.2 STRATEGIC_THEME + CUSTOMER_PRIORITY Detection (Shipley Capture Intelligence)
+----------------------------------------------------------------------------------
+Capture intelligence has TWO extraction targets:
+- CUSTOMER_PRIORITY = what the customer EXPLICITLY states is important
+- STRATEGIC_THEME = what the proposer INFERS from patterns in the RFP
 
-Theme Types (ThemeType enum):
-1. CUSTOMER_HOT_BUTTON: Government's explicit emphasis or priority concern
-2. DISCRIMINATOR: Key differentiator between competitors
-3. PROOF_POINT: Evidence/past performance that validates capability
-4. WIN_THEME: Overarching proposal messaging/positioning
+STRATEGIC_THEME Types (ThemeType enum):
+1. DISCRIMINATOR: Key differentiator between competitors (INFERRED)
+2. PROOF_POINT: Evidence/past performance that validates capability (INFERRED)
+3. WIN_THEME: Overarching proposal messaging/positioning (INFERRED)
 
-CUSTOMER_HOT_BUTTON Detection Signals:
+*** NOTE: CUSTOMER_HOT_BUTTON is NO LONGER a STRATEGIC_THEME subtype.
+    Hot buttons are now extracted as CUSTOMER_PRIORITY entities. ***
+
+CUSTOMER_PRIORITY Detection Signals (extract as customer_priority):
 - "The Government places emphasis on..."
 - "Critical to mission success is..."
 - "Of paramount importance..."
@@ -393,32 +397,43 @@ CUSTOMER_HOT_BUTTON Detection Signals:
 - "Key to award decision..."
 - Evaluation factor weighted >30% (signals priority)
 - "Key to success is..."
-- "Offerors must demonstrate..."
 - "Past performance demonstrating [X] is essential"
 - Repeated emphasis on specific capability areas
+- "Significantly more important than..."
+- Adjectival rating comparisons between factors
 
-WIN_THEME / DISCRIMINATOR Detection:
+DISCRIMINATOR Detection (extract as strategic_theme, theme_type=DISCRIMINATOR):
 - Unique capability requirements that favor specific approaches
 - Technology or methodology preferences stated in RFP
+- Requirements where a specific approach would stand out
+- Ghost language ("contractors without X may struggle to...")
+
+WIN_THEME Detection (extract as strategic_theme, theme_type=WIN_THEME):
+- Intersection of customer priorities + pain points + evaluation weights
 - Emphasis on innovation, cost savings, or efficiency
 - References to lessons learned from previous contracts
 
-PROOF_POINT Detection:
+PROOF_POINT Detection (extract as strategic_theme, theme_type=PROOF_POINT):
 - Specific past performance requirements
 - CPARS rating references
 - Certification requirements (CMMI, ISO, etc.)
 - Quantified experience (years, contract values, staff size)
 - Similar contract references
 
-Example - From Evaluation Weighting:
+Example - Explicit Customer Statement → CUSTOMER_PRIORITY:
 "Factor 1: Mission Readiness (50%) - Most Important"
-Extract as: strategic_theme with theme_type CUSTOMER_HOT_BUTTON
-Name: "Mission Readiness Priority"
+Extract as: customer_priority
+Name: "Mission Readiness Is Top Priority"
 
-Example - From PWS Emphasis:
+Example - Explicit Customer Emphasis → CUSTOMER_PRIORITY:
 "Cultural sensitivity in host nation operations is essential to contract success."
-Extract as: strategic_theme with theme_type CUSTOMER_HOT_BUTTON
-Name: "Host Nation Cultural Sensitivity"
+Extract as: customer_priority
+Name: "Host Nation Cultural Sensitivity Priority"
+
+Example - Inferred Discriminator → STRATEGIC_THEME:
+"Contractor must maintain TS/SCI cleared personnel on-site at all times."
+Extract as: strategic_theme with theme_type DISCRIMINATOR
+Name: "Cleared Personnel On-Site Requirement (DISCRIMINATOR)"
 
 C.3 Requirement Criticality Classification
 -------------------------------------------
@@ -652,34 +667,54 @@ You MUST classify every entity into exactly ONE of these 33 types:
 
 ─── STRATEGIC AND ANALYTICAL SIGNAL ───
 
-22. STRATEGIC_THEME - Win themes, discriminators, proof points, or hot buttons
+22. STRATEGIC_THEME - Capture strategy signals INFERRED from document patterns
     Required metadata: theme_type
-    Theme types: CUSTOMER_HOT_BUTTON, DISCRIMINATOR, PROOF_POINT, WIN_THEME
+    Theme types: DISCRIMINATOR, PROOF_POINT, WIN_THEME
+    *** EXTRACTION RULE: STRATEGIC_THEME captures insights the PROPOSER synthesizes
+    from reading between the lines. These are NOT explicitly stated by the customer —
+    they are strategic conclusions drawn from patterns, emphasis, requirements structure,
+    and evaluation criteria. If the customer EXPLICITLY states importance, use
+    CUSTOMER_PRIORITY instead. ***
     Shipley definitions (use these for classification):
-    - DISCRIMINATOR: Feature that (1) differs from competitors AND (2) the customer
-      acknowledges as important. Both conditions required. Look for unique requirements
-      where a specific approach would stand out.
-    - WIN_THEME: Links a customer benefit to a discriminating feature. Themes tell
-      evaluators why they should select you. "Strategies are things to do. Themes
-      are things to say."
-    - CUSTOMER_HOT_BUTTON: What keeps the customer up at night — worry items, core
-      needs, hidden agendas, reasons behind requirements. Look for repeated emphasis,
-      unusual specificity, enhanced surveillance language.
-    - PROOF_POINT: Evidence backing a claim — certifications, metrics, past
-      performance results. Part of the FAB chain (Feature → Advantage → Benefit).
-    Content signals: emphasis language, repeated themes, "critical", "paramount",
-    "key objective", unique requirements, Ghost language ("contractors without X
-    may struggle to...")
-    Example: Mission Readiness Priority (CUSTOMER_HOT_BUTTON)
+    - DISCRIMINATOR: A capability or approach that (1) differs from competitors AND
+      (2) the customer acknowledges as important. Both conditions required. Inferred
+      from unique requirements, unusual specificity, or evaluation criteria that favor
+      a particular approach. The RFP won't say "this is a discriminator" — you infer it.
+    - WIN_THEME: A proposal message that links a customer benefit to a discriminating
+      feature. Win themes are CRAFTED by the proposer, not stated by the customer.
+      "Strategies are things to do. Themes are things to say." Inferred from the
+      intersection of customer priorities + pain points + evaluation weights.
+    - PROOF_POINT: Evidence that backs a discriminator claim — certifications, metrics,
+      past performance results, staffing credentials. Part of the FAB chain
+      (Feature → Advantage → Benefit). Inferred when the RFP creates an opportunity
+      to demonstrate capability (e.g., "demonstrate experience with..." signals a
+      proof point opportunity).
+    Content signals: Ghost language ("contractors without X may struggle to..."),
+    unusual specificity in requirements, evaluation criteria that favor niche capabilities,
+    repeated emphasis on a theme across multiple sections, requirements that align with
+    known incumbent weaknesses
+    Example: "Integrated Logistics Approach (WIN_THEME)", "CMMI Level 3 Maturity (PROOF_POINT)"
 
-23. CUSTOMER_PRIORITY - Explicit importance language or weighting signal from the customer
-   Content signals: paramount, critical, essential, significantly more important, highest priority,
-   "of utmost importance", "overriding concern", "cannot be overstated"
-   Distinction: CUSTOMER_PRIORITY = importance/emphasis signal; STRATEGIC_THEME = broader strategic message
-   Shipley: Customer priorities are Hot Buttons — what keeps decision-makers up at night.
-   They drive Executive Summary organization and should appear in every volume's theme
-   statements. Repeated emphasis across multiple sections signals a true hot button.
-   Example: "Cybersecurity Is Paramount", "Mission Readiness Is the Top Priority"
+23. CUSTOMER_PRIORITY - What the customer EXPLICITLY states matters most
+    Content signals: paramount, critical, essential, significantly more important, highest
+    priority, "of utmost importance", "overriding concern", "cannot be overstated",
+    evaluation factor weights, adjectival ratings ("most important", "significantly
+    more important than"), repeated emphasis across multiple sections
+    *** EXTRACTION RULE: CUSTOMER_PRIORITY captures what the customer DIRECTLY tells
+    you is important — through explicit language, weighting, or emphasis. If you must
+    READ BETWEEN THE LINES, use STRATEGIC_THEME instead. ***
+    Two sub-patterns:
+    - STATED PRIORITY: Direct importance language ("Cybersecurity is paramount",
+      "Mission readiness is the overriding concern")
+    - WEIGHTED PRIORITY: Evaluation factor emphasis ("Technical Approach is
+      significantly more important than Cost", "Past Performance and Technical
+      are equal and more important than Price")
+    Shipley: Customer priorities are Hot Buttons — what keeps decision-makers up at
+    night. They drive Executive Summary organization and should appear in every
+    volume's theme statements. Repeated emphasis across multiple sections signals
+    a true hot button vs. boilerplate.
+    Example: "Cybersecurity Is Paramount", "Mission Readiness Is the Top Priority",
+    "Technical Approach is significantly more important than Cost"
 
 24. PAIN_POINT - Problem statements, deficiencies, shortfalls, or issues the government wants resolved
    Content signals: deficiencies, current contract lacks, shortfall, lessons learned, challenge, issue,
@@ -803,10 +838,12 @@ LABOR_CATEGORY vs WORKLOAD_METRIC:
   If RFP names specific positions → labor_category. If only quantities → workload_metric.
 
 STRATEGIC_THEME vs CUSTOMER_PRIORITY vs PAIN_POINT:
-   "Mission readiness" emphasized as the proposal message → strategic_theme
-   "Mission readiness is the highest priority" → customer_priority
-   "Current readiness shortfalls delay sortie generation" → pain_point
-   Theme = strategy, priority = weighting/emphasis, pain point = problem to solve
+   "Technical Approach is significantly more important than Cost" → customer_priority (EXPLICIT weighting)
+   "Mission readiness is the highest priority" → customer_priority (EXPLICIT statement)
+   "Contractors without cleared personnel may face access delays" → strategic_theme (INFERRED ghost language → discriminator opportunity)
+   "Integrated logistics approach reduces transition risk" → strategic_theme (INFERRED win theme)
+   "Current readiness shortfalls delay sortie generation" → pain_point (problem statement)
+   *** KEY RULE: If the CUSTOMER says it → customer_priority. If the PROPOSER infers it → strategic_theme. ***
 
 STRICTLY FORBIDDEN entity types (NEVER USE):
 ❌ other, UNKNOWN, process, table, image, plan, policy, standard, instruction,
@@ -1869,7 +1906,7 @@ Before finalizing extraction, validate:
 
 10. ENUM VALIDATION:
     - criticality ∈ MANDATORY, IMPORTANT, OPTIONAL, INFORMATIONAL
-    - theme_type ∈ CUSTOMER_HOT_BUTTON, DISCRIMINATOR, PROOF_POINT, WIN_THEME
+    - theme_type ∈ DISCRIMINATOR, PROOF_POINT, WIN_THEME
     - modal_verb ∈ shall, should, may, must, will, can, encouraged
     - work_type ∈ SOW, PWS, SOO
 
