@@ -1554,10 +1554,10 @@ FOR EVERY PROPOSAL_INSTRUCTION entity:
 ✓ Addressed evaluation factors listed (which factors this guides)
 ✓ Special constraints noted (cross-reference rules, standalone requirements)
 
-Examples of CORRECT proposal instruction descriptions:
-✅ "Technical Approach Volume limited to 25 pages, 12-point Times New Roman font, 1-inch margins, must address Factors 1 and 2 (Technical and Maintenance Approach), standalone without cross-referencing other volumes"
-✅ "Management Volume limited to 15 pages addressing Factor A Management Methodology, font 12pt Times New Roman, margins 1-inch all sides"
-✅ "Oral Presentation limited to 30 slides, no additional materials, max 5 presenters, incorporated into Factors A-C evaluation"
+Examples of CORRECT proposal instruction descriptions (values are RFP-sourced, not defaults):
+✅ "Technical Approach Volume limited to 25 pages [RFP-stated], 12-point Times New Roman font [RFP-stated], 1-inch margins [RFP-stated], must address Factors 1 and 2 (Technical and Maintenance Approach), standalone without cross-referencing other volumes"
+✅ "Management Volume limited to 15 pages [RFP-stated] addressing Factor A Management Methodology, font 12pt Times New Roman [RFP-stated], margins 1-inch all sides [RFP-stated]"
+✅ "Oral Presentation limited to 30 slides [RFP-stated], no additional materials, max 5 presenters [RFP-stated], incorporated into Factors A-C evaluation"
 ❌ "Technical volume requirements" (missing all structured metadata)
 
 FOR EVERY PROPOSAL_VOLUME entity:
