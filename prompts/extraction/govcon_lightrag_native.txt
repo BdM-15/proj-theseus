@@ -2,7 +2,7 @@ GOVCON ONTOLOGY - LIGHTRAG NATIVE FORMAT (FULL INTELLIGENCE RESTORED)
 ======================================================================
 Model: xAI Grok-4-fast-reasoning (2M context window)
 Output: LightRAG tuple-delimited format (entity/relation lines)
-Version: 6.1 (Branch 077 - Typed Relationship Schema)
+Version: 6.2 (Branch 078 - Shipley Definition Enrichment)
 Source: Complete restoration from Branch 040 modular prompts
 Total Size: ~35K tokens (comprehensive domain intelligence)
 
@@ -608,11 +608,15 @@ You MUST classify every entity into exactly ONE of these 33 types:
 
 ─── PROPOSAL AND EVALUATION STRUCTURE ───
 
-17. EVALUATION_FACTOR - Top-level scoring criteria
+17. EVALUATION_FACTOR - Top-level scoring criteria that drive proposal structure and page allocation
    Required metadata: weight, importance, subfactors
-   Content signals: "will be evaluated", "most important", "adjectival rating"
+   Content signals: "will be evaluated", "most important", "adjectival rating",
+   "approximately equal", "significantly more important", "descending order"
    Must Extract: Weight (40%, 25pts), Importance (Most Important), Subfactors
    Distinction: EVALUATION_FACTOR = top-level factors; SUBFACTOR = child criteria
+   Shipley: Factors form the backbone of the Compliance Matrix — each factor maps to
+   Section L instructions, Section M criteria, and proposal page budgets. When factor
+   weights don't match page allocations, flag the mismatch as a compliance risk.
    Example: Factor 1 Technical Approach (40%) - Most Important
 
 18. SUBFACTOR - Evaluation subfactor hierarchy (children of evaluation_factor)
@@ -623,8 +627,12 @@ You MUST classify every entity into exactly ONE of these 33 types:
 
 19. PROPOSAL_INSTRUCTION - Proposal preparation, format, submission, and response requirements
     Required metadata: page_limit, format_reqs, volume
-    Content signals: "page limit", "font size", "shall not exceed", "volume"
+    Content signals: "page limit", "font size", "shall not exceed", "volume",
+    "submit", "organize", "address each", "demonstrate", "describe your approach"
    Must Extract: Page limits, formatting (font/margins), volume organization, submission mechanics
+    Shipley: Instructions form the L-side of the Compliance Matrix. Each instruction
+    maps to evaluation criteria (M-side). Extract response directives ("describe",
+    "demonstrate", "provide evidence") — these tell evaluators what to score.
     Example: Technical Volume limited to 25 pages, 12pt Times New Roman
 
 20. PROPOSAL_VOLUME - Named proposal containers or response volumes
@@ -633,8 +641,13 @@ You MUST classify every entity into exactly ONE of these 33 types:
    Example: "Volume I Technical", "Volume III Past Performance"
 
 21. PAST_PERFORMANCE_REFERENCE - Reference contracts, PPQs, CPARS records, relevance examples
-   Content signals: past performance, PPQ, CPARS, reference contract, relevancy rating
+   Content signals: past performance, PPQ, CPARS, reference contract, relevancy rating,
+   "similar in size", "similar in scope", "relevancy", "recency"
    Distinction: PAST_PERFORMANCE_REFERENCE = evidence/reference object; EVALUATION_FACTOR = scoring criterion
+   Shipley: Past performance references are proof points in the FAB chain (Feature →
+   Advantage → Benefit). They prove discriminators are real, not theoretical. Extract
+   relevancy criteria (size, scope, complexity, dollar value) — these define what
+   "similar" means to this evaluator.
    Example: "Contract W912-1234 Afghanistan BOS", "CPARS Exceptional Rating 2024"
 
 ─── STRATEGIC AND ANALYTICAL SIGNAL ───
@@ -642,16 +655,39 @@ You MUST classify every entity into exactly ONE of these 33 types:
 22. STRATEGIC_THEME - Win themes, discriminators, proof points, or hot buttons
     Required metadata: theme_type
     Theme types: CUSTOMER_HOT_BUTTON, DISCRIMINATOR, PROOF_POINT, WIN_THEME
+    Shipley definitions (use these for classification):
+    - DISCRIMINATOR: Feature that (1) differs from competitors AND (2) the customer
+      acknowledges as important. Both conditions required. Look for unique requirements
+      where a specific approach would stand out.
+    - WIN_THEME: Links a customer benefit to a discriminating feature. Themes tell
+      evaluators why they should select you. "Strategies are things to do. Themes
+      are things to say."
+    - CUSTOMER_HOT_BUTTON: What keeps the customer up at night — worry items, core
+      needs, hidden agendas, reasons behind requirements. Look for repeated emphasis,
+      unusual specificity, enhanced surveillance language.
+    - PROOF_POINT: Evidence backing a claim — certifications, metrics, past
+      performance results. Part of the FAB chain (Feature → Advantage → Benefit).
+    Content signals: emphasis language, repeated themes, "critical", "paramount",
+    "key objective", unique requirements, Ghost language ("contractors without X
+    may struggle to...")
     Example: Mission Readiness Priority (CUSTOMER_HOT_BUTTON)
 
 23. CUSTOMER_PRIORITY - Explicit importance language or weighting signal from the customer
-   Content signals: paramount, critical, essential, significantly more important, highest priority
+   Content signals: paramount, critical, essential, significantly more important, highest priority,
+   "of utmost importance", "overriding concern", "cannot be overstated"
    Distinction: CUSTOMER_PRIORITY = importance/emphasis signal; STRATEGIC_THEME = broader strategic message
+   Shipley: Customer priorities are Hot Buttons — what keeps decision-makers up at night.
+   They drive Executive Summary organization and should appear in every volume's theme
+   statements. Repeated emphasis across multiple sections signals a true hot button.
    Example: "Cybersecurity Is Paramount", "Mission Readiness Is the Top Priority"
 
 24. PAIN_POINT - Problem statements, deficiencies, shortfalls, or issues the government wants resolved
-   Content signals: deficiencies, current contract lacks, shortfall, lessons learned, challenge, issue
+   Content signals: deficiencies, current contract lacks, shortfall, lessons learned, challenge, issue,
+   "incumbent failed", "historically problematic", "area of concern"
    Distinction: PAIN_POINT = problem to solve; REQUIREMENT = action/solution expected
+   Shipley: Pain points are Ghost opportunities — you can raise a competitor's likely
+   weakness without naming them ("Contractors without X may struggle to..."). Each
+   pain point should map to a discriminator that solves it via the FAB chain.
    Example: "Current Turnaround Delays Impact Mission", "Fragmented Asset Visibility Problem"
 
 ─── STANDARD ENTITIES ───

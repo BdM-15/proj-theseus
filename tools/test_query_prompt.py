@@ -182,6 +182,11 @@ MENTOR_SIGNALS = {
         "you should", "consider", "I'd recommend", "keep in mind",
         "in Shipley terms", "in practice", "the strategic implication",
         "important to understand", "worth noting",
+        "for your bid", "for your proposal", "what this means",
+        "the reason this matters", "I recommend", "suggests that",
+        "reveals", "indicates", "pay attention to", "don't overlook",
+        "strategically", "from a capture perspective", "evaluators will",
+        "your approach should", "make sure", "be careful",
     ],
     "risk_flags": [
         "Risk:", "Watch out:", "risk", "compliance trap", "ankle biter",
