@@ -211,7 +211,7 @@ if __name__ == "__main__":
     
     print(f"""
 {CYAN}{'═' * 65}{RESET}
-  {MAGENTA}Government Contracting Intelligence Platform{RESET}
+  {MAGENTA}Project Theseus{RESET}
   {DIM}Ontology-Based RAG for Federal RFP Analysis{RESET}
 {CYAN}{'═' * 65}{RESET}
 """)
@@ -219,11 +219,14 @@ if __name__ == "__main__":
     # Now initialize logging (after banner is displayed)
     from src.core.config import get_settings as _get_settings
     from src.utils.logging_config import setup_logging
+    import os as _os
     _settings = _get_settings()
+    # Workspace-specific log dir: ./rag_storage/{workspace}/processing.log
+    _workspace_log_dir = _os.path.join(_settings.working_dir, _settings.workspace)
     log_info = setup_logging(
         log_level="INFO",
         log_dir="logs",
-        workspace_dir=_settings.working_dir,
+        workspace_dir=_workspace_log_dir,
         max_file_size=10 * 1024 * 1024,  # 10MB per file
         backup_count=5,
         console_output=True
@@ -240,7 +243,7 @@ if __name__ == "__main__":
         neo4j_started_by_us = is_neo4j_enabled() and is_neo4j_running()
         
         # Start the RAG server
-        print("🚀 Starting GovCon RAG Server...\n")
+        print("🚀 Starting Project Theseus...\n")
         asyncio.run(main())
     
     except KeyboardInterrupt:
