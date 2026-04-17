@@ -39,6 +39,9 @@ class Colors:
     MAGENTA = '\033[95m'
     RED = '\033[91m'
     BOLD = '\033[1m'
+    DIM = '\033[2m'
+    ITALIC = '\033[3m'
+    WHITE = '\033[97m'
     RESET = '\033[0m'
 
 
@@ -46,73 +49,75 @@ def log_banner(
     title: str,
     items: Optional[List[Tuple[str, str]]] = None,
     width: int = 80,
-    logger: Optional[logging.Logger] = None
+    logger: Optional[logging.Logger] = None,
+    force_print: bool = False,
 ) -> None:
     """
     Log a standardized banner with title and optional items.
-    
-    Usage:
-        from src.utils.logging_config import log_banner, Colors
-        
-        log_banner("🎯 CONFIGURATION", [
-            ("Entity Types", "18 specialized"),
-            ("Parser", "MinerU 3.0.9"),
-        ])
-    
+
     Args:
-        title: Banner title (can include emoji)
+        title: Banner title (can include emoji and ANSI codes)
         items: Optional list of (label, value) tuples to display
         width: Banner width in characters (default: 80)
-        emoji: Optional emoji prefix (deprecated - include in title instead)
         logger: Logger instance (defaults to root logger)
+        force_print: When True, write directly to stdout via print() instead of
+                     going through the logging system. Use this for startup banners
+                     that must always be visible regardless of log handler state
+                     (e.g. after third-party libs reset the root logger).
     """
-    if logger is None:
-        logger = logging.getLogger()
-    
     c = Colors
     separator = f"{c.CYAN}{'═' * width}{c.RESET}"
-    
-    logger.info("")
-    logger.info(separator)
-    logger.info(f"{c.BOLD}{c.MAGENTA}{title}{c.RESET}")
-    logger.info(separator)
-    
+
+    def _emit(msg: str) -> None:
+        if force_print:
+            print(msg)
+        else:
+            _log = logger if logger is not None else logging.getLogger()
+            _log.info(msg)
+
+    _emit("")
+    _emit(separator)
+    _emit(f"{c.BOLD}{c.MAGENTA}{title}{c.RESET}")
+    _emit(separator)
+
     if items:
         for label, value in items:
-            # Empty label = divider row
             if not label:
-                logger.info(f"{c.CYAN}{'─' * (width // 2)}{c.RESET}")
+                _emit(f"{c.CYAN}{'─' * (width // 2)}{c.RESET}")
             else:
-                logger.info(f"{c.GREEN}{label}:{c.RESET} {value}")
-    
-    logger.info(separator)
-    logger.info("")
+                _emit(f"{c.GREEN}{label}:{c.RESET} {value}")
+
+    _emit(separator)
+    _emit("")
 
 
-class HTTPFilter(logging.Filter):
-    """Filter out repetitive HTTP health check logs from console"""
-    
+class ConsoleFilter(logging.Filter):
+    """
+    Strict allowlist filter for console output.
+
+    Only the READY banner (src.raganything_server) and uvicorn server-start
+    messages (uvicorn.error) are shown at INFO level. Everything else —
+    initialization detail, VDB loading, LightRAG internals, prompt registration,
+    Neo4j index setup — goes to log files only.
+
+    Warnings and errors from ANY logger always pass through.
+    """
+
+    # Loggers allowed to emit INFO+ to the terminal
+    _ALLOWED = {
+        "src.raganything_server",
+        "uvicorn.error",
+    }
+
     def filter(self, record):
-        # Filter out uvicorn access logs
+        # Warnings and errors always surface
+        if record.levelno >= logging.WARNING:
+            return True
+        # Uvicorn access logs (per-request) never surface
         if record.name == "uvicorn.access":
             return False
-        
-        # Filter out health check spam
-        message = record.getMessage()
-        health_patterns = [
-            "GET /health",
-            "POST /health",
-            "GET /api/health",
-            "200 OK",
-            "::1:",  # IPv6 localhost requests
-            "127.0.0.1:",  # IPv4 localhost requests
-        ]
-        
-        for pattern in health_patterns:
-            if pattern in message:
-                return False
-        
-        return True
+        # Only allowed loggers pass at INFO level
+        return record.name in self._ALLOWED
 
 
 class ProcessingFilter(logging.Filter):
@@ -285,7 +290,7 @@ def setup_logging(
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setLevel(logging.INFO)
         console_handler.setFormatter(console_formatter)
-        console_handler.addFilter(HTTPFilter())
+        console_handler.addFilter(ConsoleFilter())
         root_logger.addHandler(console_handler)
     
     # Write session-start marker directly to processing log for run auditability

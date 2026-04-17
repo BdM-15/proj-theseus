@@ -263,7 +263,7 @@ async def process_document_with_semantic_inference(
         
         llm_timeout = settings.llm_timeout
         logger.info("🚀 Using RAG-Anything native end-to-end pipeline")
-        logger.info(f"   Ontology: 18 govcon entity types | Timeout: {llm_timeout}s")
+        logger.info(f"   Ontology: 33 govcon entity types | Timeout: {llm_timeout}s")
         
         workspace = settings.workspace
         output_dir = os.path.join(global_args.working_dir, workspace)

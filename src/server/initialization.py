@@ -2,10 +2,10 @@
 RAG-Anything Initialization Module
 
 This module handles the initialization of the RAG-Anything instance with:
-- Custom entity extraction prompts (simplified for clarity)
-- Government contracting ontology (18 specialized entity types)
+- Custom entity extraction prompts (govcon_lightrag_native.txt, Parts A-L)
+- Government contracting ontology (33 entity types, 43 relationship types)
 - Multimodal document processing (MinerU parser)
-- Cloud LLM integration (xAI Grok + OpenAI embeddings)
+- Cloud LLM integration (xAI Grok extraction + grok-4.20 reasoning + OpenAI embeddings)
 """
 
 # CRITICAL: Ensure .env is loaded before LightRAG imports
@@ -41,16 +41,11 @@ async def initialize_raganything():
     
     Configuration:
     - Parser: MinerU (multimodal - images, tables, equations)
-    - Entity Types: 18 government contracting types (semantic-first detection)
-    - LLM: xAI Grok-4-fast-reasoning (cloud processing, 2M context)
+    - Entity Types: 33 government contracting types (ontology-driven extraction)
+    - Extraction LLM: xAI Grok-4-fast-non-reasoning (literal format compliance)
+    - Reasoning LLM: xAI grok-4.20-0309-reasoning (queries + semantic inference)
     - Embeddings: OpenAI text-embedding-3-large (3072-dim, 8192 token limit)
-    - Chunking: 4K tokens (overlap: ~600) - Multiple focused extraction passes
-    
-    Architecture Note:
-    LightRAG chunks documents at 4096 tokens. Same chunks go to BOTH:
-    - LLM entity extraction (multiple focused passes = comprehensive entity coverage)
-    - Embedding generation (fits within 8192 token limit, no truncation needed)
-    Smaller chunks prevent LLM attention decay that caused 50K chunk extraction failure.
+    - Chunking: Configurable via CHUNK_SIZE env var, 15% overlap
     
     Returns:
         RAGAnything: Configured instance ready for document ingestion
@@ -467,39 +462,14 @@ async def initialize_raganything():
     logger.info(f"   Extraction prompt: {extraction_chars:,} chars (~{extraction_chars//4:,} tokens), {extraction_lines:,} lines")
     logger.info(f"   Source: govcon_lightrag_native.txt (Parts A-L)")
     logger.info(f"   Domain Intelligence:")
+    metadata_type_count = extraction_prompt.count('Required metadata:')
     logger.info(f"     • 8 Shipley user personas (Capture, Proposal, Cost, Contracts, etc.)")
-    logger.info(f"     • 18 GovCon entity types with metadata requirements")
+    logger.info(f"     • {metadata_type_count} GovCon entity types with metadata requirements")
     logger.info(f"     • 50+ relationship inference rules (L↔M, clause clustering, etc.)")
     logger.info(f"     • 12 annotated RFP examples (requirements, clauses, CDRLs, etc.)")
     logger.info(f"     • Quantitative preservation rules for BOE development")
     logger.info(f"     • Decision tree for ambiguous cases")
     logger.info(f"   Keywords examples: {len(GOVCON_PROMPTS.get('keywords_extraction_examples', []))} GovCon-specific")
-    
-    # ═══════════════════════════════════════════════════════════════════════════════
-    # Startup Configuration Summary
-    # ═══════════════════════════════════════════════════════════════════════════════
-    
-    # Use centralized color codes
-    from src.utils.logging_config import Colors
-    c = Colors
-    
-    logger.info("")
-    logger.info(f"{c.CYAN}{'═' * 80}{c.RESET}")
-    logger.info(f"{c.BOLD}{c.MAGENTA}🎯 CONFIGURATION{c.RESET}")
-    logger.info(f"{c.CYAN}{'═' * 80}{c.RESET}")
-    logger.info(f"{c.GREEN}Entity Types:{c.RESET} {c.BOLD}{len(entity_types)}{c.RESET} specialized (organization, requirement, evaluation_factor, etc.)")
-    try:
-        from importlib import metadata as _metadata
-        mineru_version = _metadata.version("mineru")
-    except Exception:
-        mineru_version = "unknown"
-    logger.info(
-        f"{c.GREEN}Parser:{c.RESET} {c.BOLD}MinerU {mineru_version}{c.RESET} | Device: {c.BOLD}{c.GREEN if device == 'cuda' else c.YELLOW}{device.upper()}{c.RESET} | Method: {parse_method.upper()}"
-    )
-    logger.info(f"{c.GREEN}Multimodal:{c.RESET} Images, Tables, Equations {c.BOLD}{c.GREEN}ENABLED{c.RESET}")
-    logger.info(f"{c.GREEN}Advanced:{c.RESET} Formula Recognition, Table Merge {c.BOLD}{c.GREEN}ENABLED{c.RESET} | Timeout: {c.YELLOW}600s{c.RESET}")
-    logger.info(f"{c.CYAN}{'═' * 80}{c.RESET}")
-    logger.info("")
     
     # ═══════════════════════════════════════════════════════════════════════════════
     # COMPATIBILITY FIX: RAG-Anything 1.2.8 + LightRAG 1.4.9.3 doc_status schema
@@ -585,19 +555,6 @@ async def initialize_raganything():
     # ═════════════════════════════════════════════════════════════════════════════
     
     # ═══════════════════════════════════════════════════════════════════════════════
-    # MinerU Model Warmup - Download VLM model at startup, not during processing
-    # ═══════════════════════════════════════════════════════════════════════════════
-    # MinerU 2.7.0 uses a VLM model (MinerU2.5-2509-1.2B) that must be downloaded
-    # from HuggingFace Hub. Without warmup, this happens on first document upload,
-    # causing unexpected delays and potential timeout/permission errors.
-    #
-    # The warmup runs `mineru --version` which triggers model download without
-    # parsing any document. HF_HUB_DISABLE_SYMLINKS=1 in .env prevents Windows
-    # symlink permission errors during download.
-    # ═══════════════════════════════════════════════════════════════════════════════
-    await warmup_mineru_model()
-    
-    # ═══════════════════════════════════════════════════════════════════════════════
     # DOMAIN ONTOLOGY BOOTSTRAP (Issue #68)
     # ═══════════════════════════════════════════════════════════════════════════════
     # Pre-load curated GovCon domain knowledge into the workspace. This provides:
@@ -637,48 +594,6 @@ async def initialize_raganything():
         logger.info("📚 Ontology auto-bootstrap DISABLED (AUTO_BOOTSTRAP_ONTOLOGY=False)")
     
     return _rag_anything
-
-
-async def warmup_mineru_model():
-    """Pre-download MinerU models at startup to avoid delays and symlink issues.
-    
-    MinerU 3.0 launches a subprocess API service that calls snapshot_download
-    internally. On Windows without Developer Mode, symlink creation fails
-    (WinError 1314). By pre-downloading both models in our main process with
-    HF_HUB_DISABLE_SYMLINKS=1, the subprocess finds cached real files and
-    skips the download entirely.
-    """
-    import asyncio
-    import os
-    
-    logger.info("🔄 Warming up MinerU models (downloading if needed)...")
-    
-    try:
-        # CRITICAL: Set env vars BEFORE importing huggingface_hub
-        # These must be set before the HF library reads them
-        os.environ["HF_HUB_DISABLE_SYMLINKS"] = "1"
-        os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
-        
-        from huggingface_hub import snapshot_download
-        
-        # 1. Pipeline backend model (layout detection, OCR, table recognition)
-        # Required by MinerU 3.0 "pipeline" backend for PDF processing
-        pipeline_path = await asyncio.to_thread(
-            snapshot_download,
-            "opendatalab/PDF-Extract-Kit-1.0"
-        )
-        logger.info(f"✅ MinerU pipeline model ready: {pipeline_path}")
-        
-        # 2. VLM model (vision-language for image/table understanding)
-        vlm_path = await asyncio.to_thread(
-            snapshot_download,
-            "opendatalab/MinerU2.5-2509-1.2B"
-        )
-        logger.info(f"✅ MinerU VLM model ready: {vlm_path}")
-        
-    except Exception as e:
-        # Non-fatal - MinerU will attempt download on first document
-        logger.warning(f"⚠️ MinerU warmup: {e} - will download on first document")
 
 
 def get_rag_instance():

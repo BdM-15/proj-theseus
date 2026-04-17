@@ -44,11 +44,11 @@
 
 This project has **three independent prompt systems** that MUST stay aligned. Changes to the domain ontology, entity types, relationship types, or Shipley methodology MUST propagate across ALL three:
 
-| System | Purpose | Files | Registration |
-|--------|---------|-------|-------------|
-| **1. LightRAG Extraction** | Entity/relationship extraction from text chunks | `prompts/extraction/govcon_lightrag_native.txt` → `prompts/govcon_prompt.py` | `PROMPTS.update(GOVCON_PROMPTS)` in `src/server/initialization.py` |
-| **2. LightRAG Query/Response** | RAG query answering (Shipley mentor persona) | `prompts/govcon_prompt.py` (`rag_response`, `naive_rag_response`, `keywords_extraction`) | Same `PROMPTS.update()` call |
-| **3. RAGAnything Multimodal** | Table/image/equation VLM analysis | `prompts/multimodal/govcon_multimodal_prompts.py` | `register_prompt_language("govcon", ...)` in `src/server/initialization.py` |
+| System                         | Purpose                                         | Files                                                                                    | Registration                                                                |
+| ------------------------------ | ----------------------------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| **1. LightRAG Extraction**     | Entity/relationship extraction from text chunks | `prompts/extraction/govcon_lightrag_native.txt` → `prompts/govcon_prompt.py`             | `PROMPTS.update(GOVCON_PROMPTS)` in `src/server/initialization.py`          |
+| **2. LightRAG Query/Response** | RAG query answering (Shipley mentor persona)    | `prompts/govcon_prompt.py` (`rag_response`, `naive_rag_response`, `keywords_extraction`) | Same `PROMPTS.update()` call                                                |
+| **3. RAGAnything Multimodal**  | Table/image/equation VLM analysis               | `prompts/multimodal/govcon_multimodal_prompts.py`                                        | `register_prompt_language("govcon", ...)` in `src/server/initialization.py` |
 
 **Additionally**, post-processing inference prompts live in `prompts/relationship_inference/` (13 algorithm-specific markdown files used by `src/inference/` modules).
 
@@ -229,12 +229,12 @@ Before proposing a commit, verify:
 2. **Schema consistency**: Do `VALID_ENTITY_TYPES` and `VALID_RELATIONSHIP_TYPES` in `schema.py` match what the prompts reference?
 3. **Test fixtures updated**: Do test signal patterns and assertions reflect the current vocabulary?
 4. **Version bumped**: If extraction prompt changed, is the version number in the prompt header updated?
-    - Run `python -m pytest tests` to run the standard test suite.
-    - Use markers if available (check `tests/pytest.ini` if present).
-3.  **Prompt Signal Tests**:
-    - `python tools/test_query_prompt.py --workspace <name> --query-id M2` — Tests mentor persona signal detection
-    - Signal categories: `shipley_terms`, `mentoring_language`, `risk_flags`, `reasoning_chain`
-    - Note: Tests query against cached LLM responses. Re-process workspace under new prompts for fresh results.
+   - Run `python -m pytest tests` to run the standard test suite.
+   - Use markers if available (check `tests/pytest.ini` if present).
+5. **Prompt Signal Tests**:
+   - `python tools/test_query_prompt.py --workspace <name> --query-id M2` — Tests mentor persona signal detection
+   - Signal categories: `shipley_terms`, `mentoring_language`, `risk_flags`, `reasoning_chain`
+   - Note: Tests query against cached LLM responses. Re-process workspace under new prompts for fresh results.
 
 ### Environment Setup
 

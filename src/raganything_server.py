@@ -106,10 +106,11 @@ async def main():
     logger.info("✅ Custom endpoints registered: /insert, /documents/upload")
     logger.info("✅ Use LightRAG's native /query/data endpoint for structured data retrieval (agent workflows)")
 
-    # Compact startup banner — full pipeline detail in docs/ARCHITECTURE.md
+    # Consolidated startup banner — full pipeline detail in docs/ARCHITECTURE.md
     graph_storage = global_args.graph_storage if hasattr(global_args, 'graph_storage') else "NetworkXStorage"
     from src.utils.logging_config import log_banner, Colors
     from importlib.metadata import version as _pkg_version, PackageNotFoundError
+    from src.ontology.schema import VALID_ENTITY_TYPES, VALID_RELATIONSHIP_TYPES
     c = Colors
 
     def _ver(pkg: str) -> str:
@@ -118,25 +119,55 @@ async def main():
         except PackageNotFoundError:
             return "unknown"
 
+    mineru_ver = _ver("mineru")
+    device = settings.mineru_device_mode.upper()
+    device_color = c.GREEN if device == "CUDA" else c.YELLOW
+
+    # Knowledge ontology modules stacked for query enrichment
+    kg_modules = [
+        ("Shipley BD Lifecycle",   "7-phase lifecycle · color teams · capture tools · APMP"),
+        ("FAR/DFARS Regulations",  "compliance patterns · CMMC · Section L/M best practices"),
+        ("Evaluation Methodology", "rating scales · LPTA vs Best Value · S/W/D framework"),
+        ("Workload & Pricing",     "BOE formulas · staffing ratios · labor categories"),
+        ("Capture Management",     "bid/no-bid · win themes · hot buttons · Pwin"),
+        ("Lessons Learned",        "20+ yrs agency patterns · recompete signals · red flags"),
+    ]
+
     startup_items = [
-        ("Workspace",    f"{c.BOLD}{settings.workspace}{c.RESET}"),
-        ("Storage",      f"{graph_storage}  |  {global_args.working_dir}"),
+        # ── Workspace ────────────────────────────────────────────────────────────
+        ("Workspace",    f"{c.BOLD}{c.WHITE}{settings.workspace}{c.RESET}"),
+        ("Storage",      f"{c.YELLOW}{graph_storage}{c.RESET}  ·  {c.DIM}{global_args.working_dir}{c.RESET}"),
         ("", ""),
-        ("Extraction",   settings.extraction_llm_name),
-        ("Reasoning",    settings.reasoning_llm_name),
-        ("Embeddings",   f"{settings.embedding_model} ({settings.embedding_dim}D)"),
+        # ── Models ───────────────────────────────────────────────────────────────
+        ("Extraction",   f"{c.CYAN}{settings.extraction_llm_name}{c.RESET}"),
+        ("Reasoning",    f"{c.MAGENTA}{settings.reasoning_llm_name}{c.RESET}"),
+        ("Embeddings",   f"{c.CYAN}{settings.embedding_model}{c.RESET}  {c.DIM}({settings.embedding_dim}D){c.RESET}"),
         ("", ""),
-        ("LightRAG",     _ver("lightrag-hku")),
-        ("RAG-Anything", _ver("raganything")),
-        ("MinerU",       _ver("mineru")),
+        # ── Stack Versions ───────────────────────────────────────────────────────
+        ("LightRAG",     f"{c.DIM}{_ver('lightrag-hku')}{c.RESET}"),
+        ("RAG-Anything", f"{c.DIM}{_ver('raganything')}{c.RESET}"),
+        ("MinerU",       f"{c.DIM}{mineru_ver}{c.RESET}  ·  Device: {c.BOLD}{device_color}{device}{c.RESET}  ·  Method: {c.YELLOW}{settings.parse_method.upper()}{c.RESET}"),
+        ("Multimodal",   f"Images · Tables · Equations · Formulas  {c.GREEN}▸ ENABLED{c.RESET}"),
         ("", ""),
+        # ── Ontology Schema ──────────────────────────────────────────────────────
+        ("Schema",       f"{c.BOLD}{c.YELLOW}{len(VALID_ENTITY_TYPES)}{c.RESET} entity types  ·  {c.BOLD}{c.YELLOW}{len(VALID_RELATIONSHIP_TYPES)}{c.RESET} relationship types"),
+        ("Inference",    f"{c.CYAN}8 LLM algorithms{c.RESET}  {c.DIM}(L↔M mapping · traceability · enrichment · orphan resolution){c.RESET}"),
+        ("", ""),
+        # ── Knowledge Ontologies ─────────────────────────────────────────────────
+        ("Knowledge KG", f"{c.BOLD}{c.MAGENTA}{len(kg_modules)} domain ontologies{c.RESET}  {c.DIM}injected for query enrichment{c.RESET}"),
+    ] + [
+        (f"  {c.MAGENTA}▸{c.RESET} {name}", f"{c.DIM}{desc}{c.RESET}")
+        for name, desc in kg_modules
+    ] + [
+        ("", ""),
+        # ── Endpoints ────────────────────────────────────────────────────────────
         ("WebUI",        f"{c.BLUE}http://{host}:{port}/webui{c.RESET}"),
         ("API Docs",     f"{c.BLUE}http://{host}:{port}/docs{c.RESET}"),
     ]
     if graph_storage == "Neo4JStorage":
         startup_items.append(("Neo4j", f"{c.BLUE}http://localhost:7474{c.RESET}"))
 
-    log_banner("✅ GOVCON RAG — READY", items=startup_items, logger=logger)
+    log_banner(f"{c.BOLD}✅ PROJECT THESEUS — READY{c.RESET}", items=startup_items, logger=logger, force_print=True)
 
     # Step 5: Start server
     config = uvicorn.Config(app=app, host=host, port=port, log_level="info")
