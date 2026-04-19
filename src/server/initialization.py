@@ -114,8 +114,14 @@ async def initialize_raganything():
     # ═══════════════════════════════════════════════════════════════════════════════
     
     # Create RAG-Anything configuration - it reads context settings from env vars automatically
+    # parser_output_dir: Route MinerU parsed output into the workspace folder so all
+    # workspace artifacts (KV stores, VDB, MinerU output) are co-located under
+    # rag_storage/{workspace}/.  This makes workspace cleanup trivial and avoids
+    # orphaned {docname}_{hash}/ directories in the rag_storage root.
+    workspace_dir = os.path.join(working_dir, settings.workspace)
     config = RAGAnythingConfig(
         working_dir=working_dir,
+        parser_output_dir=workspace_dir,
         parser=parser,
         parse_method=parse_method,
         enable_image_processing=enable_image,
@@ -123,6 +129,7 @@ async def initialize_raganything():
         enable_equation_processing=enable_equation,
         # Context settings are automatically loaded from env vars by RAGAnythingConfig
     )
+    logger.info(f"📁 MinerU parser output → {workspace_dir}")
     
     # Log context-aware processing configuration (read from config after env var loading)
     logger.info(f"✅ RAG-Anything context-aware processing: {'ENABLED' if config.context_window > 0 else 'DISABLED'}")
