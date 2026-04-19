@@ -19,10 +19,70 @@ Log Files Created:
 
 import logging
 import logging.handlers
+import os
 import sys
 from pathlib import Path
 from datetime import datetime
 from typing import List, Tuple, Optional
+
+
+if sys.platform == 'win32':
+    import ctypes
+    import ctypes.wintypes
+    import msvcrt
+
+    class ShareDeleteRotatingFileHandler(logging.handlers.RotatingFileHandler):
+        """
+        RotatingFileHandler that opens files with FILE_SHARE_DELETE on Windows.
+
+        Python's default RotatingFileHandler uses CreateFileW without
+        FILE_SHARE_DELETE, which prevents other processes (e.g. workspace_cleanup.py)
+        from renaming or deleting the log file while the server is running.
+
+        With FILE_SHARE_DELETE set, any other process can rename the file out from
+        under the server. The server keeps its open handle (writing to the now-orphaned
+        path in temp) until it closes; the directory entry is removed immediately so
+        rmdir succeeds.
+        """
+
+        _GENERIC_WRITE     = 0x40000000
+        _FILE_SHARE_READ   = 0x00000001
+        _FILE_SHARE_WRITE  = 0x00000002
+        _FILE_SHARE_DELETE = 0x00000004
+        _OPEN_ALWAYS       = 4
+        _FILE_ATTRIBUTE_NORMAL = 0x80
+        _INVALID_HANDLE    = ctypes.wintypes.HANDLE(-1).value
+
+        def _open(self):
+            k32 = ctypes.windll.kernel32
+            k32.CreateFileW.restype = ctypes.wintypes.HANDLE
+            k32.CreateFileW.argtypes = [
+                ctypes.wintypes.LPCWSTR,
+                ctypes.wintypes.DWORD,
+                ctypes.wintypes.DWORD,
+                ctypes.wintypes.LPVOID,
+                ctypes.wintypes.DWORD,
+                ctypes.wintypes.DWORD,
+                ctypes.wintypes.HANDLE,
+            ]
+            handle = k32.CreateFileW(
+                self.baseFilename,
+                self._GENERIC_WRITE,
+                self._FILE_SHARE_READ | self._FILE_SHARE_WRITE | self._FILE_SHARE_DELETE,
+                None,
+                self._OPEN_ALWAYS,
+                self._FILE_ATTRIBUTE_NORMAL,
+                None,
+            )
+            if handle == self._INVALID_HANDLE:
+                raise OSError(f"CreateFileW failed (error {k32.GetLastError()}) for {self.baseFilename}")
+            k32.SetFilePointer(handle, 0, None, 2)  # FILE_END — append mode
+            fd = msvcrt.open_osfhandle(handle, os.O_WRONLY | os.O_APPEND)
+            encoding = getattr(self, 'encoding', None) or 'utf-8'
+            return os.fdopen(fd, self.mode, encoding=encoding)
+
+else:
+    ShareDeleteRotatingFileHandler = logging.handlers.RotatingFileHandler
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -189,10 +249,13 @@ def setup_logging(
     Set up logging with per-workspace processing logs and a central server log.
 
     Log Files:
-        - {workspace_dir}/processing.log  — RFP extraction, entity/relation counts,
+        - {workspace_dir}/{workspace}_processing.log  — RFP extraction, entity/relation counts,
           semantic inference progress (one log per workspace, never shared)
-        - {workspace_dir}/errors.log      — all errors for this workspace
-        - {log_dir}/server.log            — server startup and API calls (central)
+        - {workspace_dir}/{workspace}_errors.log      — all errors for this workspace
+        - {log_dir}/server.log                        — server startup and API calls (central)
+
+    The workspace name is derived from the last path component of workspace_dir so
+    the log filename is self-describing even when viewed outside its parent folder.
 
     Args:
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR)
@@ -233,8 +296,11 @@ def setup_logging(
     # ========================================================================
     # 1. PROCESSING.LOG - RFP processing details (per workspace)
     # ========================================================================
-    processing_log_file = workspace_log_path / "processing.log"
-    processing_handler = logging.handlers.RotatingFileHandler(
+    # Include workspace name in the filename so logs are self-describing when
+    # viewed outside their parent folder (e.g., in an editor, log viewer, or grep).
+    workspace_name = workspace_log_path.name  # e.g. "afcapv_bos_i_t7"
+    processing_log_file = workspace_log_path / f"{workspace_name}_processing.log"
+    processing_handler = ShareDeleteRotatingFileHandler(
         processing_log_file,
         maxBytes=max_file_size,
         backupCount=backup_count,
@@ -272,8 +338,8 @@ def setup_logging(
     # ========================================================================
     # 3. ERRORS.LOG - All errors (per workspace)
     # ========================================================================
-    error_log_file = workspace_log_path / "errors.log"
-    error_handler = logging.handlers.RotatingFileHandler(
+    error_log_file = workspace_log_path / f"{workspace_name}_errors.log"
+    error_handler = ShareDeleteRotatingFileHandler(
         error_log_file,
         maxBytes=max_file_size,
         backupCount=backup_count,

@@ -227,7 +227,6 @@ async def process_document_with_semantic_inference(
     
     content_list, doc_id = await rag_instance.parse_document(
         file_path=file_path,
-        output_dir=global_args.working_dir,
         parse_method="auto",
         backend=mineru_backend
     )
@@ -264,9 +263,6 @@ async def process_document_with_semantic_inference(
         llm_timeout = settings.llm_timeout
         logger.info("🚀 Using RAG-Anything native end-to-end pipeline")
         logger.info(f"   Ontology: 33 govcon entity types | Timeout: {llm_timeout}s")
-        
-        workspace = settings.workspace
-        output_dir = os.path.join(global_args.working_dir, workspace)
         
         await rag_instance.insert_content_list(
             content_list=filtered_content,

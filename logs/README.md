@@ -2,9 +2,27 @@
 
 Captures all processing and server activity with automatic rotation (10MB files, 5 backups per log).
 
+## Log File Locations
+
+| File                         | Location                   | Purpose                                            |
+| ---------------------------- | -------------------------- | -------------------------------------------------- |
+| `{workspace}_processing.log` | `rag_storage/{workspace}/` | RFP extraction, inference progress (per workspace) |
+| `{workspace}_errors.log`     | `rag_storage/{workspace}/` | All errors for this workspace                      |
+| `server.log`                 | `logs/`                    | Server startup, API calls (central, shared)        |
+
+The workspace name is embedded in the filename so logs are self-describing when viewed in an editor, file explorer, or log aggregator without needing to navigate the directory tree.
+
+**Example** — workspace `afcapv_bos_i_t7`:
+
+```
+rag_storage/afcapv_bos_i_t7/afcapv_bos_i_t7_processing.log
+rag_storage/afcapv_bos_i_t7/afcapv_bos_i_t7_errors.log
+logs/server.log
+```
+
 ## Log Files
 
-### `processing.log`
+### `{workspace}_processing.log`
 
 **Purpose**: Complete RFP processing history  
 **Contains**:
@@ -63,7 +81,7 @@ Captures all processing and server activity with automatic rotation (10MB files,
 
 ---
 
-### `errors.log`
+### `{workspace}_errors.log`
 
 **Purpose**: All errors from any component  
 **Contains**:
@@ -92,17 +110,17 @@ Captures all processing and server activity with automatic rotation (10MB files,
 ## Log Rotation
 
 **Max File Size**: 10MB per log file  
-**Backup Count**: 5 files per log (e.g., `processing.log.1`, `processing.log.2`, etc.)  
+**Backup Count**: 5 files per log (e.g., `{workspace}_processing.log.1`, `{workspace}_processing.log.2`, etc.)  
 **Total Storage**: ~50MB per log type (10MB × 5 backups)  
 **Rotation Trigger**: Automatic when file reaches 10MB
 
 When a log file reaches 10MB:
 
-1. `processing.log` → `processing.log.1`
-2. `processing.log.1` → `processing.log.2`
-3. ... (up to `processing.log.5`)
-4. `processing.log.5` is deleted
-5. New `processing.log` starts fresh
+1. `{workspace}_processing.log` → `{workspace}_processing.log.1`
+2. `{workspace}_processing.log.1` → `{workspace}_processing.log.2`
+3. ... (up to `{workspace}_processing.log.5`)
+4. `{workspace}_processing.log.5` is deleted
+5. New `{workspace}_processing.log` starts fresh
 
 ---
 
@@ -165,10 +183,11 @@ log_info = setup_logging(
 
 ### "Can't find processing details"
 
-Processing logs are in `processing.log`, not `server.log`. Use:
+Processing logs are in `rag_storage/{workspace}/{workspace}_processing.log`, not `server.log`. Use:
 
 ```powershell
-Get-Content logs/processing.log -Wait -Tail 100
+# Replace 'afcapv_bos_i_t7' with your workspace name
+Get-Content rag_storage/afcapv_bos_i_t7/afcapv_bos_i_t7_processing.log -Wait -Tail 100
 ```
 
 ### "Terminal still showing health checks"
