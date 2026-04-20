@@ -1,5 +1,5 @@
 """
-Algorithm 8: Orphan Pattern Resolution
+Resolve Orphans: Orphan Entity Resolution
 
 Identifies orphan entities and suggests relationships.
 Processes ALL orphans in batches to ensure complete graph connectivity.
@@ -20,7 +20,7 @@ TARGET_BATCH_SIZE = 100  # Number of target entities per batch
 MAX_CONCURRENT_BATCHES = 4  # Parallel LLM calls
 
 
-async def algo_8_orphan_resolution(
+async def resolve_orphans(
     entities: List[Dict],
     id_to_entity: Dict,
     neo4j_io,
@@ -29,14 +29,14 @@ async def algo_8_orphan_resolution(
     system_prompt: str = None
 ) -> List[Dict]:
     """
-    Algorithm 8: Orphan Pattern Resolution
+    Resolve Orphans: Orphan Entity Resolution
     
     Identifies entities with no relationships and suggests
     connections based on content similarity.
     
     Now processes ALL orphans in batches instead of just first 50.
     """
-    logger.info(f"  [Algo 8] Orphan Resolution")
+    logger.info(f"  [Orphan Resolution]")
     
     orphans = []
     try:
@@ -139,13 +139,13 @@ Return ONLY valid JSON array with relationships for AS MANY orphans as possible:
         
         try:
             response = await call_llm_async(prompt, system_prompt=system_prompt, model=model, temperature=temperature)
-            rels = parse_llm_json_response(response, f"Algorithm 8 Batch {batch_idx}")
+            rels = parse_llm_json_response(response, f"Orphan Resolution Batch {batch_idx}")
             if not rels:
                 return []
-            valid_rels = validate_relationships(rels, id_to_entity, f"Algorithm 8 Batch {batch_idx}")
+            valid_rels = validate_relationships(rels, id_to_entity, f"Orphan Resolution Batch {batch_idx}")
             return valid_rels
         except Exception as e:
-            logger.error(f"    Algorithm 8 Batch {batch_idx} failed: {e}")
+            logger.error(f"    Orphan Resolution Batch {batch_idx} failed: {e}")
             return []
     
     # Process batches with limited concurrency
@@ -164,5 +164,5 @@ Return ONLY valid JSON array with relationships for AS MANY orphans as possible:
         elif result:
             all_relationships.extend(result)
     
-    logger.info(f"    -> Algo 8: {len(all_relationships)} relationships (from {len(orphans)} orphans)")
+    logger.info(f"    -> Orphan Resolution: {len(all_relationships)} relationships (from {len(orphans)} orphans)")
     return all_relationships

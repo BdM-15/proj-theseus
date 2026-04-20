@@ -24,6 +24,11 @@ import shutil
 import sys
 from pathlib import Path
 
+# Force UTF-8 output on Windows consoles (avoids cp1252 UnicodeEncodeError)
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 # tools/ → project root
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))

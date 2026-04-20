@@ -4,19 +4,19 @@ Orchestrator: Parallel Execution of Inference Algorithms
 Issue #85: Reduced from 8 algorithms to 3 after data-driven analysis showed
 extraction prompt + specialized entity types now cover algorithms 2-6.
 
-Remaining:
-- Algo 1: L↔M instruction-eval linking (cross-document gap, only 3 GUIDES from extraction)
-- Algo 7: Heuristic regex (zero LLM cost, deterministic)
-- Algo 8: Orphan resolution (13% orphan rate, 86 orphan requirements)
+Active:
+- infer_lm_links: L↔M instruction-eval linking (cross-document gap, only 3 GUIDES from extraction)
+- infer_document_structure: Heuristic regex (zero LLM cost, deterministic)
+- resolve_orphans: Orphan resolution (13% orphan rate, 86 orphan requirements)
 """
 import asyncio
 import logging
 from typing import Dict, List
 
 from src.core import get_settings
-from .algo_1_instruction_eval import algo_1_instruction_eval
-from .algo_7_heuristic import algo_7_heuristic
-from .algo_8_orphan_resolution import algo_8_orphan_resolution
+from .infer_lm_links import infer_lm_links
+from .infer_document_structure import infer_document_structure
+from .resolve_orphans import resolve_orphans
 from .base import load_prompt_template
 
 logger = logging.getLogger(__name__)
@@ -38,8 +38,8 @@ async def run_all_algorithms_parallel(
     Execute inference algorithms in parallel via asyncio.gather.
     
     Architecture:
-    - Algo 1, 8: LLM-powered, run in parallel with semaphore
-    - Algo 7: Instant regex heuristic, runs after LLM phase
+    - LLM-powered (infer_lm_links, resolve_orphans): run in parallel with semaphore
+    - Heuristic (infer_document_structure): instant regex, runs after LLM phase
     
     Args:
         entities: All entities to analyze
@@ -53,13 +53,13 @@ async def run_all_algorithms_parallel(
     Returns:
         Combined list of all inferred relationships
     """
-    logger.info(f"\n⚡ Starting PARALLEL algorithm execution (MAX_ASYNC={MAX_CONCURRENT_LLM_CALLS})")
+    logger.info(f"\n⚡ Starting parallel inference (MAX_ASYNC={MAX_CONCURRENT_LLM_CALLS})")
     
     # Load shared system prompt once
     system_prompt = await load_prompt_template("system_prompt.md")
     
     # =========================================================================
-    # PHASE 1: Run LLM-powered algorithms in parallel
+    # LLM-powered algorithms (parallel)
     # =========================================================================
     
     semaphore = asyncio.Semaphore(MAX_CONCURRENT_LLM_CALLS)
@@ -69,20 +69,20 @@ async def run_all_algorithms_parallel(
             return await coro
     
     tasks = [
-        rate_limited(algo_1_instruction_eval(
+        rate_limited(infer_lm_links(
             entities_by_type, id_to_entity, system_prompt, model, temperature
         )),
-        rate_limited(algo_8_orphan_resolution(
+        rate_limited(resolve_orphans(
             entities, id_to_entity, neo4j_io, model, temperature, system_prompt
         )),
     ]
     
     algorithm_names = [
-        "Algo 1: Instruction-Eval",
-        "Algo 8: Orphan Resolution",
+        "L↔M Links",
+        "Orphan Resolution",
     ]
     
-    logger.info(f"  Running {len(tasks)}/2 LLM algorithms...")
+    logger.info(f"  Running {len(tasks)} LLM-powered algorithms...")
     results = await asyncio.gather(*tasks, return_exceptions=True)
     
     # Process results
@@ -97,19 +97,19 @@ async def run_all_algorithms_parallel(
             logger.info(f"  ⏭️  {name}: skipped (no applicable entities)")
     
     # =========================================================================
-    # PHASE 2: Run heuristic algorithm (instant, no LLM)
+    # Heuristic algorithm (instant, no LLM)
     # =========================================================================
     
-    logger.info("\n  Running Algorithm 7 (heuristic)...")
-    heuristic_rels = algo_7_heuristic(entities, entities_by_type)
+    logger.info("\n  Running document structure heuristic...")
+    heuristic_rels = infer_document_structure(entities, entities_by_type)
     all_relationships.extend(heuristic_rels)
-    logger.info(f"  ✅ Algo 7: Heuristic: {len(heuristic_rels)} relationships")
+    logger.info(f"  ✅ Doc Structure: {len(heuristic_rels)} relationships")
     
     # =========================================================================
     # Summary
     # =========================================================================
     
-    logger.info(f"\n✅ Total relationships from all algorithms: {len(all_relationships)}")
+    logger.info(f"\n✅ Total inferred relationships: {len(all_relationships)}")
     
     return all_relationships
 

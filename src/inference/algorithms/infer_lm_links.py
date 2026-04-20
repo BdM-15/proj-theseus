@@ -1,5 +1,5 @@
 """
-Algorithm 1: Instruction-Evaluation Linking
+Infer L↔M Links: Instruction-Evaluation Linking
 
 Maps proposal instructions → evaluation factors using GUIDES relationships.
 """
@@ -13,7 +13,7 @@ from src.utils.llm_client import call_llm_async
 logger = logging.getLogger(__name__)
 
 
-async def algo_1_instruction_eval(
+async def infer_lm_links(
     entities_by_type: Dict,
     id_to_entity: Dict,
     system_prompt: str,
@@ -21,7 +21,7 @@ async def algo_1_instruction_eval(
     temperature: float
 ) -> List[Dict]:
     """
-    Algorithm 1: Instruction-Evaluation Linking
+    Infer L↔M Links: Instruction-Evaluation Linking
     
     Finds instruction-like entities regardless of type:
     - Traditional proposal_instruction entities
@@ -56,7 +56,7 @@ async def algo_1_instruction_eval(
     if not all_instruction_entities or not eval_factors:
         return []
     
-    logger.info(f"  [Algo 1] Instruction-Eval: {len(all_instruction_entities)} instructions × {len(eval_factors)} factors")
+    logger.info(f"  [L↔M Links] {len(all_instruction_entities)} instructions × {len(eval_factors)} factors")
     
     prompt_instructions = await load_prompt_template("instruction_evaluation_linking.md")
     
@@ -94,10 +94,10 @@ Return ONLY valid JSON array:
         rels = parse_llm_json_response(response, "Algorithm 1")
         if not rels:
             return []
-        valid_rels = validate_relationships(rels, id_to_entity, "Algorithm 1")
-        logger.info(f"    → Algo 1: {len(valid_rels)} relationships")
+        valid_rels = validate_relationships(rels, id_to_entity, "L↔M Links")
+        logger.info(f"    → L↔M Links: {len(valid_rels)} relationships")
         return valid_rels
     except Exception as e:
-        logger.error(f"    ❌ Algorithm 1 failed: {e}")
+        logger.error(f"    ❌ L↔M Links failed: {e}")
         return []
 

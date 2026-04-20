@@ -1,5 +1,5 @@
 """
-Algorithm 7: Heuristic Pattern Matching
+Infer Document Structure: Heuristic Pattern Matching
 
 CDRL/DID cross-reference detection using regex patterns.
 Also detects document-section cross-references and requirement-deliverable links.
@@ -49,9 +49,9 @@ def _get_parent_number(number: str) -> Optional[str]:
     return '.'.join(parts[:-1])
 
 
-def algo_7_heuristic(entities: List[Dict], entities_by_type: Dict) -> List[Dict]:
+def infer_document_structure(entities: List[Dict], entities_by_type: Dict) -> List[Dict]:
     """
-    Algorithm 7: Heuristic Pattern Matching (Cross-references + Hierarchy)
+    Infer Document Structure: Heuristic Pattern Matching (Cross-references + Hierarchy)
     
     Detects:
     - CDRL, DID, DD Form 1423 references
@@ -65,7 +65,7 @@ def algo_7_heuristic(entities: List[Dict], entities_by_type: Dict) -> List[Dict]
     Returns:
         List of relationship dicts with REFERENCES and CHILD_OF edges
     """
-    logger.info(f"  [Algo 7] Heuristic Pattern Matching")
+    logger.info(f"  [Doc Structure] Heuristic Pattern Matching")
     
     heuristic_rels = []
     seen_pairs: Set[Tuple[str, str]] = set()

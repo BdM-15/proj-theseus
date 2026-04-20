@@ -27,11 +27,11 @@ Work through opportunities in priority order. Each can be its own issue/branch.
 | Aspect               | Detail                                                                                                                                                                        |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Upstream Feature** | `merge_entities()` API — merges duplicate entities in the knowledge graph with configurable similarity thresholds                                                             |
-| **Our Current Code** | Algorithm 8 (Orphan Resolution) in `src/inference/algorithms/algo_8_orphan_resolution.py` partially handles this by connecting orphaned entities                              |
-| **Action**           | **Enhance** — Use LightRAG's native merge as a pre-step before our orphan resolution. Our algo 8 handles govcon-specific semantic connections that generic merge won't catch. |
+| **Our Current Code** | Orphan Resolution in `src/inference/algorithms/resolve_orphans.py` partially handles this by connecting orphaned entities                              |
+| **Action**           | **Enhance** — Use LightRAG's native merge as a pre-step before our orphan resolution. Our resolve_orphans handles govcon-specific semantic connections that generic merge won't catch. |
 | **Effort**           | Medium                                                                                                                                                                        |
 | **Risk**             | Low                                                                                                                                                                           |
-| **File**             | `src/inference/algorithms/algo_8_orphan_resolution.py`                                                                                                                        |
+| **File**             | `src/inference/algorithms/resolve_orphans.py`                                                                                                                        |
 
 ### 1.2 Enhanced Document Status Tracking (v1.4.11)
 
@@ -236,11 +236,11 @@ These are **future opportunities** contingent on MinerU 3.0 becoming deployable 
 | Aspect               | Detail                                                                                                                                                                                |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Upstream Feature** | MinerU 3.0 `content_list.json` includes `text_level` field (1=H1, 2=H2, etc.) for all text blocks                                                                                     |
-| **Our Current Code** | Algorithm 5 (Document Hierarchy) in `algo_5_doc_hierarchy.py` uses LLM to infer PARENT_SECTION / CHILD_OF relationships; Algorithm 7 (Heuristic) does pattern-based section detection |
-| **Action**           | **Replace (partial)** — `text_level` could replace or seed heuristic heading detection in algo 7 and reduce LLM calls in algo 5                                                       |
+| **Our Current Code** | Algorithm 5 (Document Hierarchy) in `algo_5_doc_hierarchy.py` uses LLM to infer PARENT_SECTION / CHILD_OF relationships; Document Structure Heuristic does pattern-based section detection |
+| **Action**           | **Replace (partial)** — `text_level` could replace or seed heuristic heading detection in infer_document_structure and reduce LLM calls in algo 5                                                       |
 | **Effort**           | Medium                                                                                                                                                                                |
 | **Risk**             | Low                                                                                                                                                                                   |
-| **Files**            | `algo_5_doc_hierarchy.py`, `algo_7_heuristic.py`                                                                                                                                      |
+| **Files**            | `algo_5_doc_hierarchy.py` (dropped), `infer_document_structure.py`                                                                                                                                                      |
 
 ### 5.2 DOCX Native Parsing
 
@@ -297,14 +297,14 @@ These are **future opportunities** contingent on MinerU 3.0 becoming deployable 
 
 | Algorithm                         | Purpose                                                      | Upstream Feature That Could Reduce/Replace                                           |
 | --------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| Algo 1 (Instruction-Eval Linking) | Links Section L instructions to Section M evaluation factors | **None** — govcon-specific, no upstream equivalent                                   |
-| Algo 2 (Eval Hierarchy)           | Builds evaluation factor hierarchy                           | **None** — govcon-specific                                                           |
-| Algo 3 (Requirement-Eval)         | Maps requirements to evaluation criteria                     | **None** — govcon-specific, but LightRAG community detection could identify clusters |
-| Algo 4 (Deliverable Traceability) | Links SOW deliverables to requirements                       | **None** — govcon-specific                                                           |
-| Algo 5 (Document Hierarchy)       | Infers section parent-child structure                        | **MinerU 3.0 `text_level`** could provide heading hierarchy directly                 |
-| Algo 6 (Concept Linking)          | Finds semantic connections between entities                  | **LightRAG community detection** could seed or replace                               |
-| Algo 7 (Heuristic)                | Pattern-based section detection, attachment linking          | **MinerU 3.0 `text_level`** for headings; still needed for attachment heuristics     |
-| Algo 8 (Orphan Resolution)        | Connects isolated entities                                   | **LightRAG `merge_entities()`** for duplicates; still needed for semantic orphans    |
+| L↔M Links (infer_lm_links)          | Links Section L instructions to Section M evaluation factors | **None** — govcon-specific, no upstream equivalent                                   |
+| Algo 2 (Eval Hierarchy) *dropped*     | Builds evaluation factor hierarchy                           | **None** — govcon-specific                                                           |
+| Algo 3 (Requirement-Eval) *dropped*   | Maps requirements to evaluation criteria                     | **None** — govcon-specific, but LightRAG community detection could identify clusters |
+| Algo 4 (Deliverable Trace) *dropped*  | Links SOW deliverables to requirements                       | **None** — govcon-specific                                                           |
+| Algo 5 (Document Hierarchy) *dropped* | Infers section parent-child structure                        | **MinerU 3.0 `text_level`** could provide heading hierarchy directly                 |
+| Algo 6 (Concept Linking) *dropped*    | Finds semantic connections between entities                  | **LightRAG community detection** could seed or replace                               |
+| Doc Structure (infer_document_structure) | Pattern-based section detection, attachment linking          | **MinerU 3.0 `text_level`** for headings; still needed for attachment heuristics     |
+| Orphan Resolution (resolve_orphans)   | Connects isolated entities                                   | **LightRAG `merge_entities()`** for duplicates; still needed for semantic orphans    |
 
 ### 6.3 Remove Redundant Error Handling
 
@@ -325,9 +325,9 @@ With Instructor 1.15.1 + OpenAI SDK 2.x, many of our manual error handling patte
 | **P1**      | Evaluate doc status tracking simplification                | Medium | Medium | Low     |
 | **P2**      | Add batch dry-run via RAG-Anything                         | Low    | Medium | Low     |
 | **P2**      | Evaluate JSON parsing simplification                       | Medium | Medium | Medium  |
-| **P2**      | Evaluate community detection vs algo 6                     | Medium | Medium | Medium  |
+| **P2**      | Evaluate community detection vs concept linking             | Medium | Medium | Medium  |
 | **P3**      | Enable xAI streaming for inference algos                   | Medium | Medium | Low     |
-| **P3**      | Evaluate LightRAG merge_entities vs algo 8                 | Medium | Medium | Medium  |
+| **P3**      | Evaluate LightRAG merge_entities vs resolve_orphans        | Medium | Medium | Medium  |
 | **BLOCKED** | MinerU 3.0 features (text_level, DOCX, etc.)               | —      | High   | Blocked |
 
 ---

@@ -6,16 +6,16 @@ Each algorithm is a separate module for:
 - Testability: Test each in isolation
 - Parallelization: Clean asyncio.gather execution
 
-Remaining algorithms after Issue #85 cleanup:
-- Algo 1: L↔M Instruction-Eval linking (cross-document, cannot be solved by extraction)
-- Algo 7: Heuristic regex patterns (zero LLM cost, deterministic)
-- Algo 8: Orphan resolution (13% orphan rate justifies rescue pass)
+Active algorithms after Issue #85 cleanup:
+- infer_lm_links: L↔M Instruction-Eval linking (cross-document, cannot be solved by extraction)
+- infer_document_structure: Heuristic regex patterns (zero LLM cost, deterministic)
+- resolve_orphans: Orphan resolution (13% orphan rate justifies rescue pass)
 
 Dropped (extraction prompt + specialized entities now cover these):
 - Algo 2: Eval hierarchy (HAS_SUBFACTOR, MEASURED_BY, EVALUATED_BY from extraction)
 - Algo 3: Req-eval mapping (EVALUATED_BY from extraction Part F.3)
 - Algo 4: Deliverable traceability (98% connected via SATISFIED_BY/PRODUCES from extraction)
-- Algo 5: Doc hierarchy (637 CHILD_OF from extraction + algo 7 heuristic)
+- Algo 5: Doc hierarchy (637 CHILD_OF from extraction + heuristic)
 - Algo 6: Concept linking (87% connected via ADDRESSES/RESOLVES/SUPPORTS)
 
 Usage:
@@ -26,15 +26,15 @@ Usage:
     )
 """
 
-from .algo_1_instruction_eval import algo_1_instruction_eval
-from .algo_7_heuristic import algo_7_heuristic
-from .algo_8_orphan_resolution import algo_8_orphan_resolution
+from .infer_lm_links import infer_lm_links
+from .infer_document_structure import infer_document_structure
+from .resolve_orphans import resolve_orphans
 from .orchestrator import run_all_algorithms_parallel
 
 __all__ = [
-    'algo_1_instruction_eval',
-    'algo_7_heuristic',
-    'algo_8_orphan_resolution',
+    'infer_lm_links',
+    'infer_document_structure',
+    'resolve_orphans',
     'run_all_algorithms_parallel',
 ]
 
