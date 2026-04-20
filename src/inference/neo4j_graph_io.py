@@ -257,6 +257,71 @@ class Neo4jGraphIO:
             logger.info(f"  💾 Created {count} new relationships in Neo4j")
             return count
     
+    def retype_relationships(self, retype_updates: List[Dict]) -> int:
+        """
+        Retype relationships in Neo4j using APOC.
+        
+        Neo4j relationship types are immutable labels, so this uses
+        apoc.refactor.setType to change the label in-place.
+        
+        Args:
+            retype_updates: List of dicts with:
+                - source_id: elementId of source node
+                - target_id: elementId of target node
+                - old_type: current relationship type label
+                - new_type: desired relationship type label
+                
+        Returns:
+            Number of relationships retyped
+        """
+        if not retype_updates:
+            return 0
+        
+        # Group by (old_type, new_type) for batch processing
+        from collections import defaultdict
+        batches = defaultdict(list)
+        for update in retype_updates:
+            key = (update['old_type'], update['new_type'])
+            batches[key].append(update)
+        
+        total_retyped = 0
+        for (old_type, new_type), updates in batches.items():
+            source_ids = [u['source_id'] for u in updates]
+            target_ids = [u['target_id'] for u in updates]
+            
+            # Use APOC to retype relationships in batch
+            query = f"""
+            UNWIND range(0, size($source_ids) - 1) AS idx
+            MATCH (a:`{self.workspace}`)-[r:`{old_type}`]->(b:`{self.workspace}`)
+            WHERE elementId(a) = $source_ids[idx] AND elementId(b) = $target_ids[idx]
+            CALL apoc.refactor.setType(r, $new_type)
+            YIELD input, output
+            SET output.retyped_from = $old_type,
+                output.retyped_by = 'generic_relationship_normalizer',
+                output.retyped_at = datetime()
+            RETURN count(output) as retyped_count
+            """
+            
+            try:
+                with self.driver.session(database=self.database) as session:
+                    result = session.run(
+                        query,
+                        source_ids=source_ids,
+                        target_ids=target_ids,
+                        new_type=new_type
+                    )
+                    record = result.single()
+                    count = record['retyped_count'] if record else 0
+                    total_retyped += count
+                    if count > 0:
+                        logger.info(f"    Retyped {count} relationships: {old_type} → {new_type}")
+            except Exception as e:
+                logger.warning(f"    ⚠️ Failed to retype {old_type} → {new_type}: {e}")
+        
+        if total_retyped > 0:
+            logger.info(f"  ✅ Retyped {total_retyped} relationships in Neo4j")
+        return total_retyped
+
     def enrich_entity_metadata(self, metadata_updates: List[Dict]) -> int:
         """
         Add metadata properties to entities in Neo4j.

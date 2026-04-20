@@ -215,18 +215,6 @@ class Settings(BaseSettings):
         default=30,
         description="Seconds to wait after last document before triggering semantic enhancement"
     )
-    batch_size_algorithm_3: int = Field(
-        default=100,
-        description="Batch size for algorithm 3 (requirement-evaluation linking)"
-    )
-    batch_overlap_algorithm_3: int = Field(
-        default=20,
-        description="Batch overlap for algorithm 3"
-    )
-    batch_size_algorithm_4: int = Field(
-        default=50,
-        description="Batch size for algorithm 4 (deliverable traceability)"
-    )
     workload_max_workers: Optional[int] = Field(
         default=None,
         description="Max workers for workload enrichment (defaults to post_processing_max_async)"
@@ -284,22 +272,7 @@ class Settings(BaseSettings):
                     "Context-aware processing connects related tables via semantic inference."
     )
     
-    # ═══════════════════════════════════════════════════════════════════════════
-    # ALGORITHM THRESHOLDS
-    # Set to 1.0 to always run (quality over cost)
-    # ═══════════════════════════════════════════════════════════════════════════
-    algo_3_threshold: float = Field(
-        default=1.0,
-        description="Coverage threshold for algorithm 3 (1.0 = always run)"
-    )
-    algo_4_threshold: float = Field(
-        default=1.0,
-        description="Coverage threshold for algorithm 4 (1.0 = always run)"
-    )
-    algo_6_threshold: float = Field(
-        default=1.0,
-        description="Coverage threshold for algorithm 6 (1.0 = always run)"
-    )
+
     
     # ═══════════════════════════════════════════════════════════════════════════
     # CONTEXT-AWARE PROCESSING (RAG-Anything)

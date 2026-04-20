@@ -48,9 +48,6 @@ def get_semantic_post_processing_config():
     settings = get_settings()
     return {
         'max_concurrent_llm_calls': settings.get_effective_post_processing_max_async(),
-        'batch_size_algo3': settings.batch_size_algorithm_3,
-        'batch_overlap_algo3': settings.batch_overlap_algorithm_3,
-        'batch_size_algo4': settings.batch_size_algorithm_4,
     }
 
 
@@ -58,9 +55,83 @@ def get_semantic_post_processing_config():
 # These are evaluated at import time for modules that depend on them
 _settings = get_settings()
 MAX_CONCURRENT_LLM_CALLS = _settings.get_effective_post_processing_max_async()
-BATCH_SIZE_ALGO3 = _settings.batch_size_algorithm_3
-BATCH_OVERLAP_ALGO3 = _settings.batch_overlap_algorithm_3
-BATCH_SIZE_ALGO4 = _settings.batch_size_algorithm_4
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ENTITY-PAIR → RELATIONSHIP TYPE MAPPING (Approach B: Generic Relationship Fix)
+# ═══════════════════════════════════════════════════════════════════════════════
+# When extraction produces generic types (belongs_to, contained_in, part_of)
+# that get normalized to RELATED_TO or CHILD_OF, this mapping re-types them
+# based on the source and target entity types.
+#
+# Root cause: Table-derived text from MinerU/VLM has entities co-occurring
+# without prose connectors, so the LLM defaults to generic relationships.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_ENTITY_PAIR_REL_MAP = {
+    # ─── WORK & DELIVERABLES ───
+    ("requirement", "deliverable"): "SATISFIED_BY",
+    ("deliverable", "requirement"): "SATISFIED_BY",
+    ("requirement", "performance_standard"): "MEASURED_BY",
+    ("performance_standard", "requirement"): "MEASURED_BY",
+    ("work_scope_item", "deliverable"): "PRODUCES",
+    ("deliverable", "work_scope_item"): "PRODUCES",
+    ("requirement", "workload_metric"): "QUANTIFIES",
+    ("workload_metric", "requirement"): "QUANTIFIES",
+    ("deliverable", "contract_line_item"): "PRICED_UNDER",
+    ("contract_line_item", "deliverable"): "FUNDS",
+    ("requirement", "contract_line_item"): "PRICED_UNDER",
+    ("contract_line_item", "requirement"): "FUNDS",
+    ("deliverable", "organization"): "SUBMITTED_TO",
+    ("organization", "deliverable"): "SUBMITTED_TO",
+    # ─── EVALUATION ───
+    ("requirement", "evaluation_factor"): "EVALUATED_BY",
+    ("evaluation_factor", "requirement"): "EVALUATED_BY",
+    ("deliverable", "evaluation_factor"): "EVALUATED_BY",
+    ("evaluation_factor", "deliverable"): "EVALUATED_BY",
+    ("work_scope_item", "evaluation_factor"): "EVALUATED_BY",
+    ("evaluation_factor", "work_scope_item"): "EVALUATED_BY",
+    ("evaluation_factor", "subfactor"): "HAS_SUBFACTOR",
+    ("subfactor", "evaluation_factor"): "CHILD_OF",
+    # ─── AUTHORITY & GOVERNANCE ───
+    ("requirement", "clause"): "GOVERNED_BY",
+    ("clause", "requirement"): "MANDATES",
+    ("requirement", "regulatory_reference"): "GOVERNED_BY",
+    ("regulatory_reference", "requirement"): "MANDATES",
+    # ─── RESOURCE ───
+    ("requirement", "labor_category"): "STAFFED_BY",
+    ("labor_category", "requirement"): "STAFFED_BY",
+    ("work_scope_item", "labor_category"): "STAFFED_BY",
+    ("labor_category", "work_scope_item"): "STAFFED_BY",
+    ("location", "equipment"): "HAS_EQUIPMENT",
+    ("equipment", "location"): "HAS_EQUIPMENT",
+    ("government_furnished_item", "organization"): "PROVIDED_BY",
+    ("organization", "government_furnished_item"): "PROVIDED_BY",
+    # ─── STRATEGIC ───
+    ("requirement", "customer_priority"): "ADDRESSES",
+    ("customer_priority", "requirement"): "ADDRESSES",
+    ("requirement", "pain_point"): "RESOLVES",
+    ("pain_point", "requirement"): "RESOLVES",
+}
+
+# Relationship types that indicate the LLM used a generic fallback
+_GENERIC_REL_TYPES = {"RELATED_TO"}
+
+
+def _resolve_generic_relationship(rel_type: str, src_type: str, tgt_type: str) -> str:
+    """
+    Re-type a generic relationship based on source and target entity types.
+    
+    Only operates on RELATED_TO relationships (the normalized form of
+    belongs_to, contained_in, and other generic LLM outputs).
+    
+    Returns the original type if no better mapping exists.
+    """
+    if rel_type not in _GENERIC_REL_TYPES:
+        return rel_type
+    
+    pair = (src_type.lower(), tgt_type.lower())
+    return _ENTITY_PAIR_REL_MAP.get(pair, rel_type)
 
 
 def _heuristic_table_type_mapping(entity: Dict) -> str:
@@ -755,6 +826,55 @@ async def _semantic_post_processor_neo4j(
         else:
             logger.info("\n✅ No entity type corrections needed (native LightRAG extraction working)")
         
+        # Step 2.5: Generic Relationship Type Resolution (NO LLM)
+        # ========================================================================
+        # After entity types are corrected (table→requirement, etc.), re-type
+        # RELATED_TO relationships using entity-pair lookup. These RELATED_TO rels
+        # originate from LLM-produced belongs_to/contained_in/part_of that were
+        # normalized to RELATED_TO by schema.normalize_relationship_type().
+        # ========================================================================
+        logger.info("\n🔗 Step 2.5: Resolving generic relationship types (entity-pair lookup)...")
+        
+        # Reload entities with corrected types
+        entities = neo4j_io.get_all_entities()
+        relationships = neo4j_io.get_all_relationships()
+        
+        # Build entity lookup by elementId
+        entity_by_id = {e['id']: e for e in entities}
+        
+        # Find RELATED_TO relationships that can be retyped
+        retype_updates = []
+        for rel in relationships:
+            if rel['type'] not in _GENERIC_REL_TYPES:
+                continue
+            
+            src_entity = entity_by_id.get(rel['source'])
+            tgt_entity = entity_by_id.get(rel['target'])
+            if not src_entity or not tgt_entity:
+                continue
+            
+            src_type = (src_entity.get('entity_type') or '').lower()
+            tgt_type = (tgt_entity.get('entity_type') or '').lower()
+            
+            new_type = _resolve_generic_relationship(rel['type'], src_type, tgt_type)
+            if new_type != rel['type']:
+                retype_updates.append({
+                    'source_id': rel['source'],
+                    'target_id': rel['target'],
+                    'old_type': rel['type'],
+                    'new_type': new_type,
+                })
+        
+        relationships_retyped = 0
+        if retype_updates:
+            logger.info(f"  Found {len(retype_updates)} generic relationships to retype")
+            relationships_retyped = neo4j_io.retype_relationships(retype_updates)
+        else:
+            logger.info("  ✅ No generic relationships need retyping")
+        
+        # Refresh grouped entities for algorithm phase
+        grouped = group_entities_by_type(entities)
+        
         # Step 3: Infer missing relationships using PARALLEL modular algorithms
         logger.info("\n🔗 Step 3: Inferring relationships with PARALLEL algorithm execution...")
         
@@ -827,6 +947,7 @@ async def _semantic_post_processor_neo4j(
         logger.info("✅ SEMANTIC POST-PROCESSING COMPLETE (Neo4j + VDB)")
         logger.info("="*80)
         logger.info(f"  Entities corrected:      {entities_corrected}")
+        logger.info(f"  Relationships retyped:   {relationships_retyped}")
         logger.info(f"  Relationships inferred:  {relationships_inferred}")
         logger.info(f"  Relationships synced:    {relationships_synced}")
         logger.info(f"  Requirements enriched:   {requirements_enriched}")
@@ -851,6 +972,7 @@ async def _semantic_post_processor_neo4j(
         logger.info("="*60)
         logger.info(f"  Main Processing Entities:      {initial_entity_count}")
         logger.info(f"  Main Processing Relationships: {initial_rel_count}")
+        logger.info(f"  Post-Processing Retyped Rels:  {relationships_retyped}")
         logger.info(f"  Post-Processing Added Rels:    {relationships_inferred}")
         logger.info(f"  VDB Synced Relationships:      {relationships_synced}")
         logger.info(f"  ─────────────────────────────────────")
