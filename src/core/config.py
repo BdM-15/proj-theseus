@@ -54,6 +54,10 @@ class Settings(BaseSettings):
         default="grok-4.20-0309-reasoning",
         description="Reasoning model for queries and semantic inference (grok-4.20 = lowest hallucination + strict prompt adherence)"
     )
+    post_processing_llm_name: str = Field(
+        default="grok-4-1-fast-reasoning",
+        description="Reasoning model for post-processing inference algorithms (fast reasoning for throughput)"
+    )
     llm_timeout: int = Field(
         default=600,
         description="LLM timeout in seconds (10 min for complex chunks)"
@@ -207,17 +211,9 @@ class Settings(BaseSettings):
         default=True,
         description="Enable semantic post-processing after batch completion (relationship algorithms and optional enrichment)"
     )
-    enable_workload_enrichment: bool = Field(
-        default=False,
-        description="Enable workload enrichment during semantic post-processing. Defaults to false so ontology extraction can be evaluated without BOE metadata augmentation."
-    )
     batch_timeout_seconds: int = Field(
         default=30,
         description="Seconds to wait after last document before triggering semantic enhancement"
-    )
-    workload_max_workers: Optional[int] = Field(
-        default=None,
-        description="Max workers for workload enrichment (defaults to post_processing_max_async)"
     )
 
     # ═══════════════════════════════════════════════════════════════════════════
@@ -334,12 +330,6 @@ class Settings(BaseSettings):
     def get_effective_post_processing_max_async(self) -> int:
         """Get effective post-processing max async (legacy MAX_ASYNC override if set)."""
         return self.max_async if self.max_async is not None else self.post_processing_max_async
-    
-    def get_effective_workload_max_workers(self) -> int:
-        """Get effective workload max workers (falls back to post_processing_max_async)."""
-        if self.workload_max_workers is not None:
-            return self.workload_max_workers
-        return self.get_effective_post_processing_max_async()
     
     def validate_required_settings(self) -> None:
         """

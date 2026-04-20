@@ -70,6 +70,7 @@ def normalize_relationship_type(rel_type: str, fallback: str = "RELATED_TO") -> 
 
     # Common rogue type mappings (from old prompts / LLM drift)
     _ROGUE_MAPPINGS = {
+        # Legacy / renamed
         "MEASURES": "MEASURED_BY",
         "PART_OF": "CHILD_OF",
         "BELONGS_TO": "RELATED_TO",
@@ -83,6 +84,12 @@ def normalize_relationship_type(rel_type: str, fallback: str = "RELATED_TO") -> 
         "SPECIFIES": "DEFINES",
         "FIELD_IN": "CHILD_OF",
         "INFERRED": "RELATED_TO",
+        # LLM-generated types not yet in canonical set
+        "IMPLEMENTED_BY": "SATISFIED_BY",    # requirement IMPLEMENTED_BY approach
+        "SUBJECT_TO": "GOVERNED_BY",          # entity SUBJECT_TO regulation
+        "REFERENCED_BY": "REFERENCES",        # inverse reference (direction approximated)
+        "REQUIRES_DELIVERABLE": "REQUIRES",   # more specific form of REQUIRES
+        "USED_FOR": "SUPPORTS",               # resource/tech USED_FOR purpose
     }
     if normalized in _ROGUE_MAPPINGS:
         mapped = _ROGUE_MAPPINGS[normalized]

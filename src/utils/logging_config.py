@@ -153,12 +153,11 @@ def log_banner(
 
 class ConsoleFilter(logging.Filter):
     """
-    Strict allowlist filter for console output.
+    Allowlist filter for console output.
 
-    Only the READY banner (src.raganything_server) and uvicorn server-start
-    messages (uvicorn.error) are shown at INFO level. Everything else —
-    initialization detail, VDB loading, LightRAG internals, prompt registration,
-    Neo4j index setup — goes to log files only.
+    INFO+ is shown for: startup banner, batch completion, and post-processing
+    phase transitions. Everything else (VDB loading, LightRAG internals, prompt
+    registration, Neo4j index setup) goes to log files only.
 
     Warnings and errors from ANY logger always pass through.
     """
@@ -167,6 +166,8 @@ class ConsoleFilter(logging.Filter):
     _ALLOWED = {
         "src.raganything_server",
         "uvicorn.error",
+        "src.server.routes",    # batch completion + post-processing trigger
+        "src.inference",        # phase transitions + algorithm results
     }
 
     def filter(self, record):
@@ -176,8 +177,8 @@ class ConsoleFilter(logging.Filter):
         # Uvicorn access logs (per-request) never surface
         if record.name == "uvicorn.access":
             return False
-        # Only allowed loggers pass at INFO level
-        return record.name in self._ALLOWED
+        # Allow exact matches or prefix matches (e.g. src.inference covers src.inference.semantic_post_processor)
+        return any(record.name == name or record.name.startswith(name + ".") for name in self._ALLOWED)
 
 
 class ProcessingFilter(logging.Filter):
