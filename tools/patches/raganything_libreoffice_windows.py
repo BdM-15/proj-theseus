@@ -1,30 +1,29 @@
 """
 RAG-Anything LibreOffice Windows Compatibility Patch
 
-Problem:
-    On Windows, `libreoffice.exe` is a GUI wrapper that returns exit code
-    0xFFFFFFFF (-1) when run headless, even if conversion succeeds.
-    The parser.py checks `returncode == 0`, so it always falls back and
-    warns "LibreOffice command 'libreoffice' failed:".
+Problems:
+    1. On Windows, `libreoffice.exe` is a GUI wrapper that returns exit code
+       0xFFFFFFFF (-1) when run headless, even if conversion succeeds.
+    2. Office parsing can still fail after successful PDF conversion if the
+       downstream MinerU invocation exits non-zero on the first attempt.
 
-    `soffice.com` (the console redirector) works correctly on Windows
-    and returns RC 0 on success.
-
-Fix:
+Fixes:
     1. On Windows, try `soffice` before `libreoffice` (soffice.com resolves first).
     2. After all commands are tried, check whether the PDF was actually generated
        even if returncode != 0 (LO sometimes exits non-zero but still writes the file).
-    3. Also adds --norestore --nofirststartwizard flags to suppress LO first-run wizard.
+    3. Add --norestore --nofirststartwizard flags to suppress LO first-run wizard.
+    4. Retry Office parsing once against the generated PDF before failing the document.
 
 Usage:
     Import and call apply_patch() BEFORE any document parsing occurs.
     Applied in src/server/initialization.py during startup.
 
 When to remove:
-    When raganything fixes Windows soffice ordering upstream.
+    When raganything fixes Windows soffice ordering and adds a robust Office retry upstream.
 """
 
 import logging
+import hashlib
 import platform
 import subprocess
 import tempfile
@@ -37,12 +36,39 @@ _PATCHED = False
 
 
 def apply_patch():
-    """Monkey-patch MineruParser.convert_office_to_pdf for Windows compatibility."""
+    """Monkey-patch MineruParser Office parsing for Windows compatibility."""
     global _PATCHED
     if _PATCHED:
         return
 
-    from raganything.parser import MineruParser
+    from raganything.parser import MineruParser, Parser
+
+    _original_unique_output_dir = Parser._unique_output_dir
+    _generated_pdf_paths: set[Path] = set()
+
+    @staticmethod
+    def _patched_unique_output_dir(
+        base_dir: Union[str, Path], file_path: Union[str, Path]
+    ) -> Path:
+        """Use a short deterministic work dir on Windows when the default path is too long."""
+        candidate = _original_unique_output_dir(base_dir, file_path)
+        if platform.system() != "Windows":
+            return candidate
+
+        file_path = Path(file_path).resolve()
+        stem = file_path.stem
+        predicted_md = candidate.resolve() / stem / "auto" / f"{stem}.md"
+        if len(str(predicted_md)) <= 240:
+            return candidate
+
+        path_hash = hashlib.md5(str(file_path).encode()).hexdigest()[:8]
+        short_candidate = Path(base_dir) / f"_mineru_{path_hash}"
+        logger.warning(
+            "Using shortened MinerU output dir for Windows path-length safety: %s -> %s",
+            candidate.name,
+            short_candidate.name,
+        )
+        return short_candidate
 
     @classmethod
     def _patched_convert_office_to_pdf(
@@ -146,8 +172,91 @@ def apply_patch():
             pdf_src = pdf_files[0]
             pdf_dst = base_output_dir / pdf_src.name
             shutil.copy2(pdf_src, pdf_dst)
+            _generated_pdf_paths.add(pdf_dst.resolve())
             return pdf_dst
 
+    def _patched_parse_office_doc(
+        self,
+        doc_path: Union[str, Path],
+        output_dir: Optional[str] = None,
+        lang: Optional[str] = None,
+        **kwargs,
+    ):
+        """Retry MinerU once when Office conversion succeeds but parsing fails."""
+        pdf_path: Path | None = None
+
+        def _cleanup_generated_pdf() -> None:
+            if pdf_path is None:
+                return
+
+            resolved_pdf = pdf_path.resolve()
+            if resolved_pdf not in _generated_pdf_paths:
+                return
+
+            try:
+                pdf_path.unlink(missing_ok=True)
+                self.logger.info(
+                    "Removed temporary Office-to-PDF artifact after successful parse: %s",
+                    pdf_path.name,
+                )
+            except Exception as cleanup_error:
+                self.logger.warning(
+                    "Could not remove temporary Office-to-PDF artifact %s: %s",
+                    pdf_path,
+                    cleanup_error,
+                )
+            finally:
+                _generated_pdf_paths.discard(resolved_pdf)
+
+        try:
+            pdf_path = self.convert_office_to_pdf(doc_path, output_dir)
+
+            try:
+                content_list = self.parse_pdf(
+                    pdf_path=pdf_path, output_dir=output_dir, lang=lang, **kwargs
+                )
+                _cleanup_generated_pdf()
+                return content_list
+            except Exception as first_error:
+                if pdf_path is None or not pdf_path.exists():
+                    raise
+
+                self.logger.warning(
+                    "Office parse failed after successful PDF conversion for %s; "
+                    "retrying MinerU once against %s. First error: %s",
+                    Path(doc_path).name,
+                    pdf_path.name,
+                    first_error,
+                )
+
+                try:
+                    content_list = self.parse_pdf(
+                        pdf_path=pdf_path,
+                        output_dir=output_dir,
+                        lang=lang,
+                        **kwargs,
+                    )
+                    _cleanup_generated_pdf()
+                    return content_list
+                except Exception as retry_error:
+                    self.logger.error(
+                        "Office parse retry failed for %s. First error: %s | Retry error: %s",
+                        Path(doc_path).name,
+                        first_error,
+                        retry_error,
+                    )
+                    raise retry_error from first_error
+
+        except Exception as e:
+            self.logger.error(f"Error in parse_office_doc: {str(e)}")
+            raise
+
+    Parser._unique_output_dir = _patched_unique_output_dir
+    MineruParser._unique_output_dir = _patched_unique_output_dir
     MineruParser.convert_office_to_pdf = _patched_convert_office_to_pdf
+    MineruParser.parse_office_doc = _patched_parse_office_doc
     _PATCHED = True
-    logger.info("✅ LibreOffice Windows patch applied (soffice preferred on Windows)")
+    logger.info(
+        "✅ LibreOffice Windows patch applied "
+        "(soffice preferred + Office PDF retry enabled)"
+    )
