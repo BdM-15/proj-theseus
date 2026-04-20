@@ -157,9 +157,10 @@ class GovConProcessingCallback(ProcessingCallback):
         
         try:
             from src.inference.semantic_post_processor import enhance_knowledge_graph
+            workspace_rag_path = os.path.join(global_args.working_dir, get_settings().workspace)
             
             inference_result = await enhance_knowledge_graph(
-                rag_storage_path=global_args.working_dir,
+                rag_storage_path=workspace_rag_path,
                 llm_func=self._llm_func,
                 batch_size=50
             )

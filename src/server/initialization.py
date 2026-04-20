@@ -18,6 +18,8 @@ load_dotenv()
 # Apply compatibility patches BEFORE raganything imports
 from tools.patches.raganything_libreoffice_windows import apply_patch as _apply_lo_patch
 _apply_lo_patch()
+from tools.patches.raganything_mineru_error_details import apply_patch as _apply_mineru_error_patch
+_apply_mineru_error_patch()
 
 # Now safe to import LightRAG and related modules
 import logging
@@ -114,14 +116,16 @@ async def initialize_raganything():
     # ═══════════════════════════════════════════════════════════════════════════════
     
     # Create RAG-Anything configuration - it reads context settings from env vars automatically
-    # parser_output_dir: Route MinerU parsed output into the workspace folder so all
-    # workspace artifacts (KV stores, VDB, MinerU output) are co-located under
-    # rag_storage/{workspace}/.  This makes workspace cleanup trivial and avoids
-    # orphaned {docname}_{hash}/ directories in the rag_storage root.
+    # parser_output_dir: Route MinerU parsed output into a dedicated subfolder so
+    # workspace state stays readable for humans: canonical LightRAG stores remain
+    # at rag_storage/{workspace}/ while per-document MinerU artifacts live under
+    # rag_storage/{workspace}/mineru/.
     workspace_dir = os.path.join(working_dir, settings.workspace)
+    mineru_output_dir = os.path.join(workspace_dir, "mineru")
+    os.makedirs(mineru_output_dir, exist_ok=True)
     config = RAGAnythingConfig(
         working_dir=working_dir,
-        parser_output_dir=workspace_dir,
+        parser_output_dir=mineru_output_dir,
         parser=parser,
         parse_method=parse_method,
         enable_image_processing=enable_image,
@@ -129,7 +133,7 @@ async def initialize_raganything():
         enable_equation_processing=enable_equation,
         # Context settings are automatically loaded from env vars by RAGAnythingConfig
     )
-    logger.info(f"📁 MinerU parser output → {workspace_dir}")
+    logger.info(f"📁 MinerU parser output → {mineru_output_dir}")
     
     # Log context-aware processing configuration (read from config after env var loading)
     logger.info(f"✅ RAG-Anything context-aware processing: {'ENABLED' if config.context_window > 0 else 'DISABLED'}")

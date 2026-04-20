@@ -14,7 +14,8 @@ Usage:
 What gets deleted per workspace:
     - Neo4j nodes/relationships with the workspace label
     - rag_storage/{workspace}/ folder (KV stores, VDB files, logs, MinerU output)
-    - Orphaned MinerU output dirs in rag_storage root (_{8hex} pattern directories)
+    - MinerU artifacts now live under rag_storage/{workspace}/mineru/
+    - Legacy orphaned MinerU output dirs in rag_storage root (_{8hex} pattern directories)
 """
 
 import os
@@ -181,14 +182,14 @@ def _delete_storage_workspace(workspace_name: str, rag_root: Path) -> bool:
 
 
 def _handle_orphaned_dirs(rag_root: Path) -> None:
-    """Prompt to delete orphaned MinerU output dirs in rag_storage root."""
+    """Prompt to delete legacy orphaned MinerU output dirs in rag_storage root."""
     orphans = _orphaned_mineru_dirs(rag_root)
     if not orphans:
         return
-    print(f"\n   🔍 Found {len(orphans)} orphaned MinerU output dir(s) in rag_storage root:")
+    print(f"\n   🔍 Found {len(orphans)} legacy MinerU output dir(s) in rag_storage root:")
     for d in orphans:
         print(f"      - {d.name}")
-    ans = input(f"\n   Delete these {len(orphans)} orphaned dir(s)? (yes/no): ").strip().lower()
+    ans = input(f"\n   Delete these {len(orphans)} legacy orphaned dir(s)? (yes/no): ").strip().lower()
     if ans in ("yes", "y"):
         for d in orphans:
             shutil.rmtree(d)

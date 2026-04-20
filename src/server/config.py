@@ -38,6 +38,13 @@ def configure_raganything_args():
     # Working directory
     global_args.working_dir = settings.working_dir
     global_args.input_dir = settings.input_dir
+
+    # Canonical LightRAG state stays on local file-backed storage for this repo.
+    # Neo4j remains the graph backend, while KV/doc status/vector persistence lives
+    # under rag_storage/<workspace>/ using LightRAG's default local implementations.
+    global_args.kv_storage = "JsonKVStorage"
+    global_args.vector_storage = "NanoVectorDBStorage"
+    global_args.doc_status_storage = "JsonDocStatusStorage"
     
     # Graph Storage Configuration - Neo4j vs NetworkX
     if settings.graph_storage == "Neo4JStorage":
@@ -193,5 +200,11 @@ def configure_raganything_args():
     logger.info(f"  Parallelization: max_parallel_insert={settings.max_parallel_insert}, "
                 f"llm_max_async={effective_llm_async}, embedding_max_async={effective_embedding_async}")
     logger.info(f"  Post-processing will use: max_async={settings.get_effective_post_processing_max_async()}")
+    logger.info(
+        "  Local state storage: kv=%s, vector=%s, doc_status=%s",
+        global_args.kv_storage,
+        global_args.vector_storage,
+        global_args.doc_status_storage,
+    )
     
     # Configuration complete - detailed startup logging happens in initialization.py
