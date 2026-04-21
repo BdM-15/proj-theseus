@@ -224,6 +224,72 @@ ENTITIES = [
         "source_id": SOURCE_ID,
         "file_path": FILE_PATH
     },
+
+    # -------------------------------------------------------------------------
+    # Capture Governance and Intelligence
+    # -------------------------------------------------------------------------
+    {
+        "entity_name": "Gate Review Process",
+        "entity_type": "concept",
+        "description": (
+            "Formal stage-gate governance for pursuits — forces honest go/no-go decisions "
+            "before B&P burn escalates. Typical gates: (1) OPPORTUNITY IDENTIFICATION — raw "
+            "lead qualified for tracking; (2) QUALIFICATION GATE — commit capture resources, "
+            "assign capture manager, initial Pwin; (3) PURSUIT/CAPTURE GATE — approve capture "
+            "plan, teaming strategy, B&P budget; (4) BID GATE — formal bid/no-bid decision at "
+            "RFP release with updated Pwin and PTW; (5) PROPOSAL REVIEWS — Pink (strategy), "
+            "Red (full draft), Gold (final); (6) SUBMISSION GATE — senior sign-off on price "
+            "and terms; (7) POST-SUBMISSION — Black (lessons learned) after win/loss. Each "
+            "gate has written entry criteria, a decision authority, and a documented outcome. "
+            "Anti-pattern: skipping gates because 'we've already decided to bid' — the "
+            "discipline exists precisely to catch confirmation bias and sunk-cost thinking."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "entity_name": "Competitive Intelligence Sources",
+        "entity_type": "concept",
+        "description": (
+            "Lawful public and subscription sources for building competitive picture. "
+            "GOVERNMENT DATA: (1) FPDS / USASpending.gov — contract awards, obligated values, "
+            "NAICS, place of performance; (2) SAM.gov — active opportunities, sources sought, "
+            "industry day notices; (3) CPARS — past performance (FOIA-obtainable for competitors' "
+            "relevant contracts); (4) GAO and COFC protest decisions — reveal pricing "
+            "differentials, evaluation findings, and competitor weaknesses disclosed in the "
+            "record; (5) Agency budget justifications (J-books for DoD) — program funding and "
+            "direction. SUBSCRIPTION: GovWin/Deltek, Bloomberg Government, GovTribe — aggregated "
+            "opportunity and competitor intelligence. PUBLIC COMMERCIAL: LinkedIn (personnel "
+            "movements, role titles signaling pursuits), company press releases, SEC filings "
+            "(10-K, 10-Q segment disclosures), industry conference presentations. RULES: "
+            "no procurement-sensitive source selection information (FAR 3.104), no solicitation "
+            "of current government employees working the acquisition, no contractor proprietary "
+            "information. Document every intelligence source so claims are defensible."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "entity_name": "Win Loss Analysis",
+        "entity_type": "concept",
+        "description": (
+            "Systematic post-award learning loop — converts every outcome (win, loss, or "
+            "no-award) into capture-plan improvements. Data sources: (1) FAR 15.506 DEBRIEF — "
+            "written debrief questions submitted within 3 days of notice; capture actual "
+            "evaluation strengths, weaknesses, deficiencies, and (for unsuccessful offerors) "
+            "the awardee's total evaluated price and technical rating summary; (2) GAO/COFC "
+            "PROTEST RECORD — if protested, the agency report and decision reveal evaluator "
+            "reasoning; (3) INTERNAL RETROSPECTIVE — capture manager, proposal manager, and "
+            "pricing lead review what worked and what didn't, scored against the capture plan's "
+            "assumptions; (4) CUSTOMER RELATIONSHIP SIGNAL — post-award informal conversations "
+            "within ethical limits. Findings feed back into: Pwin calibration, discriminator "
+            "refinement, PTW modeling, gate criteria, and proposal writing patterns. "
+            "Anti-pattern: declaring 'we lost on price' without reading the debrief or the "
+            "protest record — it's almost never just price, and unexamined losses repeat."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
 ]
 
 
@@ -338,6 +404,71 @@ RELATIONSHIPS = [
         "source_id": SOURCE_ID,
         "file_path": FILE_PATH
     },
+
+    # Governance and intelligence relationships
+    {
+        "src_id": "Gate Review Process",
+        "tgt_id": "Bid No-Bid Decision Framework",
+        "description": "Bid/No-Bid decision is one of the formal stage gates in the capture lifecycle",
+        "keywords": "INCLUDES GOVERNS",
+        "weight": 0.95,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Gate Review Process",
+        "tgt_id": "Capture Plan Development",
+        "description": "Capture Plan is the primary artifact reviewed and updated at each gate",
+        "keywords": "GOVERNS REVIEWS",
+        "weight": 0.9,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Black Hat Review",
+        "tgt_id": "Discriminator Development",
+        "description": "Black Hat stress-tests discriminators — neutralized ones must be revised or dropped",
+        "keywords": "VALIDATES STRESS_TESTS",
+        "weight": 0.95,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Competitive Intelligence Sources",
+        "tgt_id": "Incumbent Analysis Strategy",
+        "description": "Incumbent analysis depends on lawful public intelligence sources",
+        "keywords": "FEEDS ENABLES",
+        "weight": 0.9,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Competitive Intelligence Sources",
+        "tgt_id": "Price to Win Analysis",
+        "description": "PTW modeling relies on contract award data from FPDS/USASpending and protest records",
+        "keywords": "FEEDS INFORMS",
+        "weight": 0.85,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Win Loss Analysis",
+        "tgt_id": "Pwin Probability Assessment",
+        "description": "Win/loss findings calibrate Pwin assumptions on future pursuits",
+        "keywords": "CALIBRATES IMPROVES",
+        "weight": 0.85,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Win Loss Analysis",
+        "tgt_id": "Capture Plan Development",
+        "description": "Win/loss lessons feed improvements into future capture plans",
+        "keywords": "IMPROVES INFORMS",
+        "weight": 0.85,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
 ]
 
 
@@ -385,6 +516,43 @@ CHUNKS = [
             "highlighting: 'We mitigate key personnel risk through deep bench strength' "
             "(ghosts small company reliance on few key people). Never directly name or "
             "disparage competitors. Let evaluators draw conclusions from your strengths."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "content": (
+            "Debrief Exploitation Worked Example: Offeror loses a $50M services competition "
+            "on best-value tradeoff. FAR 15.506 written debrief questions submitted within "
+            "3 days ask: (1) our adjectival/color ratings per factor and subfactor with "
+            "significant strengths, weaknesses, significant weaknesses, deficiencies; "
+            "(2) awardee's total evaluated price and overall technical rating; (3) "
+            "past-performance relevancy ratings on each submitted example; (4) rationale "
+            "for the tradeoff decision. Debrief reveals: our Management Approach was 'Good' "
+            "vs awardee 'Outstanding' due to two weaknesses — no named transition manager "
+            "and vague risk register. Price delta was 4%, so price was NOT the cause. "
+            "Win/Loss finding: Management Approach needs a named transition manager with "
+            "resume in every bid, plus a populated risk register with quantified mitigations. "
+            "This feeds capture plan template for next pursuit. Without the debrief, the "
+            "team would have mis-attributed the loss to price."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "content": (
+            "Black Hat Review Run Sheet: (1) Two weeks before Pink Team. (2) Capture manager "
+            "identifies top 3 expected competitors based on Competitive Intelligence Sources "
+            "(FPDS history on similar NAICS, LinkedIn signals of staffing, teaming announcements). "
+            "(3) Assign senior reviewer to each — must be outside the capture team, ideally "
+            "from another business unit. (4) Each reviewer prepares a 20-minute 'their pitch' "
+            "covering: win themes they'd use, discriminators they'd claim, their likely PTW "
+            "position, their ghosting angles against us. (5) Review session: reviewers present "
+            "back-to-back; capture team listens only. (6) Scoring: for each of our draft "
+            "discriminators, ask 'which competitor just neutralized this?' — discriminators "
+            "neutralized by two or more competitors must be dropped or reinforced with new "
+            "proof. (7) Output: revised win strategy one-pager with discriminators that "
+            "survived, counter-ghosting plan, and updated Pwin."
         ),
         "source_id": SOURCE_ID,
         "file_path": FILE_PATH
