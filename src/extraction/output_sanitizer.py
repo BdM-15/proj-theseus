@@ -11,6 +11,11 @@ Patterns Fixed:
 3. <|#|>(requirement<|#|>  → <|#|>requirement<|#|>   (parenthesis prefix)
 4. <|#|>requirement|<|#|>  → <|#|>requirement<|#|>   (trailing pipe)
 5. Extra pipes in descriptions causing field count overflow
+6. <|#|#|requirement<|#|> → <|#|>requirement<|#|>   (truncated delimiter: LLM dropped '>')
+
+Note on line splitting: uses splitlines() (not split('\n')) to handle Windows \r\n
+line endings, which would otherwise leave \r at line ends and cause Pattern 1 to
+fail matching <|#|>\r (the '>' is not the last char the regex sees).
 
 Entity type normalization (lowercase, underscore, strip special chars) is handled
 natively by LightRAG 1.4.13 (operate.py sanitize_and_normalize_extracted_text + line 441).
@@ -57,7 +62,7 @@ def sanitize_extraction_output(raw_output: str) -> str:
     if not raw_output:
         return raw_output
 
-    lines = raw_output.split('\n')
+    lines = raw_output.splitlines()  # handles \r\n, \n, \r uniformly
     fixed_lines = []
     fixes_applied = 0
 
@@ -139,6 +144,11 @@ def _pre_split_fixes(line: str) -> str:
 
     # Pattern 5: General garbage prefix before entity type
     line = re.sub(r'<\|#\|>\s*[^\w\s]+\s*(\w+(?:_\w+)*)\s*<\|#\|>', r'<|#|>\1<|#|>', line)
+
+    # Pattern 6: Truncated delimiter — LLM dropped '>' from <|#|>, producing <|#|#|type<|#|>
+    # Confirmed in cache hex: 3C 7C 23 7C 23 7C = <|#|#| (missing 3E = '>')
+    # entity<|#|>Name<|#|#|requirement<|#|>desc  →  entity<|#|>Name<|#|>requirement<|#|>desc
+    line = re.sub(r'<\|#\|#\|(\w+(?:_\w+)*)\s*<\|#\|>', r'<|#|>\1<|#|>', line)
 
     if line != original:
         _stats.pre_split_fixes += 1
