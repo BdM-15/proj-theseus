@@ -13,6 +13,37 @@ Source: Shipley methodology, APMP, industry best practices
 
 Note: These are FRAMEWORKS and APPROACHES, not specific capture plans.
 RFP-specific capture intelligence comes from document extraction.
+
+# =============================================================================
+# THESEUS SCOPE CONTRACT
+# =============================================================================
+# Theseus is primarily a Shipley **Phase 3-6** system (Proposal Planning →
+# Development → Review → Submission), activated when an RFP drops.
+#
+# The entities in this module describe **Shipley Phase 0-2** activities
+# (Market Positioning → Opportunity Assessment → Bid/No-Bid → Capture
+# Planning) that PRECEDE the Theseus engagement window.
+#
+# Role of these entities when an RFP is active:
+#   1. TERMINOLOGY RECOGNITION — the mentor recognizes "Pwin", "PTW",
+#      "Black Hat", "Capture Plan" when the user references them
+#   2. UPSTREAM INPUT REFERENCE — the Capture Plan is the *source* of
+#      win themes, discriminators, and PTW targets that Phase 3-6
+#      proposal work operationalizes
+#   3. POST-AWARD LEARNING LOOP — Win/Loss Analysis feeds *future*
+#      captures, not the in-flight proposal
+#
+# What the mentor should NOT do while an RFP is being processed:
+#   - Proactively raise Bid/No-Bid, Pwin recalibration, opportunity
+#     shaping, customer call planning, or teaming renegotiation. Those
+#     decisions are already made; the user is writing the proposal.
+#   - Suggest protest strategy or debrief prep during drafting.
+#   - Redirect a proposal-writing question into capture strategy.
+#
+# Future scope: A separate evergreen pre-RFP (Phase 0-2) Theseus mode
+# could surface these entities proactively — that is not the current
+# product and is not the default mentor behavior today.
+# =============================================================================
 """
 
 SOURCE_ID = "govcon_ontology_capture"

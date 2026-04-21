@@ -437,3 +437,85 @@ A successful L↔M inference run should:
 **Last Updated**: January 2025 (Branch 004)  
 **Version**: 2.0 (Enhanced from regex patterns to LLM semantic inference)  
 **Replaces**: Brittle Jaccard similarity regex (Phase 6.0) with LLM understanding
+
+---
+
+## Shipley Thread: Linking RFP Entities to Bootstrapped Methodology Knowledge
+
+**Added in Branch 087 (ontology knowledge enhancement).**
+
+The bootstrapped methodology ontology (`src/ontology/knowledge/`) ships a pre-populated graph of
+Shipley proposal mechanics, evaluation mechanics, regulations, workload/pricing patterns, lessons
+learned, and company capabilities. When an RFP is processed, these evergreen entities are valid
+link targets for RFP-extracted entities — this is how domain knowledge is made available to the
+Phase 3-6 proposal mentor.
+
+### Theseus Scope Contract
+
+**Theseus is a Shipley Phase 3-6 system** (Proposal Planning → Development → Review →
+Submission), activated when an RFP drops. The Shipley Thread must keep mentor responses focused
+on **writing a compelling and compliant proposal**, not re-opening bid-qualification decisions.
+
+### Eligible Link Targets (Phase 3-6 — DEFAULT)
+
+When the inference runs over a processed RFP, the following methodology entity groups are
+**valid targets** for RFP entities (`customer_priority`, `pain_point`, `evaluation_factor`,
+`proposal_instruction`, `requirement`, `clause`, `deliverable`):
+
+| Methodology Module | Module File | Role |
+|---|---|---|
+| `shipley` | `shipley.py` | Win themes, discriminators, proof points, FAB, ghosting, compliance matrix, Pink/Red/Gold reviews, executive summary, storyboards |
+| `evaluation` | `evaluation.py` | Section M decoding, SSEB structure, relative-importance language, competitive range, discussions/FPRs, SSDD |
+| `regulations` | `regulations.py` | FAR/DFARS citations, Section 889, Section 508, FAR 15.506 debrief rights, NAICS/size standard, data rights |
+| `workload` | `workload.py` | BOE discipline, indirect rates, Agile capacity, cloud costs, labor mix |
+| `lessons_learned` | `lessons_learned.py` | Anti-patterns, **Explicit Benefit Linkage Rule**, agency tendencies, GAO protest patterns, Q&A strategy |
+| `company_capabilities` | `company_capabilities.py` | KBR capabilities, platforms, past performance, cleared workforce, compliance artifacts (proof-point sourcing) |
+
+### Excluded Link Targets (Phase 0-2 — DO NOT LINK BY DEFAULT)
+
+Entities in `capture.py` describe **pre-RFP capture-phase activities** (Bid/No-Bid,
+Pwin Assessment, Opportunity Shaping, Customer Call Planning, Teaming Strategy,
+Competitive Intelligence Sources, Price-to-Win, Capture Plan Development, Win/Loss Analysis,
+and the broader Gate Review Process). These are **Phase 0-2 inputs** to the proposal, not
+Phase 3-6 guidance topics.
+
+**Rule:** Do NOT create default inference links from RFP-extracted entities to `capture.py`
+methodology entities. Exceptions (require explicit signal in the RFP text):
+
+- An RFP `customer_priority` or `pain_point` may link to a `shipley` discriminator or
+  `company_capabilities` proof point — NOT to `Pwin Probability Assessment`.
+- If the user explicitly asks about capture concepts (e.g., "what was our Pwin?"), those
+  entities can be retrieved via direct query, not via pre-baked inference edges.
+
+### Relationship Types for Shipley Thread
+
+Use these canonical relationship types from `src/ontology/schema.py`:
+
+- `ADDRESSED_BY` — RFP customer_priority → shipley discriminator / proof_point
+- `COMPLIES_WITH` — RFP clause / requirement → regulations entity
+- `GUIDED_BY` — RFP evaluation_factor → shipley/evaluation methodology entity
+- `INFORMS` — lessons_learned entity → RFP proposal_instruction or evaluation_factor
+- `SUPPORTED_BY` — shipley discriminator → company_capabilities past_performance_reference / technology
+
+### Confidence Guidance
+
+- **0.85-0.95**: RFP entity text directly matches methodology entity vocabulary (e.g., RFP
+  mentions "cost realism" → link to `evaluation.py` relative-importance / cost-realism entity)
+- **0.70-0.85**: Topic alignment requires interpretation (e.g., RFP requires "transition plan"
+  → link to `shipley` discriminator/proof-point framework + `workload` transition entities)
+- **Below 0.70**: Do not create the link
+
+### Anti-Patterns
+
+- ❌ Linking an RFP `evaluation_factor` to `capture.py` `Pwin Probability Assessment` —
+  Pwin is a pre-RFP capture metric, not a proposal-writing topic
+- ❌ Linking an RFP `proposal_instruction` to `capture.py` `Opportunity Shaping Strategy` —
+  shaping ended when the RFP dropped
+- ❌ Linking an RFP `clause` to `capture.py` `Bid No-Bid Decision Framework` — the decision
+  is already made
+- ✅ Linking an RFP `customer_priority` to a `shipley` `Discriminator` entity + a
+  `company_capabilities` proof point — this is exactly the Phase 3-6 win-theme construction the
+  mentor should enable
+- ✅ Linking an RFP `clause` containing "Section 889" to `regulations.py` `Section 889
+  Prohibition` — regulatory compliance is Phase 3-6 relevant
+
