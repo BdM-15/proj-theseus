@@ -16,7 +16,8 @@ load_dotenv()
 # Now safe to import LightRAG and our config
 import logging
 from lightrag.api.config import global_args
-from lightrag.operate import chunking_by_token_size
+from lightrag.operate import chunking_by_token_size  # noqa: F401  # kept for reference / fallback
+from src.extraction.govcon_chunking import govcon_chunking_func
 
 from src.core.config import get_settings
 
@@ -184,7 +185,13 @@ def configure_raganything_args():
     # CHUNK_SIZE: Document chunking for BOTH LLM entity extraction and embeddings
     # - 8K chunks = multiple focused extraction passes = comprehensive coverage
     # - Embeddings auto-truncate to model limits via EmbeddingFunc.max_token_size
-    global_args.chunking_func = chunking_by_token_size
+    #
+    # govcon_chunking_func wraps LightRAG's native chunking_by_token_size and
+    # prepends a [GOVCON_DOC: type=...; note=...] banner to each chunk based on
+    # filename echoes and structural signals (templates, solicitations, PWS,
+    # CDRL exhibits). Non-invasive — uses the documented chunking_func seam,
+    # no library patches. See src/extraction/govcon_chunking.py.
+    global_args.chunking_func = govcon_chunking_func
     
     # Validate required chunking settings (centralized validation)
     settings.validate_required_settings()
