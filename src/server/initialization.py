@@ -591,10 +591,12 @@ async def initialize_raganything():
             )
             
             if bootstrap_result["status"] == "success":
-                logger.info(f"✅ GovCon ontology bootstrapped: {bootstrap_result['entities_added']} entities, "
+                logger.info(f"✅ GovCon ontology bootstrapped into workspace '{settings.workspace}': "
+                          f"{bootstrap_result['entities_added']} entities, "
                           f"{bootstrap_result['relationships_added']} relationships")
             elif bootstrap_result["status"] == "already_bootstrapped":
-                logger.info(f"📚 GovCon ontology already bootstrapped ({bootstrap_result['bootstrapped_at']})")
+                logger.info(f"📚 GovCon ontology already bootstrapped into workspace "
+                          f"'{settings.workspace}' ({bootstrap_result['bootstrapped_at']})")
             else:
                 logger.warning(f"⚠️ Ontology bootstrap: {bootstrap_result.get('error', 'unknown issue')}")
                 
