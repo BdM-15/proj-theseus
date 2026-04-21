@@ -234,6 +234,71 @@ ENTITIES = [
         "source_id": SOURCE_ID,
         "file_path": FILE_PATH
     },
+
+    # -------------------------------------------------------------------------
+    # Pricing Fundamentals (Indirect Rates, Agile, Cloud)
+    # -------------------------------------------------------------------------
+    {
+        "entity_name": "Indirect Rate Structure",
+        "entity_type": "pricing_element",
+        "description": (
+            "Federal cost proposals are built up from DIRECT labor + direct ODCs, layered "
+            "with INDIRECT rates that recover company overhead and profit. Typical structure "
+            "(FAR 31.203 allocation requirements): (1) FRINGE rate — benefits, PTO, payroll "
+            "tax loading on direct labor (industry range ~25-40%, varies by benefits package); "
+            "(2) OVERHEAD rate — program management, facilities, supervision not charged "
+            "direct (on-site OH often 20-40%, off-site OH 40-80% given lower direct base); "
+            "(3) G&A rate — corporate-level General & Administrative (ranges ~6-15%); "
+            "(4) FEE / PROFIT — negotiated based on contract type and risk (FFP 8-12%, CPFF "
+            "5-8% typical, CPAF has base fee plus award fee pool). Cost realism evaluations "
+            "reject unrealistically low indirect rates — 'buying in' with below-DCAA-audited "
+            "rates is a known tell. Strategy: disclose your forward-pricing rate agreement "
+            "(FPRA) or DCAA-approved rates; do not undercut sustainably reportable indirects."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "entity_name": "Agile Capacity Estimation",
+        "entity_type": "concept",
+        "description": (
+            "Sizing Agile/DevSecOps efforts without falling into pseudo-precision. Core inputs: "
+            "(1) Historical team VELOCITY — story points completed per sprint by comparable "
+            "teams (do NOT claim velocity from a team that does not yet exist); (2) TEAM SIZE "
+            "— 5-9 members per Scrum team including Scrum Master and Product Owner; (3) SPRINT "
+            "LENGTH — 2 weeks standard; (4) CAPACITY per sprint = team size × sprint days × "
+            "focus factor (typically 60-75% — not 100%). Estimation approaches: relative "
+            "sizing with planning poker for the first 2-3 sprints of known scope; feature-"
+            "level t-shirt sizing rolled to release-level ranges beyond that. Anti-pattern: "
+            "converting story points to hours in the proposal — points are intentionally "
+            "relative and not linear in time; conversion signals a waterfall mindset. "
+            "Honest pattern: size known near-term work in points, express longer-term "
+            "commitments as capacity (team-sprints) plus a prioritized backlog governance model."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "entity_name": "Cloud Cost Estimation",
+        "entity_type": "concept",
+        "description": (
+            "Cloud consumption pricing for AWS GovCloud, Azure Government, and similar "
+            "environments requires its own BOE discipline. Cost drivers: (1) COMPUTE — "
+            "instance-hours by family/size with right-sizing plan, (2) STORAGE — tiered "
+            "(hot/warm/cold) by retention, (3) NETWORK — egress (largest surprise category), "
+            "inter-region, VPN/Direct Connect, (4) MANAGED SERVICES — databases, analytics, "
+            "containers typically dominate variable cost, (5) LICENSING — BYOL vs pay-as-you-"
+            "go for Windows/Oracle/SQL Server. Pricing strategy: (a) use current published "
+            "cloud calculators as the floor; (b) apply reserved-instance / savings-plan "
+            "commitment discounts only to the portion of load that is genuinely steady-state; "
+            "(c) include egress at realistic transfer volumes — egress underestimates are a "
+            "leading cost-realism finding; (d) carry a 10-20% cloud growth contingency for "
+            "multi-year ordering periods. Anti-pattern: quoting list prices without egress or "
+            "without a FinOps management approach — evaluators read this as naive."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
 ]
 
 
@@ -323,6 +388,35 @@ RELATIONSHIPS = [
         "source_id": SOURCE_ID,
         "file_path": FILE_PATH
     },
+
+    # Pricing-fundamentals relationships
+    {
+        "src_id": "Indirect Rate Structure",
+        "tgt_id": "Basis of Estimate Development",
+        "description": "Indirect rates are applied to the direct BOE to produce fully-loaded cost",
+        "keywords": "APPLIED_TO LAYERED_ON",
+        "weight": 0.9,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Agile Capacity Estimation",
+        "tgt_id": "Software Development Staffing Model",
+        "description": "Agile capacity estimation is the Agile variant of development staffing",
+        "keywords": "SPECIALIZES RELATED_TO",
+        "weight": 0.85,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Cloud Cost Estimation",
+        "tgt_id": "Other Direct Costs Estimation",
+        "description": "Cloud consumption costs are a major ODC category requiring dedicated BOE discipline",
+        "keywords": "SPECIALIZES COMPONENT_OF",
+        "weight": 0.85,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
 ]
 
 
@@ -371,6 +465,41 @@ CHUNKS = [
             "proposed equivalencies (e.g., experience substituting for education). "
             "Misalignment between staff qualifications and proposed categories undermines "
             "credibility and may constitute material misrepresentation."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "content": (
+            "Indirect Rate Build-Up Example (federal services contract): Direct labor hour "
+            "at a $55/hr bare rate → FRINGE 32% = $72.60 → OVERHEAD 28% (on-site) = $92.93 → "
+            "G&A 8% on extended base = $100.36 → FEE 9% (FFP) = $109.39/hr billable. Each "
+            "layer is disclosed on a DCAA-approved or forward-pricing rate agreement (FPRA) "
+            "basis. Cost realism considerations: (1) indirect rates below a company's "
+            "DCAA-audited history trigger 'buy-in' concern; (2) rates significantly above "
+            "competitor norms trigger price reasonableness concern; (3) teaming arrangements "
+            "where the prime applies G&A on top of subcontractor fully-burdened rates must "
+            "be disclosed. Anti-pattern: undisclosed rate departures from FPRA — CO will "
+            "request justification and can treat silence as misrepresentation."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "content": (
+            "Agile Estimation That Survives Cost Realism: For fixed-scope work use story "
+            "points on a normalized scale the team has actually run before — do NOT invent a "
+            "velocity. For unknown scope express capacity honestly as (teams × sprints × "
+            "focus-factor hours) with a governance model describing how the Product Owner "
+            "will re-prioritize when the backlog exceeds capacity. Pricing approach: firm-"
+            "fixed-price per sprint or per release works for steady-state teams; T&M with "
+            "ceiling is often the honest fit early in a discovery-heavy program. Anti-pattern: "
+            "(a) selling 100% focus factor — evaluators know meetings, PTO, and context-"
+            "switching consume real capacity; (b) translating story points to hours in the "
+            "proposal — points are relative, not linear; (c) claiming a velocity the proposed "
+            "team has never run — velocity belongs to a specific team composition, not a "
+            "company. Honest pattern: quote capacity, scope the first 2-3 sprints precisely, "
+            "commit to release planning cadence for everything beyond."
         ),
         "source_id": SOURCE_ID,
         "file_path": FILE_PATH
