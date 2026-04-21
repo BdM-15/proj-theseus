@@ -19,7 +19,7 @@ ARCHITECTURE:
                     ↓
              Neo4j sync
                     ↓
-             8 Algorithms discover relationships → Neo4j updated ✅
+             3 Algorithms discover relationships → Neo4j updated ✅
                     ↓
              sync_discoveries_to_vdb() → VDBs UPDATED ✅  ← NEW
                     ↓

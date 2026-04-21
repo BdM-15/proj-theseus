@@ -85,7 +85,7 @@ This project wraps **LightRAG** and **RAGAnything** to provide specialized gover
   - `config.py` - LightRAG `global_args` setup (MUST load .env first)
   - `routes.py` - Custom endpoints with batch completion detection
   - `initialization.py` - RAGAnything wrapper initialization, prompt registration (all 3 systems)
-- `src/inference/` - Semantic post-processing algorithms (8 LLM relationship inference algorithms)
+- `src/inference/` - Semantic post-processing (3 inference algorithms: L↔M links, document structure, orphan resolution)
 - `src/ontology/` - Domain schema validation (Pydantic models for 33 entity types, 43 relationship types)
 - `src/extraction/` - Custom entity extraction logic
 
@@ -97,7 +97,13 @@ This project wraps **LightRAG** and **RAGAnything** to provide specialized gover
 4. **LightRAG Chunking** → Configurable tokens/chunk (set via CHUNK_SIZE in .env), 15% overlap
 5. **Entity Extraction** → 33 govcon entity types via xAI Grok + Pydantic validation using **System 1** prompts
 6. **Relationship Extraction** → 43 canonical relationship types with typed schema validation
-7. **Semantic Post-Processing** → 8 LLM algorithms (auto-triggered after batch) using inference prompts
+7. **Semantic Post-Processing** → 6-phase pipeline (auto-triggered after batch) using inference prompts
+   - Phase 1: Data Loading
+   - Phase 2: Entity Normalization
+   - Phase 3: Relationship Normalization (entity-pair retyping)
+   - Phase 4: Relationship Inference (L↔M links, document structure, orphan resolution)
+   - Phase 5: Workload Enrichment (optional)
+   - Phase 6: VDB Synchronization
 8. **Query Response** → Shipley mentor persona via **System 2** prompts
 
 ### RAG-Anything & MinerU Integration

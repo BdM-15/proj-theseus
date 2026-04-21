@@ -4,8 +4,11 @@ Semantic Post-Processing for Government Contracting RFPs
 
 Neo4j-native LLM-powered enhancements to the extracted knowledge graph:
 
-1. **Relationship Inference**: Infer missing semantic relationships using 8 algorithms
-2. **Optional Workload Enrichment**: Add BOE metadata to requirements when explicitly enabled
+1. **Entity Normalization**: Fix table/hash/unknown entity types
+2. **Relationship Normalization**: Re-type generic RELATED_TO via entity-pair lookup
+3. **Relationship Inference**: Infer missing semantic relationships using 3 algorithms
+4. **Optional Workload Enrichment**: Add BOE metadata to requirements when explicitly enabled
+5. **VDB Synchronization**: Sync inferred relationships to LightRAG vector stores
 
 Architecture (Issue #54 - Back to Basics):
 - Entity extraction uses native LightRAG with the govcon ontology
@@ -48,9 +51,6 @@ def get_semantic_post_processing_config():
     settings = get_settings()
     return {
         'max_concurrent_llm_calls': settings.get_effective_post_processing_max_async(),
-        'batch_size_algo3': settings.batch_size_algorithm_3,
-        'batch_overlap_algo3': settings.batch_overlap_algorithm_3,
-        'batch_size_algo4': settings.batch_size_algorithm_4,
     }
 
 
@@ -58,9 +58,83 @@ def get_semantic_post_processing_config():
 # These are evaluated at import time for modules that depend on them
 _settings = get_settings()
 MAX_CONCURRENT_LLM_CALLS = _settings.get_effective_post_processing_max_async()
-BATCH_SIZE_ALGO3 = _settings.batch_size_algorithm_3
-BATCH_OVERLAP_ALGO3 = _settings.batch_overlap_algorithm_3
-BATCH_SIZE_ALGO4 = _settings.batch_size_algorithm_4
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ENTITY-PAIR → RELATIONSHIP TYPE MAPPING (Approach B: Generic Relationship Fix)
+# ═══════════════════════════════════════════════════════════════════════════════
+# When extraction produces generic types (belongs_to, contained_in, part_of)
+# that get normalized to RELATED_TO or CHILD_OF, this mapping re-types them
+# based on the source and target entity types.
+#
+# Root cause: Table-derived text from MinerU/VLM has entities co-occurring
+# without prose connectors, so the LLM defaults to generic relationships.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_ENTITY_PAIR_REL_MAP = {
+    # ─── WORK & DELIVERABLES ───
+    ("requirement", "deliverable"): "SATISFIED_BY",
+    ("deliverable", "requirement"): "SATISFIED_BY",
+    ("requirement", "performance_standard"): "MEASURED_BY",
+    ("performance_standard", "requirement"): "MEASURED_BY",
+    ("work_scope_item", "deliverable"): "PRODUCES",
+    ("deliverable", "work_scope_item"): "PRODUCES",
+    ("requirement", "workload_metric"): "QUANTIFIES",
+    ("workload_metric", "requirement"): "QUANTIFIES",
+    ("deliverable", "contract_line_item"): "PRICED_UNDER",
+    ("contract_line_item", "deliverable"): "FUNDS",
+    ("requirement", "contract_line_item"): "PRICED_UNDER",
+    ("contract_line_item", "requirement"): "FUNDS",
+    ("deliverable", "organization"): "SUBMITTED_TO",
+    ("organization", "deliverable"): "SUBMITTED_TO",
+    # ─── EVALUATION ───
+    ("requirement", "evaluation_factor"): "EVALUATED_BY",
+    ("evaluation_factor", "requirement"): "EVALUATED_BY",
+    ("deliverable", "evaluation_factor"): "EVALUATED_BY",
+    ("evaluation_factor", "deliverable"): "EVALUATED_BY",
+    ("work_scope_item", "evaluation_factor"): "EVALUATED_BY",
+    ("evaluation_factor", "work_scope_item"): "EVALUATED_BY",
+    ("evaluation_factor", "subfactor"): "HAS_SUBFACTOR",
+    ("subfactor", "evaluation_factor"): "CHILD_OF",
+    # ─── AUTHORITY & GOVERNANCE ───
+    ("requirement", "clause"): "GOVERNED_BY",
+    ("clause", "requirement"): "MANDATES",
+    ("requirement", "regulatory_reference"): "GOVERNED_BY",
+    ("regulatory_reference", "requirement"): "MANDATES",
+    # ─── RESOURCE ───
+    ("requirement", "labor_category"): "STAFFED_BY",
+    ("labor_category", "requirement"): "STAFFED_BY",
+    ("work_scope_item", "labor_category"): "STAFFED_BY",
+    ("labor_category", "work_scope_item"): "STAFFED_BY",
+    ("location", "equipment"): "HAS_EQUIPMENT",
+    ("equipment", "location"): "HAS_EQUIPMENT",
+    ("government_furnished_item", "organization"): "PROVIDED_BY",
+    ("organization", "government_furnished_item"): "PROVIDED_BY",
+    # ─── STRATEGIC ───
+    ("requirement", "customer_priority"): "ADDRESSES",
+    ("customer_priority", "requirement"): "ADDRESSES",
+    ("requirement", "pain_point"): "RESOLVES",
+    ("pain_point", "requirement"): "RESOLVES",
+}
+
+# Relationship types that indicate the LLM used a generic fallback
+_GENERIC_REL_TYPES = {"RELATED_TO"}
+
+
+def _resolve_generic_relationship(rel_type: str, src_type: str, tgt_type: str) -> str:
+    """
+    Re-type a generic relationship based on source and target entity types.
+    
+    Only operates on RELATED_TO relationships (the normalized form of
+    belongs_to, contained_in, and other generic LLM outputs).
+    
+    Returns the original type if no better mapping exists.
+    """
+    if rel_type not in _GENERIC_REL_TYPES:
+        return rel_type
+    
+    pair = (src_type.lower(), tgt_type.lower())
+    return _ENTITY_PAIR_REL_MAP.get(pair, rel_type)
 
 
 def _heuristic_table_type_mapping(entity: Dict) -> str:
@@ -160,7 +234,7 @@ async def _parse_and_validate_relationship_batch(
     Args:
         response: Raw LLM response text
         id_to_entity: Dict mapping entity IDs to entity objects
-        context: Context string for logging (e.g., "Algorithm 1 Batch 2")
+        context: Context string for logging (e.g., "L↔M Links Batch 2")
         
     Returns:
         List of valid relationship dicts ready for Neo4j insertion
@@ -572,11 +646,11 @@ If no relationships found, return []."""
     try:
         response = await call_llm_async(prompt, model=model, temperature=temperature)
         rels = json.loads(response.strip())
-        valid_rels = _validate_relationships(rels, id_to_entity, "Algorithm 8")
+        valid_rels = _validate_relationships(rels, id_to_entity, "Orphan Resolution")
         logger.info(f"    → Found {len(valid_rels)} orphan relationships")
         return valid_rels
     except Exception as e:
-        logger.error(f"    ❌ Algorithm 8 failed: {e}")
+        logger.error(f"    ❌ Orphan resolution failed: {e}")
         return []
 
 
@@ -609,25 +683,28 @@ async def _semantic_post_processor_neo4j(
     settings = get_settings()
     if llm_model_name is None:
         # Use REASONING model for post-processing (grok-4-1 series)
-        llm_model_name = settings.reasoning_llm_name
+        llm_model_name = settings.post_processing_llm_name
     
-    logger.info("🔧 Starting Neo4j semantic post-processing...")
     start_time = time.time()
+    phase_times = {}  # Track per-phase durations
     
     # Initialize Neo4j I/O
     logger.info("\n📊 Initializing Neo4j connection...")
     neo4j_io = Neo4jGraphIO()
     
     try:
-        # Step 1: Load entities and relationships
-        logger.info("\n📥 Step 1: Loading knowledge graph from Neo4j...")
+        # Phase 1: Load entities and relationships
+        phase_start = time.time()
+        logger.info("\n📥 Phase 1 · Data Loading: Reading knowledge graph from Neo4j...")
         entities = neo4j_io.get_all_entities()
         relationships = neo4j_io.get_all_relationships()
         
         # Capture initial counts from main processing (before post-processing)
         initial_entity_count = len(entities)
         initial_rel_count = len(relationships)
+        phase_times['Phase 1 · Data Loading'] = time.time() - phase_start
         logger.info(f"  📊 Main Processing Results: {initial_entity_count} entities, {initial_rel_count} relationships")
+        logger.info(f"  ⏱️  Phase 1 completed in {phase_times['Phase 1 · Data Loading']:.1f}s")
         
         if not entities:
             logger.warning("⚠️  No entities found in Neo4j workspace")
@@ -639,16 +716,18 @@ async def _semantic_post_processor_neo4j(
                 "processing_time": 0
             }
         
-        # Step 2: Lightweight Entity Type Cleanup (NO LLM INFERENCE)
+        # Phase 2: Lightweight Entity Type Cleanup (NO LLM INFERENCE)
         # ========================================================================
         # With native LightRAG extraction, most types are valid from our ontology.
-        # This step ONLY handles edge cases:
+        # This phase ONLY handles edge cases:
         # 1. "table" from RAG-Anything's multimodal processors (generic type)
         # 2. Hash-prefixed types (#requirement) from LightRAG internal markers
         # 
         # NO LLM calls needed - all corrections are heuristic/deterministic.
         # ========================================================================
-        logger.info("\n🔧 Step 2: Lightweight entity type cleanup (native LightRAG handles most types)...")
+        phase_start = time.time()
+        phase_start = time.time()
+        logger.info("\n🔧 Phase 2 · Entity Normalization: Lightweight type cleanup...")
         entity_updates = []
         grouped = group_entities_by_type(entities)
         
@@ -755,8 +834,65 @@ async def _semantic_post_processor_neo4j(
         else:
             logger.info("\n✅ No entity type corrections needed (native LightRAG extraction working)")
         
-        # Step 3: Infer missing relationships using PARALLEL modular algorithms
-        logger.info("\n🔗 Step 3: Inferring relationships with PARALLEL algorithm execution...")
+        # Phase 3: Generic Relationship Type Resolution (NO LLM)
+        # ========================================================================
+        # After entity types are corrected (table→requirement, etc.), re-type
+        # RELATED_TO relationships using entity-pair lookup. These RELATED_TO rels
+        # originate from LLM-produced belongs_to/contained_in/part_of that were
+        # normalized to RELATED_TO by schema.normalize_relationship_type().
+        # ========================================================================
+        phase_start = time.time()
+        logger.info("\n🔗 Phase 3 · Relationship Normalization: Resolving generic types (entity-pair lookup)...")
+        
+        phase_times['Phase 2 · Entity Normalization'] = time.time() - phase_start
+        logger.info(f"  ⏱️  Phase 2 completed in {phase_times['Phase 2 · Entity Normalization']:.1f}s")
+        
+        # Reload entities with corrected types
+        entities = neo4j_io.get_all_entities()
+        relationships = neo4j_io.get_all_relationships()
+        
+        # Build entity lookup by elementId
+        entity_by_id = {e['id']: e for e in entities}
+        
+        # Find RELATED_TO relationships that can be retyped
+        retype_updates = []
+        for rel in relationships:
+            if rel['type'] not in _GENERIC_REL_TYPES:
+                continue
+            
+            src_entity = entity_by_id.get(rel['source'])
+            tgt_entity = entity_by_id.get(rel['target'])
+            if not src_entity or not tgt_entity:
+                continue
+            
+            src_type = (src_entity.get('entity_type') or '').lower()
+            tgt_type = (tgt_entity.get('entity_type') or '').lower()
+            
+            new_type = _resolve_generic_relationship(rel['type'], src_type, tgt_type)
+            if new_type != rel['type']:
+                retype_updates.append({
+                    'source_id': rel['source'],
+                    'target_id': rel['target'],
+                    'old_type': rel['type'],
+                    'new_type': new_type,
+                })
+        
+        relationships_retyped = 0
+        if retype_updates:
+            logger.info(f"  Found {len(retype_updates)} generic relationships to retype")
+            relationships_retyped = neo4j_io.retype_relationships(retype_updates)
+        else:
+            logger.info("  ✅ No generic relationships need retyping")
+        
+        # Refresh grouped entities for algorithm phase
+        grouped = group_entities_by_type(entities)
+        
+        phase_times['Phase 3 · Rel Normalization'] = time.time() - phase_start
+        logger.info(f"  ⏱️  Phase 3 completed in {phase_times['Phase 3 · Rel Normalization']:.1f}s")
+        
+        # Phase 4: Infer missing relationships using PARALLEL modular algorithms
+        phase_start = time.time()
+        logger.info("\n🔗 Phase 4 · Relationship Inference: Running parallel algorithms...")
         
         # Build lookups for algorithm orchestrator
         entities_by_type = grouped  # Already built from step 2
@@ -779,33 +915,13 @@ async def _semantic_post_processor_neo4j(
         else:
             logger.info("\n✅ No new relationships inferred")
         
-        requirements_enriched = 0
-        if settings.enable_workload_enrichment:
-            logger.info("\n🏗️ Step 4: Enriching requirements with workload metadata...")
-            from src.inference.workload_enrichment import enrich_workload_metadata
-
-            workload_stats = await enrich_workload_metadata(
-                neo4j_io=neo4j_io,
-                batch_size=5,  # Small batches, NO truncation - full detail for quality (~94K tokens max)
-                model=llm_model_name,
-                temperature=temperature
-            )
-
-            requirements_enriched = workload_stats.get("requirements_enriched", 0)
-            enrichment_rate = workload_stats.get("enrichment_rate", 0)
-            category_distribution = workload_stats.get("category_distribution", {})
-
-            logger.info(f"\n✅ Workload enrichment complete:")
-            logger.info(f"  Requirements enriched: {requirements_enriched}")
-            logger.info(f"  Enrichment rate:       {enrichment_rate:.1f}%")
-            if category_distribution:
-                logger.info(f"  BOE categories used:   {', '.join([f'{k}:{v}' for k,v in category_distribution.items() if v > 0])}")
-        else:
-            logger.info("\n⏭️ Step 4: Workload enrichment skipped (ENABLE_WORKLOAD_ENRICHMENT=false)")
+        phase_times['Phase 4 · Rel Inference'] = time.time() - phase_start
+        logger.info(f"  ⏱️  Phase 4 completed in {phase_times['Phase 4 · Rel Inference']:.1f}s")
         
-        # Step 5: Sync inferred relationships to LightRAG VDBs (Issue #65 - Critical Fix)
+        # Phase 5: Sync inferred relationships to LightRAG VDBs (Issue #65 - Critical Fix)
         # Without this, agent queries via /query miss algorithm-discovered relationships
-        logger.info("\n🔄 Step 5: Syncing inferred relationships to LightRAG VDBs...")
+        phase_start = time.time()
+        logger.info("\n🔄 Phase 5 · VDB Synchronization: Syncing inferred relationships...")
         from src.inference.vdb_sync import sync_discoveries_to_vdb
         
         vdb_sync_stats = await sync_discoveries_to_vdb(
@@ -821,15 +937,21 @@ async def _semantic_post_processor_neo4j(
         else:
             logger.error(f"❌ VDB sync failed: {vdb_sync_stats.get('error', 'unknown')}")
         
+        phase_times['Phase 5 · VDB Sync'] = time.time() - phase_start
+        logger.info(f"  ⏱️  Phase 5 completed in {phase_times['Phase 5 · VDB Sync']:.1f}s")
+        
         # Summary statistics
         processing_time = time.time() - start_time
         logger.info("\n" + "="*80)
-        logger.info("✅ SEMANTIC POST-PROCESSING COMPLETE (Neo4j + VDB)")
+        logger.info("✅ SEMANTIC POST-PROCESSING COMPLETE")
         logger.info("="*80)
+        logger.info(f"  Total time:              {processing_time:.1f}s")
+        for phase_name, phase_duration in phase_times.items():
+            logger.info(f"    {phase_name:30s}  {phase_duration:6.1f}s")
         logger.info(f"  Entities corrected:      {entities_corrected}")
+        logger.info(f"  Relationships retyped:   {relationships_retyped}")
         logger.info(f"  Relationships inferred:  {relationships_inferred}")
         logger.info(f"  Relationships synced:    {relationships_synced}")
-        logger.info(f"  Requirements enriched:   {requirements_enriched}")
         logger.info(f"  Processing time:         {processing_time:.2f}s")
         logger.info("="*80)
         
@@ -851,6 +973,7 @@ async def _semantic_post_processor_neo4j(
         logger.info("="*60)
         logger.info(f"  Main Processing Entities:      {initial_entity_count}")
         logger.info(f"  Main Processing Relationships: {initial_rel_count}")
+        logger.info(f"  Post-Processing Retyped Rels:  {relationships_retyped}")
         logger.info(f"  Post-Processing Added Rels:    {relationships_inferred}")
         logger.info(f"  VDB Synced Relationships:      {relationships_synced}")
         logger.info(f"  ─────────────────────────────────────")
@@ -863,9 +986,6 @@ async def _semantic_post_processor_neo4j(
             "entities_corrected": entities_corrected,
             "relationships_inferred": relationships_inferred,
             "relationships_synced": relationships_synced,
-            "requirements_enriched": requirements_enriched,
-            "enrichment_rate": enrichment_rate,
-            "category_distribution": category_distribution,
             "processing_time": processing_time,
             "entity_type_counts": type_counts,
             "vdb_sync_status": vdb_sync_stats.get("status", "unknown")
@@ -878,7 +998,6 @@ async def _semantic_post_processor_neo4j(
             "error": str(e),
             "entities_corrected": 0,
             "relationships_inferred": 0,
-            "requirements_enriched": 0,
             "processing_time": time.time() - start_time
         }
     finally:
@@ -893,14 +1012,12 @@ async def enhance_knowledge_graph(
     """
     Run semantic post-processing on extracted knowledge graph (Neo4j).
     
-    Steps:
-    1. Load entities/relationships from Neo4j
-    2. Infer missing relationships (8 algorithms)
-    3. Enrich requirements with workload metadata
-    4. Write updates back to Neo4j
-    
-    Note: Entity type enforcement is handled at extraction time via Pydantic
-    schema validation - no post-processing correction needed.
+    5-phase pipeline:
+    1. Data Loading - read entities/relationships from Neo4j
+    2. Entity Normalization - fix table/hash types
+    3. Relationship Normalization - retype generic RELATED_TO
+    4. Relationship Inference - L↔M links, doc structure, orphan resolution
+    5. VDB Synchronization - sync inferred rels to vector DB
     
     Args:
         rag_storage_path: Path to rag_storage directory (unused - kept for API compatibility)
@@ -910,17 +1027,23 @@ async def enhance_knowledge_graph(
     Returns:
         Stats dict with:
         - relationships_inferred: Number of new relationships
-        - requirements_enriched: Number of requirements with BOE metadata
         - processing_time: Total time in seconds
     """
-    logger.info("=" * 80)
-    logger.info("🧠 SEMANTIC POST-PROCESSING: LLM-Powered Graph Enhancement (Neo4j)")
-    logger.info("=" * 80)
-    
     # Get LLM model from centralized settings - use REASONING model for post-processing
     settings = get_settings()
-    llm_model = settings.reasoning_llm_name
+    llm_model = settings.post_processing_llm_name
     llm_temp = settings.llm_model_temperature
+    
+    # Startup banner with active configuration
+    logger.info("")
+    logger.info("=" * 80)
+    logger.info("🧠 SEMANTIC POST-PROCESSING: 5-Phase Pipeline")
+    logger.info("=" * 80)
+    logger.info(f"  Post-Processing Model: {llm_model}")
+    logger.info(f"  Temperature:           {llm_temp}")
+    logger.info(f"  Workspace Path:        {rag_storage_path}")
+    logger.info("  Phases: Data Loading → Entity Norm → Rel Norm → Inference → VDB Sync")
+    logger.info("=" * 80)
     
     return await _semantic_post_processor_neo4j(
         llm_model_name=llm_model,

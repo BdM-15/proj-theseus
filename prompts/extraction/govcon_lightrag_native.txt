@@ -1065,6 +1065,10 @@ RESOLVES - Requirement, deliverable, or transition activity resolves a pain poin
 SUPPORTS - One entity enables/supports another
 RELATED_TO - Semantic similarity, shared topics
 
+⛔ BANNED TYPES (these are NOT valid — NEVER use them):
+belongs_to, contained_in, part_of, has, is_a, type_of, member_of, associated_with
+→ Use the specific types above. See F.10 for table co-occurrence mapping rules.
+
 F.2 Proposal Instruction ↔ Evaluation Mapping (The "Golden Thread")
 --------------------------------------------------------------------
 CRITICAL: Proposal instructions and evaluation factors are mirror images even when the solicitation is not UCF-organized.
@@ -1413,6 +1417,65 @@ Confidence: 0.80-0.90 depending on explicitness
 WHY THIS MATTERS: "Which tasks does Technical Factor evaluate?" is critical for
 Shipley compliance matrix and proposal outlining. Without this edge, the answer
 requires vector search across disconnected graph neighborhoods.
+
+F.10 Table Co-Occurrence Relationship Rules (CRITICAL FOR MULTIMODAL CONTENT)
+------------------------------------------------------------------------------
+PROBLEM: When MinerU/VLM processes tables, entities from the same table appear
+in the same text chunk without prose connectors ("shall", "requires", "measured by").
+The extraction LLM defaults to generic types like "belongs_to", "contained_in",
+or "part_of" because no linguistic trigger fires from Part F.1.
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  RULE: NEVER use "belongs_to", "contained_in", or "part_of" as a           ║
+║  relationship type. These are NOT in the valid type set (Part F.1).         ║
+║  Instead, use the entity-pair mapping below.                                ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+When two entities co-occur in table-derived text (marked by workload data,
+tabular structure, or column/row patterns), use these typed relationships
+based on the entity pair:
+
+─── WORK & DELIVERABLES ───
+requirement ↔ deliverable         → SATISFIED_BY
+requirement ↔ performance_standard → MEASURED_BY
+requirement ↔ workload_metric     → QUANTIFIES
+work_scope_item ↔ deliverable     → PRODUCES
+deliverable ↔ contract_line_item  → PRICED_UNDER (deliverable→CLIN) or FUNDS (CLIN→deliverable)
+requirement ↔ contract_line_item  → PRICED_UNDER (req→CLIN) or FUNDS (CLIN→req)
+
+─── EVALUATION ───
+requirement ↔ evaluation_factor   → EVALUATED_BY
+deliverable ↔ evaluation_factor   → EVALUATED_BY
+work_scope_item ↔ evaluation_factor → EVALUATED_BY
+
+─── STRUCTURAL ───
+entity ↔ document_section         → CHILD_OF (entity→section) or CONTAINS (section→entity)
+entity ↔ document                 → CHILD_OF (entity→document) or CONTAINS (document→entity)
+
+─── AUTHORITY ───
+requirement ↔ clause              → GOVERNED_BY (req→clause) or MANDATES (clause→req)
+requirement ↔ regulatory_reference → GOVERNED_BY (req→reg) or MANDATES (reg→req)
+
+─── RESOURCE ───
+requirement ↔ labor_category      → STAFFED_BY
+work_scope_item ↔ labor_category  → STAFFED_BY
+location ↔ equipment              → HAS_EQUIPMENT
+deliverable ↔ organization        → SUBMITTED_TO
+
+─── STRATEGIC ───
+requirement ↔ customer_priority   → ADDRESSES
+requirement ↔ pain_point          → RESOLVES
+
+DEFAULT: If none of the above pairs match, use RELATED_TO (not belongs_to).
+
+EXAMPLE (Table-derived text):
+Text: "CDRL A001 Monthly Status Report... Contractor shall provide monthly reports..."
+
+WRONG:
+relation{tuple_delimiter}CDRL A001 Monthly Status Report{tuple_delimiter}Monthly Reporting Requirement{tuple_delimiter}belongs_to{tuple_delimiter}Report is part of the CDRL
+
+CORRECT:
+relation{tuple_delimiter}Monthly Reporting Requirement{tuple_delimiter}CDRL A001 Monthly Status Report{tuple_delimiter}SATISFIED_BY{tuple_delimiter}Monthly reporting requirement is satisfied by CDRL A001 Monthly Status Report
 
 ================================================================================
 PART G: ENTITY NAMING NORMALIZATION RULES

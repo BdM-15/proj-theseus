@@ -5,7 +5,7 @@ This module handles the initialization of the RAG-Anything instance with:
 - Custom entity extraction prompts (govcon_lightrag_native.txt, Parts A-L)
 - Government contracting ontology (33 entity types, 43 relationship types)
 - Multimodal document processing (MinerU parser)
-- Cloud LLM integration (xAI Grok extraction + grok-4.20 reasoning + OpenAI embeddings)
+- Cloud LLM integration (xAI Grok extraction + fast-reasoning post-processing + grok-4.20 queries + OpenAI embeddings)
 """
 
 # CRITICAL: Ensure .env is loaded before LightRAG imports

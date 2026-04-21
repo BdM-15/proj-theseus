@@ -211,6 +211,7 @@ def get_llm_config() -> Dict[str, Any]:
     return {
         "model": settings.reasoning_llm_name,
         "extraction_model": settings.extraction_llm_name,
+        "post_processing_model": settings.post_processing_llm_name,
         "api_host": settings.llm_host,
         "api_key_set": bool(settings.llm_api_key),
         "llm_max_async": settings.get_effective_llm_max_async(),

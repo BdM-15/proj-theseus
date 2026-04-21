@@ -4,7 +4,7 @@ Multimodal RAG system for government contracting documents
 
 Architecture:
 - src/server/config.py: Configuration (33 entity types, API credentials, chunking)
-- src/server/initialization.py: RAGAnything initialization (dual LLM, custom prompts)
+- src/server/initialization.py: RAGAnything initialization (tri-LLM, custom prompts)
 - src/server/routes.py: FastAPI endpoints + semantic post-processing
 - This file: Main entry point + server orchestration
 
@@ -139,8 +139,9 @@ async def main():
         ("Storage",      f"{c.YELLOW}{graph_storage}{c.RESET}  ·  {c.DIM}{global_args.working_dir}{c.RESET}"),
         ("", ""),
         # ── Models ───────────────────────────────────────────────────────────────
-        ("Extraction",   f"{c.CYAN}{settings.extraction_llm_name}{c.RESET}"),
-        ("Reasoning",    f"{c.MAGENTA}{settings.reasoning_llm_name}{c.RESET}"),
+        ("Extraction",      f"{c.CYAN}{settings.extraction_llm_name}{c.RESET}"),
+        ("Post-Processing", f"{c.YELLOW}{settings.post_processing_llm_name}{c.RESET}"),
+        ("Reasoning",       f"{c.MAGENTA}{settings.reasoning_llm_name}{c.RESET}"),
         ("Embeddings",   f"{c.CYAN}{settings.embedding_model}{c.RESET}  {c.DIM}({settings.embedding_dim}D){c.RESET}"),
         ("", ""),
         # ── Stack Versions ───────────────────────────────────────────────────────
@@ -151,7 +152,7 @@ async def main():
         ("", ""),
         # ── Ontology Schema ──────────────────────────────────────────────────────
         ("Schema",       f"{c.BOLD}{c.YELLOW}{len(VALID_ENTITY_TYPES)}{c.RESET} entity types  ·  {c.BOLD}{c.YELLOW}{len(VALID_RELATIONSHIP_TYPES)}{c.RESET} relationship types"),
-        ("Inference",    f"{c.CYAN}8 LLM algorithms{c.RESET}  {c.DIM}(L↔M mapping · traceability · enrichment · orphan resolution){c.RESET}"),
+        ("Inference",    f"{c.CYAN}3 LLM algorithms{c.RESET}  {c.DIM}(L↔M mapping · document structure · orphan resolution){c.RESET}"),
         ("", ""),
         # ── Knowledge Ontologies ─────────────────────────────────────────────────
         ("Knowledge KG", f"{c.BOLD}{c.MAGENTA}{len(kg_modules)} domain ontologies{c.RESET}  {c.DIM}injected for query enrichment{c.RESET}"),

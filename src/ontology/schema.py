@@ -52,9 +52,7 @@ VALID_RELATIONSHIP_TYPES = {
     "HAS_EQUIPMENT", "PROVIDED_BY", "COORDINATED_WITH", "REPORTED_TO",
     # Strategic & Capture Intelligence
     "ADDRESSES", "RESOLVES", "SUPPORTS", "RELATED_TO",
-    # Inference-only types (produced by post-processing algorithms, not extraction)
-    "HAS_RATING_SCALE", "HAS_THRESHOLD", "EVALUATED_USING", "DEFINES_SCALE",
-    "INFORMS", "IMPACTS", "DETERMINES", "ADDRESSED_BY",
+    # Inference-only types (produced by post-processing algo 8: orphan resolution)
     "REQUIRES", "ENABLED_BY", "RESPONSIBLE_FOR",
 }
 
@@ -72,12 +70,26 @@ def normalize_relationship_type(rel_type: str, fallback: str = "RELATED_TO") -> 
 
     # Common rogue type mappings (from old prompts / LLM drift)
     _ROGUE_MAPPINGS = {
+        # Legacy / renamed
         "MEASURES": "MEASURED_BY",
         "PART_OF": "CHILD_OF",
+        "BELONGS_TO": "RELATED_TO",
+        "CONTAINED_IN": "RELATED_TO",
+        "HAS": "CONTAINS",
+        "IS_A": "RELATED_TO",
+        "TYPE_OF": "RELATED_TO",
+        "MEMBER_OF": "CHILD_OF",
+        "ASSOCIATED_WITH": "RELATED_TO",
         "LOCATED_AT": "RELATED_TO",
         "SPECIFIES": "DEFINES",
         "FIELD_IN": "CHILD_OF",
         "INFERRED": "RELATED_TO",
+        # LLM-generated types not yet in canonical set
+        "IMPLEMENTED_BY": "SATISFIED_BY",    # requirement IMPLEMENTED_BY approach
+        "SUBJECT_TO": "GOVERNED_BY",          # entity SUBJECT_TO regulation
+        "REFERENCED_BY": "REFERENCES",        # inverse reference (direction approximated)
+        "REQUIRES_DELIVERABLE": "REQUIRES",   # more specific form of REQUIRES
+        "USED_FOR": "SUPPORTS",               # resource/tech USED_FOR purpose
     }
     if normalized in _ROGUE_MAPPINGS:
         mapped = _ROGUE_MAPPINGS[normalized]
