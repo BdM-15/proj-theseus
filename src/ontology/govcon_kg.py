@@ -14,7 +14,8 @@ We use a MODULAR design where each knowledge domain is a separate Python file:
     ├── evaluation.py      # Rating scales, evaluation factors
     ├── workload.py        # BOE formulas, staffing ratios
     ├── capture.py         # Bid/No-Bid, Win Themes, Discriminators
-    └── lessons_learned.py # 20+ years domain expertise
+    ├── lessons_learned.py # 20+ years domain expertise
+    └── company_capabilities.py # Company-specific platforms, past performance, discriminators
 
 Each module exports three lists:
   - ENTITIES: List of entity dicts with entity_name, entity_type, description
@@ -67,6 +68,8 @@ from src.ontology.knowledge import (
     CAPTURE_ENTITIES, CAPTURE_RELATIONSHIPS, CAPTURE_CHUNKS,
     # Lessons Learned
     LESSONS_ENTITIES, LESSONS_RELATIONSHIPS, LESSONS_CHUNKS,
+    # Company Capabilities
+    COMPANY_ENTITIES, COMPANY_RELATIONSHIPS, COMPANY_CHUNKS,
 )
 
 logger = logging.getLogger(__name__)
@@ -144,6 +147,7 @@ def build_govcon_ontology_kg() -> CustomKnowledgeGraph:
         *WORKLOAD_ENTITIES,
         *CAPTURE_ENTITIES,
         *LESSONS_ENTITIES,
+        *COMPANY_ENTITIES,
     ]
     
     # Combine all relationship lists
@@ -154,6 +158,7 @@ def build_govcon_ontology_kg() -> CustomKnowledgeGraph:
         *WORKLOAD_RELATIONSHIPS,
         *CAPTURE_RELATIONSHIPS,
         *LESSONS_RELATIONSHIPS,
+        *COMPANY_RELATIONSHIPS,
     ]
     
     # Combine all chunk lists
@@ -164,6 +169,7 @@ def build_govcon_ontology_kg() -> CustomKnowledgeGraph:
         *WORKLOAD_CHUNKS,
         *CAPTURE_CHUNKS,
         *LESSONS_CHUNKS,
+        *COMPANY_CHUNKS,
     ]
     
     logger.info(
@@ -221,21 +227,29 @@ def get_ontology_stats() -> dict:
                 "relationships": len(LESSONS_RELATIONSHIPS),
                 "chunks": len(LESSONS_CHUNKS),
             },
+            "company_capabilities": {
+                "entities": len(COMPANY_ENTITIES),
+                "relationships": len(COMPANY_RELATIONSHIPS),
+                "chunks": len(COMPANY_CHUNKS),
+            },
         },
         "total_entities": sum([
             len(SHIPLEY_ENTITIES), len(REGULATION_ENTITIES),
             len(EVALUATION_ENTITIES), len(WORKLOAD_ENTITIES),
             len(CAPTURE_ENTITIES), len(LESSONS_ENTITIES),
+            len(COMPANY_ENTITIES),
         ]),
         "total_relationships": sum([
             len(SHIPLEY_RELATIONSHIPS), len(REGULATION_RELATIONSHIPS),
             len(EVALUATION_RELATIONSHIPS), len(WORKLOAD_RELATIONSHIPS),
             len(CAPTURE_RELATIONSHIPS), len(LESSONS_RELATIONSHIPS),
+            len(COMPANY_RELATIONSHIPS),
         ]),
         "total_chunks": sum([
             len(SHIPLEY_CHUNKS), len(REGULATION_CHUNKS),
             len(EVALUATION_CHUNKS), len(WORKLOAD_CHUNKS),
             len(CAPTURE_CHUNKS), len(LESSONS_CHUNKS),
+            len(COMPANY_CHUNKS),
         ]),
     }
 

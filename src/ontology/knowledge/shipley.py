@@ -258,6 +258,119 @@ ENTITIES = [
         "file_path": FILE_PATH,
         "theme_type": "DISCRIMINATOR"
     },
+
+    # -------------------------------------------------------------------------
+    # Proposal Planning Artifacts (Shipley Model Documents)
+    # -------------------------------------------------------------------------
+    {
+        "entity_name": "Proposal Development Worksheet",
+        "entity_type": "concept",
+        "description": (
+            "Shipley PDW — the standard one-page-per-section planning artifact authors "
+            "complete BEFORE writing prose. Required fields: (1) Section Outline mapped to "
+            "RFP requirements (e.g., 2.2 Performance → 2.2.1 Flight Control, 2.2.2 Stability), "
+            "(2) Relevant Proposal/Volume Strategies (which win themes apply), (3) Defining "
+            "Your Solution → Major Issues (customer pain points being solved), (4) Key Visuals "
+            "with Action Captions (figure number, title that asserts a benefit, caption "
+            "explaining the proof). PDWs are the bridge from Annotated Outline to draft text "
+            "and feed Pink Team review. Per Shipley Proposal Guide model docs (pp. 314-316)."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "entity_name": "Storyboard Content Plan",
+        "entity_type": "concept",
+        "description": (
+            "High-level, bullet-form outline a contributor builds BEFORE prose drafting to "
+            "ensure the customer requirement is answered directly. Distinct from the Annotated "
+            "Outline (proposal-wide blueprint) — Storyboard is per-section/per-author. Includes "
+            "informative section headings (e.g., '2.5 Account Team Structure, Project Management, "
+            "and Relationship Management (10 pages)'), planned graphics, themes to weave in, "
+            "and proof points. Shipley Content Plan Template emphasizes flexibility — bullets "
+            "and notes, not full sentences. Catches non-responsiveness early."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "entity_name": "Executive Summary Writing Rules",
+        "entity_type": "concept",
+        "description": (
+            "Shipley rules for government-proposal Executive Summaries (per Proposal Guide "
+            "model doc 4, p. 309): (1) Open with theme that names the CUSTOMER FIRST, then "
+            "links to seller's most unique benefit; (2) State the customer NEED extracted from "
+            "the RFP — do not paraphrase; (3) Frame the CHALLENGE as both current position and "
+            "future requirement; (4) List capabilities word-for-word from the RFP to prove "
+            "compliance at a glance; (5) Highlight DISCRIMINATORS that may not be obvious to "
+            "less-knowledgeable readers; (6) Keep customer focus — the word 'you' should appear "
+            "more often than 'we'. Often written LAST but reviewed FIRST by evaluators."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "entity_name": "Government Cover Letter Structure",
+        "entity_type": "concept",
+        "description": (
+            "Shipley structure for cover letters on FORMALLY SOLICITED government proposals "
+            "(per model doc 7, p. 312): (1) Subject line must begin with signal word 'Proposal' "
+            "and include solicitation number + date for sorting; (2) Opening sentence uses a "
+            "short setup phrase, not a long preamble; (3) Customer's evaluation criteria or "
+            "objectives are stated in the SECOND paragraph to set up relevance for the third; "
+            "(4) Exactly ONE selling paragraph — last sentence states the seller's most unique "
+            "discriminator; (5) A dedicated paragraph asserts the proposal is COMPLIANT and "
+            "RESPONSIVE; (6) Final paragraph names key managers with point-of-contact info. "
+            "Length target: one page. Cultural and audience adjustments allowed but format holds."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "entity_name": "Action Caption",
+        "entity_type": "concept",
+        "description": (
+            "Shipley graphics convention: every figure has a Figure Number, a Figure TITLE that "
+            "asserts a BENEFIT (not just describes the image), and a Caption that delivers the "
+            "PROOF. Example from Shipley model doc (p. 315): Figure 2.2-1, title 'Superior Glide "
+            "Ratio', caption 'An 8:1 glide ratio gives the UQ601 longer unpowered range than "
+            "other commercially available ultralights.' Evaluators skim figures first — action "
+            "captions let a graphic sell even when the body text isn't read. Anti-pattern: "
+            "neutral titles like 'System Architecture Diagram' that miss the persuasive moment."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "entity_name": "Proposal Schedule",
+        "entity_type": "concept",
+        "description": (
+            "Time-phased plan working BACKWARD from submission deadline through Gold Team, Red "
+            "Team, draft completion, Pink Team, PDW completion, and kickoff. Standard buffers: "
+            "min 3-5 days from Red Team to submission for action item resolution, min 1 day "
+            "from Gold Team to production lock. Identifies critical path activities (graphics "
+            "production, past performance data calls, pricing inputs from teammates) and "
+            "owners. Slipping color team dates is a leading indicator of submission risk — "
+            "Shipley recommends rescheduling the review rather than truncating recovery time."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "entity_name": "Orange Team Review",
+        "entity_type": "concept",
+        "description": (
+            "Optional pre-Pink solution review used when the technical or management approach "
+            "is novel or risky. Reviews the PROPOSED SOLUTION (architecture, staffing model, "
+            "transition plan) against customer hot buttons and competitive landscape BEFORE "
+            "the team commits to writing. Questions: Is the solution win-able? Is it "
+            "executable at proposed price? Does it discriminate? Often run by capture team "
+            "with subject matter experts not on the proposal team. Gate decision: green-light "
+            "the solution baseline or pivot before sunk-cost commitment to writing."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
 ]
 
 
@@ -433,6 +546,107 @@ RELATIONSHIPS = [
         "source_id": SOURCE_ID,
         "file_path": FILE_PATH
     },
+
+    # Proposal artifact relationships (Shipley model documents)
+    {
+        "src_id": "Proposal Planning Phase",
+        "tgt_id": "Proposal Development Worksheet",
+        "description": "Proposal Planning produces a PDW per section before drafting",
+        "keywords": "PRODUCES REQUIRES",
+        "weight": 0.9,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Annotated Outline",
+        "tgt_id": "Proposal Development Worksheet",
+        "description": "Annotated Outline drives PDW content for each section",
+        "keywords": "INFORMS PRECEDES",
+        "weight": 0.85,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Proposal Development Worksheet",
+        "tgt_id": "Storyboard Content Plan",
+        "description": "PDW outputs roll up into per-section Storyboard Content Plans",
+        "keywords": "FEEDS PRECEDES",
+        "weight": 0.8,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Pink Team Review",
+        "tgt_id": "Storyboard Content Plan",
+        "description": "Pink Team reviews Storyboard Content Plans for compliance",
+        "keywords": "VALIDATES REVIEWS",
+        "weight": 0.85,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Executive Summary Writing Rules",
+        "tgt_id": "Win Theme Development",
+        "description": "Exec Summary opens with customer-first theme — applies Win Theme rules",
+        "keywords": "USES APPLIES",
+        "weight": 0.85,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Government Cover Letter Structure",
+        "tgt_id": "Compliance Matrix",
+        "description": "Cover letter compliance/responsiveness paragraph references the Compliance Matrix",
+        "keywords": "REFERENCES SUPPORTS",
+        "weight": 0.75,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Action Caption",
+        "tgt_id": "Proposal Development Worksheet",
+        "description": "PDW Key Visuals section requires Action Captions for every figure",
+        "keywords": "REQUIRES USED_IN",
+        "weight": 0.85,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Proposal Planning Phase",
+        "tgt_id": "Proposal Schedule",
+        "description": "Proposal Planning produces the time-phased Proposal Schedule",
+        "keywords": "PRODUCES CREATES",
+        "weight": 0.9,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Proposal Schedule",
+        "tgt_id": "Color Team Reviews",
+        "description": "Proposal Schedule sequences Color Team Review milestones",
+        "keywords": "SEQUENCES CONTAINS",
+        "weight": 0.85,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Capture Planning Phase",
+        "tgt_id": "Orange Team Review",
+        "description": "Capture Planning may run Orange Team to vet solution before commit",
+        "keywords": "USES OPTIONAL",
+        "weight": 0.7,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Orange Team Review",
+        "tgt_id": "Pink Team Review",
+        "description": "Orange Team precedes Pink Team — solution baseline before compliance review",
+        "keywords": "PRECEDES SEQUENCE",
+        "weight": 0.75,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
 ]
 
 
@@ -491,6 +705,59 @@ CHUNKS = [
             "to capture team. (5) Identify ghosting opportunities and discriminator "
             "emphasis areas. Update Black Hat analysis when new intelligence emerges. "
             "Use findings to refine price-to-win and solution differentiation."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "content": (
+            "Government Executive Summary Pattern (annotated from Shipley Proposal Guide "
+            "model document 4, p. 309): Open the lead theme with the CUSTOMER NAME first "
+            "to establish customer focus, then immediately link a broad benefit to the "
+            "seller's MOST UNIQUE DISCRIMINATOR — discriminators are often invisible to "
+            "less-knowledgeable evaluators and must be made obvious. State the customer NEED "
+            "verbatim from the RFP. Frame the CHALLENGE as both current position AND future "
+            "requirement. List required capabilities word-for-word from the RFP — this lets "
+            "the evaluator confirm compliance at a glance. Anti-pattern: opening with seller "
+            "history or 'company overview' content. The Executive Summary is read FIRST and "
+            "scored heavily, even when it is written LAST."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "content": (
+            "Government Cover Letter Template (annotated from Shipley Proposal Guide model "
+            "document 7, p. 312 — formally solicited proposal): Subject line MUST start with "
+            "signal word 'Proposal' followed by solicitation number and date for buyer sorting. "
+            "Opening sentence is a short setup — not a long preamble. SECOND paragraph states "
+            "the customer's evaluation criteria/objectives so the third paragraph reads as "
+            "directly relevant. Limit to ONE selling paragraph; its LAST sentence must state "
+            "the seller's most unique discriminator. Dedicate one paragraph to asserting the "
+            "proposal is COMPLIANT and RESPONSIVE. Final paragraph names key managers with "
+            "POC details. Target one page. Anti-pattern: padding with company history, "
+            "multiple selling paragraphs, or omitting the compliance/responsiveness assertion."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "content": (
+            "Proposal Development Worksheet (PDW) workflow (annotated from Shipley Proposal "
+            "Guide model document, pp. 314-316): For each section, the author completes — "
+            "BEFORE drafting prose — a one-page worksheet with: (1) SECTION OUTLINE mapped "
+            "to RFP requirements (e.g., 2.2 Performance → 2.2.1 Flight Control, 2.2.2 "
+            "Aerodynamic Stability, 2.2.3 Glider Capability); (2) RELEVANT VOLUME STRATEGIES "
+            "(which capture-derived themes apply, e.g., 'Emphasize proven 20-year performance "
+            "and extensive testing'); (3) MAJOR ISSUES describing the customer pain solved "
+            "(e.g., 'Easy to use; positive stability for self-corrective flying enhancing "
+            "training; high glide ratio for extended range and quiet operation'); (4) KEY "
+            "VISUALS with Action Caption pattern — Figure Number, Figure TITLE that asserts "
+            "a benefit (e.g., 'Superior Glide Ratio'), and caption delivering the proof "
+            "('An 8:1 glide ratio gives the UQ601 longer unpowered range than other "
+            "commercially available ultralights'). PDWs feed Pink Team review and become "
+            "the source of truth for prose drafting. Skipping the PDW stage is a leading "
+            "indicator of non-compliant first drafts and ballooning Red Team action items."
         ),
         "source_id": SOURCE_ID,
         "file_path": FILE_PATH

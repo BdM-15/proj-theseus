@@ -13,8 +13,9 @@ Module Categories:
 - workload.py: BOE formulas, staffing ratios
 - capture.py: Bid/No-Bid, Win Themes, Discriminators
 - lessons_learned.py: 20+ years domain expertise
+- company_capabilities.py: Company-specific service lines, platforms, past performance, discriminators
 
-Entity types align with schema.py (18 govcon types) for seamless merging.
+Entity types align with schema.py (33 govcon types) for seamless merging.
 """
 
 from src.ontology.knowledge.shipley import ENTITIES as SHIPLEY_ENTITIES
@@ -41,6 +42,10 @@ from src.ontology.knowledge.lessons_learned import ENTITIES as LESSONS_ENTITIES
 from src.ontology.knowledge.lessons_learned import RELATIONSHIPS as LESSONS_RELATIONSHIPS
 from src.ontology.knowledge.lessons_learned import CHUNKS as LESSONS_CHUNKS
 
+from src.ontology.knowledge.company_capabilities import ENTITIES as COMPANY_ENTITIES
+from src.ontology.knowledge.company_capabilities import RELATIONSHIPS as COMPANY_RELATIONSHIPS
+from src.ontology.knowledge.company_capabilities import CHUNKS as COMPANY_CHUNKS
+
 __all__ = [
     # Shipley
     "SHIPLEY_ENTITIES", "SHIPLEY_RELATIONSHIPS", "SHIPLEY_CHUNKS",
@@ -54,4 +59,6 @@ __all__ = [
     "CAPTURE_ENTITIES", "CAPTURE_RELATIONSHIPS", "CAPTURE_CHUNKS",
     # Lessons Learned
     "LESSONS_ENTITIES", "LESSONS_RELATIONSHIPS", "LESSONS_CHUNKS",
+    # Company Capabilities
+    "COMPANY_ENTITIES", "COMPANY_RELATIONSHIPS", "COMPANY_CHUNKS",
 ]
