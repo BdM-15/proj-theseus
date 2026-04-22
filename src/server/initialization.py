@@ -298,7 +298,13 @@ async def initialize_raganything():
     # Build lightrag_kwargs with configuration
     # LLM timeout configuration for complex chunks (360s default was insufficient for chunk 8)
     llm_timeout = settings.llm_timeout
-    
+
+    # Import the GovCon chunking function (non-invasive doc-type classifier + banner
+    # injection). LightRAG's API server constructs LightRAG without passing
+    # chunking_func, so setting global_args.chunking_func has no effect — we must
+    # inject it via lightrag_kwargs. See src/extraction/govcon_chunking.py.
+    from src.extraction.govcon_chunking import govcon_chunking_func
+
     lightrag_kwargs = {
         "addon_params": {
             "entity_types": entity_types,
@@ -310,6 +316,7 @@ async def initialize_raganything():
         # - CHUNK_SIZE controls chunk_token_size (default: 4096)
         # - CHUNK_OVERLAP_SIZE controls chunk_overlap_token_size (default: 600)
         # LightRAG reads these at dataclass field initialization time
+        "chunking_func": govcon_chunking_func,
         
         # LLM timeout: default 180s causes Worker timeout (2×=360s) failures on complex chunks
         # Increased to 600s (10 min) to handle extraction from dense requirement tables
@@ -341,6 +348,18 @@ async def initialize_raganything():
         error_msg = result.get("error", "Unknown error")
         logger.error(f"Failed to initialize LightRAG: {error_msg}")
         raise RuntimeError(f"LightRAG initialization failed: {error_msg}")
+
+    # Verify the GovCon chunking_func actually landed on the LightRAG instance
+    active_chunker = getattr(_rag_anything.lightrag, "chunking_func", None)
+    chunker_name = getattr(active_chunker, "__name__", repr(active_chunker))
+    if chunker_name == "govcon_chunking_func":
+        logger.info("✅ GovCon chunking_func registered on LightRAG instance (banner injection active)")
+    else:
+        logger.warning(
+            "⚠️  Active chunking_func is '%s' (expected 'govcon_chunking_func'). "
+            "Doc-type banners will NOT be injected.",
+            chunker_name,
+        )
     
     # ═══════════════════════════════════════════════════════════════════════════════
     # Register GovConProcessingCallback with RAG-Anything's callback system

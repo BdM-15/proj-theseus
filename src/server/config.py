@@ -186,11 +186,11 @@ def configure_raganything_args():
     # - 8K chunks = multiple focused extraction passes = comprehensive coverage
     # - Embeddings auto-truncate to model limits via EmbeddingFunc.max_token_size
     #
-    # govcon_chunking_func wraps LightRAG's native chunking_by_token_size and
-    # prepends a [GOVCON_DOC: type=...; note=...] banner to each chunk based on
-    # filename echoes and structural signals (templates, solicitations, PWS,
-    # CDRL exhibits). Non-invasive — uses the documented chunking_func seam,
-    # no library patches. See src/extraction/govcon_chunking.py.
+    # NOTE: global_args.chunking_func is NOT consumed by lightrag.api.lightrag_server
+    # — the API constructs LightRAG without forwarding this attribute. The actual
+    # registration of govcon_chunking_func happens in src/server/initialization.py
+    # via lightrag_kwargs={"chunking_func": govcon_chunking_func}. We set the
+    # attribute here only for completeness / future LightRAG API support.
     global_args.chunking_func = govcon_chunking_func
     
     # Validate required chunking settings (centralized validation)

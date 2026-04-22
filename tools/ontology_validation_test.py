@@ -1,13 +1,15 @@
 """
-Ontology usefulness smoke test for workspace afcapv_bos_i_t11.
+Ontology usefulness smoke test.
 
 Runs a spread of queries that each exercise a different ontology surface
 and writes answers + signal-scan results to a markdown report.
+Workspace is read from the WORKSPACE env var (default: afcapv_bos_i_t11).
 """
 from dotenv import load_dotenv
 load_dotenv()
 
 import json
+import os
 import re
 import sys
 import time
@@ -16,7 +18,8 @@ from pathlib import Path
 import requests
 
 BASE = "http://localhost:9621"
-OUT = Path("tools/ontology_validation_report.md")
+WORKSPACE = os.environ.get("WORKSPACE", "afcapv_bos_i_t11")
+OUT = Path(f"tools/ontology_validation_report_{WORKSPACE}.md")
 
 QUERIES = [
     {
@@ -169,7 +172,7 @@ def post_query(query: str, mode: str, timeout: int = 180) -> dict:
 
 
 def main():
-    print(f"Running {len(QUERIES)} queries against {BASE} (workspace afcapv_bos_i_t11)...\n")
+    print(f"Running {len(QUERIES)} queries against {BASE} (workspace {WORKSPACE})...\n")
     results = []
     for q in QUERIES:
         print(f"[{q['id']}] ({q['mode']}) ... ", end="", flush=True)
@@ -185,7 +188,7 @@ def main():
     # Write markdown report
     OUT.parent.mkdir(exist_ok=True, parents=True)
     with OUT.open("w", encoding="utf-8") as f:
-        f.write("# Ontology Validation Report — afcapv_bos_i_t11\n\n")
+        f.write(f"# Ontology Validation Report — {WORKSPACE}\n\n")
         f.write(f"Queries: {len(QUERIES)}  |  Endpoint: {BASE}\n\n")
         f.write("## Signal Summary\n\n")
         f.write("| ID | Mode | Targets | Time | Len | Shipley | Reg | Mentor | Quant | Scope | Benefit | Halluc |\n")
