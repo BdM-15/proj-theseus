@@ -51,6 +51,15 @@ from src.inference.neo4j_graph_io import Neo4jGraphIO
 # ═══════════════════════════════════════════════════════════════════════════════
 
 SYSTEM_LABELS = {"__Entity__", "__Relation__", "__Community__", "base", "DELETED"}
+
+# Labels emitted by LightRAG/RAGAnything that look like workspaces but aren't.
+#   - ``UNKNOWN``        : fallback when entity_type extraction fails
+#   - ``table`` ``image`` ``equation`` ``list`` ``figure``: multimodal
+#     source-tag labels stamped on nodes derived from MinerU table/image/etc.
+#     content. They co-exist with the real workspace label on the same node.
+# Anything starting with ``#`` is also treated as a marker label (legacy
+# LightRAG concept-marker convention).
+_NON_WORKSPACE_LABELS = {"UNKNOWN", "table", "image", "equation", "list", "figure"}
 HEX_SUFFIX = re.compile(r"_[0-9a-f]{8}$", re.IGNORECASE)
 
 DIVIDER = "─" * 70
@@ -124,6 +133,8 @@ def _neo4j_workspaces(neo4j_io: Neo4jGraphIO) -> dict[str, int]:
             if label in SYSTEM_LABELS:
                 continue
             if label.lower() in entity_labels:
+                continue
+            if label in _NON_WORKSPACE_LABELS or label.startswith("#"):
                 continue
             rec = session.run(f"MATCH (n:`{label}`) RETURN count(n) as c").single()
             count = rec["c"] if rec else 0
