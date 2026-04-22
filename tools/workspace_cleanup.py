@@ -50,7 +50,7 @@ from src.inference.neo4j_graph_io import Neo4jGraphIO
 # Helpers
 # ═══════════════════════════════════════════════════════════════════════════════
 
-SYSTEM_LABELS = {"__Entity__", "__Relation__", "__Community__"}
+SYSTEM_LABELS = {"__Entity__", "__Relation__", "__Community__", "base", "DELETED"}
 HEX_SUFFIX = re.compile(r"_[0-9a-f]{8}$", re.IGNORECASE)
 
 DIVIDER = "─" * 70
@@ -77,9 +77,41 @@ def _folder_size_mb(path: Path) -> float:
     return round(total / 1024 / 1024, 1)
 
 
+def _entity_type_labels(session) -> set[str]:
+    """Return set of label names that are actually entity types, not workspaces.
+
+    LightRAG/RAGAnything writes nodes with multiple labels: at least one
+    workspace label + one entity-type label (e.g. ``concept``, ``document``).
+    Entity-type labels mirror the value stored in each node's ``entity_type``
+    property. Without filtering, ``CALL db.labels()`` returns both kinds and
+    the cleanup tool mistakes entity types for workspaces.
+    """
+    rec = session.run(
+        "MATCH (n) WHERE n.entity_type IS NOT NULL "
+        "RETURN collect(DISTINCT toLower(n.entity_type)) as types"
+    ).single()
+    types = set(rec["types"] if rec else [])
+    # Also include the canonical schema set so empty-DB / partial-state cases
+    # still hide entity-type labels reliably.
+    try:
+        from src.ontology.schema import VALID_ENTITY_TYPES  # type: ignore
+        types |= {t.lower() for t in VALID_ENTITY_TYPES}
+    except Exception:
+        pass
+    return types
+
+
 def _neo4j_workspaces(neo4j_io: Neo4jGraphIO) -> dict[str, int]:
-    """Return {workspace_label: node_count} for all non-system labels."""
+    """Return {workspace_label: node_count} for true workspace labels only.
+
+    Excludes:
+      - LightRAG system labels (``__Entity__`` etc.)
+      - Entity-type labels (``concept``, ``document``, …) — see
+        :func:`_entity_type_labels`.
+    """
     with neo4j_io.driver.session(database=neo4j_io.database) as session:
+        entity_labels = _entity_type_labels(session)
+
         result = session.run("CALL db.labels() YIELD label RETURN collect(label) as labels")
         record = result.single()
         labels = record["labels"] if record else []
@@ -87,6 +119,8 @@ def _neo4j_workspaces(neo4j_io: Neo4jGraphIO) -> dict[str, int]:
         counts: dict[str, int] = {}
         for label in labels:
             if label in SYSTEM_LABELS:
+                continue
+            if label.lower() in entity_labels:
                 continue
             rec = session.run(f"MATCH (n:`{label}`) RETURN count(n) as c").single()
             count = rec["c"] if rec else 0
