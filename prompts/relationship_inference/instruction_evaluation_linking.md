@@ -448,15 +448,16 @@ The bootstrapped methodology ontology (`src/ontology/knowledge/`) ships a pre-po
 Shipley proposal mechanics, evaluation mechanics, regulations, workload/pricing patterns, lessons
 learned, and company capabilities. When an RFP is processed, these evergreen entities are valid
 link targets for RFP-extracted entities — this is how domain knowledge is made available to the
-Phase 3-6 proposal mentor.
+Phase 4-6 proposal mentor.
 
 ### Theseus Scope Contract
 
-**Theseus is a Shipley Phase 3-6 system** (Proposal Planning → Development → Review →
-Submission), activated when an RFP drops. The Shipley Thread must keep mentor responses focused
-on **writing a compelling and compliant proposal**, not re-opening bid-qualification decisions.
+**Theseus is a Shipley Phase 4-6 system** (Proposal Planning → Proposal Development →
+Post-Submittal Activities), activated AFTER the Final RFP is received and the Bid Validation
+Decision is made. The Shipley Thread must keep mentor responses focused on **writing a
+compelling and compliant proposal**, not re-opening bid-qualification decisions.
 
-### Eligible Link Targets (Phase 3-6 — DEFAULT)
+### Eligible Link Targets (Phase 4-6 — DEFAULT)
 
 When the inference runs over a processed RFP, the following methodology entity groups are
 **valid targets** for RFP entities (`customer_priority`, `pain_point`, `evaluation_factor`,
@@ -471,13 +472,13 @@ When the inference runs over a processed RFP, the following methodology entity g
 | `lessons_learned` | `lessons_learned.py` | Anti-patterns, **Explicit Benefit Linkage Rule**, agency tendencies, GAO protest patterns, Q&A strategy |
 | `company_capabilities` | `company_capabilities.py` | KBR capabilities, platforms, past performance, cleared workforce, compliance artifacts (proof-point sourcing) |
 
-### Excluded Link Targets (Phase 0-2 — DO NOT LINK BY DEFAULT)
+### Excluded Link Targets (Phase 0-3 — DO NOT LINK BY DEFAULT)
 
 Entities in `capture.py` describe **pre-RFP capture-phase activities** (Bid/No-Bid,
 Pwin Assessment, Opportunity Shaping, Customer Call Planning, Teaming Strategy,
-Competitive Intelligence Sources, Price-to-Win, Capture Plan Development, Win/Loss Analysis,
-and the broader Gate Review Process). These are **Phase 0-2 inputs** to the proposal, not
-Phase 3-6 guidance topics.
+Competitive Intelligence Sources, Price-to-Win, Capture/Opportunity Planning, Win/Loss Analysis,
+and the broader Gate Review Process). These are **Phase 0-3 inputs** to the proposal, not
+Phase 4-6 guidance topics.
 
 **Rule:** Do NOT create default inference links from RFP-extracted entities to `capture.py`
 methodology entities. Exceptions (require explicit signal in the RFP text):
@@ -514,8 +515,8 @@ Use these canonical relationship types from `src/ontology/schema.py`:
 - ❌ Linking an RFP `clause` to `capture.py` `Bid No-Bid Decision Framework` — the decision
   is already made
 - ✅ Linking an RFP `customer_priority` to a `shipley` `Discriminator` entity + a
-  `company_capabilities` proof point — this is exactly the Phase 3-6 win-theme construction the
+  `company_capabilities` proof point — this is exactly the Phase 4-6 win-theme construction the
   mentor should enable
 - ✅ Linking an RFP `clause` containing "Section 889" to `regulations.py` `Section 889
-  Prohibition` — regulatory compliance is Phase 3-6 relevant
+  Prohibition` — regulatory compliance is Phase 4-6 relevant
 

@@ -126,7 +126,7 @@ SIGNALS = {
         r"\breduce[ds]?\s+(by\s+)?[0-9]",
     ],
     "scope_enforcement": [
-        r"(out of scope|outside.*scope|not.*theseus|phase [0-2]|capture phase|pre-RFP|pre-rfp)",
+        r"(out of scope|outside.*scope|not.*theseus|phase [0-3]|capture phase|pre-RFP|pre-rfp)",
         r"(bid.?no.?bid|P\.?win|competitive intel)",
     ],
     "explicit_benefit_rule": [

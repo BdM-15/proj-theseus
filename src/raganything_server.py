@@ -124,7 +124,7 @@ async def main():
     device_color = c.GREEN if device == "CUDA" else c.YELLOW
 
     # Knowledge ontology modules stacked for query enrichment
-    # Scope: Shipley Phase 3-6 (Proposal Planning → Development → Review → Submission)
+    # Scope: Shipley Phase 4-6 (Proposal Planning → Proposal Development → Post-Submittal Activities)
     kg_modules = [
         ("Shipley Methodology",   "proposal mechanics · writing craft · color teams"),
         ("Evaluation",            "Section M · SSEB · source-selection mechanics"),
@@ -132,7 +132,7 @@ async def main():
         ("Workload & Pricing",    "BOE · indirect rates · pricing discipline"),
         ("Lessons Learned",       "anti-patterns · explicit benefit linkage rule"),
         ("Company Capabilities",  "KBR platforms · proof points · past performance"),
-        ("Capture (Phase 0-2)",   "pre-RFP terminology · upstream reference only"),
+        ("Capture (Phase 0-3)",   "pre-RFP terminology · upstream reference only"),
     ]
 
     startup_items = [
@@ -162,7 +162,7 @@ async def main():
         (f"  {c.MAGENTA}▸{c.RESET} {name}", f"{c.DIM}{desc}{c.RESET}")
         for name, desc in kg_modules
     ] + [
-        ("Scope", f"{c.DIM}Shipley Phase 3-6 — Proposal Planning → Development → Review → Submission{c.RESET}"),
+        ("Scope", f"{c.DIM}Shipley Phase 4-6 — Proposal Planning → Proposal Development → Post-Submittal Activities{c.RESET}"),
         ("", ""),
         # ── Endpoints ────────────────────────────────────────────────────────────
         ("WebUI",        f"{c.BLUE}http://{host}:{port}/webui{c.RESET}"),
