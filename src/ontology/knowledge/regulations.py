@@ -212,6 +212,124 @@ ENTITIES = [
         "source_id": SOURCE_ID,
         "file_path": FILE_PATH
     },
+
+    # -------------------------------------------------------------------------
+    # High-Impact Regulatory References (Common Deficiency Traps)
+    # -------------------------------------------------------------------------
+    {
+        "entity_name": "FAR Part 16 Contract Type Selection",
+        "entity_type": "regulatory_reference",
+        "description": (
+            "FAR Part 16 defines contract types and selection criteria. Major categories: "
+            "FIXED-PRICE (FFP — contractor bears all cost risk; FPIF — incentive; FP-LOE — "
+            "level of effort); COST-REIMBURSEMENT (CPFF — cost plus fixed fee; CPIF — incentive; "
+            "CPAF — award fee, often DoD sustainment); TIME-AND-MATERIALS / LABOR-HOUR (T&M, "
+            "LH — ceiling price, billed at fixed hourly rates, per FAR 16.601); IDIQ / MATOC "
+            "(FAR 16.5 — task/delivery order vehicles with base + option period ceilings). "
+            "Proposal implications: cost-realism analysis applies to cost-type and T&M (FAR "
+            "15.404-1(d)); FFP forces the contractor to price risk fully; award-fee contracts "
+            "require demonstrating management approach to earn fee. Misreading contract type "
+            "causes pricing errors that are often fatal to cost realism or price-reasonableness."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "entity_name": "Section 889 Prohibition",
+        "entity_type": "regulatory_reference",
+        "description": (
+            "Section 889(a)(1)(A) and (a)(1)(B) of the FY2019 NDAA (Pub. L. 115-232), "
+            "implemented via FAR 52.204-25, prohibits federal agencies from procuring or "
+            "using covered telecommunications equipment or services from Huawei, ZTE, "
+            "Hytera, Hikvision, Dahua, or their subsidiaries/affiliates — AND from "
+            "contracting with entities that USE such equipment/services anywhere in the "
+            "business. Proposal implications: offeror must represent (FAR 52.204-26) "
+            "whether it does or does not use covered equipment; a 'does' answer without "
+            "waiver is disqualifying. Flow-down required to subcontractors. Common trap: "
+            "overlooked IP cameras, VoIP phones, or video-conferencing gear at a minor "
+            "office location causes the entire representation to fail. Pre-bid supply "
+            "chain audit is the only safe way to sign the rep."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "entity_name": "Section 508 Accessibility Requirements",
+        "entity_type": "regulatory_reference",
+        "description": (
+            "Section 508 of the Rehabilitation Act (29 U.S.C. 794d), implemented via FAR "
+            "39.2 and the Revised 508 Standards (36 CFR Part 1194), requires that electronic "
+            "and information technology (EIT) developed, procured, maintained, or used by "
+            "federal agencies be accessible to people with disabilities. Applies to software, "
+            "web content, documents, multimedia, hardware. Proposal implications: solicitations "
+            "commonly require an Accessibility Conformance Report (ACR) using the VPAT "
+            "(Voluntary Product Accessibility Template); deliverables must meet WCAG 2.0 AA "
+            "success criteria as incorporated. Non-conformance is a material defect. Strategy: "
+            "name testing tools (axe, JAWS, NVDA), name accessibility SMEs, and commit to "
+            "a remediation approach for any gaps. Frequently scored yet frequently ignored."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "entity_name": "FAR 15 505 15 506 Debrief Rights",
+        "entity_type": "regulatory_reference",
+        "description": (
+            "FAR 15.505 (pre-award debriefs for offerors eliminated from competitive range) "
+            "and FAR 15.506 (post-award debriefs for unsuccessful offerors) grant losing "
+            "offerors the right to a debrief upon written request within specified windows: "
+            "pre-award debrief must be requested in writing within 3 days of elimination "
+            "notice; post-award debrief within 3 days of award notice. Content includes "
+            "overall evaluation, significant weaknesses/deficiencies, ratings, overall "
+            "ranking, and rationale. Critically: timely debrief request preserves the GAO "
+            "bid-protest clock (protest must be filed within 5 days of debrief or 10 days "
+            "of award, whichever is later, per 4 CFR 21.2). DoD offers enhanced debriefs "
+            "under 10 U.S.C. 2305 allowing written follow-up questions within 2 business "
+            "days. Missing the 3-day window forfeits both debrief and timely-protest rights."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "entity_name": "NAICS Code and Size Standard Strategy",
+        "entity_type": "concept",
+        "description": (
+            "The solicitation's NAICS code determines the applicable SBA size standard and "
+            "therefore who is 'small' for set-aside purposes (13 CFR 121). Offerors may "
+            "CHALLENGE the CO's NAICS designation within 10 days of solicitation issuance "
+            "via SBA OHA appeal (13 CFR 121.1103) — an under-sized NAICS on an unrestricted "
+            "competition can open a set-aside; an over-sized NAICS on a set-aside can keep "
+            "a mid-size firm eligible. Size status is determined as of the date of INITIAL "
+            "offer including price, not at award. Ostensible-subcontractor rule (13 CFR "
+            "121.103(h)(4)) treats the prime as affiliated with a sub if the sub performs "
+            "'primary and vital' work or the prime is 'unduly reliant' — common protest "
+            "ground. Strategy: confirm NAICS, confirm size, document primary-and-vital work "
+            "stays with the prime, and consider a timely NAICS appeal when wrongly designated."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "entity_name": "Proprietary Data Rights and Markings",
+        "entity_type": "concept",
+        "description": (
+            "Federal contractors deliver data and software with specific government use "
+            "rights determined by funding source and markings. Civilian (FAR 52.227-14 "
+            "Rights in Data — General) default to UNLIMITED RIGHTS unless the contractor "
+            "identifies and marks LIMITED RIGHTS DATA (developed at private expense) or "
+            "RESTRICTED COMPUTER SOFTWARE. Defense (DFARS 252.227-7013 technical data, "
+            "252.227-7014 software) distinguish UNLIMITED, GOVERNMENT PURPOSE, LIMITED/"
+            "RESTRICTED, and SBIR rights based on funding. Proposal implications: the "
+            "Assertions table (DFARS 252.227-7017) must be submitted identifying any "
+            "data/software with less than unlimited rights — OMITTING an assertion waives "
+            "the right to restrict. Deliverables must bear the correct legend. Proposal "
+            "strategy: inventory any proprietary IP you plan to use, assert it early, and "
+            "price accordingly. Losing IP rights to the government due to unmarked delivery "
+            "is a recurring and costly mistake for capability-led firms."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
 ]
 
 
@@ -299,6 +417,71 @@ RELATIONSHIPS = [
         "source_id": SOURCE_ID,
         "file_path": FILE_PATH
     },
+
+    # High-impact regulatory reference relationships
+    {
+        "src_id": "FAR Part 16 Contract Type Selection",
+        "tgt_id": "FAR Part 15 Competitive Negotiation",
+        "description": "Contract type selection interacts with Part 15 cost realism and price reasonableness analysis",
+        "keywords": "RELATES_TO INFORMS",
+        "weight": 0.85,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Section 889 Prohibition",
+        "tgt_id": "DFARS Subcontracting Requirements",
+        "description": "Section 889 covered-equipment prohibition flows down to subcontractors",
+        "keywords": "FLOWS_TO APPLIES_TO",
+        "weight": 0.85,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Section 889 Prohibition",
+        "tgt_id": "FAR Compliance Best Practices",
+        "description": "Section 889 representation is a mandatory FAR compliance item",
+        "keywords": "COMPONENT_OF MANDATES",
+        "weight": 0.9,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Section 508 Accessibility Requirements",
+        "tgt_id": "Section L Proposal Instructions Analysis",
+        "description": "Section 508 commonly drives Section L accessibility submission instructions (e.g., VPAT/ACR)",
+        "keywords": "DRIVES INFORMS",
+        "weight": 0.8,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "FAR 15 505 15 506 Debrief Rights",
+        "tgt_id": "FAR Part 15 Competitive Negotiation",
+        "description": "Debrief rights are part of FAR Part 15 competitive negotiation procedures",
+        "keywords": "COMPONENT_OF PART_OF",
+        "weight": 0.9,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "NAICS Code and Size Standard Strategy",
+        "tgt_id": "DFARS Subcontracting Requirements",
+        "description": "NAICS determines size, which gates set-aside eligibility and shapes subcontracting plan requirements",
+        "keywords": "DETERMINES GATES",
+        "weight": 0.85,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Proprietary Data Rights and Markings",
+        "tgt_id": "FAR Compliance Best Practices",
+        "description": "Data-rights assertions and markings are mandatory FAR/DFARS compliance items",
+        "keywords": "COMPONENT_OF MANDATES",
+        "weight": 0.85,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
 ]
 
 
@@ -346,6 +529,47 @@ CHUNKS = [
             "performance history, prepare narrative explaining circumstances and corrective "
             "actions taken, (6) New entrants should emphasize relevant commercial experience "
             "and key personnel credentials. Past performance neutral is better than negative past."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "content": (
+            "Contract Type Quick Reference (FAR Part 16): FIXED-PRICE (FFP, FPIF, FP-LOE) "
+            "— contractor bears cost risk; winning price becomes ceiling. COST-REIMBURSEMENT "
+            "(CPFF, CPIF, CPAF) — government bears cost risk up to ceiling; cost realism "
+            "analysis (FAR 15.404-1(d)) evaluates whether proposed costs are realistic for "
+            "the work; common in R&D, sustainment, and advisory work. TIME-AND-MATERIALS / "
+            "LABOR-HOUR (FAR 16.601) — billed at fixed hourly rates up to a ceiling; used "
+            "when work cannot be estimated with confidence; DoD prefers alternatives. IDIQ "
+            "/ MATOC (FAR 16.5) — umbrella vehicle with task or delivery orders placed "
+            "under it; award the umbrella first, then compete TOs under fair-opportunity "
+            "procedures (FAR 16.505). Pricing strategy differs fundamentally by type: FFP "
+            "requires pricing ALL risk; cost-type requires defending realism; T&M requires "
+            "competitive rates plus credible ODC and travel estimates. Anti-pattern: using "
+            "an FFP-style BOE on a cost-reimbursement bid strips out management reserve and "
+            "understates realism — a frequent cost-realism 'unrealistically low' finding."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "content": (
+            "Common Compliance Traps That Sink Otherwise Strong Proposals: (1) SECTION 889 "
+            "(FAR 52.204-25/-26) — supply-chain audit must confirm no Huawei/ZTE/Hytera/"
+            "Hikvision/Dahua equipment anywhere in the business before the rep is signed; "
+            "overlooked IP cameras or VoIP phones at a minor site disqualify the entire "
+            "offer. (2) SECTION 508 (29 U.S.C. 794d / 36 CFR 1194) — deliverables-based EIT "
+            "must have a VPAT/ACR; omitting accessibility documentation is a material defect "
+            "and often an auto-weakness. (3) NAICS SIZE (13 CFR 121) — challenge within 10 "
+            "days of solicitation if mis-designated; confirm primary-and-vital work stays "
+            "with the prime to avoid ostensible-subcontractor affiliation (13 CFR "
+            "121.103(h)(4)). (4) DATA RIGHTS ASSERTIONS (DFARS 252.227-7017) — any "
+            "proprietary IP must be listed in the Assertions table and marked on delivery "
+            "or the government gets unlimited rights. (5) DEBRIEF DEADLINE (FAR 15.505/"
+            "15.506) — request in writing within 3 days of notice to preserve protest clock "
+            "(4 CFR 21.2). Each of these is binary: comply or lose, with little room for "
+            "narrative recovery."
         ),
         "source_id": SOURCE_ID,
         "file_path": FILE_PATH

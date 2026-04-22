@@ -223,6 +223,110 @@ ENTITIES = [
         "source_id": SOURCE_ID,
         "file_path": FILE_PATH
     },
+
+    # -------------------------------------------------------------------------
+    # Explicit Benefit Linkage (High-Impact Lesson)
+    # -------------------------------------------------------------------------
+    {
+        "entity_name": "Explicit Benefit Linkage Rule",
+        "entity_type": "concept",
+        "description": (
+            "The customer must SEE the connection between every proposed tool, technique, "
+            "platform, process, or approach and a direct, specific benefit to the GOVERNMENT — "
+            "do NOT assume the evaluator will infer it, even when the connection feels obvious "
+            "to the writer. Evaluators read under time pressure, score only what is documented, "
+            "and do not award strengths for benefits they must reconstruct. Anti-pattern: naming "
+            "a tool or capability and stopping there ('We will use KBRain', 'Our team applies "
+            "DevSecOps'). Required pattern: (1) NAME the tool/technique/approach, (2) STATE the "
+            "specific government outcome it produces (time saved, risk reduced, cost avoided, "
+            "mission metric improved), (3) QUANTIFY the benefit where possible, (4) TIE it back "
+            "to a customer pain point, Section M evaluation factor, or PWS objective by name or "
+            "paragraph number. This rule applies to EVERY paragraph introducing a capability, "
+            "every figure, every call-out box, and every win theme sentence."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+
+    # -------------------------------------------------------------------------
+    # Agency / Protest / Q&A / Debrief
+    # -------------------------------------------------------------------------
+    {
+        "entity_name": "Agency-Specific Evaluation Tendencies",
+        "entity_type": "concept",
+        "description": (
+            "Observed agency patterns that shape proposal strategy even when Section M is "
+            "silent: Air Force/DoD sustainment agencies weight transition risk and cleared "
+            "workforce heavily; NASA emphasizes technical rigor, safety, and mission assurance "
+            "narratives; VA and HHS weight small business participation and socioeconomic "
+            "factors more than DoD; DHS/CBP/ICE weight cybersecurity posture and clearance "
+            "holder counts; civilian CIO-office IT buys weight Agile/DevSecOps and cloud-native "
+            "evidence; USSF weights domain-specific SSA/C2 experience over generic IT work. "
+            "These tendencies do NOT override Section M — they influence the EMPHASIS within "
+            "Section M categories. Source: aggregated capture team observations across bids; "
+            "validate each bid with current customer-intimacy data before relying on patterns."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "entity_name": "GAO Protest Risk Patterns",
+        "entity_type": "concept",
+        "description": (
+            "Common grounds on which losing offerors successfully protest awards (and which "
+            "therefore also signal areas where your own proposal must be airtight): "
+            "(1) Unequal treatment — discussions topics raised with one offeror but not others; "
+            "(2) Undisclosed evaluation criteria — SSA relying on considerations not in Section M; "
+            "(3) Unreasonable tradeoff — SSDD rationale not supported by proposal record; "
+            "(4) Flawed cost realism — cost-reimbursement evaluations that ignored obvious "
+            "understaffing; (5) Misevaluation of past performance — ignoring relevant CPARS or "
+            "giving credit for irrelevant work; (6) Organizational Conflict of Interest (OCI) "
+            "not mitigated; (7) Late receipt exceptions mis-applied. Use as a checklist — if "
+            "YOU can identify these defects in a competitor's award, you may have protest "
+            "grounds; conversely, write your own proposal to close these doors for others."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "entity_name": "Debrief Exploitation Strategy",
+        "entity_type": "concept",
+        "description": (
+            "Post-award debriefs (FAR 15.506 for the awardee-post / 15.505 pre-award for "
+            "eliminated offerors) are an underused intelligence source. Rights: unsuccessful "
+            "offeror receives overall evaluation, significant weaknesses/deficiencies in its "
+            "proposal, ratings, overall ranking, and rationale for award. DoD enhanced "
+            "debriefs (10 U.S.C. 2305) allow written follow-up questions within 2 business "
+            "days. Strategy: (1) Request debrief for every loss — data feeds capture library; "
+            "(2) Bring proposal volume leads to hear unfiltered evaluator language; "
+            "(3) Take notes on VERBATIM evaluator phrases — these are the next bid's win "
+            "themes; (4) Preserve protest clock by requesting debrief within 3 days of "
+            "notification; (5) Debrief reveals competitor strengths indirectly — what did "
+            "the winner do that you didn't? Anti-pattern: skipping debriefs on losses because "
+            "'we know why we lost' — almost always you don't."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "entity_name": "RFP Q and A Strategy",
+        "entity_type": "concept",
+        "description": (
+            "Solicitation question-and-answer periods are a strategic tool, not a clarification "
+            "afterthought. Rules: (1) Questions and answers typically go to ALL offerors — do "
+            "NOT telegraph your win strategy; (2) Use questions to resolve genuine ambiguity, "
+            "not to argue for requirement relaxation; (3) Pose questions that, if answered "
+            "favorably, close doors on competitors (e.g., forcing clarification of a clearance "
+            "or certification threshold that only you meet); (4) Watch competitor questions in "
+            "the public Q&A response — they reveal competitor uncertainties and sometimes their "
+            "intended approach; (5) Do NOT ask questions whose answers would help competitors "
+            "understand a discriminator you have; (6) Submit questions early — late Q&A may "
+            "be truncated or unanswered. Prepare Q&A submissions with the same review rigor "
+            "as the proposal itself."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
 ]
 
 
@@ -319,6 +423,73 @@ RELATIONSHIPS = [
         "source_id": SOURCE_ID,
         "file_path": FILE_PATH
     },
+
+    # Explicit Benefit Linkage relationships — this is a cross-cutting rule
+    {
+        "src_id": "Explicit Benefit Linkage Rule",
+        "tgt_id": "Outstanding Rating Reality",
+        "description": "Outstanding ratings require explicit, documented benefit linkage — evaluators do not infer",
+        "keywords": "REQUIRED_FOR SUPPORTS",
+        "weight": 0.95,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Explicit Benefit Linkage Rule",
+        "tgt_id": "Evaluator Perspective Understanding",
+        "description": "Evaluators score only what is documented — explicit linkage serves evaluator reality",
+        "keywords": "INFORMED_BY APPLIES",
+        "weight": 0.9,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+
+    # New lesson relationships
+    {
+        "src_id": "Agency-Specific Evaluation Tendencies",
+        "tgt_id": "Evaluator Perspective Understanding",
+        "description": "Agency tendencies shape how evaluators weight emphasis within Section M",
+        "keywords": "INFLUENCES INFORMED_BY",
+        "weight": 0.8,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "GAO Protest Risk Patterns",
+        "tgt_id": "Common Proposal Disqualification Causes",
+        "description": "Protest grounds overlap with disqualification patterns — both indicate proposal defects",
+        "keywords": "RELATED_TO MIRRORS",
+        "weight": 0.8,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Debrief Exploitation Strategy",
+        "tgt_id": "GAO Protest Risk Patterns",
+        "description": "Debrief preserves protest clock and reveals potential protest grounds",
+        "keywords": "SUPPORTS INFORMS",
+        "weight": 0.85,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "RFP Q and A Strategy",
+        "tgt_id": "Ambiguous Requirement Red Flags",
+        "description": "Q&A period is the primary tool for resolving ambiguous requirement red flags",
+        "keywords": "ADDRESSES RESOLVES",
+        "weight": 0.85,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "RFP Q and A Strategy",
+        "tgt_id": "Hidden Requirement Patterns",
+        "description": "Q&A surfaces hidden requirements before proposal lock",
+        "keywords": "EXPOSES MITIGATES",
+        "weight": 0.8,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
 ]
 
 
@@ -370,6 +541,46 @@ CHUNKS = [
             "Winning strategy as incumbent: Treat recompete like new business opportunity "
             "while leveraging incumbent advantages (mission knowledge, staff continuity, "
             "performance metrics). Never be complacent - hungry challengers are working harder."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "content": (
+            "Explicit Benefit Linkage — The Cardinal Rule: The customer must SEE the connection "
+            "between any proposed tool, technique, platform, process, or approach and a direct "
+            "benefit to the GOVERNMENT. Do not assume the evaluator will make the connection, "
+            "even when it feels obvious. Evaluators read under time pressure and score only "
+            "what is documented. Anti-pattern: 'Our team will use [Tool X] to manage the "
+            "program.' — this states a feature, not a benefit, and earns no strength. Required "
+            "pattern (feature → government outcome → quantified → tied to RFP): 'Our team will "
+            "use [Tool X], which automates [specific PWS task cited by paragraph], reducing "
+            "[customer metric] by [quantified amount] as demonstrated on [named past performance "
+            "reference] — directly addressing Section M factor [N] subfactor [N.N] on "
+            "[evaluation criterion].' Apply this rule to every paragraph introducing a "
+            "capability, every figure and Action Caption, every win theme sentence, every "
+            "call-out box. When in doubt, add one more sentence that names the government "
+            "benefit explicitly. Over-explaining the 'so what' costs you nothing; under-"
+            "explaining costs you the strength, the rating, and often the award."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "content": (
+            "Debrief Intelligence Loop: Losses are capture intelligence assets if debriefs are "
+            "exploited. Workflow after every loss: (1) Request debrief within 3 business days "
+            "of award notice to preserve GAO protest clock (FAR 15.506 post-award, 15.505 "
+            "pre-award); (2) For DoD awards, invoke enhanced debrief rights (10 U.S.C. 2305) "
+            "for written follow-up questions within 2 business days; (3) Bring proposal volume "
+            "leads, not just capture manager, so evaluator language is heard unfiltered by "
+            "the people who wrote the losing prose; (4) Capture VERBATIM evaluator phrases — "
+            "these become win themes for related bids at the same agency; (5) Document any "
+            "hint of unequal treatment, undisclosed criteria, or unreasonable tradeoff for "
+            "protest evaluation; (6) File debrief notes in the capture library tagged by "
+            "agency, vehicle, and program — patterns emerge across 3-5 losses. Skipping "
+            "debriefs because 'we know why we lost' is one of the most expensive habits "
+            "in federal capture — almost always the real reasons differ from the assumed ones."
         ),
         "source_id": SOURCE_ID,
         "file_path": FILE_PATH

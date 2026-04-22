@@ -239,6 +239,130 @@ ENTITIES = [
         "source_id": SOURCE_ID,
         "file_path": FILE_PATH
     },
+
+    # -------------------------------------------------------------------------
+    # Source Selection Process
+    # -------------------------------------------------------------------------
+    {
+        "entity_name": "Source Selection Team Structure",
+        "entity_type": "organization",
+        "description": (
+            "FAR 15.303 source selection organization for negotiated procurements: "
+            "(1) SOURCE SELECTION AUTHORITY (SSA) — single decision-maker who selects the "
+            "winning offer, owns the Source Selection Decision Document (SSDD), and is the "
+            "subject of any GAO protest of the award rationale; (2) SOURCE SELECTION "
+            "ADVISORY COUNCIL (SSAC) — senior advisors providing comparative assessment to "
+            "the SSA, used on larger/complex acquisitions; (3) SOURCE SELECTION EVALUATION "
+            "BOARD (SSEB) — working-level evaluators applying the criteria in Section M, "
+            "documenting strengths/weaknesses/deficiencies, often split into Technical, "
+            "Past Performance, and Cost/Price teams. The Contracting Officer (CO) runs the "
+            "process and signs the award. Proposals must be written for the SSEB (detailed, "
+            "evidence-based) AND for the SSA (clear summaries that justify selection)."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "entity_name": "Competitive Range Determination",
+        "entity_type": "concept",
+        "description": (
+            "Per FAR 15.306(c), after initial evaluation the CO may establish a competitive "
+            "range comprising the most highly rated proposals — others are eliminated from "
+            "the competition without further consideration. CO may further limit the "
+            "competitive range for efficient competition (FAR 15.306(c)(2)). Implication: "
+            "weaknesses or deficiencies that drop the proposal out of the competitive range "
+            "remove the chance to fix them in discussions or FPRs. Conversely, being IN the "
+            "competitive range triggers discussions opportunity. Strategy: write to clear "
+            "the bar to enter the competitive range BEFORE optimizing for highest score."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "entity_name": "Discussions and Final Proposal Revisions",
+        "entity_type": "concept",
+        "description": (
+            "FAR 15.306(d) discussions: meaningful exchanges between government and offerors "
+            "in the competitive range to resolve uncertainties and allow proposal improvement. "
+            "CO must indicate to each offeror its deficiencies, significant weaknesses, and "
+            "adverse past performance information that the offeror has not had a prior "
+            "opportunity to respond to. Offerors then submit Final Proposal Revisions (FPRs) "
+            "by a common cutoff date. Award without discussions allowed (FAR 15.306(a)) — "
+            "RFP will state if government intends to award on initial proposals. Strategy: "
+            "treat the initial proposal as if it were the final — do not bank on discussions."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "entity_name": "Oral Presentations",
+        "entity_type": "concept",
+        "description": (
+            "Per FAR 15.102, agencies may require oral presentations as part of the proposal. "
+            "Often used for: key personnel demonstration, technical approach walkthroughs, "
+            "scenario-based problem-solving exercises, management discussions. Recordings/slides "
+            "become part of the official offer. Common rules: named team members must present "
+            "(no substitutions), time-boxed sections, no Q&A or limited Q&A, no slide updates "
+            "after submission. Strategy: rehearse to time, anchor on win themes and "
+            "discriminators, ensure presenters can speak credibly to past performance specifics. "
+            "Critical for evaluation factors scored on personnel quality or solution depth."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "entity_name": "Relative Importance Language",
+        "entity_type": "concept",
+        "description": (
+            "Section M language signals factor weighting even when numerical weights are not "
+            "stated. Decoder: 'significantly more important than' = ~2x weight; 'more important "
+            "than' = ~1.3-1.5x weight; 'approximately equal to' = same weight; 'when combined, "
+            "non-price factors are significantly more important than price' = best-value "
+            "tradeoff with strong technical preference; 'when combined, approximately equal to "
+            "price' = price will likely decide between technically close offers; 'price is the "
+            "least important factor' does NOT mean price is unimportant — it means technical "
+            "differentiation must be substantial to overcome price delta. Misreading these "
+            "phrases is a top capture-strategy error."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "entity_name": "Small Business Participation Evaluation Factor",
+        "entity_type": "evaluation_factor",
+        "description": (
+            "Common evaluation factor for unrestricted procurements requiring small business "
+            "subcontracting commitments (FAR 19.7, FAR 52.219-9 Small Business Subcontracting "
+            "Plan). Evaluators assess: percentage commitments by socioeconomic category "
+            "(SDB, WOSB, HUBZone, SDVOSB, ANC/Indian Tribes), specificity of subcontracting "
+            "opportunities, named small business teammates with binding commitments, past "
+            "performance meeting prior subcontracting goals. Failing to meet subcontracting "
+            "goals during performance can become Past Performance issues on next bid. "
+            "Strategy: name small business teammates with signed teaming agreements; commit "
+            "to specific scope, not just dollars; cite prior CPARS for subcontracting attainment."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH,
+        "weight": "5-15%",
+        "importance": "Often go/no-go threshold; rarely outcome-determinative on its own"
+    },
+    {
+        "entity_name": "Source Selection Decision Document",
+        "entity_type": "concept",
+        "description": (
+            "FAR 15.308 SSDD — written rationale by the SSA explaining the integrated "
+            "assessment and award decision, including comparative assessment of proposals "
+            "and reasoning for any tradeoff. The SSDD is the primary document GAO reviews "
+            "in a bid protest of the award rationale. Implication for proposal writing: "
+            "make the SSA's job easy — provide clear, quotable benefit statements the SSA "
+            "can paste into the SSDD to justify selecting your higher-priced offer over a "
+            "lower-priced competitor. Generic claims and unquantified benefits force the SSA "
+            "to invent justification, which is protestable. Concrete proof points ARE the "
+            "tradeoff narrative."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
 ]
 
 
@@ -333,6 +457,89 @@ RELATIONSHIPS = [
         "source_id": SOURCE_ID,
         "file_path": FILE_PATH
     },
+
+    # Source selection process relationships
+    {
+        "src_id": "Source Selection Team Structure",
+        "tgt_id": "Source Selection Decision Document",
+        "description": "SSA produces the Source Selection Decision Document",
+        "keywords": "PRODUCES OWNS",
+        "weight": 0.95,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Source Selection Team Structure",
+        "tgt_id": "Competitive Range Determination",
+        "description": "Contracting Officer establishes competitive range during source selection",
+        "keywords": "EXECUTES OWNS",
+        "weight": 0.9,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Competitive Range Determination",
+        "tgt_id": "Discussions and Final Proposal Revisions",
+        "description": "Only offerors in the competitive range receive discussions and submit FPRs",
+        "keywords": "ENABLES PRECEDES",
+        "weight": 0.95,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Evaluation Deficiencies",
+        "tgt_id": "Competitive Range Determination",
+        "description": "Deficiencies risk elimination from the competitive range",
+        "keywords": "RISKS CAUSES",
+        "weight": 0.9,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Discussions and Final Proposal Revisions",
+        "tgt_id": "Evaluation Weaknesses",
+        "description": "Discussions allow correction of weaknesses identified during evaluation",
+        "keywords": "ADDRESSES MITIGATES",
+        "weight": 0.85,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Best Value Tradeoff Methodology",
+        "tgt_id": "Source Selection Decision Document",
+        "description": "Tradeoff analysis is documented in the SSDD",
+        "keywords": "DOCUMENTED_IN PRODUCES",
+        "weight": 0.9,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Relative Importance Language",
+        "tgt_id": "Best Value Tradeoff Methodology",
+        "description": "Section M relative importance language signals tradeoff parameters",
+        "keywords": "SIGNALS DEFINES",
+        "weight": 0.85,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Oral Presentations",
+        "tgt_id": "Technical Approach Evaluation Factor",
+        "description": "Oral presentations frequently evaluate Technical Approach factor depth",
+        "keywords": "EVALUATES SUPPORTS",
+        "weight": 0.8,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "src_id": "Small Business Participation Evaluation Factor",
+        "tgt_id": "Past Performance Evaluation Factor",
+        "description": "Prior subcontracting goal attainment becomes Past Performance evidence",
+        "keywords": "INFORMS RELATES_TO",
+        "weight": 0.75,
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
 ]
 
 
@@ -381,6 +588,58 @@ CHUNKS = [
             "Hybrid approaches possible - some factors LPTA-like (meet threshold) while others "
             "allow tradeoff. Misreading award basis causes strategic errors: over-investing in "
             "LPTA (wasted cost) or under-investing in tradeoff (missed discriminators)."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "content": (
+            "Reading Section M Relative Importance Language: When Section M does not assign "
+            "numerical weights, the wording itself is the weight. Decoder reference: "
+            "'significantly more important than' implies roughly a 2:1 weight ratio; "
+            "'more important than' implies roughly 1.3-1.5:1; 'approximately equal to' is 1:1; "
+            "the bundled phrase 'when combined, non-price factors are significantly more "
+            "important than price' signals a strong best-value tradeoff posture where technical "
+            "superiority can overcome a meaningful price premium; 'when combined, approximately "
+            "equal to price' means price will likely be decisive between technically close "
+            "offers; 'price is the least important factor' does NOT mean price is unimportant. "
+            "Always cross-check the wording against any factor ordering in Section M and the "
+            "presence/absence of an LPTA statement."
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "content": (
+            "Writing for the SSA's Source Selection Decision Document: Per FAR 15.308, the "
+            "Source Selection Authority must produce a written rationale (SSDD) for the award "
+            "decision, including the comparative assessment and tradeoff reasoning. The SSDD "
+            "is the primary document GAO reviews in a protest of the award decision. "
+            "Implication for proposal writing: every claimed strength should give the SSA a "
+            "quotable, evidence-backed sentence she can paste into the SSDD to justify "
+            "selecting your higher-priced offer. Anti-pattern: vague claims ('best-in-class', "
+            "'world-class', 'unparalleled') force the SSA to invent the justification, which "
+            "is protestable. Strong pattern: 'Offeror X's [specific approach] is projected to "
+            "reduce [specific metric] by [quantified amount] based on [cited past performance "
+            "reference], warranting the [dollar amount] price premium.'"
+        ),
+        "source_id": SOURCE_ID,
+        "file_path": FILE_PATH
+    },
+    {
+        "content": (
+            "Source Selection Process Flow (FAR 15.3): (1) Initial proposal evaluation by "
+            "SSEB against Section M factors → strengths, weaknesses, deficiencies, risk "
+            "assessments, ratings; (2) CO establishes COMPETITIVE RANGE of most highly rated "
+            "proposals (FAR 15.306(c)) — others are out; (3) DISCUSSIONS with offerors in the "
+            "competitive range, where CO must surface deficiencies, significant weaknesses, and "
+            "adverse past performance the offeror has not had a chance to address (FAR "
+            "15.306(d)(3)); (4) FINAL PROPOSAL REVISIONS (FPRs) due by common cutoff; "
+            "(5) Final SSEB evaluation; (6) SSAC comparative assessment if used; (7) SSA "
+            "decision documented in the SSDD (FAR 15.308); (8) Award and unsuccessful-offeror "
+            "debriefs (FAR 15.505/15.506). Note: 'award without discussions' is permitted "
+            "under FAR 15.306(a) when the RFP states the government intends to do so — never "
+            "rely on a discussion round to fix a weak initial proposal."
         ),
         "source_id": SOURCE_ID,
         "file_path": FILE_PATH
