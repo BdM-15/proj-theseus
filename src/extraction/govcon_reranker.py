@@ -61,26 +61,27 @@ def _get_reranker() -> Any:
 
 async def govcon_rerank_func(
     query: str,
-    documents: list[dict[str, Any]],
+    documents: list[str],
     top_n: int | None = None,
     **kwargs: Any,
 ) -> list[dict[str, Any]]:
-    """Rerank documents by query-chunk relevance using local BGE cross-encoder.
+    """Rerank document texts by query relevance using local BGE cross-encoder.
 
-    Signature matches LightRAG's `rerank_model_func` contract — see
-    `lightrag/rerank.py` for reference (cohere_rerank, jina_rerank).
+    Signature matches LightRAG's `rerank_model_func` contract — LightRAG
+    pre-extracts chunk text and passes a list of strings, expecting index-based
+    results. See `lightrag/utils.py:apply_rerank_if_enabled` and reference
+    implementations in `lightrag/rerank.py` (cohere_rerank, jina_rerank).
 
     Args:
         query: User query string.
-        documents: List of dicts; each must contain a 'content' key with the chunk text.
-            Other keys are preserved.
-        top_n: If set, return only the top N highest-scoring documents.
+        documents: List of chunk text strings (already extracted by LightRAG).
+        top_n: If set, return only the top N highest-scoring entries.
         **kwargs: Ignored (LightRAG may pass extra context).
 
     Returns:
-        Documents sorted by 'rerank_score' descending. Each dict gets a new
-        'rerank_score' field (float in [0.0, 1.0] when normalize=True).
-        Documents below `min_rerank_score` are filtered out.
+        List of `{"index": int, "relevance_score": float}` dicts sorted by score
+        descending. `index` refers to the position in the input `documents` list.
+        Entries below `min_rerank_score` are filtered out.
     """
     if not documents:
         return []
@@ -89,25 +90,25 @@ async def govcon_rerank_func(
     reranker = _get_reranker()
 
     rerank_start = time.perf_counter()
-    pairs = [(query, doc.get("content", "")) for doc in documents]
+    pairs = [(query, text or "") for text in documents]
     scores = reranker.compute_score(pairs, normalize=True)
     # FlagReranker returns a single float for one pair, list for many — normalize
     if isinstance(scores, float):
         scores = [scores]
 
-    for doc, score in zip(documents, scores):
-        doc["rerank_score"] = float(score)
-
-    # Filter by min score, then sort descending
     min_score = settings.min_rerank_score
-    filtered = [d for d in documents if d["rerank_score"] >= min_score]
-    filtered.sort(key=lambda d: d["rerank_score"], reverse=True)
-    n_filtered = len(documents) - len(filtered)
+    indexed_scores = [
+        {"index": i, "relevance_score": float(s)}
+        for i, s in enumerate(scores)
+        if float(s) >= min_score
+    ]
+    indexed_scores.sort(key=lambda r: r["relevance_score"], reverse=True)
+    n_filtered = len(documents) - len(indexed_scores)
 
     elapsed_ms = (time.perf_counter() - rerank_start) * 1000
-    top_score = filtered[0]["rerank_score"] if filtered else 0.0
-    logger.debug(
-        "Reranked %d chunks in %.0fms | top_score=%.3f | filtered_below_%.2f=%d",
+    top_score = indexed_scores[0]["relevance_score"] if indexed_scores else 0.0
+    logger.info(
+        "🔀 Reranked %d chunks in %.0fms | top_score=%.3f | filtered_below_%.2f=%d",
         len(documents),
         elapsed_ms,
         top_score,
@@ -115,7 +116,7 @@ async def govcon_rerank_func(
         n_filtered,
     )
 
-    return filtered[:top_n] if top_n else filtered
+    return indexed_scores[:top_n] if top_n else indexed_scores
 
 
 def make_govcon_rerank_func() -> Any | None:

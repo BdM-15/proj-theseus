@@ -81,8 +81,36 @@ async def main():
     host = global_args.host
     port = global_args.port
     
+    # Step 3-pre: Monkey-patch LightRAG inside lightrag.api.lightrag_server so that
+    # when create_app() constructs ITS internal LightRAG instance (separate from
+    # RAGAnything's _rag_anything.lightrag), the local BGE reranker is auto-injected.
+    # The stock API server only supports remote rerank bindings (cohere, jina, ali);
+    # this hook adds first-class local FlagReranker support without forking LightRAG.
+    from src.extraction.govcon_reranker import make_govcon_rerank_func
+    _local_rerank = make_govcon_rerank_func()
+    if _local_rerank is not None:
+        import lightrag.api.lightrag_server as _lr_api_mod
+        _OriginalLightRAG = _lr_api_mod.LightRAG
+
+        class _LightRAGWithLocalRerank(_OriginalLightRAG):
+            def __init__(self, *args, **kwargs):
+                if kwargs.get("rerank_model_func") is None:
+                    kwargs["rerank_model_func"] = _local_rerank
+                    logger.info(
+                        "🎯 Auto-injecting local BGE reranker into API server's "
+                        "LightRAG (workspace=%s)",
+                        kwargs.get("workspace", "?"),
+                    )
+                super().__init__(*args, **kwargs)
+
+        _lr_api_mod.LightRAG = _LightRAGWithLocalRerank
+
     # Step 3: Create LightRAG server (WebUI + query endpoints)
     app = create_app(global_args)
+
+    # Restore original class to avoid affecting any later code paths
+    if _local_rerank is not None:
+        _lr_api_mod.LightRAG = _OriginalLightRAG
 
     # Log the effective model configuration the WebUI /query endpoint will use.
     # LightRAG's API server passes `args.llm_model` directly into openai_complete_if_cache(...)
