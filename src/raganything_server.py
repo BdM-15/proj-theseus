@@ -123,6 +123,20 @@ async def main():
     device = settings.mineru_device_mode.upper()
     device_color = c.GREEN if device == "CUDA" else c.YELLOW
 
+    def _format_reranker_line() -> str:
+        """Format the reranker status line for the startup banner."""
+        if not settings.enable_rerank:
+            return f"{c.DIM}disabled{c.RESET}"
+        rd = settings.rerank_device
+        rd_color = c.GREEN if rd.lower() == "cuda" else c.YELLOW
+        fp = "FP16" if settings.rerank_use_fp16 else "FP32"
+        return (
+            f"{c.CYAN}{settings.rerank_model}{c.RESET}  "
+            f"·  Device: {c.BOLD}{rd_color}{rd.upper()}{c.RESET}  "
+            f"·  {c.YELLOW}{fp}{c.RESET}  "
+            f"·  Min Score: {c.DIM}{settings.min_rerank_score}{c.RESET}"
+        )
+
     # Knowledge ontology modules stacked for query enrichment
     # Scope: Shipley Phase 4-6 (Proposal Planning → Proposal Development → Post-Submittal Activities)
     kg_modules = [
@@ -145,6 +159,7 @@ async def main():
         ("Post-Processing", f"{c.YELLOW}{settings.post_processing_llm_name}{c.RESET}"),
         ("Reasoning",       f"{c.MAGENTA}{settings.reasoning_llm_name}{c.RESET}"),
         ("Embeddings",   f"{c.CYAN}{settings.embedding_model}{c.RESET}  {c.DIM}({settings.embedding_dim}D){c.RESET}"),
+        ("Reranker",     _format_reranker_line()),
         ("", ""),
         # ── Stack Versions ───────────────────────────────────────────────────────
         ("LightRAG",     f"{c.DIM}{_ver('lightrag-hku')}{c.RESET}"),

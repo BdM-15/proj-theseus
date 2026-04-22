@@ -305,6 +305,11 @@ async def initialize_raganything():
     # inject it via lightrag_kwargs. See src/extraction/govcon_chunking.py.
     from src.extraction.govcon_chunking import govcon_chunking_func
 
+    # Local BGE reranker (optional — gated by ENABLE_RERANK env var).
+    # Returns None when disabled, in which case LightRAG skips reranking entirely.
+    from src.extraction.govcon_reranker import make_govcon_rerank_func
+    rerank_func = make_govcon_rerank_func()
+
     lightrag_kwargs = {
         "addon_params": {
             "entity_types": entity_types,
@@ -322,6 +327,12 @@ async def initialize_raganything():
         # Increased to 600s (10 min) to handle extraction from dense requirement tables
         "default_llm_timeout": llm_timeout,
     }
+
+    # Wire reranker only if enabled (avoid passing None which LightRAG also accepts,
+    # but keeping kwargs minimal makes intent explicit in logs).
+    if rerank_func is not None:
+        lightrag_kwargs["rerank_model_func"] = rerank_func
+        lightrag_kwargs["min_rerank_score"] = settings.min_rerank_score
     
     # Add Neo4j configuration if enabled (from config.py global_args setup)
     # Note: Neo4j connection details come from environment variables (NEO4J_URI, etc.)
