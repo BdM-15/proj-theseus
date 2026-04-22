@@ -150,6 +150,12 @@ def _pre_split_fixes(line: str) -> str:
     # entity<|#|>Name<|#|#|requirement<|#|>desc  →  entity<|#|>Name<|#|>requirement<|#|>desc
     line = re.sub(r'<\|#\|#\|(\w+(?:_\w+)*)\s*<\|#\|>', r'<|#|>\1<|#|>', line)
 
+    # Pattern 7: Whitespace-interleaved garbage prefix
+    # Observed on Israel run: <|#|>#| >performance_standard<|#|> (space between '|' and '>')
+    # Pattern 5 fails because [^\w\s]+ stops at the embedded space.
+    # Greedily strip any non-word run (allowing whitespace) up to the first snake_case identifier.
+    line = re.sub(r'<\|#\|>[^\w<]+(\w+(?:_\w+)*)\s*<\|#\|>', r'<|#|>\1<|#|>', line)
+
     if line != original:
         _stats.pre_split_fixes += 1
         logger.debug(f"🔧 Pre-split fix applied")
@@ -195,9 +201,11 @@ def create_sanitizing_wrapper(base_llm_func):
                     logger.warning(
                         f"⚠️  TRUNCATED OUTPUT detected: entities present but no relationships "
                         f"and no <|COMPLETE|> marker. Output is {len(sanitized)} chars. "
-                        f"Cause: LLM hit token limit before reaching relationship section. "
-                        f"All relationships from this chunk will be LOST. "
-                        f"Fix: ensure max_tokens is set in LLM call (see initialization.py)."
+                        f"Likely cause: model stopped emitting before completing the relationship "
+                        f"section (complexity ceiling on dense content, NOT a max_tokens issue if "
+                        f"output is well under LLM_MAX_OUTPUT_TOKENS). All relationships from this "
+                        f"chunk will be LOST. Mitigations: enable MAX_GLEANING=1 to recover on a "
+                        f"second pass, or shrink CHUNK_SIZE for denser document types."
                     )
                 elif not has_entity and not has_relation:
                     logger.warning(
