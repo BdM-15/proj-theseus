@@ -417,9 +417,12 @@ def _interactive_delete_one(
             next_key = str(len(options) + 1)
             options.append((next_key, f"⚠️  FULL DELETE: derived data + inputs/ source files  — IRRECOVERABLE  [RECOMMENDED for unusable workspaces]", has_neo4j, has_storage, True))
     elif inp is not None:
-        # Empty inputs folder — offer to remove the dir itself
+        # Empty inputs folder
         next_key = str(len(options) + 1)
         options.append((next_key, f"Remove empty inputs/{workspace_name}/ directory", False, False, True))
+        if has_neo4j or has_storage:
+            next_key = str(len(options) + 1)
+            options.append((next_key, f"FULL DELETE: derived data + empty inputs/ directory  [RECOMMENDED for unusable workspaces]", has_neo4j, has_storage, True))
 
     options.append(("Q", "Cancel", False, False, False))
 
@@ -518,30 +521,47 @@ def _interactive_delete_all(
     print(f"  Storage  : {total_mb} MB across {len(storage_dirs)} workspace folders")
     print(f"  Inputs   : {total_input_files} source file(s), {total_input_mb} MB across {len(inputs_ws)} folders")
     print(f"  {DIVIDER}")
+    has_inputs_files = total_input_files > 0
+    has_inputs_dirs = len(inputs_ws) > 0
+
+    # Build options dynamically so numbering is stable regardless of which
+    # branches are surfaced.
+    # Each entry: (label, del_neo4j, del_storage, del_inputs)
+    options: list[tuple[str, bool, bool, bool]] = []
+    options.append(("Derived data only: Neo4j + rag_storage  — keeps source PDFs (re-processable)", True, True, False))
+    options.append(("Neo4j only", True, False, False))
+    options.append(("rag_storage only", False, True, False))
+    if has_inputs_files:
+        options.append(("⚠️  inputs/ source files only  — IRRECOVERABLE", False, False, True))
+    if has_inputs_dirs or has_inputs_files:
+        if has_inputs_files:
+            full_label = "⚠️  FULL DELETE: Neo4j + rag_storage + inputs/ source files & dirs  — IRRECOVERABLE  [RECOMMENDED for unusable workspaces]"
+        else:
+            full_label = "FULL DELETE: Neo4j + rag_storage + empty inputs/ dirs  [RECOMMENDED for unusable workspaces]"
+        options.append((full_label, True, True, True))
+
     print(f"\n  What would you like to delete?")
-    print(f"    [1]  Derived data only: Neo4j + rag_storage  — keeps source PDFs (re-processable)")
-    print(f"    [2]  Neo4j only")
-    print(f"    [3]  rag_storage only")
-    if total_input_files:
-        print(f"    [4]  ⚠️  inputs/ source files only  — IRRECOVERABLE")
-        print(f"    [5]  ⚠️  FULL DELETE: Neo4j + rag_storage + inputs/ source files  — IRRECOVERABLE  [RECOMMENDED for unusable workspaces]")
+    for idx, (label, _, _, _) in enumerate(options, start=1):
+        print(f"    [{idx}]  {label}")
     print(f"    [Q]  Cancel")
 
-    valid = {"1", "2", "3", "Q"} | ({"4", "5"} if total_input_files else set())
+    valid = {str(i) for i in range(1, len(options) + 1)} | {"Q"}
     ans = input("\n  Choice: ").strip().upper()
     if ans == "Q" or ans not in valid:
         print("\n  ❌ Cancelled\n")
         return
 
-    delete_neo4j = ans in ("1", "2", "5")
-    delete_storage = ans in ("1", "3", "5")
-    delete_inputs = ans in ("4", "5")
+    _, delete_neo4j, delete_storage, delete_inputs = options[int(ans) - 1]
 
     # Double-confirm
     parts = []
     if delete_neo4j: parts.append("Neo4j")
     if delete_storage: parts.append("rag_storage")
-    if delete_inputs: parts.append(f"inputs/ ({total_input_files} source files)")
+    if delete_inputs:
+        if total_input_files:
+            parts.append(f"inputs/ ({total_input_files} source files + {len(inputs_ws)} dirs)")
+        else:
+            parts.append(f"inputs/ ({len(inputs_ws)} empty dirs)")
     print(f"\n  Type DELETE ALL to confirm wiping {', '.join(parts)}: ", end="")
     confirm = input().strip()
     if confirm != "DELETE ALL":
@@ -576,6 +596,14 @@ def _interactive_delete_all(
             f_count, mb = _delete_inputs_workspace(ws_name, inputs_root)
             if f_count:
                 print(f"  ✅ Deleted {f_count} file(s) from inputs/{ws_name}/ ({mb} MB freed)")
+            # Remove the now-empty workspace directory itself
+            ws_path = inputs_root / ws_name
+            try:
+                if ws_path.exists() and ws_path.is_dir() and not any(ws_path.iterdir()):
+                    ws_path.rmdir()
+                    print(f"  ✅ Removed empty inputs/{ws_name}/ directory")
+            except OSError as e:
+                print(f"  ⚠️  Could not remove inputs/{ws_name}/: {e}")
 
     print(f"\n  ✅ Done!\n")
 
