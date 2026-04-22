@@ -17,18 +17,21 @@ RFP-specific capture intelligence comes from document extraction.
 # =============================================================================
 # THESEUS SCOPE CONTRACT
 # =============================================================================
-# Theseus is primarily a Shipley **Phase 3-6** system (Proposal Planning →
-# Development → Review → Submission), activated when an RFP drops.
+# Theseus is a Shipley **Phase 4-6** system (Proposal Planning → Proposal
+# Development → Post-Submittal Activities), activated AFTER the Final RFP is
+# received and the Bid Validation Decision is made.
 #
-# The entities in this module describe **Shipley Phase 0-2** activities
-# (Market Positioning → Opportunity Assessment → Bid/No-Bid → Capture
-# Planning) that PRECEDE the Theseus engagement window.
+# The entities in this module describe **Shipley Phase 0-3** activities
+# (Market Segmentation → Long-Term Positioning → Opportunity Assessment →
+# Capture/Opportunity Planning) that PRECEDE the Theseus engagement window.
+# Phase 3 (Capture/Opportunity Planning) ends at the Bid Validation Decision
+# gate; Phase 4 (Proposal Planning) begins immediately after.
 #
 # Role of these entities when an RFP is active:
 #   1. TERMINOLOGY RECOGNITION — the mentor recognizes "Pwin", "PTW",
 #      "Black Hat", "Capture Plan" when the user references them
 #   2. UPSTREAM INPUT REFERENCE — the Capture Plan is the *source* of
-#      win themes, discriminators, and PTW targets that Phase 3-6
+#      win themes, discriminators, and PTW targets that Phase 4-6
 #      proposal work operationalizes
 #   3. POST-AWARD LEARNING LOOP — Win/Loss Analysis feeds *future*
 #      captures, not the in-flight proposal
@@ -40,7 +43,7 @@ RFP-specific capture intelligence comes from document extraction.
 #   - Suggest protest strategy or debrief prep during drafting.
 #   - Redirect a proposal-writing question into capture strategy.
 #
-# Future scope: A separate evergreen pre-RFP (Phase 0-2) Theseus mode
+# Future scope: A separate evergreen pre-RFP (Phase 0-3) Theseus mode
 # could surface these entities proactively — that is not the current
 # product and is not the default mentor behavior today.
 # =============================================================================
