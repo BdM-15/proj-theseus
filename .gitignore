@@ -133,26 +133,13 @@ deps-backup-*/
 # ============================================================================
 # Project-Specific: Input Documents
 # ============================================================================
-# Uploaded documents (should not be committed - may contain sensitive data)
-inputs/__enqueued__/*.pdf
-inputs/__enqueued__/*.docx
-inputs/__enqueued__/*.doc
-inputs/__enqueued__/*.pptx
-inputs/__enqueued__/*.ppt
-inputs/__enqueued__/*.xlsx
-inputs/__enqueued__/*.xls
-inputs/__enqueued__/*.txt
-inputs/__enqueued__/*.rtf
-inputs/__enqueued__/*.odt
-inputs/__enqueued__/*.html
-inputs/__enqueued__/*.xml
-inputs/__enqueued__/*.json
+# RFP source documents are staged per-workspace under inputs/<workspace>/
+# by both the WebUI upload endpoints and the /scan-rfp filesystem flow.
+# They may contain sensitive/proprietary data — never commit.
+inputs/*/**
+!inputs/.gitkeep
 
-inputs/uploaded/**/*
-!inputs/uploaded/.gitkeep
-
-# Keep directory structure
-!inputs/__enqueued__/.gitkeep
+# Keep empty folders for downstream tooling
 !logs/.gitkeep
 !rag_storage/.gitkeep
 

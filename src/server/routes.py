@@ -19,8 +19,11 @@ import logging
 import tempfile
 import shutil
 import threading
+import uuid
 from datetime import datetime
-from fastapi import UploadFile, File
+from pathlib import Path
+from typing import Optional
+from fastapi import UploadFile, File, BackgroundTasks, Query
 from fastapi.responses import JSONResponse
 from lightrag.api.config import global_args
 from raganything.callbacks import ProcessingCallback
@@ -303,121 +306,362 @@ async def process_document_with_semantic_inference(
         raise
 
 
+# ============================================================================
+# Per-workspace upload staging
+# ============================================================================
+# Both /insert and /documents/upload save originals to inputs/<workspace>/
+# (mirrors the /scan-rfp convention) so files persist for re-processing,
+# audit, and handoff. Identical filename + identical bytes is a no-op;
+# identical filename + different bytes appends a timestamp suffix.
+
+import hashlib
+
+
+def _sanitize_filename(name: str) -> str:
+    """Strip path separators and other unsafe chars from a filename."""
+    return name.replace("/", "_").replace("\\", "_").lstrip(".")
+
+
+def _hash_file(path: Path, chunk_size: int = 65536) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(chunk_size), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+async def _save_upload_to_workspace(
+    file: UploadFile, workspace: Optional[str] = None
+) -> Path:
+    """
+    Persist an uploaded file to inputs/<workspace>/<filename>.
+
+    Collision policy:
+      - Target missing → write directly.
+      - Target exists, identical content → reuse (no rewrite).
+      - Target exists, different content → append _YYYYMMDD_HHMMSS before ext.
+
+    Returns the final on-disk Path.
+    """
+    settings = get_settings()
+    ws = workspace or settings.workspace
+    folder = Path("./inputs") / ws
+    await asyncio.to_thread(folder.mkdir, parents=True, exist_ok=True)
+
+    safe_name = _sanitize_filename(file.filename)
+    target = folder / safe_name
+
+    # Stream to a temp file first so we can compare hashes without holding the
+    # whole upload in memory.
+    tmp_fd, tmp_path = tempfile.mkstemp(prefix="upload_", dir=str(folder))
+    os.close(tmp_fd)
+    tmp = Path(tmp_path)
+    try:
+        with open(tmp, "wb") as f:
+            await asyncio.to_thread(shutil.copyfileobj, file.file, f)
+
+        if target.exists():
+            existing_hash = await asyncio.to_thread(_hash_file, target)
+            new_hash = await asyncio.to_thread(_hash_file, tmp)
+            if existing_hash == new_hash:
+                logger.info(
+                    f"📎 Upload {safe_name} already present in inputs/{ws}/ "
+                    f"(identical content) — reusing existing file."
+                )
+                tmp.unlink(missing_ok=True)
+                return target
+            # Same name, different bytes — keep both with timestamp suffix.
+            stem = target.stem
+            suffix = target.suffix
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            target = folder / f"{stem}_{ts}{suffix}"
+            logger.info(
+                f"📎 Upload {safe_name} collides with existing file in inputs/{ws}/ "
+                f"with different content — saving as {target.name}."
+            )
+
+        await asyncio.to_thread(tmp.replace, target)
+        return target
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
 def create_insert_endpoint(app, rag_instance):
     """
-    Create custom /insert endpoint with automatic semantic post-processing
-    
-    This overrides LightRAG's default /insert to automatically run
-    LLM-powered relationship inference after document extraction.
-    
-    Args:
-        app: FastAPI application instance
-        rag_instance: Initialized RAGAnything instance
+    Create custom /insert endpoint with automatic semantic post-processing.
+
+    Saves the upload to inputs/<workspace>/ (preserving the original) and runs
+    RAG-Anything + LightRAG extraction with LLM-powered relationship inference.
     """
-    
-    async def insert_with_semantic_processing(file: UploadFile = File(...)):
-        """
-        Standard LightRAG insert endpoint with semantic post-processing
-        
-        API clients use this endpoint directly.
-        """
+
+    async def insert_with_semantic_processing(
+        file: UploadFile = File(...),
+        workspace: Optional[str] = Query(
+            None,
+            description="Workspace to save into. Defaults to the server's current workspace.",
+        ),
+    ):
         logger.info(f"🔔 ENDPOINT CALLED: /insert with file: {file.filename}")
-        
+
         await _callback.register_request_start(file.filename)
-        
+
         try:
-            temp_dir = tempfile.gettempdir()
-            safe_filename = file.filename.replace('/', '_').replace('\\', '_')
-            file_path = os.path.join(temp_dir, safe_filename)
-            
-            with open(file_path, 'wb') as f:
-                shutil.copyfileobj(file.file, f)
-            
-            logger.info(f"📄 Processing {file.filename} via /insert endpoint")
-            
-            processing_result = await process_document_with_semantic_inference(
-                file_path, file.filename, rag_instance, rag_instance.llm_model_func
+            file_path = await _save_upload_to_workspace(file, workspace)
+            logger.info(
+                f"📄 Processing {file_path.name} via /insert "
+                f"(saved to {file_path.parent})"
             )
-            
-            logger.info(f"✅ Processing complete for {file.filename}")
-            
-            os.unlink(file_path)
-            
+
+            processing_result = await process_document_with_semantic_inference(
+                str(file_path), file_path.name, rag_instance, rag_instance.llm_model_func
+            )
+
+            logger.info(f"✅ Processing complete for {file_path.name}")
+
             return JSONResponse({
                 "status": "success",
-                "message": f"Document {file.filename} processed successfully",
+                "message": f"Document {file_path.name} processed successfully",
+                "saved_to": str(file_path),
                 "relationships_inferred": processing_result["relationships_inferred"],
-                "method": "RAG-Anything + LLM semantic inference (format-agnostic)"
+                "method": "RAG-Anything + LLM semantic inference (format-agnostic)",
             })
-            
+
         except Exception as e:
             logger.error(f"❌ Error processing document: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
-        
+
         finally:
             await _callback.register_request_end(file.filename)
-    
+
     app.add_api_route(
         "/insert",
         insert_with_semantic_processing,
         methods=["POST"],
-        response_class=JSONResponse
+        response_class=JSONResponse,
     )
 
 
 def create_documents_upload_endpoint(app, rag_instance):
     """
     Override LightRAG's WebUI /documents/upload endpoint to use RAG-Anything.
-    
-    WebUI uses /documents/upload (not /insert), which would bypass
-    RAG-Anything's multimodal processing without this override.
+
+    Saves the upload to inputs/<workspace>/ so the WebUI flow and the
+    /scan-rfp filesystem flow both stage originals in the same place.
     """
-    
-    async def documents_upload_with_raganything(file: UploadFile = File(...)):
-        """WebUI document upload - routes through RAG-Anything for MinerU processing."""
+
+    async def documents_upload_with_raganything(
+        file: UploadFile = File(...),
+        workspace: Optional[str] = Query(
+            None,
+            description="Workspace to save into. Defaults to the server's current workspace.",
+        ),
+    ):
         logger.info(f"🔔 ENDPOINT CALLED: /documents/upload with file: {file.filename}")
-        
+
         await _callback.register_request_start(file.filename)
-        
+
         try:
-            temp_dir = tempfile.gettempdir()
-            safe_filename = file.filename.replace('/', '_').replace('\\', '_')
-            file_path = os.path.join(temp_dir, safe_filename)
-            
-            with open(file_path, 'wb') as f:
-                shutil.copyfileobj(file.file, f)
-            
-            logger.info(f"📄 Processing {file.filename} via WebUI /documents/upload endpoint")
-            
-            processing_result = await process_document_with_semantic_inference(
-                file_path, file.filename, rag_instance, rag_instance.llm_model_func
+            file_path = await _save_upload_to_workspace(file, workspace)
+            logger.info(
+                f"📄 Processing {file_path.name} via WebUI /documents/upload "
+                f"(saved to {file_path.parent})"
             )
-            
-            logger.info(f"✅ Processing complete for {file.filename}")
-            
-            os.unlink(file_path)
-            
+
+            processing_result = await process_document_with_semantic_inference(
+                str(file_path), file_path.name, rag_instance, rag_instance.llm_model_func
+            )
+
+            logger.info(f"✅ Processing complete for {file_path.name}")
+
             return JSONResponse({
                 "status": "success",
-                "message": f"Document {file.filename} processed successfully",
+                "message": f"Document {file_path.name} processed successfully",
+                "saved_to": str(file_path),
                 "relationships_inferred": processing_result.get("relationships_inferred", 0),
-                "method": "RAG-Anything + LLM semantic inference (format-agnostic)"
+                "method": "RAG-Anything + LLM semantic inference (format-agnostic)",
             })
-            
+
         except Exception as e:
             logger.error(f"❌ Error processing document: {e}")
             import traceback
             logger.error(traceback.format_exc())
             return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
-        
+
         finally:
             await _callback.register_request_end(file.filename)
-    
+
     app.add_api_route(
         "/documents/upload",
         documents_upload_with_raganything,
         methods=["POST"],
-        response_class=JSONResponse
+        response_class=JSONResponse,
+    )
+
+
+# ============================================================================
+# /scan-rfp ENDPOINT — Filesystem-based batch ingestion from inputs/<workspace>/
+# ============================================================================
+# Reuses the same `process_document_with_semantic_inference` pipeline as
+# /insert and /documents/upload, so multimodal parsing, callback dispatch,
+# and batch-completion post-processing all behave identically.
+#
+# Convention:
+#   inputs/<workspace>/*.{pdf,docx,...}  ← drop files here
+#   POST /scan-rfp                        ← triggers ingest of new files
+#
+# Idempotent: skips files whose filename already has status="processed"
+# in the workspace's doc_status KV store (mirrors upstream LightRAG /scan).
+
+# Default extensions match RAGAnythingConfig.supported_file_extensions
+_DEFAULT_SCAN_EXTENSIONS = (
+    ".pdf", ".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif", ".gif", ".webp",
+    ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".txt", ".md",
+)
+
+
+def _resolve_scan_folder(workspace: Optional[str]) -> Path:
+    """Resolve the inputs folder for a workspace. Defaults to current settings.workspace."""
+    settings = get_settings()
+    ws = workspace or settings.workspace
+    folder = Path("./inputs") / ws
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder
+
+
+def _list_scannable_files(folder: Path, extensions=_DEFAULT_SCAN_EXTENSIONS) -> list[Path]:
+    """List supported files directly in `folder` (non-recursive)."""
+    files: list[Path] = []
+    for ext in extensions:
+        files.extend(folder.glob(f"*{ext}"))
+        files.extend(folder.glob(f"*{ext.upper()}"))
+    # Dedupe (case-insensitive globs can overlap on case-insensitive filesystems)
+    seen = set()
+    unique: list[Path] = []
+    for p in files:
+        if p.resolve() not in seen:
+            seen.add(p.resolve())
+            unique.append(p)
+    return sorted(unique)
+
+
+async def _filter_already_processed(rag_instance, files: list[Path]) -> tuple[list[Path], list[str]]:
+    """Split files into (to_process, already_processed_names) using doc_status."""
+    to_process: list[Path] = []
+    already: list[str] = []
+    doc_status = rag_instance.lightrag.doc_status
+    for f in files:
+        try:
+            existing = await doc_status.get_doc_by_file_path(f.name)
+        except Exception:
+            existing = None
+        if existing and existing.get("status") == "processed":
+            already.append(f.name)
+        else:
+            to_process.append(f)
+    return to_process, already
+
+
+async def _run_scan(rag_instance, folder: Path, track_id: str):
+    """Background task: process all new files in `folder` sequentially."""
+    try:
+        all_files = _list_scannable_files(folder)
+        if not all_files:
+            logger.info(f"📭 [scan {track_id}] No supported files in {folder}")
+            return
+
+        to_process, already = await _filter_already_processed(rag_instance, all_files)
+        logger.info(
+            f"📂 [scan {track_id}] {folder}: {len(all_files)} found, "
+            f"{len(to_process)} to process, {len(already)} already processed"
+        )
+
+        if not to_process:
+            return
+
+        for file_path in to_process:
+            await _callback.register_request_start(file_path.name)
+            try:
+                logger.info(f"📄 [scan {track_id}] Processing {file_path.name}")
+                await process_document_with_semantic_inference(
+                    str(file_path),
+                    file_path.name,
+                    rag_instance,
+                    rag_instance.llm_model_func,
+                )
+            except Exception as e:
+                logger.error(f"❌ [scan {track_id}] Failed {file_path.name}: {e}")
+            finally:
+                await _callback.register_request_end(file_path.name)
+
+        logger.info(
+            f"✅ [scan {track_id}] Completed — {len(to_process)} files queued. "
+            f"Batch post-processing will run after {get_settings().batch_timeout_seconds}s idle."
+        )
+    except Exception as e:
+        logger.error(f"❌ [scan {track_id}] Scan failed: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+
+
+def create_scan_endpoint(app, rag_instance):
+    """
+    Register POST /scan-rfp — filesystem batch ingest from inputs/<workspace>/.
+
+    Returns immediately with a track_id; processing runs in the background.
+    Reuses the standard upload pipeline so multimodal parsing, batch callbacks,
+    and semantic post-processing all fire normally.
+    """
+
+    async def scan_rfp(
+        background_tasks: BackgroundTasks,
+        workspace: Optional[str] = Query(
+            None,
+            description="Workspace to scan. Defaults to the server's current workspace.",
+        ),
+    ):
+        try:
+            folder = _resolve_scan_folder(workspace)
+            files = _list_scannable_files(folder)
+            track_id = f"scan-{uuid.uuid4().hex[:8]}"
+
+            if not files:
+                return JSONResponse({
+                    "status": "empty",
+                    "track_id": track_id,
+                    "folder": str(folder),
+                    "files_found": 0,
+                    "message": f"No supported files found in {folder}. "
+                               f"Drop PDFs/DOCX/etc. into this folder and call /scan-rfp again.",
+                })
+
+            background_tasks.add_task(_run_scan, rag_instance, folder, track_id)
+
+            return JSONResponse({
+                "status": "scanning_started",
+                "track_id": track_id,
+                "folder": str(folder),
+                "files_found": len(files),
+                "message": (
+                    f"Scanning {len(files)} file(s) in background. "
+                    f"Watch server logs (filter on '[scan {track_id}]') for progress. "
+                    f"Already-processed files are skipped automatically."
+                ),
+            })
+        except Exception as e:
+            logger.error(f"❌ /scan-rfp failed: {e}")
+            return JSONResponse(
+                {"status": "error", "message": str(e)},
+                status_code=500,
+            )
+
+    app.add_api_route(
+        "/scan-rfp",
+        scan_rfp,
+        methods=["POST"],
+        response_class=JSONResponse,
     )
 
 
