@@ -567,12 +567,17 @@ def _interactive_delete_all(
     options.append(("rag_storage only", False, True, False))
     if has_inputs_files:
         options.append(("⚠️  inputs/ source files only  — IRRECOVERABLE", False, False, True))
-    if has_inputs_dirs or has_inputs_files:
+    # Always offer FULL DELETE as long as there's any data anywhere — the
+    # production-mode "wipe everything" path. Label and risk-level adapt to
+    # what actually exists.
+    if total_nodes or storage_dirs or has_inputs_files or has_inputs_dirs:
         if has_inputs_files:
             full_label = "⚠️  FULL DELETE: Neo4j + rag_storage + inputs/ source files & dirs  — IRRECOVERABLE  [RECOMMENDED for unusable workspaces]"
-        else:
+        elif has_inputs_dirs:
             full_label = "FULL DELETE: Neo4j + rag_storage + empty inputs/ dirs  [RECOMMENDED for unusable workspaces]"
-        options.append((full_label, True, True, True))
+        else:
+            full_label = "FULL DELETE: Neo4j + rag_storage  [RECOMMENDED for clean slate / production reset]"
+        options.append((full_label, True, True, has_inputs_files or has_inputs_dirs))
 
     print(f"\n  What would you like to delete?")
     for idx, (label, _, _, _) in enumerate(options, start=1):
