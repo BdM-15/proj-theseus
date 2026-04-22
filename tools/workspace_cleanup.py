@@ -67,7 +67,10 @@ def _inputs_root() -> Path:
     return (project_root / "inputs").resolve()
 
 
-# Subdirs of inputs/ that are NOT per-workspace folders
+# Subdirs of inputs/ that are NOT per-workspace folders.
+# Historically held WebUI uploads and LightRAG's processed-file archive; both
+# upload paths now stage into inputs/<workspace>/ directly. Kept here so the
+# cleanup tool still hides leftover legacy folders from the workspace list.
 _INPUTS_RESERVED = {"uploaded", "__enqueued__"}
 
 

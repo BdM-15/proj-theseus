@@ -306,121 +306,198 @@ async def process_document_with_semantic_inference(
         raise
 
 
+# ============================================================================
+# Per-workspace upload staging
+# ============================================================================
+# Both /insert and /documents/upload save originals to inputs/<workspace>/
+# (mirrors the /scan-rfp convention) so files persist for re-processing,
+# audit, and handoff. Identical filename + identical bytes is a no-op;
+# identical filename + different bytes appends a timestamp suffix.
+
+import hashlib
+
+
+def _sanitize_filename(name: str) -> str:
+    """Strip path separators and other unsafe chars from a filename."""
+    return name.replace("/", "_").replace("\\", "_").lstrip(".")
+
+
+def _hash_file(path: Path, chunk_size: int = 65536) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(chunk_size), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+async def _save_upload_to_workspace(
+    file: UploadFile, workspace: Optional[str] = None
+) -> Path:
+    """
+    Persist an uploaded file to inputs/<workspace>/<filename>.
+
+    Collision policy:
+      - Target missing → write directly.
+      - Target exists, identical content → reuse (no rewrite).
+      - Target exists, different content → append _YYYYMMDD_HHMMSS before ext.
+
+    Returns the final on-disk Path.
+    """
+    settings = get_settings()
+    ws = workspace or settings.workspace
+    folder = Path("./inputs") / ws
+    await asyncio.to_thread(folder.mkdir, parents=True, exist_ok=True)
+
+    safe_name = _sanitize_filename(file.filename)
+    target = folder / safe_name
+
+    # Stream to a temp file first so we can compare hashes without holding the
+    # whole upload in memory.
+    tmp_fd, tmp_path = tempfile.mkstemp(prefix="upload_", dir=str(folder))
+    os.close(tmp_fd)
+    tmp = Path(tmp_path)
+    try:
+        with open(tmp, "wb") as f:
+            await asyncio.to_thread(shutil.copyfileobj, file.file, f)
+
+        if target.exists():
+            existing_hash = await asyncio.to_thread(_hash_file, target)
+            new_hash = await asyncio.to_thread(_hash_file, tmp)
+            if existing_hash == new_hash:
+                logger.info(
+                    f"📎 Upload {safe_name} already present in inputs/{ws}/ "
+                    f"(identical content) — reusing existing file."
+                )
+                tmp.unlink(missing_ok=True)
+                return target
+            # Same name, different bytes — keep both with timestamp suffix.
+            stem = target.stem
+            suffix = target.suffix
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            target = folder / f"{stem}_{ts}{suffix}"
+            logger.info(
+                f"📎 Upload {safe_name} collides with existing file in inputs/{ws}/ "
+                f"with different content — saving as {target.name}."
+            )
+
+        await asyncio.to_thread(tmp.replace, target)
+        return target
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
 def create_insert_endpoint(app, rag_instance):
     """
-    Create custom /insert endpoint with automatic semantic post-processing
-    
-    This overrides LightRAG's default /insert to automatically run
-    LLM-powered relationship inference after document extraction.
-    
-    Args:
-        app: FastAPI application instance
-        rag_instance: Initialized RAGAnything instance
+    Create custom /insert endpoint with automatic semantic post-processing.
+
+    Saves the upload to inputs/<workspace>/ (preserving the original) and runs
+    RAG-Anything + LightRAG extraction with LLM-powered relationship inference.
     """
-    
-    async def insert_with_semantic_processing(file: UploadFile = File(...)):
-        """
-        Standard LightRAG insert endpoint with semantic post-processing
-        
-        API clients use this endpoint directly.
-        """
+
+    async def insert_with_semantic_processing(
+        file: UploadFile = File(...),
+        workspace: Optional[str] = Query(
+            None,
+            description="Workspace to save into. Defaults to the server's current workspace.",
+        ),
+    ):
         logger.info(f"🔔 ENDPOINT CALLED: /insert with file: {file.filename}")
-        
+
         await _callback.register_request_start(file.filename)
-        
+
         try:
-            temp_dir = tempfile.gettempdir()
-            safe_filename = file.filename.replace('/', '_').replace('\\', '_')
-            file_path = os.path.join(temp_dir, safe_filename)
-            
-            with open(file_path, 'wb') as f:
-                shutil.copyfileobj(file.file, f)
-            
-            logger.info(f"📄 Processing {file.filename} via /insert endpoint")
-            
-            processing_result = await process_document_with_semantic_inference(
-                file_path, file.filename, rag_instance, rag_instance.llm_model_func
+            file_path = await _save_upload_to_workspace(file, workspace)
+            logger.info(
+                f"📄 Processing {file_path.name} via /insert "
+                f"(saved to {file_path.parent})"
             )
-            
-            logger.info(f"✅ Processing complete for {file.filename}")
-            
-            os.unlink(file_path)
-            
+
+            processing_result = await process_document_with_semantic_inference(
+                str(file_path), file_path.name, rag_instance, rag_instance.llm_model_func
+            )
+
+            logger.info(f"✅ Processing complete for {file_path.name}")
+
             return JSONResponse({
                 "status": "success",
-                "message": f"Document {file.filename} processed successfully",
+                "message": f"Document {file_path.name} processed successfully",
+                "saved_to": str(file_path),
                 "relationships_inferred": processing_result["relationships_inferred"],
-                "method": "RAG-Anything + LLM semantic inference (format-agnostic)"
+                "method": "RAG-Anything + LLM semantic inference (format-agnostic)",
             })
-            
+
         except Exception as e:
             logger.error(f"❌ Error processing document: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
-        
+
         finally:
             await _callback.register_request_end(file.filename)
-    
+
     app.add_api_route(
         "/insert",
         insert_with_semantic_processing,
         methods=["POST"],
-        response_class=JSONResponse
+        response_class=JSONResponse,
     )
 
 
 def create_documents_upload_endpoint(app, rag_instance):
     """
     Override LightRAG's WebUI /documents/upload endpoint to use RAG-Anything.
-    
-    WebUI uses /documents/upload (not /insert), which would bypass
-    RAG-Anything's multimodal processing without this override.
+
+    Saves the upload to inputs/<workspace>/ so the WebUI flow and the
+    /scan-rfp filesystem flow both stage originals in the same place.
     """
-    
-    async def documents_upload_with_raganything(file: UploadFile = File(...)):
-        """WebUI document upload - routes through RAG-Anything for MinerU processing."""
+
+    async def documents_upload_with_raganything(
+        file: UploadFile = File(...),
+        workspace: Optional[str] = Query(
+            None,
+            description="Workspace to save into. Defaults to the server's current workspace.",
+        ),
+    ):
         logger.info(f"🔔 ENDPOINT CALLED: /documents/upload with file: {file.filename}")
-        
+
         await _callback.register_request_start(file.filename)
-        
+
         try:
-            temp_dir = tempfile.gettempdir()
-            safe_filename = file.filename.replace('/', '_').replace('\\', '_')
-            file_path = os.path.join(temp_dir, safe_filename)
-            
-            with open(file_path, 'wb') as f:
-                shutil.copyfileobj(file.file, f)
-            
-            logger.info(f"📄 Processing {file.filename} via WebUI /documents/upload endpoint")
-            
-            processing_result = await process_document_with_semantic_inference(
-                file_path, file.filename, rag_instance, rag_instance.llm_model_func
+            file_path = await _save_upload_to_workspace(file, workspace)
+            logger.info(
+                f"📄 Processing {file_path.name} via WebUI /documents/upload "
+                f"(saved to {file_path.parent})"
             )
-            
-            logger.info(f"✅ Processing complete for {file.filename}")
-            
-            os.unlink(file_path)
-            
+
+            processing_result = await process_document_with_semantic_inference(
+                str(file_path), file_path.name, rag_instance, rag_instance.llm_model_func
+            )
+
+            logger.info(f"✅ Processing complete for {file_path.name}")
+
             return JSONResponse({
                 "status": "success",
-                "message": f"Document {file.filename} processed successfully",
+                "message": f"Document {file_path.name} processed successfully",
+                "saved_to": str(file_path),
                 "relationships_inferred": processing_result.get("relationships_inferred", 0),
-                "method": "RAG-Anything + LLM semantic inference (format-agnostic)"
+                "method": "RAG-Anything + LLM semantic inference (format-agnostic)",
             })
-            
+
         except Exception as e:
             logger.error(f"❌ Error processing document: {e}")
             import traceback
             logger.error(traceback.format_exc())
             return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
-        
+
         finally:
             await _callback.register_request_end(file.filename)
-    
+
     app.add_api_route(
         "/documents/upload",
         documents_upload_with_raganything,
         methods=["POST"],
-        response_class=JSONResponse
+        response_class=JSONResponse,
     )
 
 
