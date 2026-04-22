@@ -294,6 +294,33 @@ class Settings(BaseSettings):
         description="Include table/figure captions in context"
     )
 
+    # ═══════════════════════════════════════════════════════════════════════════
+    # LOCAL RERANKER (Phase 1: BAAI/bge-reranker-v2-m3)
+    # Re-scores chunks after LightRAG's vector/entity/relation triple-merge.
+    # Loaded once at first query (~5s cold start, ~1.2GB VRAM @ FP16).
+    # Disabled by default — flip ENABLE_RERANK=true to activate.
+    # ═══════════════════════════════════════════════════════════════════════════
+    enable_rerank: bool = Field(
+        default=False,
+        description="Enable local cross-encoder reranking of retrieved chunks"
+    )
+    rerank_model: str = Field(
+        default="BAAI/bge-reranker-v2-m3",
+        description="HuggingFace model id for the local reranker (8192 ctx, multilingual)"
+    )
+    rerank_device: str = Field(
+        default="cuda",
+        description="Reranker device: 'cuda' (RTX 4060) or 'cpu' fallback"
+    )
+    rerank_use_fp16: bool = Field(
+        default=True,
+        description="Use FP16 inference (halves VRAM, ~2x speedup on Ada-gen GPUs)"
+    )
+    min_rerank_score: float = Field(
+        default=0.0,
+        description="Filter chunks with rerank score below this threshold (0.0 = no filter)"
+    )
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
