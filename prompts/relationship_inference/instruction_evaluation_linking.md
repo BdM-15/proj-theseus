@@ -463,14 +463,14 @@ When the inference runs over a processed RFP, the following methodology entity g
 **valid targets** for RFP entities (`customer_priority`, `pain_point`, `evaluation_factor`,
 `proposal_instruction`, `requirement`, `clause`, `deliverable`):
 
-| Methodology Module | Module File | Role |
-|---|---|---|
-| `shipley` | `shipley.py` | Win themes, discriminators, proof points, FAB, ghosting, compliance matrix, Pink/Red/Gold reviews, executive summary, storyboards |
-| `evaluation` | `evaluation.py` | Section M decoding, SSEB structure, relative-importance language, competitive range, discussions/FPRs, SSDD |
-| `regulations` | `regulations.py` | FAR/DFARS citations, Section 889, Section 508, FAR 15.506 debrief rights, NAICS/size standard, data rights |
-| `workload` | `workload.py` | BOE discipline, indirect rates, Agile capacity, cloud costs, labor mix |
-| `lessons_learned` | `lessons_learned.py` | Anti-patterns, **Explicit Benefit Linkage Rule**, agency tendencies, GAO protest patterns, Q&A strategy |
-| `company_capabilities` | `company_capabilities.py` | KBR capabilities, platforms, past performance, cleared workforce, compliance artifacts (proof-point sourcing) |
+| Methodology Module     | Module File               | Role                                                                                                                              |
+| ---------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `shipley`              | `shipley.py`              | Win themes, discriminators, proof points, FAB, ghosting, compliance matrix, Pink/Red/Gold reviews, executive summary, storyboards |
+| `evaluation`           | `evaluation.py`           | Section M decoding, SSEB structure, relative-importance language, competitive range, discussions/FPRs, SSDD                       |
+| `regulations`          | `regulations.py`          | FAR/DFARS citations, Section 889, Section 508, FAR 15.506 debrief rights, NAICS/size standard, data rights                        |
+| `workload`             | `workload.py`             | BOE discipline, indirect rates, Agile capacity, cloud costs, labor mix                                                            |
+| `lessons_learned`      | `lessons_learned.py`      | Anti-patterns, **Explicit Benefit Linkage Rule**, agency tendencies, GAO protest patterns, Q&A strategy                           |
+| `company_capabilities` | `company_capabilities.py` | KBR capabilities, platforms, past performance, cleared workforce, compliance artifacts (proof-point sourcing)                     |
 
 ### Excluded Link Targets (Phase 0-3 — DO NOT LINK BY DEFAULT)
 
@@ -518,5 +518,4 @@ Use these canonical relationship types from `src/ontology/schema.py`:
   `company_capabilities` proof point — this is exactly the Phase 4-6 win-theme construction the
   mentor should enable
 - ✅ Linking an RFP `clause` containing "Section 889" to `regulations.py` `Section 889
-  Prohibition` — regulatory compliance is Phase 4-6 relevant
-
+Prohibition` — regulatory compliance is Phase 4-6 relevant
