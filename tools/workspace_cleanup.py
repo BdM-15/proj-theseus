@@ -173,12 +173,19 @@ def _inputs_workspaces(inputs_root: Path) -> dict[str, tuple[int, float]]:
 
 
 def _delete_neo4j_workspace(neo4j_io: Neo4jGraphIO, workspace_name: str) -> int:
-    """Delete all Neo4j nodes for workspace. Returns count deleted."""
+    """Delete all Neo4j nodes for workspace. Returns count deleted.
+
+    Uses session.execute_write to ensure the transaction commits — implicit
+    transactions via session.run() may roll back if the result is never
+    consumed (observed silently dropping deletes).
+    """
     with neo4j_io.driver.session(database=neo4j_io.database) as session:
         rec = session.run(f"MATCH (n:`{workspace_name}`) RETURN count(n) as c").single()
         count = rec["c"] if rec else 0
         if count > 0:
-            session.run(f"MATCH (n:`{workspace_name}`) DETACH DELETE n")
+            session.execute_write(
+                lambda tx: tx.run(f"MATCH (n:`{workspace_name}`) DETACH DELETE n").consume()
+            )
     return count
 
 
@@ -620,9 +627,18 @@ def _interactive_delete_all(
 
     print()
     if delete_neo4j:
+        # Use CALL { ... } IN TRANSACTIONS so large wipes don't blow the
+        # single-tx memory limit (observed silent no-op on ~164k nodes).
         with neo4j_io.driver.session(database=neo4j_io.database) as session:
-            session.run("MATCH (n) DETACH DELETE n")
-        print(f"  ✅ Deleted all {total_nodes:,} Neo4j nodes")
+            session.run(
+                "MATCH (n) CALL { WITH n DETACH DELETE n } IN TRANSACTIONS OF 5000 ROWS"
+            ).consume()
+            after = session.run("MATCH (n) RETURN count(n) as c").single()["c"]
+        deleted = total_nodes - after
+        if after == 0:
+            print(f"  ✅ Deleted all {deleted:,} Neo4j nodes (database is now empty)")
+        else:
+            print(f"  ⚠️  Deleted {deleted:,} nodes; {after:,} still remain (check server lock or constraints)")
 
     if delete_storage:
         for d in storage_dirs:
@@ -773,8 +789,15 @@ def clear_all_neo4j():
             neo4j_io.close()
             return
 
-        session.run("MATCH (n) DETACH DELETE n")
-        print(f"   ✅ Deleted all {node_count:,} nodes")
+        session.run(
+            "MATCH (n) CALL { WITH n DETACH DELETE n } IN TRANSACTIONS OF 5000 ROWS"
+        ).consume()
+        after = session.run("MATCH (n) RETURN count(n) as c").single()["c"]
+        deleted = node_count - after
+        if after == 0:
+            print(f"   ✅ Deleted all {deleted:,} nodes")
+        else:
+            print(f"   ⚠️  Deleted {deleted:,} nodes; {after:,} still remain")
 
     neo4j_io.close()
 
