@@ -63,6 +63,7 @@ from src.server.routes import (
     create_documents_upload_endpoint,
     create_scan_endpoint,
 )
+from src.server.ui_routes import register_ui
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -150,6 +151,12 @@ async def main():
     logger.info("✅ Custom endpoints registered: /insert, /documents/upload, /scan-rfp")
     logger.info("✅ Use LightRAG's native /query/data endpoint for structured data retrieval (agent workflows)")
 
+    # Project Theseus custom UI (cyberpunk capture workbench at /ui)
+    async def _ui_query(text: str, mode: str) -> str:
+        from lightrag import QueryParam
+        return await rag_instance.lightrag.aquery(text, param=QueryParam(mode=mode))
+    register_ui(app, _ui_query)
+
     # Consolidated startup banner — full pipeline detail in docs/ARCHITECTURE.md
     graph_storage = global_args.graph_storage if hasattr(global_args, 'graph_storage') else "NetworkXStorage"
     from src.utils.logging_config import log_banner, Colors
@@ -225,6 +232,7 @@ async def main():
         ("", ""),
         # ── Endpoints ────────────────────────────────────────────────────────────
         ("WebUI",        f"{c.BLUE}http://{host}:{port}/webui{c.RESET}"),
+        ("Capture UI",   f"{c.BOLD}{c.CYAN}http://{host}:{port}/ui{c.RESET}  {c.DIM}(new){c.RESET}"),
         ("API Docs",     f"{c.BLUE}http://{host}:{port}/docs{c.RESET}"),
     ]
     if graph_storage == "Neo4JStorage":
