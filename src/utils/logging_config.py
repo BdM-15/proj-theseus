@@ -168,6 +168,7 @@ class ConsoleFilter(logging.Filter):
         "uvicorn.error",
         "src.server.routes",    # batch completion + post-processing trigger
         "src.inference",        # phase transitions + algorithm results
+        "src.extraction.govcon_reranker",  # rerank timing + score visibility
     }
 
     def filter(self, record):
@@ -192,6 +193,7 @@ class ProcessingFilter(logging.Filter):
             "src.server.routes",  # Our processing pipeline
             "src.inference",  # Semantic inference (entity correction, relationship inference, metadata enrichment)
             "src.ingestion",  # Document ingestion
+            "src.extraction.govcon_reranker",  # rerank timing + score visibility
         ]
         
         for logger_name in processing_loggers:

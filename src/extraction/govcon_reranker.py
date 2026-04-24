@@ -97,20 +97,24 @@ async def govcon_rerank_func(
         scores = [scores]
 
     min_score = settings.min_rerank_score
+    all_scores = [(i, float(s)) for i, s in enumerate(scores)]
+    all_scores.sort(key=lambda r: r[1], reverse=True)
+    pre_filter_top = all_scores[0][1] if all_scores else 0.0
+
     indexed_scores = [
-        {"index": i, "relevance_score": float(s)}
-        for i, s in enumerate(scores)
-        if float(s) >= min_score
+        {"index": i, "relevance_score": s}
+        for i, s in all_scores
+        if s >= min_score
     ]
-    indexed_scores.sort(key=lambda r: r["relevance_score"], reverse=True)
     n_filtered = len(documents) - len(indexed_scores)
 
     elapsed_ms = (time.perf_counter() - rerank_start) * 1000
     top_score = indexed_scores[0]["relevance_score"] if indexed_scores else 0.0
     logger.info(
-        "🔀 Reranked %d chunks in %.0fms | top_score=%.3f | filtered_below_%.2f=%d",
+        "🔀 Reranked %d chunks in %.0fms | pre_filter_top=%.3f | top_score=%.3f | filtered_below_%.2f=%d",
         len(documents),
         elapsed_ms,
+        pre_filter_top,
         top_score,
         min_score,
         n_filtered,
