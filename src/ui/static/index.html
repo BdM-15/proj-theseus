@@ -452,6 +452,57 @@
               </div>
             </div>
 
+            <!-- Empty-workspace onboarding -->
+            <div
+              x-show="(stats.documents ?? 0) === 0"
+              x-cloak
+              class="card p-6 mb-5 border-neon-amber/40"
+            >
+              <div class="flex items-start gap-4">
+                <div
+                  class="w-10 h-10 rounded-lg bg-neon-amber/10 border border-neon-amber/30 flex items-center justify-center text-neon-amber shrink-0"
+                >
+                  <i data-lucide="rocket" class="w-5 h-5"></i>
+                </div>
+                <div class="flex-1">
+                  <h2 class="text-lg font-semibold">
+                    This workspace is empty.
+                  </h2>
+                  <p class="text-sm text-slate-400 mt-1">
+                    Drop an RFP into the
+                    <code class="text-neon-cyan"
+                      >inputs/<span x-text="stats.workspace"></span>/</code
+                    >
+                    folder, or upload directly. Then choose Scan or wait for
+                    the watcher.
+                  </p>
+                  <div class="mt-3 flex flex-wrap gap-2">
+                    <button
+                      class="btn btn-primary"
+                      @click="active='documents'"
+                    >
+                      <i data-lucide="upload-cloud" class="w-4 h-4"></i> Upload
+                      RFP
+                    </button>
+                    <button
+                      class="btn btn-ghost border border-edge"
+                      @click="scanRfp()"
+                    >
+                      <i data-lucide="folder-search" class="w-4 h-4"></i> Scan
+                      inputs folder
+                    </button>
+                    <button
+                      class="btn btn-ghost border border-edge"
+                      @click="openWorkspaceModal()"
+                    >
+                      <i data-lucide="layers" class="w-4 h-4"></i> Switch
+                      workspace
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <template x-for="m in metrics()" :key="m.label">
                 <div
@@ -1845,18 +1896,41 @@
           Θ
         </div>
         <h2 class="mt-6 text-2xl font-semibold neon-text">
-          Restarting server…
+          <span x-show="!restartStuck">Restarting server…</span>
+          <span x-show="restartStuck" class="text-neon-amber"
+            >Restart taking longer than expected</span
+          >
         </h2>
         <p class="mt-2 text-slate-400">
           Switching to
           <span class="text-neon-cyan font-mono" x-text="restartTarget"></span>
         </p>
-        <div class="mt-6 dot-pulse">
+        <div x-show="!restartStuck" class="mt-6 dot-pulse">
           <span></span><span></span><span></span>
         </div>
-        <p class="mt-6 text-xs font-mono text-slate-500">
+        <p
+          x-show="!restartStuck"
+          class="mt-6 text-xs font-mono text-slate-500"
+        >
           UI will reload automatically when API is back.
         </p>
+        <div x-show="restartStuck" class="mt-6 flex flex-col items-center gap-3">
+          <p class="text-xs font-mono text-slate-500 max-w-sm">
+            The server hasn't responded for 60 seconds. It may still be loading
+            embeddings, or it may have failed. Check the server log.
+          </p>
+          <div class="flex gap-2">
+            <button class="btn btn-primary" @click="window.location.reload()">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i> Reload anyway
+            </button>
+            <button
+              class="btn btn-ghost border border-edge"
+              @click="restarting=false; restartStuck=false"
+            >
+              <i data-lucide="x" class="w-4 h-4"></i> Dismiss
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1916,6 +1990,7 @@
           wsModal: { open: false, items: [], newName: "", switching: false },
           restarting: false,
           restartTarget: "",
+          restartStuck: false,
 
           // Knowledge graph state
           cy: null,
@@ -2728,6 +2803,7 @@
               });
               this.wsModal.open = false;
               this.restartTarget = name;
+              this.restartStuck = false;
               this.restarting = true;
               this.pollRestart();
             } catch (e) {
@@ -2738,20 +2814,31 @@
           },
 
           pollRestart() {
-            // Wait for API to go down then come back up; reload when it does.
-            let sawDown = false;
+            // The server restarts via os.execv; the new process will report
+            // stats.workspace === restartTarget. We poll until either:
+            //   (a) we see the new workspace in /api/ui/stats -> reload
+            //   (b) we exceed maxWaitMs -> show manual-reload fallback
+            const target = this.restartTarget;
+            const startedAt = Date.now();
+            const maxWaitMs = 60_000; // 60s safety cap
             const tick = async () => {
+              if (!this.restarting) return; // user dismissed / reset
+              if (Date.now() - startedAt > maxWaitMs) {
+                this.restartStuck = true;
+                return;
+              }
               try {
                 const r = await fetch("/api/ui/stats", { cache: "no-store" });
                 if (r.ok) {
-                  if (sawDown) {
+                  const j = await r.json();
+                  if (j.workspace === target) {
                     window.location.reload();
                     return;
                   }
-                  // Not yet restarted (still old process). Keep waiting briefly.
+                  // Still the old process serving the previous workspace.
                 }
               } catch {
-                sawDown = true;
+                // Server is down mid-restart — expected; keep polling.
               }
               setTimeout(tick, 1000);
             };
