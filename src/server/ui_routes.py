@@ -150,27 +150,59 @@ def _summary(chat: dict[str, Any]) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 _PROMPT_LIBRARY: list[dict[str, str]] = [
-    # Phase 4 — Proposal Planning
+    # ───────────────────────── Phase 3 — Capture / RFP Discovery ─────────────────────────
+    {"phase": "3", "category": "Discovery", "title": "Acquisition snapshot",
+     "prompt": "Summarize this acquisition in one page: customer, mission need, contract vehicle, NAICS, set-aside, period of performance, estimated value, place of performance, and incumbent (if known). Cite the clauses you used."},
+    {"phase": "3", "category": "Discovery", "title": "Customer hot buttons",
+     "prompt": "Extract the customer's stated and implied hot buttons. For each, quote the source language, classify it as cost / schedule / performance / risk / mission, and propose a response posture."},
+    {"phase": "3", "category": "Discovery", "title": "Incumbent & competitor signals",
+     "prompt": "Surface every clue in the RFP about the incumbent or likely competitors — transition language, GFE/GFI references, resumes, past performance asks, oddly specific requirements. List each clue with the cited source."},
+    {"phase": "3", "category": "Discovery", "title": "Bid / no-bid scoring inputs",
+     "prompt": "Score this opportunity against standard bid/no-bid factors (customer fit, capability fit, competition, win probability, profitability, strategic value, risk). Cite RFP language supporting each score and surface unknowns we need to chase."},
+
+    # ───────────────────────── Phase 4 — Proposal Planning ─────────────────────────
     {"phase": "4", "category": "Compliance", "title": "Full L↔M Compliance Matrix",
      "prompt": "Generate a full Section L ↔ Section M compliance matrix for this RFP. For every Section L instruction, list the linked Section M evaluation criterion, the responsible proposal volume, page-limit constraints, and any unmatched items as gaps."},
     {"phase": "4", "category": "Compliance", "title": "Page-limit & format constraints",
      "prompt": "List every page limit, font, margin, file-format, and submission-mechanic constraint stated in Section L or anywhere else in the RFP. Cite the source clause for each."},
+    {"phase": "4", "category": "Compliance", "title": "Submission checklist",
+     "prompt": "Build a submission checklist: every artifact required (volumes, certifications, reps & certs, oral presentation slides, pricing files), the format, the page limit, the section that imposes the requirement, and the responsible owner."},
     {"phase": "4", "category": "Strategy", "title": "Win themes & discriminators",
      "prompt": "Identify candidate win themes, discriminators, and proof points implied by the RFP language. Map each to the customer priority or pain point it addresses, and to the evaluation factor it would influence."},
-    # Phase 5 — Proposal Development
+    {"phase": "4", "category": "Strategy", "title": "Solution architecture brief",
+     "prompt": "Sketch a solution architecture brief: technical approach pillars, management approach pillars, staffing model assumptions, and risk mitigations. Tie each pillar to the Section M evaluation factor it earns credit against."},
+    {"phase": "4", "category": "Pricing", "title": "Workload & BOE drivers",
+     "prompt": "Pull every workload metric, performance standard, deliverable count, and surge condition that drives basis of estimate. For each, cite the RFP location and flag where the data is ambiguous."},
+
+    # ───────────────────────── Phase 5 — Proposal Development ─────────────────────────
     {"phase": "5", "category": "Traceability", "title": "Requirements → Deliverables → BOE",
      "prompt": "Trace every shall/will requirement to its satisfying deliverable, performance standard, and workload metric. Flag any requirement with no satisfying deliverable as a coverage gap."},
     {"phase": "5", "category": "Writing", "title": "Volume outline (Shipley-aligned)",
      "prompt": "Produce a Shipley-aligned proposal volume outline. For each volume, list sections, page budgets derived from Section L, and the evaluation factors it must answer."},
     {"phase": "5", "category": "Writing", "title": "FAB chain for top discriminator",
      "prompt": "For the most defensible discriminator, write a Feature → Advantage → Benefit chain grounded in cited proof points and tied to the relevant evaluation factor."},
+    {"phase": "5", "category": "Writing", "title": "Section storyboard",
+     "prompt": "Storyboard a single proposal section: the Section L instruction it answers, the Section M factors it earns, the win theme it carries, the proof points it cites, the graphic concepts, and the action caption for each graphic."},
+    {"phase": "5", "category": "Writing", "title": "Executive summary draft",
+     "prompt": "Draft an executive summary that opens with the customer's mission challenge, states our solution promise, surfaces 3 discriminators with proof, and closes with a benefit-anchored call to action. Stay within typical 4-page Section L limits."},
     {"phase": "5", "category": "Risk", "title": "Ghost competitor weaknesses",
      "prompt": "Identify language we can ghost to highlight likely competitor weaknesses without naming them, anchored in customer pain points and evaluation factors."},
-    # Phase 6 — Post-submittal
+    {"phase": "5", "category": "Risk", "title": "Risk register & mitigations",
+     "prompt": "Build a risk register from the RFP: technical, schedule, cost, transition, security, and supply-chain risks. For each, cite the source language, score likelihood × impact, and propose a mitigation with the proposal section that will describe it."},
+
+    # ───────────────────────── Phase 6 — Color Reviews & Submittal ─────────────────────────
     {"phase": "6", "category": "Review", "title": "Gap analysis vs Section M",
      "prompt": "Run a gap analysis: for each Section M evaluation factor and subfactor, list the proposal sections, deliverables, and proof points that respond to it. Highlight unanswered factors."},
     {"phase": "6", "category": "Review", "title": "Compliance review checklist",
      "prompt": "Generate a compliance review checklist a Pink/Red team can execute, organized by Section L instruction with pass/fail criteria from Section M."},
+    {"phase": "6", "category": "Review", "title": "Pink team feedback prompts",
+     "prompt": "Generate Pink team review prompts for each volume: are win themes visible, are discriminators substantiated with proof, are graphics earning their space, is compliance language unambiguous, are FAB chains complete?"},
+    {"phase": "6", "category": "Review", "title": "Red team challenge questions",
+     "prompt": "Generate Red team challenge questions a tough evaluator would ask. For each, point to the proposal section that should answer it and the proof point that should land it."},
+    {"phase": "6", "category": "Review", "title": "Gold team executive narrative check",
+     "prompt": "Read the executive summary and management volume openers as a Gold team would. Flag any place the customer's mission outcome is not the subject of the verbs, or where benefits are not quantified."},
+    {"phase": "6", "category": "Submission", "title": "Final compliance sweep",
+     "prompt": "Final pre-submission sweep: confirm every Section L instruction is answered, every Section M factor is addressed, every page limit is met, every required artifact is named, and every cross-reference is intact."},
 ]
 
 
@@ -217,6 +249,34 @@ def _safe_count_json_keys(path: Path) -> int:
 _COUNT_CACHE: dict[tuple[str, int, int], int] = {}
 
 
+def _stack_versions() -> dict[str, Optional[str]]:
+    """Read installed package versions for the engine stack. Cached at import."""
+    global _STACK_CACHE  # noqa: PLW0603
+    if _STACK_CACHE is not None:
+        return _STACK_CACHE
+    from importlib.metadata import PackageNotFoundError, version  # local
+
+    out: dict[str, Optional[str]] = {}
+    for key, dist in (
+        ("lightrag", "lightrag-hku"),
+        ("raganything", "raganything"),
+        ("mineru", "mineru"),
+        ("transformers", "transformers"),
+    ):
+        try:
+            out[key] = version(dist)
+        except PackageNotFoundError:
+            try:
+                out[key] = version(key)  # fall back to bare name
+            except PackageNotFoundError:
+                out[key] = None
+    _STACK_CACHE = out
+    return out
+
+
+_STACK_CACHE: Optional[dict[str, Optional[str]]] = None
+
+
 def _gather_stats() -> dict[str, Any]:
     settings = get_settings()
     ws = _workspace_dir()
@@ -233,7 +293,10 @@ def _gather_stats() -> dict[str, Any]:
             "extraction": settings.extraction_llm_name,
             "reasoning": settings.reasoning_llm_name,
             "embedding": settings.embedding_model,
+            "rerank": settings.rerank_model if settings.enable_rerank else None,
+            "rerank_enabled": settings.enable_rerank,
         },
+        "stack": _stack_versions(),
         "timestamp": _now_iso(),
     }
 
@@ -1023,6 +1086,22 @@ def register_ui(
         return JSONResponse({
             "status": "restarting",
             "workspace": name,
+            "message": "Server is restarting. The UI will reconnect automatically.",
+        })
+
+    @app.post("/api/ui/restart", tags=["theseus-ui"])
+    async def restart_server() -> JSONResponse:
+        """Schedule a graceful self-restart of the server process.
+
+        Identical mechanism to the workspace switch: re-execs ~750ms after
+        responding so the HTTP reply can flush. Browser polls /api/ui/stats
+        and reconnects automatically.
+        """
+        asyncio.get_event_loop().call_later(0.75, _self_restart)
+        logger.warning("🔄 Manual restart requested via Settings page.")
+        return JSONResponse({
+            "status": "restarting",
+            "workspace": get_settings().workspace,
             "message": "Server is restarting. The UI will reconnect automatically.",
         })
 
