@@ -215,3 +215,10 @@ credentials/
 # Memory dumps
 *.dmp
 *.dump
+
+# ============================================================================
+# Theseus local artifacts
+# ============================================================================
+docs/Clean_Prompt_Library.xlsx
+tools/_prompt_xlsx_dump.json
+
