@@ -171,14 +171,42 @@ _PROMPT_LIBRARY: list[dict[str, str]] = [
 # ---------------------------------------------------------------------------
 
 def _safe_count_json_keys(path: Path) -> int:
-    """Count top-level keys in a JSON dict file. Returns 0 on any error."""
+    """Count records in a LightRAG storage JSON file. Returns 0 on any error.
+
+    Handles two on-disk shapes used by LightRAG:
+    - kv_store_*.json: top-level dict keyed by record id -> count via len(dict)
+    - vdb_*.json:      {"embedding_dim": N, "data": [...records...], "matrix": "..."}
+                       -> count via len(data)
+
+    Results are cached by (path, mtime, size) so the multi-MB vdb files are
+    only re-read when they actually change.
+    """
     try:
         if not path.exists():
             return 0
+        st = path.stat()
+        key = (str(path), st.st_mtime_ns, st.st_size)
+        cached = _COUNT_CACHE.get(key)
+        if cached is not None:
+            return cached
         data = json.loads(path.read_text(encoding="utf-8"))
-        return len(data) if isinstance(data, dict) else 0
+        if isinstance(data, dict):
+            inner = data.get("data")
+            count = len(inner) if isinstance(inner, list) else len(data)
+        elif isinstance(data, list):
+            count = len(data)
+        else:
+            count = 0
+        # Drop any prior cached entries for this path before storing the new one
+        for k in [k for k in _COUNT_CACHE if k[0] == str(path)]:
+            _COUNT_CACHE.pop(k, None)
+        _COUNT_CACHE[key] = count
+        return count
     except Exception:
         return 0
+
+
+_COUNT_CACHE: dict[tuple[str, int, int], int] = {}
 
 
 def _gather_stats() -> dict[str, Any]:
