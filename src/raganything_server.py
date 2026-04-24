@@ -152,9 +152,21 @@ async def main():
     logger.info("✅ Use LightRAG's native /query/data endpoint for structured data retrieval (agent workflows)")
 
     # Project Theseus custom UI (cyberpunk capture workbench at /ui)
-    async def _ui_query(text: str, mode: str) -> str:
+    async def _ui_query(text: str, mode: str, history: list[dict], stream: bool):
+        """UI query bridge: passes conversation_history + stream flag to LightRAG.
+
+        Returns either a string (stream=False) or an AsyncIterator[str]
+        (stream=True). The UI router unpacks both shapes.
+        """
         from lightrag import QueryParam
-        return await rag_instance.lightrag.aquery(text, param=QueryParam(mode=mode))
+        return await rag_instance.lightrag.aquery(
+            text,
+            param=QueryParam(
+                mode=mode,
+                stream=stream,
+                conversation_history=history or [],
+            ),
+        )
     register_ui(app, _ui_query)
 
     # Consolidated startup banner — full pipeline detail in docs/ARCHITECTURE.md

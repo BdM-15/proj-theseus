@@ -26,13 +26,21 @@ import sys
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Optional
+from typing import Any, AsyncIterator, Awaitable, Callable, Optional, Union
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from lightrag.api.config import global_args
 from pydantic import BaseModel, Field
+
+# query_func signature: (text, mode, history, stream) -> str | AsyncIterator[str]
+# - history: list of {"role": "user"|"assistant", "content": str}
+# - stream=False returns awaitable str; stream=True returns awaitable AsyncIterator[str]
+QueryFunc = Callable[
+    [str, str, list[dict], bool],
+    Awaitable[Union[str, AsyncIterator[str]]],
+]
 
 from src.core import get_settings, reset_settings
 
@@ -485,15 +493,17 @@ def _compute_intel() -> dict[str, Any]:
 
 def register_ui(
     app: FastAPI,
-    query_func: Callable[[str, str], Awaitable[str]],
+    query_func: QueryFunc,
 ) -> None:
     """
     Register the Project Theseus UI routes on an existing FastAPI app.
 
     Args:
         app: The FastAPI app produced by lightrag.api.lightrag_server.create_app.
-        query_func: Async callable (query_text, mode) -> answer_text.
-                    Typically rag_instance.lightrag.aquery.
+        query_func: Async callable (query_text, mode, history, stream) ->
+                    str | AsyncIterator[str]. The conversation_history is a
+                    list of {role, content} dicts; when stream=True the return
+                    is an async iterator of token chunks.
     """
     if not _STATIC_DIR.exists():
         logger.warning("UI static dir missing: %s — UI will not be mounted", _STATIC_DIR)
@@ -578,6 +588,22 @@ def register_ui(
         return JSONResponse({"status": "deleted", "id": chat_id})
 
     # ---- Chats: send message (calls LightRAG /query under the hood) ------
+    def _build_history(chat: dict, exclude_last: bool = False) -> list[dict]:
+        """Build LightRAG conversation_history from persisted messages.
+
+        Returns the list of {role, content} dicts in chronological order. If
+        exclude_last is True, drops the most recent message (used when we just
+        appended the new user message and want only the prior turns as context).
+        """
+        msgs = chat.get("messages", [])
+        if exclude_last and msgs:
+            msgs = msgs[:-1]
+        return [
+            {"role": m.get("role", "user"), "content": str(m.get("content", ""))}
+            for m in msgs
+            if m.get("role") in ("user", "assistant") and m.get("content")
+        ]
+
     @app.post("/api/ui/chats/{chat_id}/messages", tags=["theseus-ui"])
     async def post_message(chat_id: str, payload: ChatMessageCreate) -> JSONResponse:
         """Append a user message, invoke RAG query, persist the assistant reply."""
@@ -589,8 +615,11 @@ def register_ui(
         }
         chat["messages"].append(user_msg)
 
+        history = _build_history(chat, exclude_last=True)
         try:
-            answer = await query_func(payload.content, chat.get("mode", "hybrid"))
+            answer = await query_func(
+                payload.content, chat.get("mode", "hybrid"), history, False
+            )
         except Exception as exc:
             logger.exception("Query failed for chat %s: %s", chat_id, exc)
             answer = f"⚠️ Query failed: {exc}"
@@ -610,6 +639,96 @@ def register_ui(
 
         _write_chat(chat)
         return JSONResponse({"user": user_msg, "assistant": assistant_msg, "chat": _summary(chat)})
+
+    # ---- Chats: streaming variant (Server-Sent Events) -------------------
+    @app.post("/api/ui/chats/{chat_id}/messages/stream", tags=["theseus-ui"])
+    async def post_message_stream(chat_id: str, payload: ChatMessageCreate):
+        """Stream the assistant reply token-by-token via SSE.
+
+        Event format (one SSE event per chunk):
+            event: token
+            data: {"text": "..."}
+
+        Final event when complete:
+            event: done
+            data: {"assistant": {...full message...}, "chat": {...summary...}}
+
+        Error event (terminal):
+            event: error
+            data: {"message": "..."}
+        """
+        chat = _read_chat(chat_id)
+        user_msg = {
+            "role": "user",
+            "content": payload.content,
+            "ts": _now_iso(),
+        }
+        chat["messages"].append(user_msg)
+        # Persist the user turn immediately so a dropped connection doesn't lose it.
+        if chat.get("title") in (None, "", "New chat") and len(chat["messages"]) <= 1:
+            chat["title"] = (
+                (payload.content[:60] + "…") if len(payload.content) > 60 else payload.content
+            )
+        _write_chat(chat)
+
+        history = _build_history(chat, exclude_last=True)
+        mode = chat.get("mode", "hybrid")
+
+        async def event_stream():
+            # SSE preamble keeps proxies from buffering and signals the client
+            # that the stream is alive even before the first model token.
+            yield "event: open\ndata: {}\n\n"
+            collected: list[str] = []
+            try:
+                result = await query_func(payload.content, mode, history, True)
+                if hasattr(result, "__aiter__"):
+                    async for chunk in result:
+                        if not chunk:
+                            continue
+                        text = str(chunk)
+                        collected.append(text)
+                        yield f"event: token\ndata: {json.dumps({'text': text})}\n\n"
+                else:
+                    text = str(result)
+                    collected.append(text)
+                    yield f"event: token\ndata: {json.dumps({'text': text})}\n\n"
+            except Exception as exc:
+                logger.exception("Streaming query failed for chat %s", chat_id)
+                yield f"event: error\ndata: {json.dumps({'message': str(exc)})}\n\n"
+                # Persist the error so the chat reflects what the user saw.
+                collected.append(f"⚠️ Query failed: {exc}")
+
+            full_text = "".join(collected)
+            assistant_msg = {
+                "role": "assistant",
+                "content": full_text,
+                "ts": _now_iso(),
+                "mode": mode,
+            }
+            # Re-read so we don't clobber concurrent edits to the same chat file.
+            try:
+                latest = _read_chat(chat_id)
+            except HTTPException:
+                latest = chat
+            latest["messages"].append(assistant_msg)
+            latest["updated_at"] = _now_iso()
+            _write_chat(latest)
+
+            yield (
+                "event: done\ndata: "
+                + json.dumps({"assistant": assistant_msg, "chat": _summary(latest)})
+                + "\n\n"
+            )
+
+        return StreamingResponse(
+            event_stream(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache, no-transform",
+                "X-Accel-Buffering": "no",  # disable nginx buffering if proxied
+                "Connection": "keep-alive",
+            },
+        )
 
     # ---- Entity → source chunks (for KG explorer click-through) ----------
     @app.get("/api/ui/entity/{name}/chunks", tags=["theseus-ui"])
