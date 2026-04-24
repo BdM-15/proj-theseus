@@ -1,0 +1,2973 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Project Theseus — Capture Workbench</title>
+
+    <!-- Zero-build CDN stack -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <script
+      defer
+      src="https://unpkg.com/alpinejs@3.14.3/dist/cdn.min.js"
+    ></script>
+    <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+    <script src="https://unpkg.com/cytoscape@3.30.2/dist/cytoscape.min.js"></script>
+    <script src="https://unpkg.com/layout-base@2.0.1/layout-base.js"></script>
+    <script src="https://unpkg.com/cose-base@2.2.0/cose-base.js"></script>
+    <script src="https://unpkg.com/cytoscape-fcose@2.2.0/cytoscape-fcose.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ["Inter", "system-ui", "sans-serif"],
+              mono: ["JetBrains Mono", "ui-monospace", "monospace"],
+            },
+            colors: {
+              ink: {
+                950: "#05070d",
+                900: "#0a0e1a",
+                850: "#0f1422",
+                800: "#141a2b",
+                700: "#1c2338",
+                600: "#283151",
+              },
+              neon: {
+                cyan: "#00f0ff",
+                magenta: "#ff2bd6",
+                lime: "#00ff9c",
+                amber: "#ffb020",
+                red: "#ff3b6b",
+              },
+              edge: { DEFAULT: "#1f2a44", strong: "#2c3a5e" },
+            },
+            boxShadow: {
+              glow: "0 0 18px rgba(0,240,255,0.25), 0 0 2px rgba(0,240,255,0.5) inset",
+              magenta:
+                "0 0 18px rgba(255,43,214,0.2), 0 0 2px rgba(255,43,214,0.45) inset",
+            },
+          },
+        },
+      };
+    </script>
+
+    <style>
+      html,
+      body {
+        background: #05070d;
+        color: #e6ecff;
+      }
+      body {
+        background-image:
+          radial-gradient(
+            circle at 12% -10%,
+            rgba(0, 240, 255, 0.08),
+            transparent 45%
+          ),
+          radial-gradient(
+            circle at 90% 0%,
+            rgba(255, 43, 214, 0.07),
+            transparent 50%
+          ),
+          linear-gradient(180deg, #05070d 0%, #070b16 100%);
+        min-height: 100vh;
+      }
+      .scanline {
+        background-image: repeating-linear-gradient(
+          0deg,
+          rgba(255, 255, 255, 0.015) 0 1px,
+          transparent 1px 3px
+        );
+      }
+      .neon-text {
+        text-shadow: 0 0 8px rgba(0, 240, 255, 0.55);
+      }
+      .magenta-text {
+        text-shadow: 0 0 8px rgba(255, 43, 214, 0.55);
+      }
+      .card {
+        @apply bg-ink-850/70 border border-edge rounded-xl backdrop-blur;
+      }
+      .card-hover:hover {
+        @apply border-edge-strong shadow-glow;
+      }
+      .btn {
+        @apply inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition;
+      }
+      .btn-primary {
+        @apply bg-neon-cyan/10 text-neon-cyan border border-neon-cyan/40 hover:bg-neon-cyan/20 hover:shadow-glow;
+      }
+      .btn-ghost {
+        @apply text-slate-300 hover:text-white hover:bg-white/5 border border-transparent;
+      }
+      .btn-danger {
+        @apply text-neon-red border border-neon-red/40 hover:bg-neon-red/10;
+      }
+      .pill {
+        @apply inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-mono uppercase tracking-wider;
+      }
+      .nav-item {
+        @apply flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-white/5 transition cursor-pointer;
+      }
+      .nav-item-active {
+        @apply text-neon-cyan bg-neon-cyan/5 border-l-2 border-neon-cyan shadow-glow;
+      }
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #1c2338;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #2c3a5e;
+      }
+
+      /* Chat bubbles */
+      .bubble-user {
+        @apply bg-neon-cyan/10 border border-neon-cyan/30 text-slate-100;
+      }
+      .bubble-assistant {
+        @apply bg-ink-800/80 border border-edge text-slate-100;
+      }
+      .markdown p {
+        margin: 0.4em 0;
+      }
+      .markdown code {
+        background: rgba(0, 240, 255, 0.08);
+        padding: 0 4px;
+        border-radius: 3px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.9em;
+      }
+      .markdown pre {
+        background: #05070d;
+        padding: 10px;
+        border-radius: 6px;
+        overflow-x: auto;
+        border: 1px solid #1f2a44;
+      }
+
+      /* Loading dots */
+      .dot-pulse {
+        display: inline-flex;
+        gap: 4px;
+      }
+      .dot-pulse span {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #00f0ff;
+        animation: dot 1.2s infinite ease-in-out;
+      }
+      .dot-pulse span:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      .dot-pulse span:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+      @keyframes dot {
+        0%,
+        80%,
+        100% {
+          opacity: 0.2;
+          transform: translateY(0);
+        }
+        40% {
+          opacity: 1;
+          transform: translateY(-3px);
+        }
+      }
+
+      /* Toast */
+      .toast {
+        @apply fixed top-4 right-4 z-50 card px-4 py-3 shadow-glow text-sm;
+      }
+    </style>
+  </head>
+
+  <body
+    x-data="theseus()"
+    x-init="init()"
+    class="font-sans antialiased scanline"
+    @keydown.window.ctrl.k.prevent="openPalette()"
+    @keydown.window.meta.k.prevent="openPalette()"
+    @keydown.window.escape="palette.open=false; wsModal.open=false"
+  >
+    <!-- ========================== TOP COMMAND BAR ========================== -->
+    <header
+      class="h-14 shrink-0 border-b border-edge bg-ink-950/85 backdrop-blur-xl flex items-center px-5 gap-5 sticky top-0 z-40"
+    >
+      <!-- Brand -->
+      <div class="flex items-center gap-2.5 min-w-[220px]">
+        <div
+          class="w-8 h-8 rounded-xl bg-gradient-to-br from-neon-cyan via-neon-magenta to-neon-lime flex items-center justify-center text-ink-950 font-bold shadow-glow"
+        >
+          Θ
+        </div>
+        <div class="leading-tight">
+          <div class="font-semibold neon-text text-sm tracking-wide">
+            PROJECT THESEUS
+          </div>
+          <div
+            class="text-[10px] uppercase font-mono text-slate-500 tracking-[0.2em]"
+          >
+            Capture Workbench
+          </div>
+        </div>
+        <span
+          class="ml-1 px-2 py-0.5 text-[10px] font-mono text-neon-cyan border border-neon-cyan/30 rounded-full"
+          >v0.4</span
+        >
+      </div>
+
+      <!-- Global search / Ctrl-K -->
+      <div class="flex-1 max-w-2xl mx-auto">
+        <button
+          class="w-full flex items-center gap-3 bg-ink-900/80 border border-edge hover:border-neon-cyan/40 rounded-xl px-3.5 py-2 text-sm text-slate-500 hover:text-slate-300 transition group"
+          @click="openPalette()"
+        >
+          <i
+            data-lucide="search"
+            class="w-4 h-4 text-slate-500 group-hover:text-neon-cyan"
+          ></i>
+          <span class="flex-1 text-left"
+            >Jump to view, chat, prompt, or workspace…</span
+          >
+          <span
+            class="text-[10px] font-mono text-slate-500 border border-edge px-1.5 py-0.5 rounded"
+            >Ctrl K</span
+          >
+        </button>
+      </div>
+
+      <!-- Workspace selector -->
+      <div class="flex items-center gap-2">
+        <button
+          class="flex items-center gap-2 bg-ink-900 border border-edge hover:border-neon-cyan/40 rounded-xl px-3 py-1.5 text-sm transition"
+          @click="openWorkspaceModal()"
+          title="Switch workspace (server restart)"
+        >
+          <i data-lucide="layers" class="w-4 h-4 text-neon-magenta"></i>
+          <div class="leading-tight text-left">
+            <div
+              class="text-[10px] uppercase font-mono text-slate-500 tracking-wider"
+            >
+              Workspace
+            </div>
+            <div
+              class="text-neon-cyan font-mono text-xs"
+              x-text="stats.workspace || '—'"
+            ></div>
+          </div>
+          <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-500"></i>
+        </button>
+
+        <!-- Health -->
+        <div
+          class="flex items-center gap-2 bg-ink-900 border border-edge rounded-xl px-3 py-1.5"
+        >
+          <span
+            class="w-2 h-2 rounded-full"
+            :class="health ? 'bg-neon-lime shadow-[0_0_8px_#00ff9c]' : 'bg-neon-red shadow-[0_0_8px_#ff3b6b]'"
+          ></span>
+          <div class="leading-tight">
+            <div
+              class="text-[10px] uppercase font-mono tracking-wider"
+              :class="health ? 'text-neon-lime' : 'text-neon-red'"
+              x-text="health ? 'API ONLINE' : 'API OFFLINE'"
+            ></div>
+            <div
+              class="text-[10px] font-mono text-slate-500"
+              x-text="stats.graph_storage || '—'"
+            ></div>
+          </div>
+        </div>
+
+        <a
+          class="btn btn-ghost"
+          href="/docs"
+          target="_blank"
+          title="OpenAPI Docs"
+          ><i data-lucide="braces" class="w-4 h-4"></i
+        ></a>
+        <a
+          class="btn btn-ghost"
+          href="/webui"
+          target="_blank"
+          title="Legacy WebUI"
+          ><i data-lucide="external-link" class="w-4 h-4"></i
+        ></a>
+      </div>
+    </header>
+
+    <!-- ========================== APP SHELL ========================== -->
+    <div class="flex h-[calc(100vh-3.5rem)] overflow-hidden">
+      <!-- ===== Sidebar ===== -->
+      <aside
+        class="w-60 shrink-0 border-r border-edge bg-ink-900/60 backdrop-blur flex flex-col"
+      >
+        <nav class="flex-1 px-3 py-4 overflow-y-auto">
+          <template x-for="group in navGroups" :key="group.id">
+            <div class="mb-5">
+              <div
+                class="px-3 mb-2 text-[10px] uppercase font-mono text-slate-500 tracking-[0.2em]"
+                x-text="group.label"
+              ></div>
+              <div class="space-y-0.5">
+                <template x-for="item in group.items" :key="item.id">
+                  <a
+                    class="nav-item"
+                    :class="active === item.id && 'nav-item-active'"
+                    @click="active = item.id"
+                  >
+                    <i :data-lucide="item.icon" class="w-4 h-4"></i>
+                    <span x-text="item.label" class="flex-1"></span>
+                    <span
+                      x-show="item.badge"
+                      class="pill bg-neon-magenta/10 text-neon-magenta border border-neon-magenta/30"
+                      x-text="item.badge"
+                    ></span>
+                  </a>
+                </template>
+              </div>
+            </div>
+          </template>
+        </nav>
+
+        <!-- Sidebar footer: at-a-glance workspace stats -->
+        <div
+          class="px-4 py-3 border-t border-edge text-[11px] font-mono space-y-1.5"
+        >
+          <div class="flex justify-between">
+            <span class="text-slate-500">DOCS</span
+            ><span class="text-neon-cyan" x-text="stats.documents ?? 0"></span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-500">ENTS</span
+            ><span
+              class="text-neon-magenta"
+              x-text="stats.entities ?? 0"
+            ></span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-500">RELS</span
+            ><span
+              class="text-neon-lime"
+              x-text="stats.relationships ?? 0"
+            ></span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-500">CHATS</span
+            ><span class="text-neon-amber" x-text="stats.chats ?? 0"></span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- ===== Main pane ===== -->
+      <main class="flex-1 flex flex-col overflow-hidden">
+        <!-- Section heading bar -->
+        <div
+          class="h-12 shrink-0 border-b border-edge bg-ink-900/40 flex items-center px-6 justify-between"
+        >
+          <div class="flex items-center gap-3">
+            <i :data-lucide="navIcon()" class="w-4 h-4 text-neon-cyan"></i>
+            <h1
+              class="text-base font-semibold tracking-tight"
+              x-text="navTitle()"
+            ></h1>
+            <span
+              class="text-[11px] font-mono text-slate-500"
+              x-text="navSubtitle()"
+            ></span>
+          </div>
+          <button
+            class="btn btn-ghost text-xs"
+            @click="refreshAll()"
+            title="Refresh all"
+          >
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh
+          </button>
+        </div>
+
+        <!-- Content area -->
+        <div class="flex-1 overflow-y-auto p-6">
+          <!-- ============== DASHBOARD ============== -->
+          <section x-show="active === 'dashboard'" x-cloak>
+            <!-- Hero -->
+            <div class="flex items-end justify-between mb-7 flex-wrap gap-4">
+              <div>
+                <h1 class="text-4xl font-bold tracking-tight">
+                  <span x-text="greeting()"></span
+                  ><span class="neon-text">.</span>
+                </h1>
+                <p class="text-base text-slate-400 mt-1">
+                  Workspace
+                  <span
+                    class="text-neon-cyan font-mono"
+                    x-text="stats.workspace || '—'"
+                  ></span>
+                  holds
+                  <span
+                    class="text-neon-magenta font-mono"
+                    x-text="stats.entities ?? 0"
+                  ></span>
+                  entities across
+                  <span
+                    class="text-neon-lime font-mono"
+                    x-text="stats.documents ?? 0"
+                  ></span>
+                  documents.
+                  <span x-show="(stats.relationships ?? 0) > 0"
+                    >Ready when you are.</span
+                  >
+                  <span
+                    x-show="!(stats.relationships ?? 0)"
+                    class="text-neon-amber"
+                    >Upload an RFP to begin.</span
+                  >
+                </p>
+              </div>
+              <div class="flex gap-2">
+                <button class="btn btn-primary" @click="active='documents'">
+                  <i data-lucide="upload-cloud" class="w-4 h-4"></i> New RFP
+                </button>
+                <button
+                  class="btn btn-ghost border border-edge"
+                  @click="newChat()"
+                >
+                  <i data-lucide="message-square-plus" class="w-4 h-4"></i> New
+                  Chat
+                </button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <template x-for="m in metrics()" :key="m.label">
+                <div
+                  class="card p-5 card-hover transition cursor-pointer"
+                  @click="m.go && (active = m.go)"
+                >
+                  <div class="flex items-start justify-between">
+                    <div>
+                      <div
+                        class="text-xs uppercase tracking-wider font-mono text-slate-500"
+                        x-text="m.label"
+                      ></div>
+                      <div
+                        class="mt-2 text-4xl font-semibold neon-text"
+                        x-text="m.value"
+                      ></div>
+                      <div
+                        class="mt-1 text-xs text-slate-500"
+                        x-text="m.hint"
+                      ></div>
+                    </div>
+                    <div
+                      class="w-10 h-10 rounded-lg bg-ink-800 border border-edge flex items-center justify-center text-neon-cyan"
+                    >
+                      <i :data-lucide="m.icon" class="w-5 h-5"></i>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-6">
+              <div class="card p-5 lg:col-span-2">
+                <div class="flex items-center justify-between mb-4">
+                  <h2 class="font-semibold">Quick Actions</h2>
+                  <span class="text-[11px] font-mono text-slate-500"
+                    >SHIPLEY · PHASE 4–6</span
+                  >
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    class="btn btn-primary justify-start"
+                    @click="active='documents'"
+                  >
+                    <i data-lucide="upload-cloud" class="w-4 h-4"></i> Upload an
+                    RFP
+                  </button>
+                  <button
+                    class="btn btn-primary justify-start"
+                    @click="newChat()"
+                  >
+                    <i data-lucide="message-square-plus" class="w-4 h-4"></i>
+                    Start a new capture chat
+                  </button>
+                  <button
+                    class="btn btn-ghost justify-start border border-edge"
+                    @click="active='graph'"
+                  >
+                    <i data-lucide="git-fork" class="w-4 h-4"></i> Open
+                    Knowledge Graph
+                  </button>
+                  <button
+                    class="btn btn-ghost justify-start border border-edge"
+                    @click="active='intel'"
+                  >
+                    <i data-lucide="layout-grid" class="w-4 h-4"></i> RFP
+                    Intelligence
+                  </button>
+                </div>
+              </div>
+
+              <div class="card p-5">
+                <h2 class="font-semibold mb-3">Models</h2>
+                <ul class="space-y-2 text-sm font-mono">
+                  <li class="flex justify-between">
+                    <span class="text-slate-500">extract</span
+                    ><span
+                      class="text-neon-cyan truncate ml-3"
+                      x-text="stats.models?.extraction || '—'"
+                    ></span>
+                  </li>
+                  <li class="flex justify-between">
+                    <span class="text-slate-500">reason</span
+                    ><span
+                      class="text-neon-magenta truncate ml-3"
+                      x-text="stats.models?.reasoning || '—'"
+                    ></span>
+                  </li>
+                  <li class="flex justify-between">
+                    <span class="text-slate-500">embed</span
+                    ><span
+                      class="text-neon-lime truncate ml-3"
+                      x-text="stats.models?.embedding || '—'"
+                    ></span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          <!-- ============== DOCUMENTS ============== -->
+          <section x-show="active === 'documents'" x-cloak>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <!-- Upload card -->
+              <div class="card p-5 lg:col-span-1">
+                <h2 class="font-semibold mb-1">Upload RFP</h2>
+                <p class="text-xs text-slate-500 mb-4">
+                  Drop a PDF / DOCX / XLSX. Multimodal parsing + 33-type
+                  extraction + L↔M inference auto-fires after the batch idles.
+                </p>
+
+                <label
+                  class="block border-2 border-dashed border-edge rounded-xl p-6 text-center cursor-pointer hover:border-neon-cyan/50 hover:bg-neon-cyan/5 transition"
+                  @dragover.prevent="$event.currentTarget.classList.add('border-neon-cyan/60')"
+                  @dragleave.prevent="$event.currentTarget.classList.remove('border-neon-cyan/60')"
+                  @drop.prevent="$event.currentTarget.classList.remove('border-neon-cyan/60'); uploadFiles($event.dataTransfer.files)"
+                >
+                  <input
+                    type="file"
+                    class="hidden"
+                    multiple
+                    @change="uploadFiles($event.target.files)"
+                  />
+                  <i
+                    data-lucide="upload-cloud"
+                    class="w-8 h-8 mx-auto text-neon-cyan"
+                  ></i>
+                  <div class="mt-2 text-sm">Click or drop files here</div>
+                  <div class="text-[11px] text-slate-500 mt-1">
+                    PDF · DOCX · XLSX · PPTX · MD · TXT
+                  </div>
+                </label>
+
+                <div class="mt-4 space-y-2" x-show="uploads.length">
+                  <template x-for="u in uploads" :key="u.id">
+                    <div class="text-xs flex items-center gap-2 font-mono">
+                      <i
+                        :data-lucide="u.status === 'done' ? 'check-circle' : (u.status === 'error' ? 'alert-circle' : 'loader')"
+                        class="w-3.5 h-3.5"
+                        :class="{'text-neon-lime': u.status === 'done', 'text-neon-red': u.status === 'error', 'text-neon-cyan animate-spin': u.status === 'uploading'}"
+                      ></i>
+                      <span class="truncate flex-1" x-text="u.name"></span>
+                      <span
+                        class="text-slate-500"
+                        x-text="u.msg || u.status"
+                      ></span>
+                    </div>
+                  </template>
+                </div>
+
+                <button
+                  class="btn btn-ghost border border-edge w-full mt-4"
+                  @click="scanRfp()"
+                >
+                  <i data-lucide="folder-search" class="w-4 h-4"></i> Scan
+                  inputs/&lt;workspace&gt;/
+                </button>
+              </div>
+
+              <!-- Documents list -->
+              <div class="card p-5 lg:col-span-2">
+                <div class="flex items-center justify-between mb-3">
+                  <h2 class="font-semibold">Processed Documents</h2>
+                  <button
+                    class="btn btn-ghost text-xs"
+                    @click="loadDocuments()"
+                  >
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh
+                  </button>
+                </div>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-sm">
+                    <thead
+                      class="text-[11px] uppercase tracking-wider text-slate-500 font-mono"
+                    >
+                      <tr class="border-b border-edge">
+                        <th class="text-left py-2 pr-4">File</th>
+                        <th class="text-left py-2 pr-4">Status</th>
+                        <th class="text-left py-2 pr-4">Chunks</th>
+                        <th class="text-left py-2 pr-4">Created</th>
+                        <th class="py-2"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <template x-for="d in documents" :key="d.id">
+                        <tr class="border-b border-edge/40 hover:bg-white/5">
+                          <td
+                            class="py-2 pr-4 truncate max-w-[260px]"
+                            x-text="d.file_path || d.id"
+                          ></td>
+                          <td class="py-2 pr-4">
+                            <span
+                              class="pill"
+                              :class="{
+                          'bg-neon-lime/10 text-neon-lime border border-neon-lime/30': d.status === 'processed',
+                          'bg-neon-amber/10 text-neon-amber border border-neon-amber/30': d.status === 'processing' || d.status === 'pending',
+                          'bg-neon-red/10 text-neon-red border border-neon-red/30': d.status === 'failed',
+                        }"
+                              x-text="d.status"
+                            ></span>
+                          </td>
+                          <td
+                            class="py-2 pr-4 font-mono"
+                            x-text="d.chunks_count ?? '—'"
+                          ></td>
+                          <td
+                            class="py-2 pr-4 font-mono text-xs text-slate-500"
+                            x-text="(d.created_at || '').slice(0,16).replace('T',' ')"
+                          ></td>
+                          <td class="py-2 text-right">
+                            <button
+                              class="btn btn-ghost text-xs"
+                              @click="askAbout(d)"
+                            >
+                              <i
+                                data-lucide="message-square"
+                                class="w-3.5 h-3.5"
+                              ></i>
+                              Ask
+                            </button>
+                          </td>
+                        </tr>
+                      </template>
+                      <tr x-show="!documents.length">
+                        <td
+                          colspan="5"
+                          class="py-8 text-center text-slate-500 text-sm"
+                        >
+                          No documents yet. Upload an RFP to get started.
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ============== KNOWLEDGE GRAPH ============== -->
+          <section x-show="active === 'graph'" x-cloak class="h-full">
+            <div class="flex gap-4 h-[calc(100vh-9rem)]">
+              <!-- Left rail: search + filter + legend -->
+              <div class="w-64 shrink-0 card p-3 flex flex-col overflow-hidden">
+                <div class="space-y-2">
+                  <label
+                    class="text-[11px] uppercase tracking-wider font-mono text-slate-500"
+                    >Seed Label</label
+                  >
+                  <div class="relative">
+                    <input
+                      type="text"
+                      x-model="graph.labelQuery"
+                      @input.debounce.300ms="searchLabels()"
+                      @focus="graph.showLabelDropdown = true"
+                      @blur="setTimeout(() => graph.showLabelDropdown = false, 200)"
+                      placeholder="* (everything) or type…"
+                      class="w-full bg-ink-900 border border-edge focus:border-neon-cyan/60 outline-none rounded-lg px-3 py-2 text-sm font-mono"
+                    />
+                    <div
+                      x-show="graph.showLabelDropdown && graph.labelOptions.length"
+                      class="absolute z-30 mt-1 w-full max-h-60 overflow-y-auto card p-1 text-xs"
+                    >
+                      <template x-for="opt in graph.labelOptions" :key="opt">
+                        <div
+                          class="px-2 py-1 hover:bg-neon-cyan/10 hover:text-neon-cyan cursor-pointer rounded font-mono truncate"
+                          @mousedown="graph.label = opt; graph.labelQuery = opt; graph.showLabelDropdown = false; loadGraph()"
+                          x-text="opt"
+                        ></div>
+                      </template>
+                    </div>
+                  </div>
+                  <button
+                    class="btn btn-primary w-full justify-center text-xs"
+                    @click="graph.label = graph.labelQuery || '*'; loadGraph()"
+                  >
+                    <i data-lucide="search" class="w-3.5 h-3.5"></i> Load graph
+                  </button>
+                </div>
+
+                <div class="mt-4 space-y-3">
+                  <div>
+                    <label
+                      class="text-[11px] uppercase tracking-wider font-mono text-slate-500 flex justify-between"
+                    >
+                      <span>Max Nodes</span
+                      ><span
+                        class="text-neon-cyan"
+                        x-text="graph.maxNodes"
+                      ></span>
+                    </label>
+                    <input
+                      type="range"
+                      min="50"
+                      max="2000"
+                      step="50"
+                      x-model.number="graph.maxNodes"
+                      class="w-full accent-neon-cyan"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      class="text-[11px] uppercase tracking-wider font-mono text-slate-500 flex justify-between"
+                    >
+                      <span>Max Depth</span
+                      ><span
+                        class="text-neon-cyan"
+                        x-text="graph.maxDepth"
+                      ></span>
+                    </label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="5"
+                      step="1"
+                      x-model.number="graph.maxDepth"
+                      class="w-full accent-neon-cyan"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      class="text-[11px] uppercase tracking-wider font-mono text-slate-500 flex justify-between"
+                    >
+                      <span>Min Confidence</span
+                      ><span
+                        class="text-neon-magenta"
+                        x-text="graph.minConfidence.toFixed(2)"
+                      ></span>
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      x-model.number="graph.minConfidence"
+                      @input="applyFilters()"
+                      class="w-full accent-neon-magenta"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      class="text-[11px] uppercase tracking-wider font-mono text-slate-500"
+                      >Layout</label
+                    >
+                    <select
+                      x-model="graph.layout"
+                      @change="relayout()"
+                      class="w-full bg-ink-800 border border-edge rounded-md text-xs px-2 py-1 font-mono"
+                    >
+                      <option>fcose</option>
+                      <option>cose</option>
+                      <option>concentric</option>
+                      <option>breadthfirst</option>
+                      <option>circle</option>
+                      <option>grid</option>
+                    </select>
+                  </div>
+                  <div class="flex gap-1">
+                    <button
+                      class="btn btn-ghost border border-edge flex-1 justify-center text-xs"
+                      @click="fitGraph()"
+                    >
+                      <i data-lucide="maximize" class="w-3.5 h-3.5"></i> Fit
+                    </button>
+                    <button
+                      class="btn btn-ghost border border-edge flex-1 justify-center text-xs"
+                      @click="exportPng()"
+                    >
+                      <i data-lucide="download" class="w-3.5 h-3.5"></i> PNG
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Legend -->
+                <div class="mt-4 flex-1 overflow-y-auto pr-1">
+                  <div
+                    class="text-[11px] uppercase tracking-wider font-mono text-slate-500 mb-1.5"
+                  >
+                    Entity types
+                  </div>
+                  <div class="space-y-0.5">
+                    <template
+                      x-for="[type, count] in graph.typeCounts"
+                      :key="type"
+                    >
+                      <div
+                        class="flex items-center gap-2 text-[11px] font-mono cursor-pointer hover:text-white"
+                        :class="graph.hiddenTypes.includes(type) ? 'opacity-40' : ''"
+                        @click="toggleTypeFilter(type)"
+                      >
+                        <span
+                          class="w-3 h-3 rounded-sm shrink-0"
+                          :style="`background:${entityColor(type)}`"
+                        ></span>
+                        <span class="truncate flex-1" x-text="type"></span>
+                        <span class="text-slate-500" x-text="count"></span>
+                      </div>
+                    </template>
+                    <div
+                      x-show="!graph.typeCounts.length"
+                      class="text-slate-500 text-xs px-1"
+                    >
+                      Load a graph to see types.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Center: Cytoscape canvas -->
+              <div class="flex-1 card relative overflow-hidden">
+                <div
+                  class="absolute top-2 left-3 z-20 flex items-center gap-2 text-[11px] font-mono text-slate-500"
+                >
+                  <span
+                    x-show="graph.loading"
+                    class="text-neon-cyan flex items-center gap-1.5"
+                  >
+                    <span class="dot-pulse"
+                      ><span></span><span></span><span></span
+                    ></span>
+                    loading…
+                  </span>
+                  <span x-show="!graph.loading && graph.stats.nodes">
+                    <span
+                      class="text-neon-cyan"
+                      x-text="graph.stats.visibleNodes"
+                    ></span
+                    >/<span x-text="graph.stats.nodes"></span> nodes ·
+                    <span
+                      class="text-neon-magenta"
+                      x-text="graph.stats.visibleEdges"
+                    ></span
+                    >/<span x-text="graph.stats.edges"></span> edges
+                    <span
+                      x-show="graph.stats.truncated"
+                      class="ml-2 text-neon-amber"
+                      >⚠ truncated</span
+                    >
+                  </span>
+                </div>
+                <div x-ref="cy" class="absolute inset-0"></div>
+                <div
+                  x-show="!graph.stats.nodes && !graph.loading"
+                  class="absolute inset-0 flex items-center justify-center text-slate-500 text-sm pointer-events-none"
+                >
+                  <div class="text-center">
+                    <i
+                      data-lucide="git-fork"
+                      class="w-12 h-12 mx-auto text-neon-magenta opacity-40"
+                    ></i>
+                    <div class="mt-3">
+                      Type a label or use
+                      <span class="text-neon-cyan font-mono">*</span> to load
+                      the graph.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right: detail panel -->
+              <div
+                class="w-80 shrink-0 card p-4 overflow-y-auto"
+                x-show="graph.selected"
+              >
+                <template x-if="graph.selected">
+                  <div>
+                    <div class="flex items-start justify-between gap-2">
+                      <div class="min-w-0">
+                        <div
+                          class="pill mb-1"
+                          :style="`background:${entityColor(graph.selected.type)}22; color:${entityColor(graph.selected.type)}; border:1px solid ${entityColor(graph.selected.type)}55`"
+                          x-text="graph.selected.type"
+                        ></div>
+                        <h3
+                          class="font-semibold neon-text break-words"
+                          x-text="graph.selected.id"
+                        ></h3>
+                      </div>
+                      <button
+                        class="btn btn-ghost text-slate-500"
+                        @click="graph.selected = null"
+                      >
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                      </button>
+                    </div>
+                    <p
+                      class="mt-3 text-xs text-slate-400 whitespace-pre-wrap"
+                      x-text="graph.selected.description || '(no description)'"
+                    ></p>
+
+                    <div class="mt-4 space-y-1 text-[11px] font-mono">
+                      <template x-for="[k,v] in graph.selectedProps" :key="k">
+                        <div class="flex gap-2">
+                          <span
+                            class="text-slate-500 w-24 shrink-0"
+                            x-text="k"
+                          ></span
+                          ><span
+                            class="text-slate-300 break-all"
+                            x-text="v"
+                          ></span>
+                        </div>
+                      </template>
+                    </div>
+
+                    <div class="mt-4 flex gap-2">
+                      <button
+                        class="btn btn-primary text-xs flex-1 justify-center"
+                        @click="askAboutEntity(graph.selected)"
+                      >
+                        <i data-lucide="message-square" class="w-3.5 h-3.5"></i>
+                        Ask about this
+                      </button>
+                      <button
+                        class="btn btn-ghost border border-edge text-xs"
+                        @click="loadGraphFromNode(graph.selected.id)"
+                        title="Re-center on this node"
+                      >
+                        <i data-lucide="crosshair" class="w-3.5 h-3.5"></i>
+                      </button>
+                    </div>
+
+                    <div class="mt-5">
+                      <div
+                        class="text-[11px] uppercase tracking-wider font-mono text-slate-500 mb-2"
+                      >
+                        Source chunks
+                      </div>
+                      <div
+                        x-show="graph.chunksLoading"
+                        class="text-xs text-slate-500"
+                      >
+                        Loading…
+                      </div>
+                      <div class="space-y-2" x-show="!graph.chunksLoading">
+                        <template x-for="c in graph.chunks" :key="c.chunk_id">
+                          <div
+                            class="text-xs bg-ink-900 border border-edge rounded p-2"
+                          >
+                            <div
+                              class="font-mono text-[10px] text-slate-500 mb-1 truncate"
+                              x-text="c.file_path || c.chunk_id"
+                            ></div>
+                            <div
+                              class="text-slate-300 whitespace-pre-wrap"
+                              x-text="c.snippet"
+                            ></div>
+                          </div>
+                        </template>
+                        <div
+                          x-show="!graph.chunks.length"
+                          class="text-xs text-slate-500"
+                        >
+                          No chunks indexed for this entity.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </section>
+
+          <!-- ============== CHAT ============== -->
+          <section x-show="active === 'chat'" x-cloak class="h-full">
+            <div class="flex gap-4 h-[calc(100vh-9rem)]">
+              <!-- Chat list -->
+              <div class="w-64 shrink-0 card p-3 flex flex-col">
+                <button
+                  class="btn btn-primary w-full justify-center mb-3"
+                  @click="newChat()"
+                >
+                  <i data-lucide="plus" class="w-4 h-4"></i> New chat
+                </button>
+                <div class="flex-1 overflow-y-auto space-y-1">
+                  <template x-for="c in chats" :key="c.id">
+                    <div
+                      class="group p-2 rounded-lg cursor-pointer text-sm"
+                      :class="currentChat?.id === c.id ? 'bg-neon-cyan/10 border border-neon-cyan/30' : 'hover:bg-white/5 border border-transparent'"
+                      @click="openChat(c.id)"
+                    >
+                      <div class="flex items-center justify-between gap-1">
+                        <div
+                          class="truncate font-medium"
+                          x-text="c.title"
+                        ></div>
+                        <button
+                          class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-neon-red"
+                          @click.stop="deleteChat(c.id)"
+                          title="Delete"
+                        >
+                          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        </button>
+                      </div>
+                      <div class="text-[11px] font-mono text-slate-500 mt-0.5">
+                        <span x-text="c.message_count"></span> msgs ·
+                        <span x-text="c.mode"></span>
+                      </div>
+                    </div>
+                  </template>
+                  <div
+                    x-show="!chats.length"
+                    class="text-xs text-slate-500 px-2 py-4 text-center"
+                  >
+                    No saved chats yet.
+                  </div>
+                </div>
+              </div>
+
+              <!-- Chat main -->
+              <div class="flex-1 card flex flex-col overflow-hidden">
+                <div
+                  x-show="!currentChat"
+                  class="flex-1 flex items-center justify-center text-slate-500 text-sm"
+                >
+                  Select or create a chat to start.
+                </div>
+
+                <template x-if="currentChat">
+                  <div class="flex flex-col h-full">
+                    <!-- Header -->
+                    <div
+                      class="px-4 py-3 border-b border-edge flex items-center justify-between"
+                    >
+                      <div class="flex-1 min-w-0">
+                        <input
+                          class="bg-transparent w-full text-sm font-semibold text-white focus:outline-none"
+                          x-model="currentChat.title"
+                          @change="renameChat()"
+                        />
+                        <div
+                          class="text-[11px] font-mono text-slate-500"
+                          x-text="`${currentChat.messages.length} messages`"
+                        ></div>
+                      </div>
+                      <select
+                        class="bg-ink-800 border border-edge rounded-md text-xs px-2 py-1 font-mono"
+                        x-model="currentChat.mode"
+                        @change="updateMode()"
+                      >
+                        <option>hybrid</option>
+                        <option>mix</option>
+                        <option>local</option>
+                        <option>global</option>
+                        <option>naive</option>
+                      </select>
+                    </div>
+
+                    <!-- Messages -->
+                    <div
+                      class="flex-1 overflow-y-auto px-4 py-4 space-y-4"
+                      x-ref="msgs"
+                    >
+                      <template x-for="(m, i) in currentChat.messages" :key="i">
+                        <div
+                          class="flex gap-3"
+                          :class="m.role === 'user' ? 'justify-end' : 'justify-start'"
+                        >
+                          <div
+                            class="max-w-[85%] rounded-lg px-3.5 py-2.5 text-sm whitespace-pre-wrap markdown"
+                            :class="m.role === 'user' ? 'bubble-user' : 'bubble-assistant'"
+                            x-text="m.content"
+                          ></div>
+                        </div>
+                      </template>
+                      <div x-show="sending" class="flex gap-3">
+                        <div class="bubble-assistant rounded-lg px-3.5 py-2.5">
+                          <span class="dot-pulse"
+                            ><span></span><span></span><span></span
+                          ></span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Prompt library + composer -->
+                    <div class="border-t border-edge p-3 space-y-3">
+                      <div
+                        class="flex flex-wrap gap-1.5"
+                        x-show="promptLibrary.length"
+                      >
+                        <template
+                          x-for="p in promptLibrary.slice(0,6)"
+                          :key="p.title"
+                        >
+                          <button
+                            class="pill bg-ink-800 hover:bg-neon-cyan/10 hover:text-neon-cyan border border-edge transition"
+                            @click="composer = p.prompt; $refs.composer.focus()"
+                            :title="p.prompt"
+                          >
+                            <span class="text-neon-magenta"
+                              >P<span x-text="p.phase"></span
+                            ></span>
+                            <span x-text="p.title"></span>
+                          </button>
+                        </template>
+                      </div>
+                      <form class="flex gap-2" @submit.prevent="sendMessage()">
+                        <textarea
+                          x-ref="composer"
+                          x-model="composer"
+                          rows="2"
+                          placeholder="Ask about Section L, traceability, win themes…  (Ctrl+Enter to send)"
+                          class="flex-1 bg-ink-900 border border-edge focus:border-neon-cyan/60 focus:shadow-glow outline-none rounded-lg px-3 py-2 text-sm resize-none"
+                          @keydown.ctrl.enter.prevent="sendMessage()"
+                        ></textarea>
+                        <button
+                          class="btn btn-primary self-end"
+                          :disabled="sending || !composer.trim()"
+                        >
+                          <i data-lucide="send" class="w-4 h-4"></i> Send
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </section>
+
+          <!-- ============== INTELLIGENCE ============== -->
+          <section x-show="active === 'intel'" x-cloak>
+            <!-- Top: tabs + summary chips -->
+            <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+              <div
+                class="flex gap-1 bg-ink-850 border border-edge rounded-lg p-1"
+              >
+                <template x-for="tab in intel.tabs" :key="tab.id">
+                  <button
+                    class="px-3 py-1.5 text-xs font-mono uppercase tracking-wider rounded-md transition"
+                    :class="intel.tab === tab.id ? 'bg-neon-cyan/15 text-neon-cyan shadow-glow' : 'text-slate-400 hover:text-white'"
+                    @click="intel.tab = tab.id"
+                  >
+                    <i
+                      :data-lucide="tab.icon"
+                      class="w-3.5 h-3.5 inline-block mr-1"
+                    ></i>
+                    <span x-text="tab.label"></span>
+                  </button>
+                </template>
+              </div>
+              <div
+                class="flex items-center gap-2 text-[11px] font-mono text-slate-500"
+              >
+                <span
+                  x-show="intel.loading"
+                  class="text-neon-cyan flex items-center gap-1.5"
+                >
+                  <span class="dot-pulse"
+                    ><span></span><span></span><span></span
+                  ></span>
+                  computing…
+                </span>
+                <span x-show="!intel.loading && intel.data">
+                  <span
+                    class="text-neon-cyan"
+                    x-text="intel.data?.totals?.entities || 0"
+                  ></span>
+                  entities ·
+                  <span
+                    class="text-neon-magenta"
+                    x-text="intel.data?.totals?.relationships || 0"
+                  ></span>
+                  rels · generated
+                  <span
+                    x-text="(intel.data?.generated_at || '').slice(11,19)"
+                  ></span>
+                </span>
+                <button
+                  class="btn btn-ghost border border-edge text-xs"
+                  @click="loadIntel()"
+                >
+                  <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Recompute
+                </button>
+              </div>
+            </div>
+
+            <!-- ===== Tab: L↔M Matrix ===== -->
+            <div x-show="intel.tab === 'lm'" x-cloak class="space-y-6">
+              <div class="card overflow-hidden">
+                <div
+                  class="px-5 py-3 border-b border-edge flex items-center justify-between"
+                >
+                  <h2 class="font-semibold">Section L → Section M Matrix</h2>
+                  <div class="flex items-center gap-3 text-[11px] font-mono">
+                    <span class="text-slate-500">show:</span>
+                    <label class="flex items-center gap-1.5"
+                      ><input
+                        type="checkbox"
+                        class="accent-neon-cyan"
+                        x-model="intel.showCovered"
+                      />
+                      covered</label
+                    >
+                    <label class="flex items-center gap-1.5"
+                      ><input
+                        type="checkbox"
+                        class="accent-neon-red"
+                        x-model="intel.showGaps"
+                      />
+                      gaps</label
+                    >
+                  </div>
+                </div>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-sm">
+                    <thead
+                      class="text-[11px] uppercase tracking-wider text-slate-500 font-mono"
+                    >
+                      <tr class="border-b border-edge">
+                        <th class="text-left px-5 py-2 w-1/3">
+                          Section L Instruction
+                        </th>
+                        <th class="text-left px-5 py-2">
+                          Linked Section M Factor / Subfactor
+                        </th>
+                        <th class="px-5 py-2 w-20"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <template
+                        x-for="row in filteredLmRows()"
+                        :key="row.instruction.id"
+                      >
+                        <tr
+                          class="border-b border-edge/40 hover:bg-white/5 align-top"
+                        >
+                          <td class="px-5 py-3">
+                            <div
+                              class="font-medium text-neon-cyan break-words"
+                              x-text="row.instruction.id"
+                            ></div>
+                            <div
+                              class="text-xs text-slate-500 mt-0.5"
+                              x-text="row.instruction.description"
+                            ></div>
+                          </td>
+                          <td class="px-5 py-3">
+                            <template x-if="row.factors.length">
+                              <div class="space-y-1">
+                                <template x-for="f in row.factors" :key="f.id">
+                                  <div class="flex items-start gap-2">
+                                    <span
+                                      class="pill mt-0.5"
+                                      :style="`background:${entityColor(f.type)}22;color:${entityColor(f.type)};border:1px solid ${entityColor(f.type)}55`"
+                                      x-text="f.type"
+                                    ></span>
+                                    <div class="min-w-0">
+                                      <div
+                                        class="text-slate-100 break-words"
+                                        x-text="f.id"
+                                      ></div>
+                                      <div
+                                        class="text-xs text-slate-500"
+                                        x-text="f.description"
+                                      ></div>
+                                    </div>
+                                  </div>
+                                </template>
+                              </div>
+                            </template>
+                            <span
+                              x-show="!row.factors.length"
+                              class="pill bg-neon-red/10 text-neon-red border border-neon-red/30"
+                              >⚠ unmapped</span
+                            >
+                          </td>
+                          <td class="px-5 py-3 text-right">
+                            <button
+                              class="btn btn-ghost text-xs"
+                              @click="askIntel('Trace Section L instruction \\'' + row.instruction.id + '\\' to the Section M factors that evaluate it. Cite the source clauses.')"
+                            >
+                              <i
+                                data-lucide="message-square"
+                                class="w-3.5 h-3.5"
+                              ></i>
+                            </button>
+                          </td>
+                        </tr>
+                      </template>
+                      <tr x-show="!filteredLmRows().length">
+                        <td colspan="3" class="text-center text-slate-500 py-8">
+                          No instructions extracted yet.
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Reverse view: factors that lack instructions -->
+              <div class="card overflow-hidden" x-show="orphanFactors().length">
+                <div class="px-5 py-3 border-b border-edge">
+                  <h2 class="font-semibold text-neon-amber">
+                    ⚠ Section M factors with no Section L instruction
+                  </h2>
+                </div>
+                <ul class="divide-y divide-edge/40">
+                  <template x-for="row in orphanFactors()" :key="row.factor.id">
+                    <li class="px-5 py-2 text-sm">
+                      <div
+                        class="font-medium text-neon-amber"
+                        x-text="row.factor.id"
+                      ></div>
+                      <div
+                        class="text-xs text-slate-500"
+                        x-text="row.factor.description"
+                      ></div>
+                    </li>
+                  </template>
+                </ul>
+              </div>
+            </div>
+
+            <!-- ===== Tab: Traceability ===== -->
+            <div x-show="intel.tab === 'trace'" x-cloak>
+              <div class="card overflow-hidden">
+                <div
+                  class="px-5 py-3 border-b border-edge flex items-center justify-between"
+                >
+                  <h2 class="font-semibold">
+                    Requirement → Deliverable → Standard / Metric
+                  </h2>
+                  <input
+                    x-model="intel.traceFilter"
+                    placeholder="Filter…"
+                    class="bg-ink-900 border border-edge rounded-md px-2 py-1 text-xs font-mono w-48"
+                  />
+                </div>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-sm">
+                    <thead
+                      class="text-[11px] uppercase tracking-wider text-slate-500 font-mono"
+                    >
+                      <tr class="border-b border-edge">
+                        <th class="text-left px-5 py-2">Requirement</th>
+                        <th class="text-left px-5 py-2">Deliverable</th>
+                        <th class="text-left px-5 py-2">
+                          Performance Standard
+                        </th>
+                        <th class="text-left px-5 py-2">Workload Metric</th>
+                        <th class="px-5 py-2 w-16"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <template
+                        x-for="(row, i) in filteredTrace()"
+                        :key="row.requirement.id + '|' + i"
+                      >
+                        <tr
+                          class="border-b border-edge/40 hover:bg-white/5 align-top"
+                        >
+                          <td class="px-5 py-3">
+                            <div
+                              class="text-neon-magenta font-medium break-words"
+                              x-text="row.requirement.id"
+                            ></div>
+                            <div
+                              class="text-xs text-slate-500"
+                              x-text="row.requirement.description"
+                            ></div>
+                          </td>
+                          <td class="px-5 py-3">
+                            <template x-for="d in row.deliverables" :key="d.id">
+                              <div
+                                class="text-neon-lime break-words"
+                                x-text="d.id"
+                              ></div>
+                            </template>
+                            <span
+                              x-show="!row.deliverables.length"
+                              class="pill bg-neon-red/10 text-neon-red border border-neon-red/30"
+                              >⚠ gap</span
+                            >
+                          </td>
+                          <td class="px-5 py-3 text-xs">
+                            <template x-for="s in row.standards" :key="s.id"
+                              ><div x-text="s.id"></div
+                            ></template>
+                          </td>
+                          <td class="px-5 py-3 text-xs">
+                            <template x-for="m in row.metrics" :key="m.id"
+                              ><div x-text="m.id"></div
+                            ></template>
+                          </td>
+                          <td class="px-5 py-3 text-right">
+                            <span
+                              class="pill"
+                              :class="row.complete ? 'bg-neon-lime/10 text-neon-lime border border-neon-lime/30' : 'bg-neon-amber/10 text-neon-amber border border-neon-amber/30'"
+                              x-text="row.complete ? 'OK' : '…'"
+                            ></span>
+                          </td>
+                        </tr>
+                      </template>
+                      <tr x-show="!filteredTrace().length">
+                        <td colspan="5" class="text-center text-slate-500 py-8">
+                          No requirements extracted yet.
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- ===== Tab: Coverage heatmap ===== -->
+            <div x-show="intel.tab === 'coverage'" x-cloak>
+              <div class="card p-5">
+                <h2 class="font-semibold mb-1">Evaluation Factor Coverage</h2>
+                <p class="text-xs text-slate-500 mb-4">
+                  Score = inbound instructions + subfactors + supporting
+                  evidence (max 3). Click a row to ask Theseus.
+                </p>
+                <div
+                  class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"
+                >
+                  <template
+                    x-for="row in (intel.data?.coverage || [])"
+                    :key="row.factor.id"
+                  >
+                    <div
+                      class="card p-3 cursor-pointer card-hover transition"
+                      @click="askIntel('Assess our coverage of evaluation factor \\'' + row.factor.id + '\\'. List linked instructions, subfactors, and proof points; identify any gaps.')"
+                    >
+                      <div class="flex items-start justify-between gap-2">
+                        <div class="min-w-0">
+                          <div
+                            class="font-medium text-slate-100 break-words text-sm"
+                            x-text="row.factor.id"
+                          ></div>
+                          <div
+                            class="text-[11px] text-slate-500 mt-0.5"
+                            x-text="row.factor.description"
+                          ></div>
+                        </div>
+                        <span
+                          class="pill shrink-0 font-bold"
+                          :class="coverageBadgeClass(row.score)"
+                          x-text="row.score + '/3'"
+                        ></span>
+                      </div>
+                      <div
+                        class="mt-3 grid grid-cols-3 gap-1 text-[10px] font-mono"
+                      >
+                        <div class="text-center p-1.5 rounded bg-ink-900">
+                          <div class="text-slate-500">SUBS</div>
+                          <div
+                            class="text-neon-cyan text-base"
+                            x-text="row.subfactor_count"
+                          ></div>
+                        </div>
+                        <div class="text-center p-1.5 rounded bg-ink-900">
+                          <div class="text-slate-500">INSTR</div>
+                          <div
+                            class="text-neon-magenta text-base"
+                            x-text="row.instruction_count"
+                          ></div>
+                        </div>
+                        <div class="text-center p-1.5 rounded bg-ink-900">
+                          <div class="text-slate-500">EVID</div>
+                          <div
+                            class="text-neon-lime text-base"
+                            x-text="row.evidence_count"
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+                  <div
+                    x-show="!(intel.data?.coverage || []).length"
+                    class="col-span-full text-center text-slate-500 py-8"
+                  >
+                    No evaluation factors extracted.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ===== Tab: Gaps ===== -->
+            <div
+              x-show="intel.tab === 'gaps'"
+              x-cloak
+              class="grid grid-cols-1 lg:grid-cols-3 gap-4"
+            >
+              <template x-for="bucket in gapBuckets()" :key="bucket.id">
+                <div class="card p-5">
+                  <div class="flex items-center justify-between mb-2">
+                    <h3 class="font-semibold" x-text="bucket.title"></h3>
+                    <span
+                      class="pill bg-neon-red/10 text-neon-red border border-neon-red/30"
+                      x-text="bucket.items.length"
+                    ></span>
+                  </div>
+                  <p
+                    class="text-xs text-slate-500 mb-3"
+                    x-text="bucket.subtitle"
+                  ></p>
+                  <div class="space-y-1.5 max-h-96 overflow-y-auto pr-1">
+                    <template x-for="item in bucket.items" :key="item.id">
+                      <div
+                        class="text-xs bg-ink-900 border border-edge rounded p-2 cursor-pointer hover:border-neon-amber/50"
+                        @click="askIntel(bucket.askPrefix + ' \\'' + item.id + '\\'. Suggest how to close this gap.')"
+                      >
+                        <div
+                          class="font-medium text-slate-100 break-words"
+                          x-text="item.id"
+                        ></div>
+                        <div
+                          class="text-slate-500 mt-0.5"
+                          x-text="item.description"
+                        ></div>
+                      </div>
+                    </template>
+                    <div
+                      x-show="!bucket.items.length"
+                      class="text-xs text-neon-lime"
+                    >
+                      ✓ None — nothing flagged.
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </section>
+
+          <!-- ============== SETTINGS ============== -->
+          <section
+            x-show="active === 'settings'"
+            x-cloak
+            class="space-y-6 max-w-3xl"
+          >
+            <!-- Workspace card -->
+            <div class="card p-6">
+              <div class="flex items-center justify-between mb-4">
+                <div>
+                  <h2 class="font-semibold text-lg">Active Workspace</h2>
+                  <p class="text-xs text-slate-500 mt-0.5">
+                    Switching restarts the server. The UI will reconnect
+                    automatically.
+                  </p>
+                </div>
+                <button class="btn btn-primary" @click="openWorkspaceModal()">
+                  <i data-lucide="layers" class="w-4 h-4"></i> Switch / Create
+                </button>
+              </div>
+              <dl class="grid grid-cols-3 gap-y-3 text-sm font-mono">
+                <dt class="text-slate-500">workspace</dt>
+                <dd
+                  class="col-span-2 text-neon-cyan"
+                  x-text="stats.workspace"
+                ></dd>
+                <dt class="text-slate-500">working_dir</dt>
+                <dd
+                  class="col-span-2 text-slate-400 break-all"
+                  x-text="stats.working_dir"
+                ></dd>
+                <dt class="text-slate-500">documents</dt>
+                <dd class="col-span-2" x-text="stats.documents"></dd>
+                <dt class="text-slate-500">entities</dt>
+                <dd class="col-span-2" x-text="stats.entities"></dd>
+                <dt class="text-slate-500">relationships</dt>
+                <dd class="col-span-2" x-text="stats.relationships"></dd>
+                <dt class="text-slate-500">chunks</dt>
+                <dd class="col-span-2" x-text="stats.chunks"></dd>
+                <dt class="text-slate-500">chats</dt>
+                <dd class="col-span-2" x-text="stats.chats"></dd>
+              </dl>
+            </div>
+
+            <!-- Storage / Models -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="card p-5">
+                <h3 class="font-semibold mb-3">Storage</h3>
+                <dl class="grid grid-cols-3 gap-y-2 text-sm font-mono">
+                  <dt class="text-slate-500">graph</dt>
+                  <dd
+                    class="col-span-2 text-neon-magenta"
+                    x-text="stats.graph_storage"
+                  ></dd>
+                </dl>
+              </div>
+              <div class="card p-5">
+                <h3 class="font-semibold mb-3">Models</h3>
+                <dl class="grid grid-cols-3 gap-y-2 text-sm font-mono">
+                  <dt class="text-slate-500">extract</dt>
+                  <dd
+                    class="col-span-2 text-neon-cyan truncate"
+                    x-text="stats.models?.extraction || '—'"
+                  ></dd>
+                  <dt class="text-slate-500">reason</dt>
+                  <dd
+                    class="col-span-2 text-neon-magenta truncate"
+                    x-text="stats.models?.reasoning || '—'"
+                  ></dd>
+                  <dt class="text-slate-500">embed</dt>
+                  <dd
+                    class="col-span-2 text-neon-lime truncate"
+                    x-text="stats.models?.embedding || '—'"
+                  ></dd>
+                </dl>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <!-- Toast container -->
+    <template x-for="t in toasts" :key="t.id">
+      <div
+        class="toast"
+        x-text="t.msg"
+        :class="t.kind === 'error' ? 'border-neon-red/60' : 'border-neon-cyan/40'"
+      ></div>
+    </template>
+
+    <!-- ========================== COMMAND PALETTE (Ctrl+K) ========================== -->
+    <div
+      x-show="palette.open"
+      x-cloak
+      class="fixed inset-0 z-[60] bg-ink-950/80 backdrop-blur-sm flex items-start justify-center pt-32"
+      @click.self="palette.open=false"
+    >
+      <div
+        class="w-full max-w-2xl card border-edge-strong shadow-glow overflow-hidden"
+        @keydown.arrow-down.prevent="palette.cursor = Math.min(palette.cursor+1, paletteResults().length-1)"
+        @keydown.arrow-up.prevent="palette.cursor = Math.max(palette.cursor-1, 0)"
+        @keydown.enter.prevent="runPaletteAction(paletteResults()[palette.cursor])"
+      >
+        <div class="flex items-center gap-3 px-4 py-3 border-b border-edge">
+          <i data-lucide="search" class="w-4 h-4 text-neon-cyan"></i>
+          <input
+            x-ref="paletteInput"
+            x-model="palette.query"
+            @input="palette.cursor = 0"
+            placeholder="Search views, chats, prompts, workspaces…"
+            class="flex-1 bg-transparent outline-none text-sm placeholder-slate-500"
+          />
+          <span
+            class="text-[10px] font-mono text-slate-500 border border-edge px-1.5 py-0.5 rounded"
+            >ESC</span
+          >
+        </div>
+        <div class="max-h-96 overflow-y-auto">
+          <template x-for="(item, i) in paletteResults()" :key="item.key">
+            <div
+              class="flex items-center gap-3 px-4 py-2.5 cursor-pointer text-sm border-l-2"
+              :class="i === palette.cursor ? 'bg-neon-cyan/10 border-neon-cyan text-neon-cyan' : 'border-transparent hover:bg-white/5 text-slate-300'"
+              @click="runPaletteAction(item)"
+              @mouseenter="palette.cursor = i"
+            >
+              <i :data-lucide="item.icon" class="w-4 h-4 shrink-0"></i>
+              <div class="flex-1 min-w-0">
+                <div class="truncate" x-text="item.label"></div>
+                <div
+                  class="text-[10px] font-mono text-slate-500 truncate"
+                  x-text="item.hint"
+                ></div>
+              </div>
+              <span
+                class="text-[10px] font-mono text-slate-500 uppercase tracking-wider"
+                x-text="item.kind"
+              ></span>
+            </div>
+          </template>
+          <div
+            x-show="!paletteResults().length"
+            class="px-4 py-8 text-center text-slate-500 text-sm"
+          >
+            No matches.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================== WORKSPACE MODAL ========================== -->
+    <div
+      x-show="wsModal.open"
+      x-cloak
+      class="fixed inset-0 z-[60] bg-ink-950/80 backdrop-blur-sm flex items-center justify-center"
+      @click.self="wsModal.open=false"
+    >
+      <div
+        class="w-full max-w-xl card border-edge-strong shadow-glow overflow-hidden"
+      >
+        <div
+          class="px-5 py-4 border-b border-edge flex items-center justify-between"
+        >
+          <div>
+            <h3 class="font-semibold flex items-center gap-2">
+              <i data-lucide="layers" class="w-4 h-4 text-neon-magenta"></i>
+              Switch Workspace
+            </h3>
+            <p class="text-xs text-slate-500 mt-0.5">
+              Server will restart. Browser reconnects automatically.
+            </p>
+          </div>
+          <button
+            class="btn btn-ghost text-slate-500"
+            @click="wsModal.open=false"
+          >
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <div class="p-4 max-h-80 overflow-y-auto space-y-1.5">
+          <template x-for="ws in wsModal.items" :key="ws.name">
+            <button
+              class="w-full text-left p-3 rounded-lg border transition flex items-center gap-3"
+              :class="ws.name === stats.workspace
+                    ? 'bg-neon-cyan/10 border-neon-cyan/40 cursor-default'
+                    : 'border-edge hover:border-neon-cyan/40 hover:bg-white/5'"
+              :disabled="ws.name === stats.workspace || wsModal.switching"
+              @click="switchWorkspace(ws.name)"
+            >
+              <div
+                class="w-8 h-8 rounded-md flex items-center justify-center shrink-0"
+                :class="ws.has_data ? 'bg-neon-cyan/10 text-neon-cyan' : 'bg-ink-800 text-slate-500'"
+              >
+                <i
+                  :data-lucide="ws.has_data ? 'database' : 'folder'"
+                  class="w-4 h-4"
+                ></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="font-mono text-sm truncate flex items-center gap-2">
+                  <span x-text="ws.name"></span>
+                  <span
+                    x-show="ws.name === stats.workspace"
+                    class="pill bg-neon-cyan/15 text-neon-cyan border border-neon-cyan/40"
+                    >active</span
+                  >
+                </div>
+                <div
+                  class="text-[11px] font-mono text-slate-500"
+                  x-show="ws.has_data"
+                >
+                  <span x-text="ws.documents"></span> docs ·
+                  <span x-text="ws.entities"></span> ents ·
+                  <span x-text="ws.chats"></span> chats
+                </div>
+                <div
+                  class="text-[11px] font-mono text-slate-600"
+                  x-show="!ws.has_data"
+                >
+                  empty
+                </div>
+              </div>
+              <i
+                x-show="ws.name !== stats.workspace"
+                data-lucide="arrow-right"
+                class="w-4 h-4 text-slate-500"
+              ></i>
+            </button>
+          </template>
+          <div
+            x-show="!wsModal.items.length"
+            class="text-center text-slate-500 text-sm py-6"
+          >
+            No workspaces found under
+            <span class="font-mono">rag_storage/</span>.
+          </div>
+        </div>
+
+        <div class="px-4 py-3 border-t border-edge flex items-center gap-2">
+          <input
+            x-model="wsModal.newName"
+            placeholder="new-workspace-name"
+            class="flex-1 bg-ink-900 border border-edge focus:border-neon-cyan/60 outline-none rounded-lg px-3 py-2 text-sm font-mono"
+            pattern="[A-Za-z0-9][A-Za-z0-9_-]*"
+          />
+          <button
+            class="btn btn-primary"
+            :disabled="!wsModal.newName.trim() || wsModal.switching"
+            @click="switchWorkspace(wsModal.newName.trim(), true)"
+          >
+            <i data-lucide="plus" class="w-4 h-4"></i> Create &amp; Switch
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================== RESTART OVERLAY ========================== -->
+    <div
+      x-show="restarting"
+      x-cloak
+      class="fixed inset-0 z-[70] bg-ink-950/95 backdrop-blur-md flex items-center justify-center"
+    >
+      <div class="text-center">
+        <div
+          class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-neon-cyan to-neon-magenta flex items-center justify-center text-ink-950 font-bold shadow-glow text-2xl animate-pulse"
+        >
+          Θ
+        </div>
+        <h2 class="mt-6 text-2xl font-semibold neon-text">
+          Restarting server…
+        </h2>
+        <p class="mt-2 text-slate-400">
+          Switching to
+          <span class="text-neon-cyan font-mono" x-text="restartTarget"></span>
+        </p>
+        <div class="mt-6 dot-pulse">
+          <span></span><span></span><span></span>
+        </div>
+        <p class="mt-6 text-xs font-mono text-slate-500">
+          UI will reload automatically when API is back.
+        </p>
+      </div>
+    </div>
+
+    <!-- ========================== APP LOGIC ========================== -->
+    <script>
+      function theseus() {
+        return {
+          // ----- state -----
+          navGroups: [
+            {
+              id: "capture",
+              label: "CAPTURE",
+              items: [
+                {
+                  id: "dashboard",
+                  label: "Dashboard",
+                  icon: "layout-dashboard",
+                },
+                { id: "documents", label: "Documents", icon: "file-text" },
+                {
+                  id: "intel",
+                  label: "RFP Intelligence",
+                  icon: "shield-check",
+                },
+              ],
+            },
+            {
+              id: "tools",
+              label: "TOOLS",
+              items: [
+                { id: "graph", label: "Knowledge Graph", icon: "git-fork" },
+                { id: "chat", label: "Capture Chat", icon: "message-square" },
+              ],
+            },
+            {
+              id: "system",
+              label: "SYSTEM",
+              items: [{ id: "settings", label: "Settings", icon: "settings" }],
+            },
+          ],
+          active: "dashboard",
+          health: false,
+          stats: {},
+          documents: [],
+          uploads: [],
+          chats: [],
+          currentChat: null,
+          composer: "",
+          sending: false,
+          promptLibrary: [],
+          toasts: [],
+
+          // Command palette
+          palette: { open: false, query: "", cursor: 0 },
+
+          // Workspace modal + restart overlay
+          wsModal: { open: false, items: [], newName: "", switching: false },
+          restarting: false,
+          restartTarget: "",
+
+          // Knowledge graph state
+          cy: null,
+          graph: {
+            label: "*",
+            labelQuery: "",
+            labelOptions: [],
+            showLabelDropdown: false,
+            maxNodes: 500,
+            maxDepth: 2,
+            minConfidence: 0,
+            layout: "fcose",
+            loading: false,
+            stats: {
+              nodes: 0,
+              edges: 0,
+              visibleNodes: 0,
+              visibleEdges: 0,
+              truncated: false,
+            },
+            typeCounts: [],
+            hiddenTypes: [],
+            selected: null,
+            selectedProps: [],
+            chunks: [],
+            chunksLoading: false,
+          },
+
+          // RFP Intelligence state
+          intel: {
+            tab: "lm",
+            tabs: [
+              { id: "lm", label: "L↔M Matrix", icon: "arrow-left-right" },
+              { id: "trace", label: "Traceability", icon: "list-tree" },
+              { id: "coverage", label: "Coverage", icon: "shield-check" },
+              { id: "gaps", label: "Gaps", icon: "alert-triangle" },
+            ],
+            data: null,
+            loading: false,
+            showCovered: true,
+            showGaps: true,
+            traceFilter: "",
+          },
+
+          navTitle() {
+            const m = {
+              dashboard: "Dashboard",
+              documents: "Documents",
+              graph: "Knowledge Graph",
+              chat: "Capture Chat",
+              intel: "RFP Intelligence",
+              settings: "Settings",
+            };
+            return m[this.active] || "";
+          },
+
+          navIcon() {
+            const flat = this.navGroups.flatMap((g) => g.items);
+            return flat.find((i) => i.id === this.active)?.icon || "circle";
+          },
+
+          navSubtitle() {
+            const m = {
+              dashboard: "capture command overview",
+              documents: "ingest · MinerU · multimodal extraction",
+              graph: "33 entity types · 43 relationship types",
+              chat: "shipley mentor · RAG over the workspace",
+              intel: "L↔M · traceability · coverage · gaps",
+              settings: "workspace · storage · models",
+            };
+            return m[this.active] || "";
+          },
+
+          greeting() {
+            const h = new Date().getHours();
+            const part =
+              h < 5
+                ? "Working late"
+                : h < 12
+                  ? "Good morning"
+                  : h < 17
+                    ? "Good afternoon"
+                    : "Good evening";
+            return `${part}, capture lead`;
+          },
+
+          metrics() {
+            return [
+              {
+                label: "Documents",
+                value: this.stats.documents ?? "—",
+                icon: "file-text",
+                hint: "Processed in this workspace",
+                go: "documents",
+              },
+              {
+                label: "Entities",
+                value: this.stats.entities ?? "—",
+                icon: "sparkles",
+                hint: "33 govcon types",
+                go: "graph",
+              },
+              {
+                label: "Relationships",
+                value: this.stats.relationships ?? "—",
+                icon: "link",
+                hint: "43 canonical types",
+                go: "graph",
+              },
+              {
+                label: "Chats",
+                value: this.stats.chats ?? 0,
+                icon: "messages-square",
+                hint: "Saved sessions",
+                go: "chat",
+              },
+            ];
+          },
+
+          // ----- lifecycle -----
+          async init() {
+            this.$watch("active", () =>
+              this.$nextTick(() => {
+                lucide.createIcons();
+                if (
+                  this.active === "graph" &&
+                  !this.graph.stats.nodes &&
+                  !this.graph.loading
+                )
+                  this.loadGraph();
+                if (
+                  this.active === "intel" &&
+                  !this.intel.data &&
+                  !this.intel.loading
+                )
+                  this.loadIntel();
+              }),
+            );
+            this.$watch("documents", () =>
+              this.$nextTick(() => lucide.createIcons()),
+            );
+            this.$watch("uploads", () =>
+              this.$nextTick(() => lucide.createIcons()),
+            );
+            this.$watch("chats", () =>
+              this.$nextTick(() => lucide.createIcons()),
+            );
+            this.$watch("currentChat", () =>
+              this.$nextTick(() => {
+                lucide.createIcons();
+                this.scrollMsgs();
+              }),
+            );
+            this.$watch("graph.selected", () =>
+              this.$nextTick(() => lucide.createIcons()),
+            );
+            this.$watch("palette.open", () =>
+              this.$nextTick(() => lucide.createIcons()),
+            );
+            this.$watch("wsModal.open", () =>
+              this.$nextTick(() => lucide.createIcons()),
+            );
+            this.$watch("wsModal.items", () =>
+              this.$nextTick(() => lucide.createIcons()),
+            );
+            this.$watch("restarting", () =>
+              this.$nextTick(() => lucide.createIcons()),
+            );
+
+            await this.refreshAll();
+            lucide.createIcons();
+            // background refresh
+            setInterval(() => {
+              this.loadStats();
+              this.checkHealth();
+            }, 15000);
+          },
+
+          async refreshAll() {
+            await Promise.all([
+              this.checkHealth(),
+              this.loadStats(),
+              this.loadDocuments(),
+              this.loadChats(),
+              this.loadPromptLibrary(),
+            ]);
+          },
+
+          // ----- API helpers -----
+          async api(path, opts = {}) {
+            const r = await fetch(path, {
+              headers: {
+                "Content-Type": "application/json",
+                ...(opts.headers || {}),
+              },
+              ...opts,
+            });
+            if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+            const ct = r.headers.get("content-type") || "";
+            return ct.includes("application/json") ? r.json() : r.text();
+          },
+
+          toast(msg, kind = "ok") {
+            const id = Math.random().toString(36).slice(2);
+            this.toasts.push({ id, msg, kind });
+            setTimeout(() => {
+              this.toasts = this.toasts.filter((t) => t.id !== id);
+            }, 3500);
+          },
+
+          async checkHealth() {
+            try {
+              await this.api("/health");
+              this.health = true;
+            } catch {
+              this.health = false;
+            }
+          },
+
+          async loadStats() {
+            try {
+              this.stats = await this.api("/api/ui/stats");
+            } catch (e) {
+              /* silent */
+            }
+          },
+
+          // ----- Documents -----
+          async loadDocuments() {
+            try {
+              const data = await this.api("/documents");
+              // /documents groups docs by status: { statuses: { processed: [...], failed: [...], ... } }
+              const docs = [];
+              const buckets = data.statuses || {};
+              for (const [status, list] of Object.entries(buckets)) {
+                for (const d of list) docs.push({ ...d, status });
+              }
+              docs.sort((a, b) =>
+                (b.created_at || "").localeCompare(a.created_at || ""),
+              );
+              this.documents = docs;
+            } catch (e) {
+              this.documents = [];
+            }
+          },
+
+          async uploadFiles(fileList) {
+            const files = Array.from(fileList || []);
+            for (const f of files) {
+              const id = Math.random().toString(36).slice(2);
+              this.uploads.unshift({ id, name: f.name, status: "uploading" });
+              const fd = new FormData();
+              fd.append("file", f);
+              try {
+                const r = await fetch("/documents/upload", {
+                  method: "POST",
+                  body: fd,
+                });
+                const j = await r.json();
+                this.uploads = this.uploads.map((u) =>
+                  u.id === id
+                    ? {
+                        ...u,
+                        status: r.ok ? "done" : "error",
+                        msg: r.ok ? "queued" : j.message || "failed",
+                      }
+                    : u,
+                );
+                if (r.ok) this.toast(`${f.name} uploaded — extraction running`);
+              } catch (e) {
+                this.uploads = this.uploads.map((u) =>
+                  u.id === id ? { ...u, status: "error", msg: "network" } : u,
+                );
+                this.toast(`Upload failed: ${f.name}`, "error");
+              }
+            }
+            setTimeout(() => {
+              this.loadDocuments();
+              this.loadStats();
+            }, 1500);
+          },
+
+          async scanRfp() {
+            try {
+              const r = await this.api("/scan-rfp", { method: "POST" });
+              this.toast(r.message || "Scan started");
+            } catch (e) {
+              this.toast("Scan failed: " + e.message, "error");
+            }
+          },
+
+          askAbout(doc) {
+            this.active = "chat";
+            this.composer = `Focus on the document "${doc.file_path || doc.id}". `;
+            this.newChat(doc.file_path || doc.id);
+          },
+
+          // ----- Chats -----
+          async loadChats() {
+            try {
+              const r = await this.api("/api/ui/chats");
+              this.chats = r.chats || [];
+            } catch {
+              this.chats = [];
+            }
+          },
+
+          async loadPromptLibrary() {
+            try {
+              const r = await this.api("/api/ui/prompt-library");
+              this.promptLibrary = r.prompts || [];
+            } catch {
+              this.promptLibrary = [];
+            }
+          },
+
+          async newChat(rfpContext = null) {
+            const c = await this.api("/api/ui/chats", {
+              method: "POST",
+              body: JSON.stringify({
+                title: "New chat",
+                mode: "hybrid",
+                rfp_context: rfpContext,
+              }),
+            });
+            await this.loadChats();
+            await this.openChat(c.id);
+            this.active = "chat";
+          },
+
+          async openChat(id) {
+            try {
+              this.currentChat = await this.api(`/api/ui/chats/${id}`);
+            } catch (e) {
+              this.toast("Could not open chat", "error");
+            }
+          },
+
+          async deleteChat(id) {
+            if (!confirm("Delete this chat?")) return;
+            await this.api(`/api/ui/chats/${id}`, { method: "DELETE" });
+            if (this.currentChat?.id === id) this.currentChat = null;
+            await this.loadChats();
+            await this.loadStats();
+          },
+
+          async renameChat() {
+            if (!this.currentChat) return;
+            await this.api(`/api/ui/chats/${this.currentChat.id}`, {
+              method: "PATCH",
+              body: JSON.stringify({ title: this.currentChat.title }),
+            });
+            await this.loadChats();
+          },
+
+          async updateMode() {
+            if (!this.currentChat) return;
+            await this.api(`/api/ui/chats/${this.currentChat.id}`, {
+              method: "PATCH",
+              body: JSON.stringify({ mode: this.currentChat.mode }),
+            });
+          },
+
+          async sendMessage() {
+            if (!this.currentChat || !this.composer.trim() || this.sending)
+              return;
+            const content = this.composer.trim();
+            this.composer = "";
+            this.sending = true;
+            // optimistic user bubble
+            this.currentChat.messages.push({
+              role: "user",
+              content,
+              ts: new Date().toISOString(),
+            });
+            this.scrollMsgs();
+            try {
+              const r = await this.api(
+                `/api/ui/chats/${this.currentChat.id}/messages`,
+                {
+                  method: "POST",
+                  body: JSON.stringify({ content }),
+                },
+              );
+              // replace optimistic + append assistant
+              this.currentChat.messages.pop();
+              this.currentChat.messages.push(r.user, r.assistant);
+              await this.loadChats();
+            } catch (e) {
+              this.currentChat.messages.push({
+                role: "assistant",
+                content: "⚠️ " + e.message,
+                ts: new Date().toISOString(),
+              });
+              this.toast("Query failed", "error");
+            } finally {
+              this.sending = false;
+              this.scrollMsgs();
+            }
+          },
+
+          scrollMsgs() {
+            this.$nextTick(() => {
+              const el = this.$refs.msgs;
+              if (el) el.scrollTop = el.scrollHeight;
+            });
+          },
+
+          // ===== Knowledge Graph =====
+          entityColor(type) {
+            const PALETTE = {
+              // Document structure
+              document: "#00f0ff",
+              document_section: "#22c1f5",
+              amendment: "#7df9ff",
+              clause: "#a78bfa",
+              regulatory_reference: "#c084fc",
+              // Requirements / compliance
+              requirement: "#ff2bd6",
+              proposal_instruction: "#ff6ad5",
+              evaluation_factor: "#ffb020",
+              subfactor: "#ffd166",
+              performance_standard: "#fbbf24",
+              compliance_artifact: "#f59e0b",
+              // Work / deliverables
+              deliverable: "#00ff9c",
+              work_scope_item: "#34d399",
+              transition_activity: "#10b981",
+              contract_line_item: "#84cc16",
+              workload_metric: "#a3e635",
+              technical_specification: "#bef264",
+              // People / orgs
+              organization: "#ff3b6b",
+              person: "#fb7185",
+              labor_category: "#f472b6",
+              // Strategy / capture
+              strategic_theme: "#ec4899",
+              customer_priority: "#d946ef",
+              pain_point: "#ef4444",
+              past_performance_reference: "#f97316",
+              proposal_volume: "#fdba74",
+              // Operational / resources
+              equipment: "#60a5fa",
+              technology: "#3b82f6",
+              government_furnished_item: "#1d4ed8",
+              pricing_element: "#fde047",
+              program: "#facc15",
+              // Generic
+              concept: "#94a3b8",
+              event: "#cbd5e1",
+              location: "#64748b",
+            };
+            return PALETTE[type] || "#64748b";
+          },
+
+          async searchLabels() {
+            const q = (this.graph.labelQuery || "").trim();
+            if (!q) {
+              this.graph.labelOptions = [];
+              return;
+            }
+            try {
+              const r = await fetch(
+                `/graph/label/search?q=${encodeURIComponent(q)}&limit=30`,
+              );
+              if (!r.ok) return;
+              const data = await r.json();
+              this.graph.labelOptions = Array.isArray(data)
+                ? data
+                : data.labels || data.results || [];
+            } catch {
+              this.graph.labelOptions = [];
+            }
+          },
+
+          async loadGraph() {
+            const label = (this.graph.label || "*").trim() || "*";
+            this.graph.loading = true;
+            this.graph.selected = null;
+            try {
+              const url = `/graphs?label=${encodeURIComponent(label)}&max_depth=${this.graph.maxDepth}&max_nodes=${this.graph.maxNodes}`;
+              const r = await fetch(url);
+              if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+              const data = await r.json();
+              const nodes = (data.nodes || []).map((n) => {
+                const p = n.properties || {};
+                const type = (
+                  p.entity_type ||
+                  (n.labels && n.labels[0]) ||
+                  "concept"
+                )
+                  .toString()
+                  .toLowerCase();
+                return {
+                  data: {
+                    id: String(n.id),
+                    label: (p.entity_id || n.id)
+                      .toString()
+                      .replace(/^"|"$/g, ""),
+                    type,
+                    description: p.description || "",
+                    raw: p,
+                    degree: 0,
+                  },
+                };
+              });
+              const nodeIds = new Set(nodes.map((n) => n.data.id));
+              const edges = (data.edges || [])
+                .filter(
+                  (e) =>
+                    nodeIds.has(String(e.source)) &&
+                    nodeIds.has(String(e.target)),
+                )
+                .map((e) => {
+                  const p = e.properties || {};
+                  return {
+                    data: {
+                      id: String(e.id),
+                      source: String(e.source),
+                      target: String(e.target),
+                      label: e.type || p.keywords || "RELATED_TO",
+                      weight: parseFloat(p.weight ?? 1) || 1,
+                      confidence: parseFloat(p.confidence ?? 1) || 1,
+                      raw: p,
+                    },
+                  };
+                });
+              // compute degrees + type counts
+              const deg = {};
+              edges.forEach((e) => {
+                deg[e.data.source] = (deg[e.data.source] || 0) + 1;
+                deg[e.data.target] = (deg[e.data.target] || 0) + 1;
+              });
+              nodes.forEach((n) => (n.data.degree = deg[n.data.id] || 0));
+              const counts = {};
+              nodes.forEach(
+                (n) => (counts[n.data.type] = (counts[n.data.type] || 0) + 1),
+              );
+              this.graph.typeCounts = Object.entries(counts).sort(
+                (a, b) => b[1] - a[1],
+              );
+              this.graph.stats = {
+                nodes: nodes.length,
+                edges: edges.length,
+                visibleNodes: nodes.length,
+                visibleEdges: edges.length,
+                truncated: !!data.is_truncated,
+              };
+              this.renderGraph(nodes, edges);
+            } catch (e) {
+              this.toast("Graph load failed: " + e.message, "error");
+            } finally {
+              this.graph.loading = false;
+            }
+          },
+
+          loadGraphFromNode(id) {
+            this.graph.label = id;
+            this.graph.labelQuery = id;
+            this.loadGraph();
+          },
+
+          renderGraph(nodes, edges) {
+            const container = this.$refs.cy;
+            if (!container) return;
+            if (this.cy) {
+              try {
+                this.cy.destroy();
+              } catch {}
+              this.cy = null;
+            }
+            const self = this;
+            this.cy = cytoscape({
+              container,
+              elements: [...nodes, ...edges],
+              wheelSensitivity: 0.3,
+              style: [
+                {
+                  selector: "node",
+                  style: {
+                    "background-color": (ele) =>
+                      self.entityColor(ele.data("type")),
+                    "border-color": "#0a0e1a",
+                    "border-width": 1.5,
+                    label: "data(label)",
+                    "font-size": 9,
+                    color: "#cbd5e1",
+                    "font-family": "JetBrains Mono, monospace",
+                    "text-valign": "bottom",
+                    "text-margin-y": 4,
+                    "text-outline-width": 2,
+                    "text-outline-color": "#05070d",
+                    width: (ele) =>
+                      Math.max(
+                        14,
+                        Math.min(46, 14 + (ele.data("degree") || 0) * 2),
+                      ),
+                    height: (ele) =>
+                      Math.max(
+                        14,
+                        Math.min(46, 14 + (ele.data("degree") || 0) * 2),
+                      ),
+                    "min-zoomed-font-size": 8,
+                  },
+                },
+                {
+                  selector: "node:selected",
+                  style: {
+                    "border-color": "#00f0ff",
+                    "border-width": 3,
+                    "overlay-color": "#00f0ff",
+                    "overlay-opacity": 0.15,
+                  },
+                },
+                {
+                  selector: "edge",
+                  style: {
+                    "curve-style": "bezier",
+                    width: (ele) =>
+                      Math.max(0.6, Math.min(3, ele.data("weight") || 1)),
+                    "line-color": "#2c3a5e",
+                    "target-arrow-color": "#2c3a5e",
+                    "target-arrow-shape": "triangle",
+                    "arrow-scale": 0.8,
+                    opacity: 0.55,
+                    label: "data(label)",
+                    "font-size": 7,
+                    color: "#64748b",
+                    "font-family": "JetBrains Mono, monospace",
+                    "text-rotation": "autorotate",
+                    "text-background-color": "#05070d",
+                    "text-background-opacity": 0.7,
+                    "text-background-padding": 1,
+                    "min-zoomed-font-size": 9,
+                  },
+                },
+                {
+                  selector: "edge:selected",
+                  style: {
+                    "line-color": "#ff2bd6",
+                    "target-arrow-color": "#ff2bd6",
+                    opacity: 1,
+                    width: 2.5,
+                  },
+                },
+                { selector: ".dimmed", style: { opacity: 0.08 } },
+                { selector: ".highlight", style: { opacity: 1 } },
+              ],
+              layout: this.layoutOptions(),
+            });
+
+            this.cy.on("tap", "node", (evt) => self.selectNode(evt.target));
+            this.cy.on("tap", (evt) => {
+              if (evt.target === self.cy) {
+                self.graph.selected = null;
+                self.cy.elements().removeClass("dimmed highlight");
+              }
+            });
+            this.applyFilters();
+          },
+
+          layoutOptions() {
+            const base = { animate: false, fit: true, padding: 30 };
+            if (this.graph.layout === "fcose")
+              return {
+                name: "fcose",
+                quality: "default",
+                randomize: true,
+                nodeRepulsion: 4500,
+                idealEdgeLength: 80,
+                ...base,
+              };
+            if (this.graph.layout === "concentric")
+              return {
+                name: "concentric",
+                concentric: (n) => n.degree(),
+                levelWidth: () => 2,
+                ...base,
+              };
+            return { name: this.graph.layout, ...base };
+          },
+
+          relayout() {
+            if (!this.cy) return;
+            this.cy.layout(this.layoutOptions()).run();
+          },
+
+          fitGraph() {
+            if (this.cy) this.cy.fit(undefined, 30);
+          },
+
+          exportPng() {
+            if (!this.cy) return;
+            const png = this.cy.png({ full: true, scale: 2, bg: "#05070d" });
+            const a = document.createElement("a");
+            a.href = png;
+            a.download = `theseus-graph-${Date.now()}.png`;
+            a.click();
+          },
+
+          toggleTypeFilter(type) {
+            const i = this.graph.hiddenTypes.indexOf(type);
+            if (i >= 0) this.graph.hiddenTypes.splice(i, 1);
+            else this.graph.hiddenTypes.push(type);
+            this.applyFilters();
+          },
+
+          applyFilters() {
+            if (!this.cy) return;
+            const hidden = new Set(this.graph.hiddenTypes);
+            const minC = this.graph.minConfidence;
+            let visN = 0,
+              visE = 0;
+            this.cy.batch(() => {
+              this.cy.nodes().forEach((n) => {
+                const show = !hidden.has(n.data("type"));
+                n.style("display", show ? "element" : "none");
+                if (show) visN++;
+              });
+              this.cy.edges().forEach((e) => {
+                const srcOk = e.source().style("display") !== "none";
+                const tgtOk = e.target().style("display") !== "none";
+                const confOk = (e.data("confidence") ?? 1) >= minC;
+                const show = srcOk && tgtOk && confOk;
+                e.style("display", show ? "element" : "none");
+                if (show) visE++;
+              });
+            });
+            this.graph.stats.visibleNodes = visN;
+            this.graph.stats.visibleEdges = visE;
+          },
+
+          async selectNode(node) {
+            const d = node.data();
+            const skip = new Set([
+              "id",
+              "label",
+              "type",
+              "description",
+              "raw",
+              "degree",
+            ]);
+            const props = Object.entries(d.raw || {}).filter(
+              ([k]) => !skip.has(k),
+            );
+            props.unshift(["degree", String(d.degree)]);
+            this.graph.selected = {
+              id: d.label,
+              type: d.type,
+              description: d.description,
+            };
+            this.graph.selectedProps = props.map(([k, v]) => [
+              k,
+              typeof v === "string" ? v : JSON.stringify(v),
+            ]);
+
+            // Highlight neighborhood
+            this.cy.elements().addClass("dimmed").removeClass("highlight");
+            const hood = node.closedNeighborhood();
+            hood.removeClass("dimmed").addClass("highlight");
+
+            // Fetch source chunks
+            this.graph.chunksLoading = true;
+            this.graph.chunks = [];
+            try {
+              const r = await this.api(
+                `/api/ui/entity/${encodeURIComponent(d.label)}/chunks?limit=5`,
+              );
+              this.graph.chunks = r.chunks || [];
+            } catch {
+            } finally {
+              this.graph.chunksLoading = false;
+            }
+          },
+
+          askAboutEntity(entity) {
+            this.composer = `Tell me everything about "${entity.id}" (${entity.type}). Cite source chunks.`;
+            this.newChat(entity.id);
+          },
+
+          // ===== Workspace switching =====
+          async openWorkspaceModal() {
+            this.wsModal.open = true;
+            this.wsModal.newName = "";
+            try {
+              const r = await this.api("/api/ui/workspaces");
+              this.wsModal.items = r.workspaces || [];
+            } catch (e) {
+              this.toast("Could not list workspaces: " + e.message, "error");
+            }
+          },
+
+          async switchWorkspace(name, create = false) {
+            if (!name || this.wsModal.switching) return;
+            if (name === this.stats.workspace) {
+              this.wsModal.open = false;
+              return;
+            }
+            if (
+              !confirm(
+                `Switch to workspace "${name}"? The server will restart.`,
+              )
+            )
+              return;
+            this.wsModal.switching = true;
+            try {
+              await this.api("/api/ui/workspaces/switch", {
+                method: "POST",
+                body: JSON.stringify({ name, create }),
+              });
+              this.wsModal.open = false;
+              this.restartTarget = name;
+              this.restarting = true;
+              this.pollRestart();
+            } catch (e) {
+              this.toast("Switch failed: " + e.message, "error");
+            } finally {
+              this.wsModal.switching = false;
+            }
+          },
+
+          pollRestart() {
+            // Wait for API to go down then come back up; reload when it does.
+            let sawDown = false;
+            const tick = async () => {
+              try {
+                const r = await fetch("/api/ui/stats", { cache: "no-store" });
+                if (r.ok) {
+                  if (sawDown) {
+                    window.location.reload();
+                    return;
+                  }
+                  // Not yet restarted (still old process). Keep waiting briefly.
+                }
+              } catch {
+                sawDown = true;
+              }
+              setTimeout(tick, 1000);
+            };
+            // Give the server a moment to actually restart before first probe.
+            setTimeout(tick, 1500);
+          },
+
+          // ===== Command palette =====
+          openPalette() {
+            this.palette.open = true;
+            this.palette.query = "";
+            this.palette.cursor = 0;
+            this.$nextTick(() => {
+              this.$refs.paletteInput?.focus();
+              lucide.createIcons();
+            });
+          },
+
+          paletteResults() {
+            const q = (this.palette.query || "").trim().toLowerCase();
+            const items = [];
+            // Views
+            this.navGroups
+              .flatMap((g) => g.items)
+              .forEach((n) =>
+                items.push({
+                  key: "view:" + n.id,
+                  kind: "view",
+                  label: n.label,
+                  hint: "Open " + n.label,
+                  icon: n.icon,
+                  action: () => {
+                    this.active = n.id;
+                  },
+                }),
+              );
+            // Workspace switch
+            items.push({
+              key: "ws:switch",
+              kind: "workspace",
+              label: "Switch workspace…",
+              hint: "Restart server with a different workspace",
+              icon: "layers",
+              action: () => this.openWorkspaceModal(),
+            });
+            // Actions
+            items.push({
+              key: "act:newchat",
+              kind: "action",
+              label: "New capture chat",
+              hint: "Start a fresh Shipley-mentor chat",
+              icon: "message-square-plus",
+              action: () => this.newChat(),
+            });
+            items.push({
+              key: "act:upload",
+              kind: "action",
+              label: "Upload RFP",
+              hint: "Open the documents view",
+              icon: "upload-cloud",
+              action: () => {
+                this.active = "documents";
+              },
+            });
+            items.push({
+              key: "act:scan",
+              kind: "action",
+              label: "Scan inputs/<workspace>/",
+              hint: "Trigger /scan-rfp",
+              icon: "folder-search",
+              action: () => this.scanRfp(),
+            });
+            items.push({
+              key: "act:refresh",
+              kind: "action",
+              label: "Refresh all",
+              hint: "Reload stats / docs / chats",
+              icon: "refresh-cw",
+              action: () => this.refreshAll(),
+            });
+            // Recent chats
+            (this.chats || []).slice(0, 8).forEach((c) =>
+              items.push({
+                key: "chat:" + c.id,
+                kind: "chat",
+                label: c.title || "(untitled)",
+                hint: `${c.message_count} msgs · ${c.mode}`,
+                icon: "message-square",
+                action: () => {
+                  this.openChat(c.id);
+                  this.active = "chat";
+                },
+              }),
+            );
+            // Prompts
+            (this.promptLibrary || []).forEach((p) =>
+              items.push({
+                key: "prompt:" + p.title,
+                kind: "prompt",
+                label: p.title,
+                hint: `Phase ${p.phase} · ${p.prompt.slice(0, 60)}…`,
+                icon: "wand-sparkles",
+                action: () => {
+                  this.composer = p.prompt;
+                  this.newChat();
+                },
+              }),
+            );
+            if (!q) return items.slice(0, 12);
+            return items
+              .filter(
+                (i) =>
+                  i.label.toLowerCase().includes(q) ||
+                  (i.hint || "").toLowerCase().includes(q),
+              )
+              .slice(0, 20);
+          },
+
+          runPaletteAction(item) {
+            if (!item) return;
+            this.palette.open = false;
+            try {
+              item.action();
+            } catch (e) {
+              this.toast("Action failed: " + e.message, "error");
+            }
+          },
+
+          // ===== RFP Intelligence =====
+          async loadIntel() {
+            this.intel.loading = true;
+            try {
+              this.intel.data = await this.api("/api/ui/intel/summary");
+            } catch (e) {
+              this.toast("Intel compute failed: " + e.message, "error");
+            } finally {
+              this.intel.loading = false;
+            }
+          },
+
+          filteredLmRows() {
+            const rows = this.intel.data?.lm_matrix?.instructions || [];
+            return rows.filter((r) =>
+              r.covered ? this.intel.showCovered : this.intel.showGaps,
+            );
+          },
+
+          orphanFactors() {
+            const rows = this.intel.data?.lm_matrix?.factors || [];
+            return rows.filter((r) => !r.covered);
+          },
+
+          filteredTrace() {
+            const rows = this.intel.data?.traceability || [];
+            const q = this.intel.traceFilter.trim().toLowerCase();
+            if (!q) return rows;
+            return rows.filter((r) => {
+              const blob = [
+                r.requirement.id,
+                r.requirement.description,
+                ...r.deliverables.map((d) => d.id),
+                ...r.standards.map((s) => s.id),
+                ...r.metrics.map((m) => m.id),
+              ]
+                .join(" ")
+                .toLowerCase();
+              return blob.includes(q);
+            });
+          },
+
+          coverageBadgeClass(score) {
+            if (score >= 3)
+              return "bg-neon-lime/10 text-neon-lime border border-neon-lime/30";
+            if (score === 2)
+              return "bg-neon-cyan/10 text-neon-cyan border border-neon-cyan/30";
+            if (score === 1)
+              return "bg-neon-amber/10 text-neon-amber border border-neon-amber/30";
+            return "bg-neon-red/10 text-neon-red border border-neon-red/30";
+          },
+
+          gapBuckets() {
+            const g = this.intel.data?.gaps || {};
+            return [
+              {
+                id: "req",
+                title: "Requirements without SATISFIED_BY",
+                subtitle: "shall/will language with no satisfying deliverable.",
+                items: g.requirements_no_satisfaction || [],
+                askPrefix:
+                  "Identify candidate deliverables to satisfy requirement",
+              },
+              {
+                id: "fact",
+                title: "Section M factors with no Section L hook",
+                subtitle: "Evaluation factors no instruction guides toward.",
+                items: g.factors_no_instruction || [],
+                askPrefix:
+                  "Recommend Section L instructions to add for evaluation factor",
+              },
+              {
+                id: "del",
+                title: "Deliverables without measure",
+                subtitle: "Deliverables lacking MEASURED_BY or TRACKED_BY.",
+                items: g.deliverables_no_measure || [],
+                askPrefix:
+                  "Suggest performance standards or workload metrics for deliverable",
+              },
+            ];
+          },
+
+          askIntel(prompt) {
+            this.composer = prompt;
+            this.newChat();
+          },
+        };
+      }
+    </script>
+  </body>
+</html>
