@@ -21,8 +21,22 @@ Workflow:
 #   chunk_token_size: int = field(default=int(os.getenv("CHUNK_SIZE", 1200)))
 # If .env isn't loaded first, it uses the hardcoded 1200 default
 import os
+import sys
 from dotenv import load_dotenv
 load_dotenv()
+
+# Windows MAX_PATH mitigation for MinerU document processing
+# MinerU CLI creates mineru-api-client-{random} temp dirs under the system temp
+# directory. Long document names (≥60 chars) push the output path:
+#   {TEMP}\mineru-api-client-{8}\output\{uuid-36}\{name-69}\auto\{name-69}_origin.pdf
+# to ~259 chars — hitting Windows' 260-char MAX_PATH limit and causing
+# FileNotFoundError when MinerU tries to write _origin.pdf.
+# Fix: redirect Python's tempfile module to a shorter base path.
+if sys.platform == "win32":
+    import tempfile
+    _mineru_temp = os.environ.get("MINERU_TEMP_DIR", r"C:\T")
+    os.makedirs(_mineru_temp, exist_ok=True)
+    tempfile.tempdir = _mineru_temp
 
 # Now safe to import modules that may import LightRAG
 import asyncio

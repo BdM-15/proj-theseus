@@ -917,6 +917,15 @@ async def _semantic_post_processor_neo4j(
         
         phase_times['Phase 4 · Rel Inference'] = time.time() - phase_start
         logger.info(f"  ⏱️  Phase 4 completed in {phase_times['Phase 4 · Rel Inference']:.1f}s")
+
+        # Capture final counts HERE (after Phase 4, before Phase 5).
+        # Phase 5 VDB sync calls ainsert_custom_kg() which, when GRAPH_STORAGE=Neo4JStorage,
+        # writes additional native-typed rels back to Neo4j, inflating counts beyond
+        # initial_rel_count + relationships_inferred.
+        type_counts = neo4j_io.get_entity_count_by_type()
+        rel_counts = neo4j_io.get_relationship_count_by_type()
+        final_entity_count = sum(type_counts.values())
+        final_relationship_count = sum(rel_counts.values())
         
         # Phase 5: Sync inferred relationships to LightRAG VDBs (Issue #65 - Critical Fix)
         # Without this, agent queries via /query miss algorithm-discovered relationships
@@ -954,13 +963,6 @@ async def _semantic_post_processor_neo4j(
         logger.info(f"  Relationships synced:    {relationships_synced}")
         logger.info(f"  Processing time:         {processing_time:.2f}s")
         logger.info("="*80)
-        
-        # Get updated counts
-        type_counts = neo4j_io.get_entity_count_by_type()
-        rel_counts = neo4j_io.get_relationship_count_by_type()
-        
-        final_entity_count = sum(type_counts.values())
-        final_relationship_count = sum(rel_counts.values())
         
         logger.info("\n📊 Entity Type Distribution (ALL 18 types):")
         # Show all types, sorted by count
