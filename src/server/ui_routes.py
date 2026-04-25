@@ -159,7 +159,7 @@ def _build_query_overrides() -> dict[str, Any]:
 
 class ChatCreate(BaseModel):
     title: str = Field(default="New chat", max_length=120)
-    mode: str = Field(default="hybrid")
+    mode: str = Field(default="mix")
     rfp_context: Optional[str] = Field(default=None, max_length=200)
 
 
@@ -239,7 +239,7 @@ def _summary(chat: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": chat["id"],
         "title": chat.get("title", "Untitled"),
-        "mode": chat.get("mode", "hybrid"),
+        "mode": chat.get("mode", "mix"),
         "rfp_context": chat.get("rfp_context"),
         "message_count": len(chat.get("messages", [])),
         "created_at": chat.get("created_at"),
@@ -1028,7 +1028,7 @@ def register_ui(
         overrides = _build_query_overrides()
         try:
             answer = await query_func(
-                payload.content, chat.get("mode", "hybrid"), history, False, overrides
+                payload.content, chat.get("mode", "mix"), history, False, overrides
             )
         except Exception as exc:
             logger.exception("Query failed for chat %s: %s", chat_id, exc)
@@ -1038,7 +1038,7 @@ def register_ui(
             "role": "assistant",
             "content": str(answer),
             "ts": _now_iso(),
-            "mode": chat.get("mode", "hybrid"),
+            "mode": chat.get("mode", "mix"),
         }
         chat["messages"].append(assistant_msg)
         chat["updated_at"] = _now_iso()
@@ -1082,7 +1082,7 @@ def register_ui(
         _write_chat(chat)
 
         history = _build_history(chat, exclude_last=True)
-        mode = chat.get("mode", "hybrid")
+        mode = chat.get("mode", "mix")
         overrides = _build_query_overrides()
 
         async def event_stream():
