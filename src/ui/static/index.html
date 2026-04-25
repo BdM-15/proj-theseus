@@ -17,6 +17,8 @@
     <script src="https://unpkg.com/layout-base@2.0.1/layout-base.js"></script>
     <script src="https://unpkg.com/cose-base@2.2.0/cose-base.js"></script>
     <script src="https://unpkg.com/cytoscape-fcose@2.2.0/cytoscape-fcose.js"></script>
+    <script src="https://unpkg.com/marked@14.1.3/marked.min.js"></script>
+    <script src="https://unpkg.com/dompurify@3.1.7/dist/purify.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
@@ -243,13 +245,532 @@
 
       /* Chat bubbles */
       .bubble-user {
-        @apply bg-neon-cyan/10 border border-neon-cyan/30 text-slate-100;
+        background: linear-gradient(
+          135deg,
+          rgba(0, 240, 255, 0.18) 0%,
+          rgba(0, 240, 255, 0.06) 100%
+        );
+        border: 1px solid rgba(0, 240, 255, 0.35);
+        color: #e2e8f0;
+        box-shadow:
+          0 1px 0 rgba(255, 255, 255, 0.04) inset,
+          0 8px 24px -12px rgba(0, 240, 255, 0.35);
       }
       .bubble-assistant {
-        @apply bg-ink-800/80 border border-edge text-slate-100;
+        position: relative;
+        background:
+          linear-gradient(
+            180deg,
+            rgba(24, 18, 40, 0.92) 0%,
+            rgba(15, 12, 28, 0.92) 100%
+          );
+        border: 1px solid rgba(168, 85, 247, 0.28);
+        color: #e2e8f0;
+        box-shadow:
+          0 1px 0 rgba(255, 255, 255, 0.04) inset,
+          0 10px 28px -14px rgba(168, 85, 247, 0.45),
+          0 4px 12px -6px rgba(0, 0, 0, 0.55);
+      }
+      /* Magenta→purple→cyan accent stripe on the left edge of assistant bubbles */
+      .bubble-assistant::before {
+        content: "";
+        position: absolute;
+        left: -1px;
+        top: 8px;
+        bottom: 8px;
+        width: 3px;
+        border-radius: 0 2px 2px 0;
+        background: linear-gradient(180deg, #ff2bd6 0%, #a855f7 50%, #00f0ff 100%);
+        box-shadow:
+          0 0 8px rgba(168, 85, 247, 0.55),
+          0 0 12px rgba(255, 43, 214, 0.35);
+        opacity: 0.85;
+      }
+      /* Faint inner sheen */
+      .bubble-assistant::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        pointer-events: none;
+        background: radial-gradient(
+          ellipse 120% 60% at 0% 0%,
+          rgba(168, 85, 247, 0.08),
+          transparent 60%
+        );
+      }
+
+      /* Assistant avatar badge — sits above-left of the bubble */
+      .assistant-avatar {
+        width: 28px;
+        height: 28px;
+        border-radius: 9999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(
+          135deg,
+          #a855f7 0%,
+          #ff2bd6 60%,
+          #00f0ff 100%
+        );
+        background-size: 180% 180%;
+        color: #0a0f1c;
+        font-weight: 800;
+        font-size: 11px;
+        letter-spacing: 0.05em;
+        box-shadow:
+          0 0 0 1px rgba(255, 255, 255, 0.15) inset,
+          0 4px 12px -2px rgba(168, 85, 247, 0.6),
+          0 0 16px rgba(255, 43, 214, 0.35);
+        animation: avatar-spin 6s ease-in-out infinite;
+      }
+      @keyframes avatar-spin {
+        0%,
+        100% {
+          background-position: 0% 50%;
+        }
+        50% {
+          background-position: 100% 50%;
+        }
+      }
+
+      /* Chat ambient backdrop: animated aurora + grid */
+      .chat-canvas {
+        position: relative;
+        background-color: #070b18;
+        background-image:
+          radial-gradient(
+            ellipse 70% 50% at 12% 8%,
+            rgba(0, 240, 255, 0.22),
+            transparent 60%
+          ),
+          radial-gradient(
+            ellipse 60% 50% at 92% 92%,
+            rgba(255, 43, 214, 0.18),
+            transparent 60%
+          ),
+          radial-gradient(
+            ellipse 50% 40% at 60% 40%,
+            rgba(168, 85, 247, 0.12),
+            transparent 65%
+          ),
+          radial-gradient(
+            ellipse 40% 40% at 30% 80%,
+            rgba(132, 255, 99, 0.08),
+            transparent 60%
+          ),
+          linear-gradient(
+            rgba(255, 255, 255, 0.025) 1px,
+            transparent 1px
+          ),
+          linear-gradient(
+            90deg,
+            rgba(255, 255, 255, 0.025) 1px,
+            transparent 1px
+          );
+        background-size:
+          200% 200%,
+          200% 200%,
+          180% 180%,
+          180% 180%,
+          32px 32px,
+          32px 32px;
+        animation: aurora-drift 22s ease-in-out infinite;
+      }
+      @keyframes aurora-drift {
+        0%,
+        100% {
+          background-position:
+            0% 0%,
+            100% 100%,
+            50% 50%,
+            30% 70%,
+            0 0,
+            0 0;
+        }
+        50% {
+          background-position:
+            20% 30%,
+            70% 60%,
+            60% 40%,
+            40% 60%,
+            0 0,
+            0 0;
+        }
+      }
+      .chat-canvas::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(
+          ellipse at top,
+          transparent 60%,
+          rgba(0, 0, 0, 0.5) 100%
+        );
+      }
+
+      /* Sidebar gradient + accent ribbon */
+      .chat-sidebar {
+        background:
+          radial-gradient(
+            ellipse 100% 40% at 50% 0%,
+            rgba(0, 240, 255, 0.07),
+            transparent 70%
+          ),
+          linear-gradient(
+            180deg,
+            rgba(13, 18, 32, 0.96) 0%,
+            rgba(8, 12, 24, 0.96) 100%
+          );
+        position: relative;
+      }
+      .chat-sidebar::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: -1px;
+        bottom: 0;
+        width: 1px;
+        background: linear-gradient(
+          180deg,
+          transparent 0%,
+          rgba(0, 240, 255, 0.5) 15%,
+          rgba(168, 85, 247, 0.45) 50%,
+          rgba(255, 43, 214, 0.45) 85%,
+          transparent 100%
+        );
+        pointer-events: none;
+        animation: ribbon-shimmer 6s ease-in-out infinite;
+      }
+      @keyframes ribbon-shimmer {
+        0%,
+        100% {
+          opacity: 0.7;
+        }
+        50% {
+          opacity: 1;
+        }
+      }
+
+      /* Glassy chat header / composer */
+      .glass-bar {
+        background: linear-gradient(
+          180deg,
+          rgba(20, 27, 45, 0.7) 0%,
+          rgba(13, 18, 32, 0.55) 100%
+        );
+        backdrop-filter: blur(8px) saturate(160%);
+        -webkit-backdrop-filter: blur(8px) saturate(160%);
+      }
+      .composer-bar {
+        background: linear-gradient(
+          0deg,
+          rgba(8, 12, 24, 0.92) 0%,
+          rgba(13, 18, 32, 0.45) 100%
+        );
+        backdrop-filter: blur(10px) saturate(160%);
+        -webkit-backdrop-filter: blur(10px) saturate(160%);
+        border-top: 1px solid transparent;
+        border-image: linear-gradient(
+            90deg,
+            transparent,
+            rgba(0, 240, 255, 0.6),
+            rgba(168, 85, 247, 0.5),
+            rgba(255, 43, 214, 0.5),
+            transparent
+          )
+          1;
+      }
+
+      /* New-chat / send hero button: shimmering gradient */
+      .btn-hero-cyan {
+        background: linear-gradient(
+          110deg,
+          #00f0ff 0%,
+          #67e8f9 30%,
+          #ffffff 50%,
+          #67e8f9 70%,
+          #00f0ff 100%
+        );
+        background-size: 250% 100%;
+        background-position: 100% 0;
+        transition:
+          background-position 0.6s ease,
+          box-shadow 0.3s ease,
+          transform 0.12s ease;
+        box-shadow:
+          0 0 0 1px rgba(0, 240, 255, 0.5),
+          0 8px 24px -6px rgba(0, 240, 255, 0.6),
+          0 1px 0 rgba(255, 255, 255, 0.5) inset;
+      }
+      .btn-hero-cyan:hover {
+        background-position: 0% 0;
+        box-shadow:
+          0 0 0 1px rgba(0, 240, 255, 0.8),
+          0 12px 36px -6px rgba(0, 240, 255, 0.9),
+          0 0 24px rgba(0, 240, 255, 0.4),
+          0 1px 0 rgba(255, 255, 255, 0.6) inset;
+        transform: translateY(-1px);
+      }
+      .btn-hero-cyan:active {
+        transform: translateY(1px);
+      }
+      .btn-hero-cyan:disabled,
+      .btn-hero-cyan[disabled] {
+        background: #1a2238 !important;
+        color: #475569 !important;
+        box-shadow: none !important;
+        transform: none !important;
+        cursor: not-allowed;
+      }
+
+      /* Magenta hero variant for prompt library */
+      .btn-hero-magenta {
+        background: linear-gradient(
+          110deg,
+          rgba(255, 43, 214, 0.15) 0%,
+          rgba(168, 85, 247, 0.18) 50%,
+          rgba(255, 43, 214, 0.15) 100%
+        );
+        background-size: 200% 100%;
+        background-position: 0% 0;
+        color: #ff8af0;
+        border: 1px solid rgba(255, 43, 214, 0.45);
+        transition:
+          background-position 0.5s ease,
+          box-shadow 0.3s ease,
+          color 0.2s ease,
+          transform 0.12s ease;
+      }
+      .btn-hero-magenta:hover {
+        background-position: 100% 0;
+        color: #ffffff;
+        border-color: rgba(255, 43, 214, 0.8);
+        box-shadow:
+          0 0 0 1px rgba(255, 43, 214, 0.4),
+          0 8px 24px -6px rgba(255, 43, 214, 0.55),
+          0 0 18px rgba(255, 43, 214, 0.25);
+        transform: translateY(-1px);
+      }
+
+      /* Chat list item active glow ribbon */
+      .chat-item-active {
+        background: linear-gradient(
+          90deg,
+          rgba(0, 240, 255, 0.22) 0%,
+          rgba(168, 85, 247, 0.1) 60%,
+          transparent 100%
+        );
+        border-color: rgba(0, 240, 255, 0.55) !important;
+        box-shadow:
+          0 0 0 1px rgba(0, 240, 255, 0.2),
+          0 6px 20px -8px rgba(0, 240, 255, 0.55);
+        position: relative;
+      }
+      .chat-item-active::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 6px;
+        bottom: 6px;
+        width: 3px;
+        border-radius: 0 2px 2px 0;
+        background: linear-gradient(180deg, #00f0ff, #a855f7, #ff2bd6);
+        box-shadow:
+          0 0 10px rgba(0, 240, 255, 0.7),
+          0 0 14px rgba(255, 43, 214, 0.4);
+      }
+      .chat-item-active:hover {
+        transform: translateX(2px);
+        transition: transform 0.15s ease;
+      }
+
+      /* Animated gradient border for assistant bubble while streaming */
+      @keyframes border-spin {
+        0% {
+          background-position: 0% 50%;
+        }
+        100% {
+          background-position: 200% 50%;
+        }
+      }
+      .bubble-streaming {
+        position: relative;
+        background:
+          linear-gradient(
+              180deg,
+              rgba(24, 18, 40, 0.94) 0%,
+              rgba(15, 12, 28, 0.94) 100%
+            )
+            padding-box,
+          linear-gradient(
+              110deg,
+              #00f0ff 0%,
+              #a855f7 25%,
+              #ff2bd6 50%,
+              #a855f7 75%,
+              #00f0ff 100%
+            )
+            border-box;
+        background-size:
+          100% 100%,
+          200% 100%;
+        border: 1px solid transparent !important;
+        animation: border-spin 4s linear infinite;
+      }
+
+      /* Vibrant prompt library trigger pulse */
+      @keyframes lib-glow {
+        0%,
+        100% {
+          box-shadow: 0 0 0 0 rgba(255, 43, 214, 0);
+        }
+        50% {
+          box-shadow: 0 0 16px -2px rgba(255, 43, 214, 0.45);
+        }
+      }
+      .lib-pulse {
+        animation: lib-glow 3s ease-in-out infinite;
+      }
+
+      /* Send icon nudge on hover */
+      .btn-hero-cyan:hover [data-lucide="send-horizontal"] {
+        transform: translateX(2px);
+        transition: transform 0.18s ease;
+      }
+
+      /* Confetti dot pulse for thinking — colorful */
+      .dot-pulse-vivid span {
+        background: #00f0ff;
+        animation: dot-bounce 1s infinite ease-in-out both;
+        box-shadow: 0 0 8px rgba(0, 240, 255, 0.7);
+      }
+      .dot-pulse-vivid span:nth-child(2) {
+        background: #a855f7;
+        animation-delay: 0.15s;
+        box-shadow: 0 0 8px rgba(168, 85, 247, 0.7);
+      }
+      .dot-pulse-vivid span:nth-child(3) {
+        background: #ff2bd6;
+        animation-delay: 0.3s;
+        box-shadow: 0 0 8px rgba(255, 43, 214, 0.7);
+      }
+      .dot-pulse-vivid {
+        display: inline-flex;
+        gap: 4px;
+        align-items: center;
+      }
+      .dot-pulse-vivid span {
+        width: 7px;
+        height: 7px;
+        border-radius: 9999px;
+      }
+      @keyframes dot-bounce {
+        0%,
+        80%,
+        100% {
+          transform: scale(0.6);
+          opacity: 0.5;
+        }
+        40% {
+          transform: scale(1.1);
+          opacity: 1;
+        }
       }
       .markdown p {
         margin: 0.4em 0;
+      }
+      .markdown p:first-child {
+        margin-top: 0;
+      }
+      .markdown p:last-child {
+        margin-bottom: 0;
+      }
+      .markdown h1,
+      .markdown h2,
+      .markdown h3,
+      .markdown h4 {
+        font-weight: 600;
+        color: #e2e8f0;
+        margin: 0.8em 0 0.3em;
+        line-height: 1.25;
+      }
+      .markdown h1 {
+        font-size: 1.15em;
+        color: #00f0ff;
+      }
+      .markdown h2 {
+        font-size: 1.05em;
+        color: #7df9ff;
+      }
+      .markdown h3 {
+        font-size: 1em;
+      }
+      .markdown h4 {
+        font-size: 0.95em;
+        color: #cbd5e1;
+      }
+      .markdown ul,
+      .markdown ol {
+        margin: 0.4em 0;
+        padding-left: 1.4em;
+      }
+      .markdown ul {
+        list-style: disc;
+      }
+      .markdown ol {
+        list-style: decimal;
+      }
+      .markdown li {
+        margin: 0.15em 0;
+      }
+      .markdown li > p {
+        margin: 0.15em 0;
+      }
+      .markdown strong {
+        color: #f1f5f9;
+        font-weight: 600;
+      }
+      .markdown em {
+        color: #e2e8f0;
+      }
+      .markdown a {
+        color: #00f0ff;
+        text-decoration: underline;
+        text-decoration-color: rgba(0, 240, 255, 0.4);
+      }
+      .markdown a:hover {
+        text-decoration-color: #00f0ff;
+      }
+      .markdown blockquote {
+        border-left: 3px solid #00f0ff66;
+        padding: 0.2em 0.8em;
+        margin: 0.5em 0;
+        color: #cbd5e1;
+        background: rgba(0, 240, 255, 0.03);
+        border-radius: 0 4px 4px 0;
+      }
+      .markdown table {
+        border-collapse: collapse;
+        margin: 0.5em 0;
+        font-size: 0.9em;
+      }
+      .markdown th,
+      .markdown td {
+        border: 1px solid #1f2a44;
+        padding: 4px 8px;
+        text-align: left;
+      }
+      .markdown th {
+        background: #0f1422;
+        color: #e2e8f0;
+      }
+      .markdown hr {
+        border: 0;
+        border-top: 1px solid #1f2a44;
+        margin: 0.8em 0;
       }
       .markdown code {
         background: rgba(0, 240, 255, 0.08);
@@ -310,7 +831,7 @@
     class="font-sans antialiased scanline"
     @keydown.window.ctrl.k.prevent="openPalette()"
     @keydown.window.meta.k.prevent="openPalette()"
-    @keydown.window.escape="palette.open=false; wsModal.open=false"
+    @keydown.window.escape="palette.open=false; wsModal.open=false; promptPicker.open=false"
   >
     <!-- ========================== TOP COMMAND BAR ========================== -->
     <header
@@ -562,7 +1083,10 @@
         </div>
 
         <!-- Content area -->
-        <div class="flex-1 overflow-y-auto p-6">
+        <div
+          class="flex-1 overflow-y-auto"
+          :class="active === 'chat' ? 'p-0' : 'p-6'"
+        >
           <!-- ============== DASHBOARD ============== -->
           <section x-show="active === 'dashboard'" x-cloak>
             <!-- Hero -->
@@ -704,7 +1228,9 @@
                     Quick Actions
                   </h2>
                 </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div
+                  class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
+                >
                   <button
                     class="group flex items-center gap-3 p-3 rounded-lg bg-ink-900/60 border border-edge-strong hover:border-neon-cyan/40 hover:bg-neon-cyan/5 transition text-left"
                     @click="active='documents'"
@@ -1319,64 +1845,103 @@
 
           <!-- ============== CHAT ============== -->
           <section x-show="active === 'chat'" x-cloak class="h-full">
-            <div class="flex gap-4 h-[calc(100vh-9rem)]">
-              <!-- Chat list -->
-              <div class="w-64 shrink-0 card p-3 flex flex-col">
-                <button
-                  class="btn btn-primary w-full justify-center mb-3"
-                  @click="newChat()"
-                >
-                  <i data-lucide="plus" class="w-4 h-4"></i> New chat
-                </button>
-                <div class="flex-1 overflow-y-auto space-y-1">
+            <div class="flex h-[calc(100vh-3rem)]">
+              <!-- Chat list (flush-left, full-bleed) -->
+              <aside
+                class="chat-sidebar w-72 shrink-0 border-r border-edge flex flex-col"
+              >
+                <div class="p-3 border-b border-edge">
+                  <button
+                    class="btn-hero-cyan group w-full flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-ink-950"
+                    @click="newChat()"
+                  >
+                    <i data-lucide="message-square-plus" class="w-4 h-4"></i>
+                    New chat
+                  </button>
+                </div>
+                <div class="px-3 pt-3 pb-1 flex items-center justify-between">
+                  <span
+                    class="text-[10px] font-mono uppercase tracking-[0.18em] text-slate-500"
+                    >History</span
+                  >
+                  <span
+                    class="text-[10px] font-mono text-slate-600"
+                    x-text="chats.length + (chats.length === 1 ? ' chat' : ' chats')"
+                  ></span>
+                </div>
+                <div class="flex-1 overflow-y-auto px-2 pb-3 space-y-1">
                   <template x-for="c in chats" :key="c.id">
                     <div
-                      class="group p-2 rounded-lg cursor-pointer text-sm"
-                      :class="currentChat?.id === c.id ? 'bg-neon-cyan/10 border border-neon-cyan/30' : 'hover:bg-white/5 border border-transparent'"
+                      class="group relative px-3 py-2.5 rounded-lg cursor-pointer text-sm transition border"
+                      :class="currentChat?.id === c.id ? 'chat-item-active' : 'border-transparent hover:bg-white/[0.04] hover:border-edge'"
                       @click="openChat(c.id)"
                     >
-                      <div class="flex items-center justify-between gap-1">
-                        <div
-                          class="truncate font-medium"
-                          x-text="c.title"
-                        ></div>
+                      <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                          <i
+                            data-lucide="message-circle"
+                            class="w-3.5 h-3.5 shrink-0"
+                            :class="currentChat?.id === c.id ? 'text-neon-cyan' : 'text-slate-500'"
+                          ></i>
+                          <div
+                            class="truncate font-medium"
+                            :class="currentChat?.id === c.id ? 'text-white' : 'text-slate-200'"
+                            x-text="c.title"
+                          ></div>
+                        </div>
                         <button
-                          class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-neon-red"
+                          class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-neon-red transition"
                           @click.stop="deleteChat(c.id)"
-                          title="Delete"
+                          title="Delete chat"
                         >
                           <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                         </button>
                       </div>
-                      <div class="text-[11px] font-mono text-slate-500 mt-0.5">
-                        <span x-text="c.message_count"></span> msgs ·
-                        <span x-text="c.mode"></span>
+                      <div
+                        class="text-[10px] font-mono text-slate-500 mt-1 pl-5 flex items-center gap-1.5"
+                      >
+                        <span x-text="c.message_count"></span>
+                        <span>msgs</span>
+                        <span class="text-slate-700">·</span>
+                        <span class="text-neon-cyan/60" x-text="c.mode"></span>
                       </div>
                     </div>
                   </template>
                   <div
                     x-show="!chats.length"
-                    class="text-xs text-slate-500 px-2 py-4 text-center"
+                    class="text-xs text-slate-500 px-3 py-8 text-center"
                   >
-                    No saved chats yet.
+                    <i
+                      data-lucide="inbox"
+                      class="w-6 h-6 mx-auto mb-2 text-slate-700"
+                    ></i>
+                    <div>No saved chats yet.</div>
+                    <div class="text-[10px] mt-1 text-slate-600">
+                      Click <span class="text-neon-cyan">New chat</span> to
+                      start.
+                    </div>
                   </div>
                 </div>
-              </div>
+              </aside>
 
               <!-- Chat main -->
-              <div class="flex-1 card flex flex-col overflow-hidden">
+              <div class="chat-canvas flex-1 flex flex-col overflow-hidden">
                 <div
                   x-show="!currentChat"
-                  class="flex-1 flex items-center justify-center text-slate-500 text-sm"
+                  class="flex-1 flex flex-col items-center justify-center text-slate-500 text-sm gap-3"
                 >
-                  Select or create a chat to start.
+                  <i
+                    data-lucide="messages-square"
+                    class="w-10 h-10 text-slate-700"
+                  ></i>
+                  <div>Select or create a chat to start.</div>
                 </div>
 
                 <template x-if="currentChat">
                   <div class="flex flex-col h-full">
                     <!-- Header -->
                     <div
-                      class="px-4 py-3 border-b border-edge flex items-center justify-between"
+                      class="glass-bar px-6 py-3 border-b border-edge flex items-center justify-between"
                     >
                       <div class="flex-1 min-w-0">
                         <input
@@ -1404,86 +1969,186 @@
                         x-model="currentChat.mode"
                         @change="updateMode()"
                       >
-                        <option>mix</option>
-                        <option>hybrid</option>
-                        <option>local</option>
-                        <option>global</option>
-                        <option>naive</option>
+                        <option value="mix">mix</option>
+                        <option value="hybrid">hybrid</option>
+                        <option value="local">local</option>
+                        <option value="global">global</option>
+                        <option value="naive">naive</option>
+                        <option value="bypass">bypass</option>
                       </select>
                     </div>
 
                     <!-- Messages -->
                     <div
-                      class="flex-1 overflow-y-auto px-4 py-4 space-y-4"
+                      class="flex-1 overflow-y-auto px-6 py-5 space-y-4"
                       x-ref="msgs"
                     >
                       <template x-for="(m, i) in currentChat.messages" :key="i">
                         <div
-                          class="flex gap-3"
-                          :class="m.role === 'user' ? 'justify-end' : 'justify-start'"
+                          class="flex flex-col gap-1"
+                          :class="m.role === 'user' ? 'items-end' : 'items-start'"
                         >
+                          <!-- Assistant identity header (avatar + label) -->
+                          <template x-if="m.role === 'assistant'">
+                            <div class="flex items-center gap-2 pl-1 mb-0.5">
+                              <span class="assistant-avatar">
+                                <i data-lucide="brain-circuit" class="w-3.5 h-3.5"></i>
+                              </span>
+                              <span class="text-[10px] font-mono uppercase tracking-[0.2em] bg-clip-text text-transparent bg-gradient-to-r from-neon-magenta via-purple-400 to-neon-cyan font-bold">Shipley Mentor</span>
+                              <span x-show="m.streaming" class="text-[9px] font-mono text-neon-cyan/70 px-1.5 py-0.5 rounded border border-neon-cyan/30 bg-neon-cyan/5">live</span>
+                            </div>
+                          </template>
                           <div
-                            class="max-w-[85%] rounded-lg px-3.5 py-2.5 text-sm whitespace-pre-wrap markdown"
-                            :class="m.role === 'user' ? 'bubble-user' : 'bubble-assistant'"
+                            class="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm"
+                            :class="m.role === 'user' ? 'bubble-user rounded-br-md' : (m.streaming ? 'bubble-streaming rounded-bl-md markdown' : 'bubble-assistant rounded-bl-md markdown')"
                           >
-                            <span x-text="m.content"></span
-                            ><span
-                              x-show="m.streaming"
-                              class="inline-block w-1.5 h-4 align-text-bottom ml-0.5 bg-neon-cyan animate-pulse"
+                            <template x-if="m.role === 'assistant'">
+                              <div>
+                                <div
+                                  x-html="renderMd(m.content) || '&nbsp;'"
+                                ></div>
+                                <span
+                                  x-show="m.streaming"
+                                  class="inline-block w-1.5 h-4 align-text-bottom ml-0.5 bg-neon-cyan animate-pulse"
+                                ></span>
+                              </div>
+                            </template>
+                            <template x-if="m.role === 'user'">
+                              <span
+                                class="whitespace-pre-wrap"
+                                x-text="m.content"
+                              ></span>
+                            </template>
+                          </div>
+                          <!-- assistant footer: mode + timing pills -->
+                          <div
+                            x-show="m.role === 'assistant' && !m.streaming && (m.mode || m.timing)"
+                            class="flex items-center gap-2 text-[10px] uppercase tracking-wider text-slate-500 font-mono px-2"
+                          >
+                            <span
+                              x-show="m.mode"
+                              class="text-neon-cyan/70"
+                              x-text="'· ' + m.mode"
+                            ></span>
+                            <span
+                              x-show="m.timing && m.timing.ttft_ms != null"
+                              x-text="'ttft ' + (m.timing.ttft_ms / 1000).toFixed(1) + 's'"
+                            ></span>
+                            <span
+                              x-show="m.timing && m.timing.total_ms != null"
+                              x-text="'total ' + (m.timing.total_ms / 1000).toFixed(1) + 's'"
+                            ></span>
+                            <span
+                              x-show="m.timing && m.timing.char_count"
+                              x-text="m.timing.char_count + ' chars'"
                             ></span>
                           </div>
                         </div>
                       </template>
+                      <!-- Live status line: retrieving (before iterator) -->
                       <div
-                        x-show="sending && !currentChat.messages.some(m => m.streaming)"
-                        class="flex gap-3"
+                        x-show="sending && chatStatus.phase && chatStatus.phase !== 'generating'"
+                        class="flex items-center gap-2 text-xs text-slate-400"
                       >
-                        <div class="bubble-assistant rounded-lg px-3.5 py-2.5">
-                          <span class="dot-pulse"
-                            ><span></span><span></span><span></span
-                          ></span>
-                        </div>
+                        <span class="dot-pulse-vivid"
+                          ><span></span><span></span><span></span
+                        ></span>
+                        <span x-text="chatStatus.label"></span>
+                      </div>
+                      <!-- Live status: thinking (iterator open, no token yet) -->
+                      <div
+                        x-show="sending && chatStatus.phase === 'generating' && (!streamLiveContent || streamLiveContent.length === 0)"
+                        class="flex items-center gap-2 text-[11px] font-mono"
+                      >
+                        <span class="dot-pulse-vivid"
+                          ><span></span><span></span><span></span
+                        ></span>
+                        <span class="text-neon-cyan/90 font-semibold">Thinking…</span>
+                        <span
+                          class="text-slate-500"
+                          x-text="chatStatus.retrieve_ms != null ? '(context ' + (chatStatus.retrieve_ms/1000).toFixed(1) + 's · elapsed ' + thinkElapsed + 's)' : '(elapsed ' + thinkElapsed + 's)'"
+                        ></span>
+                      </div>
+                      <!-- Live status: writing (tokens flowing) -->
+                      <div
+                        x-show="sending && chatStatus.phase === 'generating' && streamLiveContent && streamLiveContent.length > 0"
+                        class="flex items-center gap-2 text-[11px] text-neon-cyan/70 font-mono"
+                      >
+                        <i data-lucide="cpu" class="w-3 h-3"></i>
+                        <span
+                          x-text="'Writing · context ' + (chatStatus.retrieve_ms != null ? (chatStatus.retrieve_ms/1000).toFixed(1) + 's' : '—') + ' · think ' + thinkElapsed + 's'"
+                        ></span>
                       </div>
                     </div>
 
-                    <!-- Prompt library + composer -->
-                    <div class="border-t border-edge p-3 space-y-3">
-                      <div
-                        class="flex flex-wrap gap-1.5"
-                        x-show="promptLibrary.length"
-                      >
-                        <template
-                          x-for="p in promptLibrary.slice(0,6)"
-                          :key="p.title"
-                        >
+                    <!-- Composer -->
+                    <div class="composer-bar p-4">
+                      <div class="max-w-4xl mx-auto space-y-2">
+                        <!-- Prompt library trigger row -->
+                        <div class="flex items-center justify-between">
                           <button
-                            class="pill bg-ink-800 hover:bg-neon-cyan/10 hover:text-neon-cyan border border-edge transition"
-                            @click="composer = p.prompt; $refs.composer.focus()"
-                            :title="p.prompt"
+                            type="button"
+                            class="btn-hero-magenta lib-pulse inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-[11px] font-mono uppercase tracking-wider"
+                            @click="openPromptPicker()"
                           >
-                            <span class="text-neon-magenta"
-                              >P<span x-text="p.phase"></span
+                            <i
+                              data-lucide="library"
+                              class="w-3.5 h-3.5"
+                            ></i>
+                            Prompt Library
+                            <span
+                              class="opacity-70"
+                              x-show="promptLibrary.length"
+                              x-text="'· ' + promptLibrary.length"
                             ></span>
-                            <span x-text="p.title"></span>
                           </button>
-                        </template>
-                      </div>
-                      <form class="flex gap-2" @submit.prevent="sendMessage()">
-                        <textarea
-                          x-ref="composer"
-                          x-model="composer"
-                          rows="2"
-                          placeholder="Ask about Section L, traceability, win themes…  (Ctrl+Enter to send)"
-                          class="flex-1 bg-ink-900 border border-edge focus:border-neon-cyan/60 focus:shadow-glow outline-none rounded-lg px-3 py-2 text-sm resize-none"
-                          @keydown.ctrl.enter.prevent="sendMessage()"
-                        ></textarea>
-                        <button
-                          class="btn btn-primary self-end"
-                          :disabled="sending || !composer.trim()"
+                          <span
+                            class="text-[10px] font-mono text-slate-600"
+                            >Enter to send · Shift+Enter for newline</span
+                          >
+                        </div>
+                        <form
+                          class="relative"
+                          @submit.prevent="sendMessage()"
                         >
-                          <i data-lucide="send" class="w-4 h-4"></i> Send
-                        </button>
-                      </form>
+                          <textarea
+                            x-ref="composer"
+                            x-model="composer"
+                            rows="3"
+                            placeholder="Ask about Section L, traceability, win themes…"
+                            class="w-full bg-ink-900 border border-edge focus:border-neon-cyan/60 focus:shadow-glow outline-none rounded-xl px-4 py-3 pr-28 text-sm resize-none transition"
+                            @keydown.enter.prevent="if (!$event.shiftKey) sendMessage(); else composer += '\n'"
+                            @keydown.ctrl.enter.prevent="sendMessage()"
+                          ></textarea>
+                          <div class="absolute bottom-2.5 right-2.5">
+                            <template x-if="!sending">
+                              <button
+                                class="btn-hero-cyan inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold text-ink-950"
+                                :disabled="!composer.trim()"
+                              >
+                                <span>Send</span>
+                                <i
+                                  data-lucide="send-horizontal"
+                                  class="w-4 h-4"
+                                ></i>
+                              </button>
+                            </template>
+                            <template x-if="sending">
+                              <button
+                                type="button"
+                                class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-neon-red/15 border border-neon-red/40 text-neon-red hover:bg-neon-red/25 transition"
+                                @click.prevent="stopMessage()"
+                              >
+                                <i
+                                  data-lucide="square"
+                                  class="w-4 h-4"
+                                ></i>
+                                Stop
+                              </button>
+                            </template>
+                          </div>
+                        </form>
+                      </div>
                     </div>
                   </div>
                 </template>
@@ -1945,7 +2610,9 @@
                     x-text="phase.items.length + ' prompts'"
                   ></span>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                <div
+                  class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
+                >
                   <template x-for="p in phase.items" :key="p.title">
                     <div
                       class="card card-accent p-4 flex flex-col gap-3 cursor-pointer card-hover"
@@ -2087,10 +2754,15 @@
 
             <!-- Query Parameters (per-workspace LightRAG tunables) -->
             <div class="card card-accent accent-cyan p-6">
-              <div class="flex items-start justify-between gap-4 flex-wrap mb-4">
+              <div
+                class="flex items-start justify-between gap-4 flex-wrap mb-4"
+              >
                 <div>
                   <h3 class="font-semibold text-lg flex items-center gap-2">
-                    <i data-lucide="sliders-horizontal" class="w-4 h-4 text-neon-cyan"></i>
+                    <i
+                      data-lucide="sliders-horizontal"
+                      class="w-4 h-4 text-neon-cyan"
+                    ></i>
                     Query Parameters
                   </h3>
                   <p class="text-xs text-slate-500 mt-1 max-w-xl">
@@ -2115,7 +2787,9 @@
                     :disabled="!querySettings.loaded || querySettings.saving"
                   >
                     <i data-lucide="save" class="w-3.5 h-3.5"></i>
-                    <span x-text="querySettings.saving ? 'Saving…' : 'Save'"></span>
+                    <span
+                      x-text="querySettings.saving ? 'Saving…' : 'Save'"
+                    ></span>
                   </button>
                 </div>
               </div>
@@ -2129,7 +2803,9 @@
                   <!-- Mode -->
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <label class="block">
-                      <span class="text-xs text-slate-400 font-mono">Default Mode (new chats)</span>
+                      <span class="text-xs text-slate-400 font-mono"
+                        >Default Mode (new chats)</span
+                      >
                       <select
                         x-model="querySettings.values.mode"
                         class="mt-1 w-full bg-ink-900/60 border border-edge rounded-lg px-3 py-2 text-sm font-mono focus:border-neon-cyan/60 outline-none"
@@ -2152,7 +2828,9 @@
                         <span class="text-slate-600">· entities/relations</span>
                       </span>
                       <input
-                        type="number" min="1" max="500"
+                        type="number"
+                        min="1"
+                        max="500"
                         x-model.number="querySettings.values.top_k"
                         class="mt-1 w-full bg-ink-900/60 border border-edge rounded-lg px-3 py-2 text-sm font-mono focus:border-neon-cyan/60 outline-none"
                       />
@@ -2163,7 +2841,9 @@
                         <span class="text-slate-600">· text chunks</span>
                       </span>
                       <input
-                        type="number" min="1" max="500"
+                        type="number"
+                        min="1"
+                        max="500"
                         x-model.number="querySettings.values.chunk_top_k"
                         class="mt-1 w-full bg-ink-900/60 border border-edge rounded-lg px-3 py-2 text-sm font-mono focus:border-neon-cyan/60 outline-none"
                       />
@@ -2173,25 +2853,37 @@
                   <!-- Token budgets -->
                   <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <label class="block">
-                      <span class="text-xs text-slate-400 font-mono">Max Entity Tokens</span>
+                      <span class="text-xs text-slate-400 font-mono"
+                        >Max Entity Tokens</span
+                      >
                       <input
-                        type="number" min="100" max="200000"
+                        type="number"
+                        min="100"
+                        max="200000"
                         x-model.number="querySettings.values.max_entity_tokens"
                         class="mt-1 w-full bg-ink-900/60 border border-edge rounded-lg px-3 py-2 text-sm font-mono focus:border-neon-cyan/60 outline-none"
                       />
                     </label>
                     <label class="block">
-                      <span class="text-xs text-slate-400 font-mono">Max Relation Tokens</span>
+                      <span class="text-xs text-slate-400 font-mono"
+                        >Max Relation Tokens</span
+                      >
                       <input
-                        type="number" min="100" max="200000"
+                        type="number"
+                        min="100"
+                        max="200000"
                         x-model.number="querySettings.values.max_relation_tokens"
                         class="mt-1 w-full bg-ink-900/60 border border-edge rounded-lg px-3 py-2 text-sm font-mono focus:border-neon-cyan/60 outline-none"
                       />
                     </label>
                     <label class="block">
-                      <span class="text-xs text-slate-400 font-mono">Max Total Tokens</span>
+                      <span class="text-xs text-slate-400 font-mono"
+                        >Max Total Tokens</span
+                      >
                       <input
-                        type="number" min="100" max="500000"
+                        type="number"
+                        min="100"
+                        max="500000"
                         x-model.number="querySettings.values.max_total_tokens"
                         class="mt-1 w-full bg-ink-900/60 border border-edge rounded-lg px-3 py-2 text-sm font-mono focus:border-neon-cyan/60 outline-none"
                       />
@@ -2200,7 +2892,9 @@
 
                   <!-- Reranker controls -->
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-                    <label class="flex items-center gap-2 text-sm font-mono select-none">
+                    <label
+                      class="flex items-center gap-2 text-sm font-mono select-none"
+                    >
                       <input
                         type="checkbox"
                         x-model="querySettings.values.enable_rerank"
@@ -2214,7 +2908,10 @@
                         <span class="text-slate-600">· 0.0 = pass-through</span>
                       </span>
                       <input
-                        type="number" min="0" max="1" step="0.01"
+                        type="number"
+                        min="0"
+                        max="1"
+                        step="0.01"
                         x-model.number="querySettings.values.min_rerank_score"
                         :disabled="!querySettings.values.enable_rerank"
                         class="mt-1 w-full bg-ink-900/60 border border-edge rounded-lg px-3 py-2 text-sm font-mono focus:border-neon-cyan/60 outline-none disabled:opacity-40"
@@ -2223,17 +2920,31 @@
                   </div>
 
                   <!-- Toggles -->
-                  <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm font-mono">
+                  <div
+                    class="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm font-mono"
+                  >
                     <label class="flex items-center gap-2 select-none">
-                      <input type="checkbox" x-model="querySettings.values.stream" class="accent-neon-cyan" />
+                      <input
+                        type="checkbox"
+                        x-model="querySettings.values.stream"
+                        class="accent-neon-cyan"
+                      />
                       <span>Stream Response</span>
                     </label>
                     <label class="flex items-center gap-2 select-none">
-                      <input type="checkbox" x-model="querySettings.values.only_need_context" class="accent-neon-magenta" />
+                      <input
+                        type="checkbox"
+                        x-model="querySettings.values.only_need_context"
+                        class="accent-neon-magenta"
+                      />
                       <span>Only Need Context</span>
                     </label>
                     <label class="flex items-center gap-2 select-none">
-                      <input type="checkbox" x-model="querySettings.values.only_need_prompt" class="accent-neon-magenta" />
+                      <input
+                        type="checkbox"
+                        x-model="querySettings.values.only_need_prompt"
+                        class="accent-neon-magenta"
+                      />
                       <span>Only Need Prompt</span>
                     </label>
                   </div>
@@ -2242,7 +2953,9 @@
                   <label class="block">
                     <span class="text-xs text-slate-400 font-mono">
                       Additional Output Prompt
-                      <span class="text-slate-600">· appended to LLM instructions</span>
+                      <span class="text-slate-600"
+                        >· appended to LLM instructions</span
+                      >
                     </span>
                     <textarea
                       x-model="querySettings.values.user_prompt"
@@ -2260,10 +2973,7 @@
               <div class="flex items-start justify-between gap-4 flex-wrap">
                 <div>
                   <h3 class="font-semibold text-lg flex items-center gap-2">
-                    <i
-                      data-lucide="power"
-                      class="w-4 h-4 text-neon-amber"
-                    ></i>
+                    <i data-lucide="power" class="w-4 h-4 text-neon-amber"></i>
                     Server Control
                   </h3>
                   <p class="text-xs text-slate-500 mt-1 max-w-md">
@@ -2279,14 +2989,18 @@
                   :disabled="restarting"
                 >
                   <i data-lucide="refresh-cw" class="w-4 h-4"></i>
-                  <span x-text="restarting ? 'Restarting…' : 'Restart Server'"></span>
+                  <span
+                    x-text="restarting ? 'Restarting…' : 'Restart Server'"
+                  ></span>
                 </button>
               </div>
               <div
                 class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-[11px] font-mono"
               >
                 <div class="bg-ink-900/60 border border-edge rounded-lg p-3">
-                  <div class="text-slate-500 uppercase tracking-wider text-[10px] mb-1">
+                  <div
+                    class="text-slate-500 uppercase tracking-wider text-[10px] mb-1"
+                  >
                     lightrag
                   </div>
                   <div
@@ -2295,7 +3009,9 @@
                   ></div>
                 </div>
                 <div class="bg-ink-900/60 border border-edge rounded-lg p-3">
-                  <div class="text-slate-500 uppercase tracking-wider text-[10px] mb-1">
+                  <div
+                    class="text-slate-500 uppercase tracking-wider text-[10px] mb-1"
+                  >
                     raganything
                   </div>
                   <div
@@ -2304,7 +3020,9 @@
                   ></div>
                 </div>
                 <div class="bg-ink-900/60 border border-edge rounded-lg p-3">
-                  <div class="text-slate-500 uppercase tracking-wider text-[10px] mb-1">
+                  <div
+                    class="text-slate-500 uppercase tracking-wider text-[10px] mb-1"
+                  >
                     mineru
                   </div>
                   <div
@@ -2313,7 +3031,9 @@
                   ></div>
                 </div>
                 <div class="bg-ink-900/60 border border-edge rounded-lg p-3">
-                  <div class="text-slate-500 uppercase tracking-wider text-[10px] mb-1">
+                  <div
+                    class="text-slate-500 uppercase tracking-wider text-[10px] mb-1"
+                  >
                     transformers
                   </div>
                   <div
@@ -2391,6 +3111,117 @@
             class="px-4 py-8 text-center text-slate-500 text-sm"
           >
             No matches.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================== PROMPT PICKER MODAL ========================== -->
+    <div
+      x-show="promptPicker.open"
+      x-cloak
+      class="fixed inset-0 z-[60] bg-ink-950/80 backdrop-blur-sm flex items-start justify-center pt-20"
+      @click.self="promptPicker.open=false"
+    >
+      <div
+        class="w-full max-w-3xl card border-edge-strong shadow-glow overflow-hidden flex flex-col max-h-[75vh]"
+      >
+        <div
+          class="px-5 py-4 border-b border-edge flex items-center justify-between gap-4"
+        >
+          <div class="flex items-center gap-3 flex-1 min-w-0">
+            <i data-lucide="library" class="w-5 h-5 text-neon-cyan"></i>
+            <div class="min-w-0">
+              <h3 class="font-semibold">Prompt Library</h3>
+              <p class="text-xs text-slate-500 mt-0.5">
+                Click any prompt to load it into the composer.
+              </p>
+            </div>
+          </div>
+          <button
+            class="btn btn-ghost text-slate-500"
+            @click="promptPicker.open=false"
+          >
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <div class="px-5 py-3 border-b border-edge">
+          <div class="relative">
+            <i
+              data-lucide="search"
+              class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
+            ></i>
+            <input
+              x-ref="promptPickerSearch"
+              x-model="promptPicker.query"
+              placeholder="Filter prompts by title, category, or text…"
+              class="w-full bg-ink-900 border border-edge focus:border-neon-cyan/60 outline-none rounded-lg pl-9 pr-3 py-2 text-sm font-mono"
+            />
+          </div>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-4 space-y-4">
+          <template
+            x-for="phase in pickerPhases()"
+            :key="'pick-phase-' + phase.id"
+          >
+            <div>
+              <div class="flex items-center gap-2 mb-2">
+                <span
+                  class="pill border"
+                  :class="phase.pillClass"
+                  x-text="'PHASE ' + phase.id"
+                ></span>
+                <h4
+                  class="text-xs font-semibold text-slate-300"
+                  x-text="phase.label"
+                ></h4>
+                <span
+                  class="text-[10px] font-mono text-slate-600"
+                  x-text="phase.items.length"
+                ></span>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <template x-for="p in phase.items" :key="'pick-' + p.title">
+                  <button
+                    type="button"
+                    class="text-left p-3 rounded-lg border border-edge bg-ink-900/60 hover:border-neon-cyan/40 hover:bg-neon-cyan/5 transition group"
+                    @click="usePromptFromPicker(p)"
+                  >
+                    <div class="flex items-start justify-between gap-2 mb-1">
+                      <div
+                        class="text-sm font-semibold text-slate-100 group-hover:text-neon-cyan leading-snug"
+                        x-text="p.title"
+                      ></div>
+                      <span
+                        class="pill bg-ink-800 text-slate-500 border border-edge whitespace-nowrap shrink-0"
+                        x-text="p.category"
+                      ></span>
+                    </div>
+                    <p
+                      class="text-[11px] text-slate-500 leading-relaxed line-clamp-2"
+                      x-text="p.prompt"
+                    ></p>
+                  </button>
+                </template>
+              </div>
+            </div>
+          </template>
+          <div
+            x-show="!pickerPhases().length"
+            class="text-center text-slate-500 text-sm py-10"
+          >
+            <i
+              data-lucide="search-x"
+              class="w-6 h-6 mx-auto mb-2 text-slate-700"
+            ></i>
+            No prompts match
+            <span
+              class="font-mono text-slate-400"
+              x-text="promptPicker.query"
+            ></span
+            >.
           </div>
         </div>
       </div>
@@ -2602,8 +3433,16 @@
           currentChat: null,
           composer: "",
           sending: false,
+          chatStatus: { phase: null, label: "", retrieve_ms: null },
+          chatAbort: null,
           promptLibrary: [],
           promptFilter: "",
+          promptPicker: { open: false, query: "" },
+          // Streaming UI helpers
+          streamLiveContent: "",
+          thinkStartedAt: null,
+          thinkElapsed: 0,
+          thinkTimer: null,
           toasts: [],
 
           // Command palette
@@ -2766,10 +3605,7 @@
                   !this.intel.loading
                 )
                   this.loadIntel();
-                if (
-                  this.active === "settings" &&
-                  !this.querySettings.loaded
-                )
+                if (this.active === "settings" && !this.querySettings.loaded)
                   this.loadQuerySettings();
               }),
             );
@@ -2798,6 +3634,17 @@
               this.$nextTick(() => lucide.createIcons()),
             );
             this.$watch("wsModal.items", () =>
+              this.$nextTick(() => lucide.createIcons()),
+            );
+            this.$watch("promptPicker.open", () =>
+              this.$nextTick(() => {
+                lucide.createIcons();
+                if (this.promptPicker.open && this.$refs.promptPickerSearch) {
+                  this.$refs.promptPickerSearch.focus();
+                }
+              }),
+            );
+            this.$watch("promptPicker.query", () =>
               this.$nextTick(() => lucide.createIcons()),
             );
             this.$watch("restarting", () =>
@@ -2959,36 +3806,11 @@
               (p) =>
                 (p.title || "").toLowerCase().includes(q) ||
                 (p.category || "").toLowerCase().includes(q) ||
-                (p.prompt || "").toLowerCase().includes(q)
+                (p.prompt || "").toLowerCase().includes(q),
             );
           },
           promptPhases() {
-            const meta = {
-              3: {
-                label: "Capture & RFP Discovery",
-                pillClass:
-                  "bg-neon-cyan/10 text-neon-cyan border-neon-cyan/30",
-                accentClass: "accent-cyan",
-              },
-              4: {
-                label: "Proposal Planning",
-                pillClass:
-                  "bg-neon-magenta/10 text-neon-magenta border-neon-magenta/30",
-                accentClass: "accent-magenta",
-              },
-              5: {
-                label: "Proposal Development",
-                pillClass:
-                  "bg-neon-lime/10 text-neon-lime border-neon-lime/30",
-                accentClass: "accent-lime",
-              },
-              6: {
-                label: "Color Reviews & Submittal",
-                pillClass:
-                  "bg-neon-amber/10 text-neon-amber border-neon-amber/30",
-                accentClass: "accent-amber",
-              },
-            };
+            const meta = this._phaseMeta();
             const buckets = {};
             for (const p of this.filteredPrompts()) {
               const ph = String(p.phase || "?");
@@ -3006,6 +3828,41 @@
                 items: buckets[id],
               }));
           },
+          _phaseMeta() {
+            return {
+              3: {
+                label: "Capture & RFP Discovery",
+                pillClass: "bg-neon-cyan/10 text-neon-cyan border-neon-cyan/30",
+                accentClass: "accent-cyan",
+              },
+              4: {
+                label: "Proposal Planning",
+                pillClass:
+                  "bg-neon-magenta/10 text-neon-magenta border-neon-magenta/30",
+                accentClass: "accent-magenta",
+              },
+              5: {
+                label: "Proposal Development",
+                pillClass: "bg-neon-lime/10 text-neon-lime border-neon-lime/30",
+                accentClass: "accent-lime",
+              },
+              6: {
+                label: "Color Reviews & Submittal",
+                pillClass:
+                  "bg-neon-amber/10 text-neon-amber border-neon-amber/30",
+                accentClass: "accent-amber",
+              },
+            };
+          },
+          phaseLabel(id) {
+            return this._phaseMeta()[String(id)]?.label || `Phase ${id}`;
+          },
+          phasePillClass(id) {
+            return (
+              this._phaseMeta()[String(id)]?.pillClass ||
+              "bg-ink-800 text-slate-400 border-edge"
+            );
+          },
           usePrompt(p) {
             this.composer = p.prompt;
             this.active = "chat";
@@ -3021,6 +3878,48 @@
             } catch {
               this.toast("Copy failed", "error");
             }
+          },
+
+          // ----- Prompt picker (modal triggered from chat composer) -----
+          openPromptPicker() {
+            this.promptPicker.open = true;
+            this.promptPicker.query = "";
+          },
+          usePromptFromPicker(p) {
+            this.composer = p.prompt;
+            this.promptPicker.open = false;
+            this.$nextTick(() => {
+              if (this.$refs.composer) this.$refs.composer.focus();
+            });
+            this.toast("Prompt loaded into composer", "info");
+          },
+          pickerPhases() {
+            const q = (this.promptPicker.query || "").toLowerCase().trim();
+            const matched = !q
+              ? this.promptLibrary
+              : this.promptLibrary.filter(
+                  (p) =>
+                    (p.title || "").toLowerCase().includes(q) ||
+                    (p.category || "").toLowerCase().includes(q) ||
+                    (p.prompt || "").toLowerCase().includes(q),
+                );
+            const phases = [];
+            const byId = {};
+            for (const p of matched) {
+              const id = String(p.phase || "?");
+              if (!byId[id]) {
+                byId[id] = {
+                  id,
+                  label: this.phaseLabel(id),
+                  pillClass: this.phasePillClass(id),
+                  items: [],
+                };
+                phases.push(byId[id]);
+              }
+              byId[id].items.push(p);
+            }
+            phases.sort((a, b) => String(a.id).localeCompare(String(b.id)));
+            return phases;
           },
 
           async newChat(rfpContext = null) {
@@ -3077,6 +3976,17 @@
             const chatId = this.currentChat.id;
             this.composer = "";
             this.sending = true;
+            this.chatStatus = { phase: null, label: "", retrieve_ms: null };
+            this.streamLiveContent = "";
+            // Thinking-elapsed timer: starts when LLM iterator opens (status=generating)
+            // and the user is staring at a static "context retrieved" line. Gives them
+            // visible motion until the first emitted token arrives.
+            this.thinkElapsed = 0;
+            this.thinkStartedAt = null;
+            if (this.thinkTimer) {
+              clearInterval(this.thinkTimer);
+              this.thinkTimer = null;
+            }
             // Optimistic user bubble + empty assistant placeholder we'll fill
             // as SSE tokens arrive.
             this.currentChat.messages.push({
@@ -3091,8 +4001,21 @@
               streaming: true,
             };
             this.currentChat.messages.push(placeholder);
+            // IMPORTANT: re-acquire the reactive proxy reference. Alpine wraps
+            // pushed objects in a Proxy; our local `placeholder` still points
+            // at the unwrapped object, so mutations like `placeholder.content +=`
+            // wouldn't trigger re-renders until another reactivity tick.
+            // Capture the reactive proxy reference for the assistant
+            // placeholder. We rebind `live` to a fresh plain object on each
+            // SSE token (see below) so Alpine's array reactivity fires every
+            // chunk — mirroring the LightRAG webui pattern of returning a
+            // new array element per chunk instead of mutating in place.
+            let live =
+              this.currentChat.messages[this.currentChat.messages.length - 1];
             this.scrollMsgs();
 
+            const controller = new AbortController();
+            this.chatAbort = controller;
             try {
               const resp = await fetch(
                 `/api/ui/chats/${chatId}/messages/stream`,
@@ -3100,6 +4023,7 @@
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ content }),
+                  signal: controller.signal,
                 },
               );
               if (!resp.ok || !resp.body) {
@@ -3143,30 +4067,114 @@
                   } catch {
                     continue;
                   }
-                  if (event === "token" && parsed.text) {
-                    placeholder.content += parsed.text;
+                  if (event === "status") {
+                    this.chatStatus = {
+                      phase: parsed.phase || null,
+                      label: parsed.label || "",
+                      retrieve_ms:
+                        parsed.retrieve_ms != null
+                          ? parsed.retrieve_ms
+                          : this.chatStatus.retrieve_ms,
+                    };
+                    if (
+                      parsed.phase === "generating" &&
+                      !this.thinkTimer
+                    ) {
+                      this.thinkStartedAt = Date.now();
+                      this.thinkTimer = setInterval(() => {
+                        this.thinkElapsed = Math.floor(
+                          (Date.now() - this.thinkStartedAt) / 1000,
+                        );
+                      }, 250);
+                    }
+                  } else if (event === "token" && parsed.text) {
+                    // Replace the last message with a NEW object so Alpine's
+                    // x-for picks up the change. Mutating live.content alone
+                    // doesn't always re-trigger inner x-html expressions when
+                    // :key uses the index (the iteration var keeps pointing
+                    // at the same proxy and Alpine batches the diff away).
+                    const idx = this.currentChat.messages.length - 1;
+                    const updated = {
+                      ...live,
+                      content: (live.content || "") + parsed.text,
+                    };
+                    live = updated;
+                    this.currentChat.messages.splice(idx, 1, updated);
+                    this.streamLiveContent = updated.content;
                     scheduleScroll();
                   } else if (event === "error") {
-                    placeholder.content += `\n\n⚠️ ${parsed.message || "stream error"}`;
+                    const idx = this.currentChat.messages.length - 1;
+                    const updated = {
+                      ...live,
+                      content:
+                        (live.content || "") +
+                        `\n\n⚠️ ${parsed.message || "stream error"}`,
+                    };
+                    live = updated;
+                    this.currentChat.messages.splice(idx, 1, updated);
                     this.toast("Query failed", "error");
                   } else if (event === "done") {
+                    const idx = this.currentChat.messages.length - 1;
+                    const updated = {
+                      ...live,
+                      streaming: false,
+                    };
                     if (parsed.assistant?.content) {
-                      placeholder.content = parsed.assistant.content;
-                      placeholder.mode = parsed.assistant.mode;
+                      updated.content = parsed.assistant.content;
+                      updated.mode = parsed.assistant.mode;
+                      updated.timing =
+                        parsed.assistant.timing || parsed.timing;
                     }
-                    placeholder.streaming = false;
+                    live = updated;
+                    this.currentChat.messages.splice(idx, 1, updated);
                   }
                 }
               }
               await this.loadChats();
             } catch (e) {
-              placeholder.streaming = false;
-              placeholder.content =
-                placeholder.content || "⚠️ " + (e?.message || "stream failed");
-              this.toast("Query failed", "error");
+              const idx = this.currentChat.messages.length - 1;
+              let content = live.content || "";
+              if (e?.name === "AbortError") {
+                content = content + "\n\n_(stopped)_";
+              } else {
+                content = content || "⚠️ " + (e?.message || "stream failed");
+                this.toast("Query failed", "error");
+              }
+              const updated = { ...live, content, streaming: false };
+              live = updated;
+              if (idx >= 0) this.currentChat.messages.splice(idx, 1, updated);
             } finally {
               this.sending = false;
+              this.chatAbort = null;
+              this.chatStatus = { phase: null, label: "", retrieve_ms: null };
+              this.streamLiveContent = "";
+              this.thinkStartedAt = null;
+              this.thinkElapsed = 0;
+              if (this.thinkTimer) {
+                clearInterval(this.thinkTimer);
+                this.thinkTimer = null;
+              }
               this.scrollMsgs();
+            }
+          },
+
+          stopMessage() {
+            if (this.chatAbort) {
+              try {
+                this.chatAbort.abort();
+              } catch (_) {}
+            }
+          },
+
+          renderMd(text) {
+            if (!text) return "";
+            try {
+              const html = window.marked
+                ? window.marked.parse(text, { breaks: true, gfm: true })
+                : text;
+              return window.DOMPurify ? window.DOMPurify.sanitize(html) : html;
+            } catch (_) {
+              return text;
             }
           },
 
@@ -3626,7 +4634,10 @@
               this.querySettings.defaults = { ...data.defaults };
               this.querySettings.loaded = true;
             } catch (e) {
-              this.toast("Failed loading query settings: " + e.message, "error");
+              this.toast(
+                "Failed loading query settings: " + e.message,
+                "error",
+              );
             }
           },
 
@@ -3647,7 +4658,9 @@
           },
 
           async resetQuerySettings() {
-            if (!confirm("Restore default query parameters for this workspace?"))
+            if (
+              !confirm("Restore default query parameters for this workspace?")
+            )
               return;
             try {
               const data = await this.api("/api/ui/settings/query/reset", {
