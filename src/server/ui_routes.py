@@ -23,6 +23,7 @@ import logging
 import os
 import re
 import sys
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -56,6 +57,83 @@ logger = logging.getLogger(__name__)
 
 _THIS_DIR = Path(__file__).resolve().parent
 _STATIC_DIR = (_THIS_DIR.parent / "ui" / "static").resolve()
+
+
+# ---------------------------------------------------------------------------
+# Reasoning-trace stripping (<think>...</think>)
+# ---------------------------------------------------------------------------
+# Reasoning-capable LLMs (e.g. xAI Grok 4 reasoning) emit their chain-of-thought
+# inline as <think>...</think> blocks within `delta.content`. LightRAG's own
+# webui parses these out and shows them in a collapsible panel; our UI just
+# wants the polished answer. We strip them here so the persisted chat content
+# and the streamed SSE tokens never include the scratchpad.
+_THINK_BLOCK = re.compile(r"<think>.*?</think>\s*", re.DOTALL | re.IGNORECASE)
+_UNCLOSED_THINK = re.compile(r"<think>.*$", re.DOTALL | re.IGNORECASE)
+
+
+def _strip_think(text: str) -> str:
+    """Remove <think>...</think> blocks from a complete string."""
+    if not text or "<think>" not in text.lower():
+        return text
+    cleaned = _THINK_BLOCK.sub("", text)
+    # Drop any unclosed trailing think block (model truncated mid-reasoning)
+    cleaned = _UNCLOSED_THINK.sub("", cleaned)
+    return cleaned.lstrip()
+
+
+class _ThinkStripper:
+    """Stateful streaming filter that strips <think>...</think> blocks.
+
+    Handles tags split across chunk boundaries by holding back up to
+    ``_HOLD`` trailing bytes that could be the prefix of an open or close tag.
+    """
+
+    OPEN = "<think>"
+    CLOSE = "</think>"
+    _HOLD = len(CLOSE)  # 8 — enough to hold any partial tag
+
+    def __init__(self) -> None:
+        self._buf = ""
+        self._in_think = False
+
+    def feed(self, chunk: str) -> str:
+        """Consume an incoming chunk; return safe-to-emit text outside <think>."""
+        if not chunk:
+            return ""
+        self._buf += chunk
+        out: list[str] = []
+        while True:
+            if self._in_think:
+                idx = self._buf.find(self.CLOSE)
+                if idx == -1:
+                    # Whole buffer is inside think; keep tail in case of split close tag
+                    if len(self._buf) > self._HOLD:
+                        self._buf = self._buf[-self._HOLD:]
+                    return "".join(out)
+                self._buf = self._buf[idx + len(self.CLOSE):].lstrip()
+                self._in_think = False
+            else:
+                idx = self._buf.find(self.OPEN)
+                if idx == -1:
+                    # No open tag in buffer — emit safe portion, hold tail.
+                    if len(self._buf) > self._HOLD:
+                        out.append(self._buf[:-self._HOLD])
+                        self._buf = self._buf[-self._HOLD:]
+                    return "".join(out)
+                if idx > 0:
+                    out.append(self._buf[:idx])
+                self._buf = self._buf[idx + len(self.OPEN):]
+                self._in_think = True
+
+    def flush(self) -> str:
+        """Drain remaining buffered text at end of stream."""
+        if self._in_think:
+            # Stream ended mid-think — discard the unclosed reasoning trace.
+            self._buf = ""
+            return ""
+        out = self._buf
+        self._buf = ""
+        return out
 
 
 def _workspace_dir() -> Path:
@@ -1036,7 +1114,7 @@ def register_ui(
 
         assistant_msg = {
             "role": "assistant",
-            "content": str(answer),
+            "content": _strip_think(str(answer)),
             "ts": _now_iso(),
             "mode": chat.get("mode", "mix"),
         }
@@ -1089,32 +1167,91 @@ def register_ui(
             # SSE preamble keeps proxies from buffering and signals the client
             # that the stream is alive even before the first model token.
             yield "event: open\ndata: {}\n\n"
+            # Tell the UI we're working on retrieval/rerank. LightRAG's aquery
+            # does retrieval + rerank + first-token-prefill *before* it returns
+            # the iterator, so this status covers that whole prep window.
+            yield (
+                "event: status\ndata: "
+                + json.dumps({"phase": "retrieving", "label": "Retrieving context\u2026"})
+                + "\n\n"
+            )
             collected: list[str] = []
+            stripper = _ThinkStripper()
+            t_start = time.perf_counter()
+            t_first_token: float | None = None
+            token_count = 0
+            error_message: str | None = None
             try:
                 result = await query_func(payload.content, mode, history, True, overrides)
+                retrieve_ms = int((time.perf_counter() - t_start) * 1000)
+                # Iterator is in hand \u2014 LLM has started generating.
+                yield (
+                    "event: status\ndata: "
+                    + json.dumps(
+                        {
+                            "phase": "generating",
+                            "label": "Generating response\u2026",
+                            "retrieve_ms": retrieve_ms,
+                        }
+                    )
+                    + "\n\n"
+                )
                 if hasattr(result, "__aiter__"):
                     async for chunk in result:
                         if not chunk:
                             continue
-                        text = str(chunk)
+                        text = stripper.feed(str(chunk))
+                        if not text:
+                            continue
+                        if t_first_token is None:
+                            t_first_token = time.perf_counter()
                         collected.append(text)
+                        token_count += 1
                         yield f"event: token\ndata: {json.dumps({'text': text})}\n\n"
+                    # Emit any trailing buffered text (e.g. final close tag absent).
+                    tail = stripper.flush()
+                    if tail:
+                        if t_first_token is None:
+                            t_first_token = time.perf_counter()
+                        collected.append(tail)
+                        token_count += 1
+                        yield f"event: token\ndata: {json.dumps({'text': tail})}\n\n"
                 else:
-                    text = str(result)
+                    text = _strip_think(str(result))
                     collected.append(text)
+                    token_count = 1
+                    t_first_token = time.perf_counter()
                     yield f"event: token\ndata: {json.dumps({'text': text})}\n\n"
             except Exception as exc:
                 logger.exception("Streaming query failed for chat %s", chat_id)
-                yield f"event: error\ndata: {json.dumps({'message': str(exc)})}\n\n"
+                error_message = str(exc)
+                yield f"event: error\ndata: {json.dumps({'message': error_message})}\n\n"
                 # Persist the error so the chat reflects what the user saw.
-                collected.append(f"⚠️ Query failed: {exc}")
+                collected.append(f"\u26a0\ufe0f Query failed: {exc}")
+
+            t_end = time.perf_counter()
+            total_ms = int((t_end - t_start) * 1000)
+            ttft_ms = (
+                int((t_first_token - t_start) * 1000) if t_first_token else None
+            )
+            generate_ms = (
+                int((t_end - t_first_token) * 1000) if t_first_token else None
+            )
 
             full_text = "".join(collected)
+            timing = {
+                "total_ms": total_ms,
+                "ttft_ms": ttft_ms,
+                "generate_ms": generate_ms,
+                "chunk_count": token_count,
+                "char_count": len(full_text),
+            }
             assistant_msg = {
                 "role": "assistant",
                 "content": full_text,
                 "ts": _now_iso(),
                 "mode": mode,
+                "timing": timing,
             }
             # Re-read so we don't clobber concurrent edits to the same chat file.
             try:
@@ -1125,9 +1262,25 @@ def register_ui(
             latest["updated_at"] = _now_iso()
             _write_chat(latest)
 
+            logger.info(
+                "[chat] mode=%s ttft=%sms total=%sms chunks=%s chars=%s%s",
+                mode,
+                ttft_ms if ttft_ms is not None else "-",
+                total_ms,
+                token_count,
+                len(full_text),
+                f" error={error_message!r}" if error_message else "",
+            )
+
             yield (
                 "event: done\ndata: "
-                + json.dumps({"assistant": assistant_msg, "chat": _summary(latest)})
+                + json.dumps(
+                    {
+                        "assistant": assistant_msg,
+                        "chat": _summary(latest),
+                        "timing": timing,
+                    }
+                )
                 + "\n\n"
             )
 
