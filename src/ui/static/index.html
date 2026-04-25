@@ -1404,8 +1404,8 @@
                         x-model="currentChat.mode"
                         @change="updateMode()"
                       >
-                        <option>hybrid</option>
                         <option>mix</option>
+                        <option>hybrid</option>
                         <option>local</option>
                         <option>global</option>
                         <option>naive</option>
@@ -2845,7 +2845,7 @@
               method: "POST",
               body: JSON.stringify({
                 title: "New chat",
-                mode: "hybrid",
+                mode: "mix",
                 rfp_context: rfpContext,
               }),
             });

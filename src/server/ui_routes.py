@@ -74,7 +74,7 @@ def _chats_dir() -> Path:
 
 class ChatCreate(BaseModel):
     title: str = Field(default="New chat", max_length=120)
-    mode: str = Field(default="hybrid")
+    mode: str = Field(default="mix")
     rfp_context: Optional[str] = Field(default=None, max_length=200)
 
 
@@ -979,7 +979,7 @@ def register_ui(
         _write_chat(chat)
 
         history = _build_history(chat, exclude_last=True)
-        mode = chat.get("mode", "hybrid")
+        mode = chat.get("mode", "mix")
 
         async def event_stream():
             # SSE preamble keeps proxies from buffering and signals the client
