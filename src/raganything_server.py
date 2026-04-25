@@ -152,19 +152,41 @@ async def main():
     logger.info("✅ Use LightRAG's native /query/data endpoint for structured data retrieval (agent workflows)")
 
     # Project Theseus custom UI (cyberpunk capture workbench at /ui)
-    async def _ui_query(text: str, mode: str, history: list[dict], stream: bool):
-        """UI query bridge: passes conversation_history + stream flag to LightRAG.
+    async def _ui_query(text: str, mode: str, history: list[dict], stream: bool, overrides: dict | None = None):
+        """UI query bridge: passes per-workspace QueryParam tunables + reranker score.
+
+        `overrides` is a dict from `_build_query_overrides()` containing any of:
+        top_k, chunk_top_k, max_entity_tokens, max_relation_tokens,
+        max_total_tokens, enable_rerank, only_need_context, only_need_prompt,
+        response_type, user_prompt, min_rerank_score.
+
+        `min_rerank_score` is applied to the LightRAG instance for the call so
+        the reranker honors the per-workspace threshold.
 
         Returns either a string (stream=False) or an AsyncIterator[str]
         (stream=True). The UI router unpacks both shapes.
         """
         from lightrag import QueryParam
+        overrides = dict(overrides or {})
+        # min_rerank_score isn't a QueryParam field — apply it directly to the
+        # LightRAG instance. Safe to mutate per-call: extraction reranker reads
+        # this attribute on each invocation.
+        min_score = overrides.pop("min_rerank_score", None)
+        if min_score is not None:
+            try:
+                rag_instance.lightrag.min_rerank_score = float(min_score)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed setting min_rerank_score=%r: %s", min_score, exc)
+        # Drop any unknown keys to avoid TypeError if QueryParam evolves.
+        valid_fields = {f.name for f in QueryParam.__dataclass_fields__.values()}
+        param_kwargs = {k: v for k, v in overrides.items() if k in valid_fields}
         return await rag_instance.lightrag.aquery(
             text,
             param=QueryParam(
                 mode=mode,
                 stream=stream,
                 conversation_history=history or [],
+                **param_kwargs,
             ),
         )
     register_ui(app, _ui_query)
