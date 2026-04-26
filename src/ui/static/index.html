@@ -1418,27 +1418,12 @@
         opacity: 0.7;
       }
 
-      Intelligence,
-      Settings,
-      Workspaces,
-      Prompt
-        Library
-        all
-        share
-        the
-        Capture
-        Chat
-        visual
-        language
-        without
-        overpowering
-        data-dense
-        tables
-        and
-        forms.
-        */
-        @keyframes
-        panel-aurora-drift {
+      /* ========== PANEL THEMING (branch 100) ==========
+         Documents, Intelligence, Settings, Workspaces, Prompt Library all
+         share the Capture Chat visual language without overpowering
+         data-dense tables and forms.
+         ================================================ */
+      @keyframes panel-aurora-drift {
         0% {
           background-position:
             0% 0%,
@@ -1901,7 +1886,7 @@
         <button
           class="topbar-pill"
           @click="openWorkspaceModal()"
-          title="Switch workspace (server restart)"
+          title="Switch workspace (Ctrl+K for quick switcher)"
         >
           <i data-lucide="layers" class="w-4 h-4 text-neon-magenta"></i>
           <div class="leading-tight text-left">
@@ -4903,6 +4888,7 @@
               this.loadDocuments(),
               this.loadChats(),
               this.loadPromptLibrary(),
+              this.loadWorkspaceList(),
             ]);
           },
 
@@ -6207,15 +6193,27 @@
           },
 
           // ===== Workspace switching =====
-          async openWorkspaceModal() {
-            this.wsModal.open = true;
-            this.wsModal.newName = "";
+          /**
+           * Fetch the list of workspaces and store it on `wsModal.items`.
+           * Used by both the modal and the Cmd-K palette so the picker can
+           * surface workspaces as direct switch actions without opening the
+           * full modal.
+           */
+          async loadWorkspaceList(silent = true) {
             try {
               const r = await this.api("/api/ui/workspaces");
               this.wsModal.items = r.workspaces || [];
             } catch (e) {
-              this.toast("Could not list workspaces: " + e.message, "error");
+              if (!silent) {
+                this.toast("Could not list workspaces: " + e.message, "error");
+              }
             }
+          },
+
+          async openWorkspaceModal() {
+            this.wsModal.open = true;
+            this.wsModal.newName = "";
+            await this.loadWorkspaceList(false);
           },
 
           async switchWorkspace(name, create = false) {
@@ -6351,6 +6349,9 @@
             this.palette.open = true;
             this.palette.query = "";
             this.palette.cursor = 0;
+            // Refresh workspace list so the palette reflects newly added
+            // folders without forcing the user to open the full modal.
+            this.loadWorkspaceList();
             this.$nextTick(() => {
               this.$refs.paletteInput?.focus();
               lucide.createIcons();
@@ -6375,13 +6376,32 @@
                   },
                 }),
               );
-            // Workspace switch
+            // Workspace switch — one item per workspace + the modal opener
+            const activeWs = (this.stats && this.stats.workspace) || "";
+            (this.wsModal.items || []).forEach((ws) => {
+              const isActive = ws.name === activeWs;
+              items.push({
+                key: "ws:" + ws.name,
+                kind: "workspace",
+                label: isActive
+                  ? `${ws.name}  (active)`
+                  : `Switch to: ${ws.name}`,
+                hint: isActive
+                  ? "Current workspace — already loaded"
+                  : `Restart server with workspace "${ws.name}"`,
+                icon: isActive ? "check-circle" : "layers",
+                action: () => {
+                  if (isActive) return;
+                  this.switchWorkspace(ws.name);
+                },
+              });
+            });
             items.push({
-              key: "ws:switch",
+              key: "ws:manage",
               kind: "workspace",
-              label: "Switch workspace…",
-              hint: "Restart server with a different workspace",
-              icon: "layers",
+              label: "Manage workspaces…",
+              hint: "Open workspace picker (create, switch, inspect)",
+              icon: "settings-2",
               action: () => this.openWorkspaceModal(),
             });
             // Actions
