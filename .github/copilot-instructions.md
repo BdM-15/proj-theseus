@@ -172,6 +172,14 @@ CONTEXT_FILTER_CONTENT_TYPES=text  # Content types in context
 - **Validation**: Always validate changes by running relevant tests (`pytest` or specific scripts).
 - **Cross-cutting awareness**: Before completing any feature branch, review the Cross-Cutting Change Checklist above if the change touches ontology, prompts, or domain vocabulary.
 
+### Frontend / UI (single-file Alpine + Tailwind CDN)
+
+- **Single source of truth**: `src/ui/static/index.html` (~6000 lines) — Alpine.js component `theseus()`, Tailwind via CDN, marked + DOMPurify for markdown, Lucide icons, Cytoscape for graphs. **No build step.**
+- **Tailwind config is duplicated**: the runtime config lives inline as `tailwind.config = {…}` in a `<script>` tag at the top of `index.html` (read by the CDN in the browser); the IDE-only mirror lives at `tailwind.config.js` (read by the VS Code Tailwind IntelliSense extension). **If you change one, mirror the other** — custom tokens (`neon-*`, `ink-*`, `edge-*`, `shadow-glow`, `shadow-magenta`) must match in both files or `@apply` warnings return.
+- **No server restart for UI changes** — hard-reload the browser (Ctrl+Shift+R) since `index.html` is served via `StaticFiles`.
+- **Alpine state lives on `theseus()`**: workspace name is `this.stats.workspace` (NOT `activeWorkspace`); chat messages are `this.currentChat.messages[]`; toasts via `this.toast(msg, kind)`; scroll target is `this.$refs.msgs`.
+- **Re-render Lucide icons after dynamic markup**: existing `$watch` hooks on `currentChat`, `palette.open`, `wsModal.open`, etc. call `lucide.createIcons()` — add a watcher when introducing a new modal/overlay.
+
 ---
 
 ## Testing & Validation
