@@ -1000,7 +1000,8 @@
                     class="text-xs text-slate-400 space-y-1 list-decimal list-inside"
                   >
                     <li>
-                      Drop files into
+                      Stage files below <span class="text-slate-500">or</span>
+                      drop into
                       <code class="text-neon-amber"
                         >inputs/&lt;workspace&gt;/</code
                       >
@@ -1008,6 +1009,56 @@
                     <li>Click <span class="text-slate-200">Scan now</span></li>
                     <li>Server enqueues + extracts each new file</li>
                   </ol>
+                </div>
+
+                <!-- In-browser staging uploader (no immediate processing) -->
+                <div
+                  class="border border-dashed border-edge rounded-lg p-4 mb-3 text-center transition cursor-pointer hover:border-neon-amber/60 hover:bg-neon-amber/5"
+                  @dragover.prevent="$event.currentTarget.classList.add('border-neon-amber/60','bg-neon-amber/5')"
+                  @dragleave.prevent="$event.currentTarget.classList.remove('border-neon-amber/60','bg-neon-amber/5')"
+                  @drop.prevent="$event.currentTarget.classList.remove('border-neon-amber/60','bg-neon-amber/5'); stageFiles($event.dataTransfer.files)"
+                  @click="$refs.stageFileInput.click()"
+                >
+                  <input
+                    type="file"
+                    multiple
+                    x-ref="stageFileInput"
+                    class="hidden"
+                    @change="stageFiles($event.target.files)"
+                  />
+                  <i
+                    data-lucide="upload-cloud"
+                    class="w-5 h-5 text-neon-amber mx-auto mb-1"
+                  ></i>
+                  <div class="text-xs text-slate-300">
+                    Drop or click to <span class="text-neon-amber">stage</span>
+                    files
+                  </div>
+                  <div class="text-[10px] text-slate-500 mt-0.5">
+                    Saved to <code>inputs/&lt;workspace&gt;/</code> — does
+                    <span class="text-slate-300">not</span> trigger extraction
+                  </div>
+                </div>
+
+                <!-- Recently staged file list -->
+                <div
+                  x-show="stagedUploads && stagedUploads.length"
+                  class="bg-ink-900/60 border border-edge rounded-lg p-2 mb-3 max-h-32 overflow-y-auto space-y-1"
+                >
+                  <template x-for="s in stagedUploads" :key="s.id">
+                    <div class="flex items-center gap-2 text-[11px] font-mono">
+                      <i
+                        :data-lucide="s.status === 'staged' ? 'check-circle' : (s.status === 'error' ? 'alert-circle' : 'loader')"
+                        class="w-3.5 h-3.5"
+                        :class="{'text-neon-amber': s.status === 'staged', 'text-neon-red': s.status === 'error', 'text-neon-cyan animate-spin': s.status === 'staging'}"
+                      ></i>
+                      <span class="truncate flex-1" x-text="s.name"></span>
+                      <span
+                        class="text-slate-500"
+                        x-text="s.msg || s.status"
+                      ></span>
+                    </div>
+                  </template>
                 </div>
 
                 <button
@@ -4145,6 +4196,10 @@
           stats: {},
           documents: [],
           uploads: [],
+          // Files queued via the Folder Watcher staging uploader. Saved to
+          // inputs/<workspace>/ via /documents/upload?stage_only=true and
+          // wait for the user to click "Scan now" before extraction starts.
+          stagedUploads: [],
           // Documents page UI state — drives status strip, pipeline pill,
           // per-row delete, and bulk reprocess. Polled lazily when the
           // Documents tab is active (see startDocStatsPoll/stopDocStatsPoll).
@@ -4512,7 +4567,7 @@
             if (this.procLog.es) return; // already open
             try {
               const es = new EventSource(
-                "/api/ui/processing-log/stream?limit=150",
+                "/api/ui/processing-log/stream?limit=1500",
               );
               this.procLog.es = es;
               this.procLog.error = null;
@@ -4531,13 +4586,14 @@
               es.addEventListener("event", (e) => {
                 try {
                   const ev = JSON.parse(e.data);
-                  // Server caps at 500; mirror the cap client-side so the DOM
-                  // doesn't grow unbounded during long ingestion runs.
+                  // Cap client-side so the DOM doesn't grow unbounded during
+                  // long ingestion runs. Snapshot can be up to 1500, so allow
+                  // headroom (2000) before we start dropping the oldest events.
                   this.procLog.events.push(ev);
-                  if (this.procLog.events.length > 500) {
+                  if (this.procLog.events.length > 2000) {
                     this.procLog.events.splice(
                       0,
-                      this.procLog.events.length - 500,
+                      this.procLog.events.length - 2000,
                     );
                   }
                   this._scrollProcLog();
@@ -4653,6 +4709,50 @@
               this.loadDocuments();
               this.loadStats();
             }, 1500);
+          },
+
+          /**
+           * Stage files into inputs/<workspace>/ WITHOUT triggering extraction.
+           * Pairs with the Folder Watcher "Scan now" button so the user can
+           * batch-drop many files in the browser, then process them as a
+           * single scan job.
+           */
+          async stageFiles(fileList) {
+            const files = Array.from(fileList || []);
+            for (const f of files) {
+              const id = Math.random().toString(36).slice(2);
+              this.stagedUploads.unshift({
+                id,
+                name: f.name,
+                status: "staging",
+              });
+              const fd = new FormData();
+              fd.append("file", f);
+              try {
+                const r = await fetch("/documents/upload?stage_only=true", {
+                  method: "POST",
+                  body: fd,
+                });
+                const j = await r.json();
+                this.stagedUploads = this.stagedUploads.map((u) =>
+                  u.id === id
+                    ? {
+                        ...u,
+                        status: r.ok ? "staged" : "error",
+                        msg: r.ok ? "ready" : j.message || "failed",
+                      }
+                    : u,
+                );
+                if (r.ok)
+                  this.toast(`${f.name} staged — click Scan now when ready`);
+              } catch (e) {
+                this.stagedUploads = this.stagedUploads.map((u) =>
+                  u.id === id ? { ...u, status: "error", msg: "network" } : u,
+                );
+                this.toast(`Stage failed: ${f.name}`, "error");
+              }
+            }
+            this.$nextTick(() => lucide.createIcons());
           },
 
           async scanRfp() {
