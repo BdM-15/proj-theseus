@@ -2969,9 +2969,10 @@
                           <span class="text-slate-700">·</span>
                           <span
                             class="inline-flex items-center gap-1 text-neon-cyan/80"
+                            :title="`Up to ${stats?.chat?.history_pairs_cap ?? 20} prior user+assistant pairs travel with each query (UI_CHAT_HISTORY_TURNS).`"
                           >
                             <i data-lucide="message-circle" class="w-3 h-3"></i>
-                            multi-turn · follow-ups carry context
+                            <span x-text="memoryLabel()"></span>
                           </span>
                         </div>
                       </div>
@@ -5709,6 +5710,37 @@
             const norm = String(path).replace(/\\/g, "/");
             const parts = norm.split("/");
             return parts[parts.length - 1] || norm;
+          },
+
+          /**
+           * Render the live "N turns in context" indicator for the chat header.
+           * Counts user+assistant *pairs* in the current chat (a pair = one
+           * user prompt + the assistant reply that followed) and clamps to the
+           * server-side cap from /api/ui/stats (UI_CHAT_HISTORY_TURNS,
+           * default 20). When the cap kicks in we show "N (max) — older trimmed"
+           * so it's obvious why earlier turns stop influencing answers.
+           */
+          memoryLabel() {
+            const cap =
+              (this.stats &&
+                this.stats.chat &&
+                this.stats.chat.history_pairs_cap) ||
+              20;
+            const msgs = (this.currentChat && this.currentChat.messages) || [];
+            // Count completed pairs (user followed by assistant). The trailing
+            // user message that's still awaiting a reply doesn't count yet.
+            let pairs = 0;
+            for (let i = 0; i < msgs.length - 1; i++) {
+              if (msgs[i].role === "user" && msgs[i + 1].role === "assistant") {
+                pairs++;
+                i++;
+              }
+            }
+            const inContext = Math.min(pairs, cap);
+            if (pairs === 0) return "multi-turn · follow-ups carry context";
+            if (pairs > cap)
+              return `${inContext} of ${pairs} turns in context · older trimmed`;
+            return `${inContext} turn${inContext === 1 ? "" : "s"} in context`;
           },
 
           /**

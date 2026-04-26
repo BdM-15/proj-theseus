@@ -584,6 +584,14 @@ def _stack_versions() -> dict[str, Optional[str]]:
 _STACK_CACHE: Optional[dict[str, Optional[str]]] = None
 
 
+def _ui_chat_history_pairs() -> int:
+    """Resolve the per-query conversation_history cap (in user+assistant pairs)."""
+    try:
+        return max(0, int(os.getenv("UI_CHAT_HISTORY_TURNS", "20")))
+    except ValueError:
+        return 20
+
+
 def _gather_stats() -> dict[str, Any]:
     settings = get_settings()
     ws = _workspace_dir()
@@ -596,6 +604,12 @@ def _gather_stats() -> dict[str, Any]:
         "relationships": _safe_count_json_keys(ws / "vdb_relationships.json"),
         "chunks": _safe_count_json_keys(ws / "vdb_chunks.json"),
         "chats": sum(1 for _ in _chats_dir().glob("*.json")),
+        "chat": {
+            # How many recent user+assistant pairs travel with each query.
+            # Mirrored from UI_CHAT_HISTORY_TURNS so the chat header can render
+            # an accurate "N turns in context" indicator.
+            "history_pairs_cap": _ui_chat_history_pairs(),
+        },
         "models": {
             "extraction": settings.extraction_llm_name,
             "reasoning": settings.reasoning_llm_name,
@@ -1144,21 +1158,32 @@ def register_ui(
         return JSONResponse({"status": "deleted", "id": chat_id})
 
     # ---- Chats: send message (calls LightRAG /query under the hood) ------
+    # LightRAG itself does NOT trim conversation_history (operate.py forwards
+    # it raw to the LLM), so we cap here. The cap lives in
+    # ``_ui_chat_history_pairs`` and is also surfaced via /api/ui/stats so the
+    # chat header can render an accurate "N turns in context" indicator.
+
     def _build_history(chat: dict, exclude_last: bool = False) -> list[dict]:
         """Build LightRAG conversation_history from persisted messages.
 
-        Returns the list of {role, content} dicts in chronological order. If
+        Returns the list of {role, content} dicts in chronological order, capped
+        at the most recent ``UI_CHAT_HISTORY_TURNS`` user+assistant pairs. If
         exclude_last is True, drops the most recent message (used when we just
         appended the new user message and want only the prior turns as context).
         """
         msgs = chat.get("messages", [])
         if exclude_last and msgs:
             msgs = msgs[:-1]
-        return [
+        cleaned = [
             {"role": m.get("role", "user"), "content": str(m.get("content", ""))}
             for m in msgs
             if m.get("role") in ("user", "assistant") and m.get("content")
         ]
+        cap = _ui_chat_history_pairs()
+        if cap > 0:
+            # 1 pair = 1 user + 1 assistant message; keep the trailing slice.
+            return cleaned[-(cap * 2) :]
+        return cleaned
 
     @app.post("/api/ui/chats/{chat_id}/messages", tags=["theseus-ui"])
     async def post_message(chat_id: str, payload: ChatMessageCreate) -> JSONResponse:

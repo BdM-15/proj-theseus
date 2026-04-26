@@ -169,10 +169,10 @@ N. **Diff vs prior compute.** Cache last summary; show what changed since last e
 7. **`103-workspace-cmdk`** — Cmd-K workspace quick-switcher.
 8. ~~**`104-stream-sources`**~~ ✅ Merged `c034c42` (Apr 26). SSE `event: sources` + collapsible Sources panel; chips open the panel.
 9. ~~**`106-source-preview-polish`**~~ ✅ Merged (Apr 26 — commit pending merge). MinerU prefix detection + content-type badges + table row/col summary + collapsible raw expander.
-10. **`103-workspace-cmdk`** — _Next._ Cmd-K workspace quick-switcher.
-11. **`105-chat-memory`** — multi-turn conversation_history wiring; honor the "follow-ups carry context" promise in the header.
-12. **`108-settings-delete-workspace`** — reuse `tools/workspace_cleanup.py`. (Renumbered from 106 after polish landed.)
-13. **`109-documents-processing-log`** — Documents tab: add a "Processing Log" window beneath the existing _Upload RFP_ and _Processed Documents_ cards. Stream/poll the per-document parsing + extraction + post-processing progress (MinerU phases, chunk count, entity/rel extraction batches, post-processing phase 1-6, errors). Reuse the existing log/status backend if available; otherwise tail `logs/server.log` filtered by workspace.
+10. ~~**`103-workspace-cmdk`**~~ ✅ Merged `b7c210d` (Apr 26). Cmd-K palette lists every workspace as a direct switch action; topbar pill tooltip mentions Ctrl+K. Also added `tailwind.config.js` mirror for VS Code IntelliSense.
+11. ~~**`105-chat-memory`**~~ ✅ Merged (Apr 26 — commit pending merge). Capped multi-turn `conversation_history` at `UI_CHAT_HISTORY_TURNS` pairs (default 20) in `_build_history`; surfaced cap on `/api/ui/stats`; chat header now renders live `memoryLabel()` (e.g. `7 turns in context`, `20 of 35 turns in context · older trimmed`).
+12. **`109-documents-processing-log`** — _Next._ Documents tab: add a "Processing Log" window beneath the existing _Upload RFP_ and _Processed Documents_ cards. Stream/poll the per-document parsing + extraction + post-processing progress (MinerU phases, chunk count, entity/rel extraction batches, post-processing phase 1-6, errors). Reuse the existing log/status backend if available; otherwise tail `logs/server.log` filtered by workspace.
+13. **`108-settings-delete-workspace`** — reuse `tools/workspace_cleanup.py`. (Renumbered from 106 after polish landed.)
 14. **`107-graph-quality-pass`** (formerly Tier 1A) — extraction prompt anchor discipline + Phase 2 normalization audit on `afcap6_drfp`. Re-extract and validate.
 15. **Iterate** Tier 1A until `afcap6_drfp` matrix renders cleanly without UI tightening.
 16. **Then** revisit issue #85 (RFP Intelligence overhaul) on top of clean data.
