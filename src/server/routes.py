@@ -458,13 +458,36 @@ def create_documents_upload_endpoint(app, rag_instance):
             None,
             description="Workspace to save into. Defaults to the server's current workspace.",
         ),
+        stage_only: bool = Query(
+            False,
+            description="If true, save the file to inputs/<workspace>/ without triggering extraction. Use Folder Watcher → Scan now to process later.",
+        ),
     ):
-        logger.info(f"🔔 ENDPOINT CALLED: /documents/upload with file: {file.filename}")
+        logger.info(
+            f"🔔 ENDPOINT CALLED: /documents/upload with file: {file.filename} "
+            f"(stage_only={stage_only})"
+        )
 
-        await _callback.register_request_start(file.filename)
+        # In stage-only mode we skip the batch callback so we don't trip
+        # post-processing on a save that produced no extraction work.
+        if not stage_only:
+            await _callback.register_request_start(file.filename)
 
         try:
             file_path = await _save_upload_to_workspace(file, workspace)
+
+            if stage_only:
+                logger.info(
+                    f"📥 Staged {file_path.name} to {file_path.parent} "
+                    f"(no processing — awaiting /scan-rfp)"
+                )
+                return JSONResponse({
+                    "status": "staged",
+                    "message": f"Document {file_path.name} staged for batch scan",
+                    "saved_to": str(file_path),
+                    "stage_only": True,
+                })
+
             logger.info(
                 f"📄 Processing {file_path.name} via WebUI /documents/upload "
                 f"(saved to {file_path.parent})"
@@ -491,7 +514,8 @@ def create_documents_upload_endpoint(app, rag_instance):
             return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
         finally:
-            await _callback.register_request_end(file.filename)
+            if not stage_only:
+                await _callback.register_request_end(file.filename)
 
     app.add_api_route(
         "/documents/upload",
