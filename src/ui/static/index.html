@@ -475,6 +475,67 @@
         }
       }
 
+      /* Per-message action toolbar (Copy / Regenerate / Export / Edit). */
+      .msg-actions {
+        opacity: 0;
+        transform: translateY(-2px);
+        transition:
+          opacity 0.15s ease,
+          transform 0.15s ease;
+        margin-top: 0.25rem;
+      }
+      .flex.flex-col.gap-1:hover > .msg-actions,
+      .msg-actions:focus-within {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .msg-actions-user {
+        align-self: flex-end;
+      }
+      .msg-action-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.2rem 0.55rem;
+        font-size: 10.5px;
+        font-family: "JetBrains Mono", ui-monospace, monospace;
+        letter-spacing: 0.05em;
+        color: #94a3b8;
+        background: rgba(10, 14, 26, 0.7);
+        border: 1px solid rgba(31, 42, 68, 0.9);
+        border-radius: 0.5rem;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+      .msg-action-btn:hover:not(:disabled) {
+        color: #00f0ff;
+        border-color: rgba(0, 240, 255, 0.55);
+        background: rgba(0, 240, 255, 0.08);
+        box-shadow: 0 0 12px -4px rgba(0, 240, 255, 0.6);
+      }
+      .msg-action-btn:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+      .msg-action-regen:hover:not(:disabled) {
+        color: #ff8af0;
+        border-color: rgba(255, 43, 214, 0.55);
+        background: rgba(255, 43, 214, 0.08);
+        box-shadow: 0 0 12px -4px rgba(255, 43, 214, 0.6);
+      }
+      .msg-action-export:hover:not(:disabled) {
+        color: #5eff9b;
+        border-color: rgba(0, 255, 156, 0.55);
+        background: rgba(0, 255, 156, 0.08);
+        box-shadow: 0 0 12px -4px rgba(0, 255, 156, 0.55);
+      }
+      .msg-action-edit:hover:not(:disabled) {
+        color: #ffcd5e;
+        border-color: rgba(255, 176, 32, 0.55);
+        background: rgba(255, 176, 32, 0.08);
+        box-shadow: 0 0 12px -4px rgba(255, 176, 32, 0.55);
+      }
+
       /* Chat ambient backdrop: animated aurora + grid */
       .chat-canvas {
         position: relative;
@@ -2644,6 +2705,7 @@
                     <div
                       class="flex-1 overflow-y-auto px-6 py-5 space-y-4"
                       x-ref="msgs"
+                      x-effect="currentChat && currentChat.messages.length, $nextTick(() => window.lucide && lucide.createIcons())"
                     >
                       <template x-for="(m, i) in currentChat.messages" :key="i">
                         <div
@@ -2714,6 +2776,75 @@
                               x-show="m.timing && m.timing.char_count"
                               x-text="m.timing.char_count + ' chars'"
                             ></span>
+                          </div>
+                          <!-- assistant action toolbar (Copy / Regenerate / Export) -->
+                          <div
+                            x-show="m.role === 'assistant' && !m.streaming && m.content"
+                            class="msg-actions flex items-center gap-1 px-1"
+                          >
+                            <button
+                              class="msg-action-btn"
+                              @click="copyMessage(m)"
+                              title="Copy message text"
+                            >
+                              <i
+                                data-lucide="copy"
+                                class="w-3.5 h-3.5"
+                              ></i>
+                              <span>Copy</span>
+                            </button>
+                            <button
+                              class="msg-action-btn msg-action-regen"
+                              @click="regenerateMessage(i)"
+                              :disabled="sending || i === 0"
+                              :title="i === 0 ? 'No prior user message' : 'Re-run the previous question'"
+                            >
+                              <i
+                                data-lucide="refresh-cw"
+                                class="w-3.5 h-3.5"
+                              ></i>
+                              <span>Regenerate</span>
+                            </button>
+                            <button
+                              class="msg-action-btn msg-action-export"
+                              @click="exportMessage(m, i)"
+                              title="Download as Markdown"
+                            >
+                              <i
+                                data-lucide="download"
+                                class="w-3.5 h-3.5"
+                              ></i>
+                              <span>Export</span>
+                            </button>
+                          </div>
+                          <!-- user message toolbar (Copy + Edit) -->
+                          <div
+                            x-show="m.role === 'user'"
+                            class="msg-actions msg-actions-user flex items-center gap-1 px-1"
+                          >
+                            <button
+                              class="msg-action-btn"
+                              @click="copyMessage(m)"
+                              title="Copy message text"
+                            >
+                              <i
+                                data-lucide="copy"
+                                class="w-3.5 h-3.5"
+                              ></i>
+                              <span>Copy</span>
+                            </button>
+                            <button
+                              class="msg-action-btn msg-action-edit"
+                              @click="editMessage(m)"
+                              :disabled="sending"
+                              title="Load into composer to edit and resend"
+                            >
+                              <i
+                                data-lucide="pencil"
+                                class="w-3.5 h-3.5"
+                              ></i>
+                              <span>Edit</span>
+                            </button>
                           </div>
                         </div>
                       </template>
@@ -4675,6 +4806,96 @@
               method: "PATCH",
               body: JSON.stringify({ mode: this.currentChat.mode }),
             });
+          },
+
+          // ----- Per-message actions (branch 101) -----
+          async copyMessage(m) {
+            if (!m || !m.content) return;
+            try {
+              await navigator.clipboard.writeText(m.content);
+              this.toast("Message copied to clipboard", "info");
+            } catch (e) {
+              this.toast("Copy failed: " + e.message, "error");
+            }
+          },
+
+          editMessage(m) {
+            if (!m || m.role !== "user" || this.sending) return;
+            this.composer = m.content;
+            // Focus the composer textarea if present.
+            this.$nextTick(() => {
+              const ta = document.querySelector(
+                'textarea[x-model="composer"]'
+              );
+              if (ta) {
+                ta.focus();
+                ta.setSelectionRange(ta.value.length, ta.value.length);
+              }
+            });
+            this.toast("Loaded into composer — edit and send", "info");
+          },
+
+          async regenerateMessage(idx) {
+            if (this.sending || !this.currentChat) return;
+            const msgs = this.currentChat.messages;
+            if (idx <= 0 || idx >= msgs.length) return;
+            // Walk backward to find the most recent user message before idx.
+            let userIdx = idx - 1;
+            while (userIdx >= 0 && msgs[userIdx].role !== "user") userIdx--;
+            if (userIdx < 0) {
+              this.toast("No prior user message to regenerate from", "error");
+              return;
+            }
+            const userContent = msgs[userIdx].content;
+            // Drop the user message + everything after it (the assistant
+            // bubble being regenerated and any subsequent turns). sendMessage()
+            // will re-append the user bubble + a fresh assistant placeholder.
+            msgs.splice(userIdx);
+            this.composer = userContent;
+            await this.sendMessage();
+          },
+
+          exportMessage(m, idx) {
+            if (!m || !m.content) return;
+            const ts = new Date().toISOString().replace(/[:.]/g, "-");
+            const chatTitle = (this.currentChat && this.currentChat.title) || "chat";
+            const slug = chatTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40);
+            // Try to find the preceding user message for context.
+            let prompt = "";
+            if (this.currentChat && idx != null) {
+              for (let j = idx - 1; j >= 0; j--) {
+                if (this.currentChat.messages[j].role === "user") {
+                  prompt = this.currentChat.messages[j].content;
+                  break;
+                }
+              }
+            }
+            const front =
+              `---\n` +
+              `chat: ${chatTitle}\n` +
+              `workspace: ${(this.stats && this.stats.workspace) || ""}\n` +
+              `mode: ${m.mode || (this.currentChat && this.currentChat.mode) || ""}\n` +
+              `exported: ${new Date().toISOString()}\n` +
+              (m.timing && m.timing.total_ms != null
+                ? `total_ms: ${m.timing.total_ms}\n`
+                : "") +
+              `---\n\n`;
+            const body =
+              (prompt ? `## Question\n\n${prompt}\n\n## Answer\n\n` : "") +
+              m.content +
+              "\n";
+            const blob = new Blob([front + body], {
+              type: "text/markdown;charset=utf-8",
+            });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `theseus-${slug}-${ts}.md`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            this.toast("Exported as Markdown", "info");
           },
 
           async sendMessage() {
