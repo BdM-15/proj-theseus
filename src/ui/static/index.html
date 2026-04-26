@@ -536,6 +536,70 @@
         box-shadow: 0 0 12px -4px rgba(255, 176, 32, 0.55);
       }
 
+      /* ----- Inline citation chips ([N] in assistant text) ----- */
+      .cite-chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 1.25rem;
+        height: 1.05rem;
+        padding: 0 0.3rem;
+        margin: 0 0.05rem;
+        border-radius: 0.4rem;
+        font-family: "JetBrains Mono", ui-monospace, monospace;
+        font-size: 0.65rem;
+        font-weight: 600;
+        line-height: 1;
+        color: #00f0ff;
+        background: rgba(0, 240, 255, 0.08);
+        border: 1px solid rgba(0, 240, 255, 0.4);
+        cursor: pointer;
+        vertical-align: baseline;
+        position: relative;
+        top: -1px;
+        transition: all 0.15s ease;
+      }
+      .cite-chip:hover {
+        background: rgba(0, 240, 255, 0.18);
+        border-color: rgba(0, 240, 255, 0.7);
+        box-shadow: 0 0 10px -2px rgba(0, 240, 255, 0.6);
+        transform: translateY(-1px);
+      }
+      .cite-chip:active {
+        transform: translateY(0);
+      }
+      .cite-chip-orphan {
+        color: #94a3b8;
+        background: rgba(148, 163, 184, 0.08);
+        border-color: rgba(148, 163, 184, 0.35);
+      }
+      .cite-chip-orphan:hover {
+        background: rgba(148, 163, 184, 0.15);
+        border-color: rgba(148, 163, 184, 0.55);
+        box-shadow: none;
+      }
+      /* Reference list item — flash on chip click */
+      .cite-target {
+        scroll-margin-top: 6rem;
+        border-radius: 0.4rem;
+        transition:
+          background-color 0.6s ease,
+          box-shadow 0.6s ease;
+      }
+      @keyframes cite-flash-anim {
+        0% {
+          background-color: rgba(0, 240, 255, 0.35);
+          box-shadow: 0 0 18px rgba(0, 240, 255, 0.55);
+        }
+        100% {
+          background-color: transparent;
+          box-shadow: none;
+        }
+      }
+      .cite-flash {
+        animation: cite-flash-anim 1.6s ease-out;
+      }
+
       /* Chat ambient backdrop: animated aurora + grid */
       .chat-canvas {
         position: relative;
@@ -2705,6 +2769,7 @@
                     <div
                       class="flex-1 overflow-y-auto px-6 py-5 space-y-4"
                       x-ref="msgs"
+                      @click="handleCiteClick($event)"
                       x-effect="currentChat && currentChat.messages.length, $nextTick(() => window.lucide && lucide.createIcons())"
                     >
                       <template x-for="(m, i) in currentChat.messages" :key="i">
@@ -2739,7 +2804,7 @@
                             <template x-if="m.role === 'assistant'">
                               <div>
                                 <div
-                                  x-html="renderMd(m.content) || '&nbsp;'"
+                                  x-html="renderMd(m.content, i) || '&nbsp;'"
                                 ></div>
                                 <span
                                   x-show="m.streaming"
@@ -2787,10 +2852,7 @@
                               @click="copyMessage(m)"
                               title="Copy message text"
                             >
-                              <i
-                                data-lucide="copy"
-                                class="w-3.5 h-3.5"
-                              ></i>
+                              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
                               <span>Copy</span>
                             </button>
                             <button
@@ -2810,10 +2872,7 @@
                               @click="exportMessage(m, i)"
                               title="Download as Markdown"
                             >
-                              <i
-                                data-lucide="download"
-                                class="w-3.5 h-3.5"
-                              ></i>
+                              <i data-lucide="download" class="w-3.5 h-3.5"></i>
                               <span>Export</span>
                             </button>
                           </div>
@@ -2827,10 +2886,7 @@
                               @click="copyMessage(m)"
                               title="Copy message text"
                             >
-                              <i
-                                data-lucide="copy"
-                                class="w-3.5 h-3.5"
-                              ></i>
+                              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
                               <span>Copy</span>
                             </button>
                             <button
@@ -2839,10 +2895,7 @@
                               :disabled="sending"
                               title="Load into composer to edit and resend"
                             >
-                              <i
-                                data-lucide="pencil"
-                                class="w-3.5 h-3.5"
-                              ></i>
+                              <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
                               <span>Edit</span>
                             </button>
                           </div>
@@ -4824,9 +4877,7 @@
             this.composer = m.content;
             // Focus the composer textarea if present.
             this.$nextTick(() => {
-              const ta = document.querySelector(
-                'textarea[x-model="composer"]'
-              );
+              const ta = document.querySelector('textarea[x-model="composer"]');
               if (ta) {
                 ta.focus();
                 ta.setSelectionRange(ta.value.length, ta.value.length);
@@ -4858,8 +4909,12 @@
           exportMessage(m, idx) {
             if (!m || !m.content) return;
             const ts = new Date().toISOString().replace(/[:.]/g, "-");
-            const chatTitle = (this.currentChat && this.currentChat.title) || "chat";
-            const slug = chatTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40);
+            const chatTitle =
+              (this.currentChat && this.currentChat.title) || "chat";
+            const slug = chatTitle
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, "-")
+              .slice(0, 40);
             // Try to find the preceding user message for context.
             let prompt = "";
             if (this.currentChat && idx != null) {
@@ -5091,16 +5146,177 @@
             }
           },
 
-          renderMd(text) {
+          renderMd(text, msgIdx) {
             if (!text) return "";
             try {
               const html = window.marked
                 ? window.marked.parse(text, { breaks: true, gfm: true })
                 : text;
-              return window.DOMPurify ? window.DOMPurify.sanitize(html) : html;
+              const safe = window.DOMPurify
+                ? window.DOMPurify.sanitize(html, {
+                    ADD_ATTR: ["data-cite", "data-msg-idx", "data-cite-anchor"],
+                  })
+                : html;
+              return this.enhanceCitations(safe, msgIdx);
             } catch (_) {
               return text;
             }
+          },
+
+          enhanceCitations(html, msgIdx) {
+            if (!html || typeof window === "undefined" || !window.document)
+              return html;
+            const idx = msgIdx == null ? 0 : msgIdx;
+            try {
+              const wrap = document.createElement("div");
+              wrap.innerHTML = html;
+
+              // 1) Find the References heading (h1-h6 whose text is References / Sources / Citations)
+              const headings = wrap.querySelectorAll("h1, h2, h3, h4, h5, h6");
+              let refHeading = null;
+              for (const h of headings) {
+                const t = (h.textContent || "").trim().toLowerCase();
+                if (
+                  t === "references" ||
+                  t === "sources" ||
+                  t === "citations"
+                ) {
+                  refHeading = h;
+                  break;
+                }
+              }
+
+              // 2) Tag <li> items in the References list with anchor IDs based on leading [N]
+              const refMap = {}; // n -> anchor id
+              if (refHeading) {
+                let node = refHeading.nextElementSibling;
+                while (node) {
+                  if (/^H[1-6]$/.test(node.tagName)) break; // next section
+                  const items = node.querySelectorAll
+                    ? node.querySelectorAll("li")
+                    : [];
+                  items.forEach((li) => {
+                    const m = (li.textContent || "").match(/^\s*\[(\d+)\]/);
+                    if (m) {
+                      const n = m[1];
+                      const aid = `cite-${idx}-${n}`;
+                      li.setAttribute("id", aid);
+                      li.setAttribute("data-cite-anchor", n);
+                      li.classList.add("cite-target");
+                      refMap[n] = aid;
+                    }
+                  });
+                  node = node.nextElementSibling;
+                }
+              }
+
+              // 3) Walk text nodes (skip code/pre/refs section) and wrap [N] / [N, M]
+              const skipParents = new Set([
+                "CODE",
+                "PRE",
+                "A",
+                "BUTTON",
+                "SCRIPT",
+                "STYLE",
+              ]);
+              const refStart = refHeading || null;
+              const inRefSection = (node) => {
+                if (!refStart) return false;
+                // Walk up to body level checking previous siblings up to refStart
+                let cur = node;
+                while (cur && cur !== wrap) {
+                  // Check if any ancestor's previousSibling chain reaches refStart
+                  let p = cur;
+                  while (p) {
+                    if (p === refStart) return true;
+                    p = p.previousSibling;
+                  }
+                  cur = cur.parentNode;
+                }
+                return false;
+              };
+
+              const walker = document.createTreeWalker(
+                wrap,
+                NodeFilter.SHOW_TEXT,
+                {
+                  acceptNode: (n) => {
+                    if (!n.parentNode) return NodeFilter.FILTER_REJECT;
+                    if (skipParents.has(n.parentNode.nodeName))
+                      return NodeFilter.FILTER_REJECT;
+                    if (inRefSection(n)) return NodeFilter.FILTER_REJECT;
+                    if (!/\[\s*\d+(?:\s*,\s*\d+)*\s*\]/.test(n.nodeValue))
+                      return NodeFilter.FILTER_REJECT;
+                    return NodeFilter.FILTER_ACCEPT;
+                  },
+                },
+              );
+
+              const targets = [];
+              let cur;
+              while ((cur = walker.nextNode())) targets.push(cur);
+
+              const citeRe = /\[\s*(\d+(?:\s*,\s*\d+)*)\s*\]/g;
+              targets.forEach((node) => {
+                const text = node.nodeValue;
+                const frag = document.createDocumentFragment();
+                let last = 0;
+                let m;
+                citeRe.lastIndex = 0;
+                while ((m = citeRe.exec(text)) !== null) {
+                  if (m.index > last)
+                    frag.appendChild(
+                      document.createTextNode(text.slice(last, m.index)),
+                    );
+                  const nums = m[1].split(",").map((s) => s.trim());
+                  nums.forEach((n, k) => {
+                    const btn = document.createElement("button");
+                    btn.type = "button";
+                    btn.className = "cite-chip";
+                    btn.setAttribute("data-cite", n);
+                    btn.setAttribute("data-msg-idx", String(idx));
+                    btn.title = refMap[n]
+                      ? `Jump to reference [${n}]`
+                      : `Citation [${n}] (no matching reference)`;
+                    if (!refMap[n]) btn.classList.add("cite-chip-orphan");
+                    btn.textContent = n;
+                    frag.appendChild(btn);
+                    if (k < nums.length - 1)
+                      frag.appendChild(document.createTextNode(" "));
+                  });
+                  last = m.index + m[0].length;
+                }
+                if (last < text.length)
+                  frag.appendChild(document.createTextNode(text.slice(last)));
+                node.parentNode.replaceChild(frag, node);
+              });
+
+              return wrap.innerHTML;
+            } catch (_) {
+              return html;
+            }
+          },
+
+          handleCiteClick(ev) {
+            const btn =
+              ev.target && ev.target.closest
+                ? ev.target.closest(".cite-chip")
+                : null;
+            if (!btn) return;
+            ev.preventDefault();
+            const n = btn.getAttribute("data-cite");
+            const idx = btn.getAttribute("data-msg-idx");
+            if (!n || idx == null) return;
+            const el = document.getElementById(`cite-${idx}-${n}`);
+            if (!el) {
+              this.toast(`Reference [${n}] not found in this answer`, "error");
+              return;
+            }
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+            el.classList.remove("cite-flash");
+            // restart animation
+            void el.offsetWidth;
+            el.classList.add("cite-flash");
           },
 
           scrollMsgs() {
