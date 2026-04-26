@@ -263,6 +263,23 @@ class WorkspaceSwitch(BaseModel):
     create: bool = Field(default=False, description="Create the folder if it does not exist.")
 
 
+class WorkspaceDeleteScope(BaseModel):
+    """Which buckets of a workspace to delete. At least one must be true."""
+
+    neo4j: bool = Field(default=False, description="Delete the workspace's Neo4j subgraph.")
+    rag_storage: bool = Field(default=False, description="Delete rag_storage/<ws>/ (KV stores, VDBs, chats, log).")
+    inputs: bool = Field(default=False, description="Delete inputs/<ws>/ source documents (irrecoverable).")
+
+
+class WipeAllScope(BaseModel):
+    """Clean-slate wipe. Requires the literal confirmation phrase."""
+
+    neo4j: bool = Field(default=False)
+    rag_storage: bool = Field(default=False)
+    inputs: bool = Field(default=False)
+    confirm: str = Field(..., description="Must equal 'DELETE ALL'.")
+
+
 class QuerySettingsUpdate(BaseModel):
     """Per-workspace LightRAG query parameter overrides. All fields optional."""
 
@@ -1588,6 +1605,201 @@ def register_ui(
             "workspace": name,
             "message": "Server is restarting. The UI will reconnect automatically.",
         })
+
+    # ---- Workspace inventory + deletion (Settings → Danger Zone) ---------
+    #
+    # The deletion paths intentionally reuse the same helpers as the
+    # `tools/workspace_cleanup.py` CLI — no second implementation. That
+    # keeps the two surfaces (CLI for ops, UI for end-users) in lockstep.
+
+    def _ws_inventory() -> dict[str, Any]:
+        """Combine rag_storage, Neo4j, and inputs/ views into one table."""
+        from tools.workspace_cleanup import (
+            _inputs_root,
+            _inputs_workspaces,
+            _neo4j_workspaces,
+            _rag_storage_root,
+            _storage_workspaces,
+        )
+
+        rag_root = _rag_storage_root()
+        inputs_root = _inputs_root()
+        storage_ws = _storage_workspaces(rag_root)
+        inputs_ws = _inputs_workspaces(inputs_root)
+
+        # Neo4j enumeration is best-effort — the driver may be unreachable in
+        # NetworkX-only deployments. Fall back to an empty map so the UI can
+        # still render rag_storage + inputs columns.
+        neo4j_ws: dict[str, int] = {}
+        backend = (getattr(global_args, "graph_storage", "") or "").lower()
+        if "neo4j" in backend:
+            try:
+                from src.inference.neo4j_graph_io import Neo4jGraphIO
+
+                io = Neo4jGraphIO()
+                try:
+                    neo4j_ws = _neo4j_workspaces(io)
+                finally:
+                    io.close()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Neo4j inventory failed: %s", exc)
+
+        all_names = sorted(
+            set(neo4j_ws) | set(storage_ws) | set(inputs_ws)
+        )
+        active = get_settings().workspace
+        rows: list[dict[str, Any]] = []
+        for name in all_names:
+            inp = inputs_ws.get(name)
+            rows.append({
+                "name": name,
+                "is_active": name == active,
+                "neo4j_nodes": neo4j_ws.get(name, 0),
+                "storage_mb": storage_ws.get(name),
+                "inputs_files": inp[0] if inp else 0,
+                "inputs_mb": inp[1] if inp else 0.0,
+            })
+        return {
+            "active": active,
+            "rag_storage_root": str(rag_root),
+            "inputs_root": str(inputs_root),
+            "neo4j_available": "neo4j" in backend,
+            "workspaces": rows,
+        }
+
+    @app.get("/api/ui/workspaces/inventory", tags=["theseus-ui"])
+    async def workspaces_inventory() -> JSONResponse:
+        """Per-workspace inventory: Neo4j node count, rag_storage size, inputs/ files."""
+        return JSONResponse(await asyncio.to_thread(_ws_inventory))
+
+    def _delete_workspace_sync(
+        name: str, scope: WorkspaceDeleteScope
+    ) -> dict[str, Any]:
+        """Worker thread: run the actual deletion using cleanup-tool helpers."""
+        from tools.workspace_cleanup import (
+            _delete_inputs_workspace,
+            _delete_neo4j_workspace,
+            _delete_storage_workspace,
+            _inputs_root,
+            _rag_storage_root,
+        )
+
+        result: dict[str, Any] = {"workspace": name, "deleted": {}}
+
+        if scope.neo4j:
+            backend = (getattr(global_args, "graph_storage", "") or "").lower()
+            if "neo4j" in backend:
+                try:
+                    from src.inference.neo4j_graph_io import Neo4jGraphIO
+
+                    io = Neo4jGraphIO()
+                    try:
+                        nodes = _delete_neo4j_workspace(io, name)
+                        result["deleted"]["neo4j_nodes"] = nodes
+                    finally:
+                        io.close()
+                except Exception as exc:  # noqa: BLE001
+                    result["deleted"]["neo4j_error"] = str(exc)
+            else:
+                result["deleted"]["neo4j_skipped"] = "backend is not Neo4j"
+
+        if scope.rag_storage:
+            try:
+                existed = _delete_storage_workspace(name, _rag_storage_root())
+                result["deleted"]["rag_storage"] = existed
+            except Exception as exc:  # noqa: BLE001
+                result["deleted"]["rag_storage_error"] = str(exc)
+
+        if scope.inputs:
+            try:
+                count, mb = _delete_inputs_workspace(name, _inputs_root())
+                # Also drop the now-empty inputs/<ws>/ dir so it disappears
+                # from the workspace list entirely.
+                ws_inputs = _inputs_root() / name
+                if ws_inputs.exists() and ws_inputs.is_dir() and not any(ws_inputs.iterdir()):
+                    try:
+                        ws_inputs.rmdir()
+                    except OSError:
+                        pass
+                result["deleted"]["inputs_files"] = count
+                result["deleted"]["inputs_mb"] = mb
+            except Exception as exc:  # noqa: BLE001
+                result["deleted"]["inputs_error"] = str(exc)
+
+        return result
+
+    @app.post("/api/ui/workspaces/{name}/delete", tags=["theseus-ui"])
+    async def delete_workspace(
+        name: str, scope: WorkspaceDeleteScope
+    ) -> JSONResponse:
+        """Delete one workspace's selected buckets (Neo4j / rag_storage / inputs).
+
+        Refuses to delete the currently-active workspace — switch first.
+        Source documents (`inputs/<ws>/`) are irrecoverable; the UI is
+        responsible for surfacing a type-to-confirm guard before calling
+        this endpoint with `inputs=true`.
+        """
+        if not _SAFE_WS.match(name):
+            raise HTTPException(400, "Invalid workspace name (use alphanumerics, _, -)")
+        if not (scope.neo4j or scope.rag_storage or scope.inputs):
+            raise HTTPException(400, "At least one scope (neo4j/rag_storage/inputs) must be true.")
+        if name == get_settings().workspace:
+            raise HTTPException(
+                409,
+                "Cannot delete the active workspace. Switch to another workspace first.",
+            )
+        logger.warning(
+            "🗑️  Deleting workspace '%s' (neo4j=%s, rag_storage=%s, inputs=%s)",
+            name, scope.neo4j, scope.rag_storage, scope.inputs,
+        )
+        result = await asyncio.to_thread(_delete_workspace_sync, name, scope)
+        return JSONResponse(result)
+
+    @app.post("/api/ui/workspaces/wipe-all", tags=["theseus-ui"])
+    async def wipe_all_workspaces(scope: WipeAllScope) -> JSONResponse:
+        """Clean-slate wipe across every workspace. Requires confirm='DELETE ALL'.
+
+        Triggers a server self-restart afterwards so the next boot lands on a
+        clean state. The active workspace folder is recreated empty so the
+        next process can start without crashing on a missing working dir.
+        """
+        if scope.confirm != "DELETE ALL":
+            raise HTTPException(400, "Confirmation phrase must equal 'DELETE ALL'.")
+        if not (scope.neo4j or scope.rag_storage or scope.inputs):
+            raise HTTPException(400, "At least one scope (neo4j/rag_storage/inputs) must be true.")
+
+        def _wipe_all_sync() -> dict[str, Any]:
+            inv = _ws_inventory()
+            names = [row["name"] for row in inv["workspaces"]]
+            results: list[dict[str, Any]] = []
+            per_scope = WorkspaceDeleteScope(
+                neo4j=scope.neo4j,
+                rag_storage=scope.rag_storage,
+                inputs=scope.inputs,
+            )
+            for nm in names:
+                results.append(_delete_workspace_sync(nm, per_scope))
+            # Make sure the active workspace's rag_storage folder still
+            # exists — LightRAG's storages assume it on next boot.
+            try:
+                from tools.workspace_cleanup import _rag_storage_root
+
+                (_rag_storage_root() / get_settings().workspace).mkdir(
+                    parents=True, exist_ok=True
+                )
+            except Exception:  # noqa: BLE001
+                pass
+            return {"deleted": results, "workspaces": len(results)}
+
+        logger.warning(
+            "🚨 WIPE ALL WORKSPACES requested (neo4j=%s, rag_storage=%s, inputs=%s)",
+            scope.neo4j, scope.rag_storage, scope.inputs,
+        )
+        result = await asyncio.to_thread(_wipe_all_sync)
+        # Restart so the UI reconnects to a clean process state.
+        asyncio.get_event_loop().call_later(0.75, _self_restart)
+        result["restarting"] = True
+        return JSONResponse(result)
 
     @app.post("/api/ui/restart", tags=["theseus-ui"])
     async def restart_server() -> JSONResponse:
