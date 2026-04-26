@@ -600,6 +600,146 @@
         animation: cite-flash-anim 1.6s ease-out;
       }
 
+      /* ========================================================
+         Sources Panel (per-message collapsible drawer)
+         ======================================================== */
+      .sources-panel {
+        margin-top: 0.35rem;
+        font-family:
+          "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, monospace;
+      }
+      .sources-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.3rem 0.7rem;
+        font-size: 0.7rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        color: rgba(94, 255, 155, 0.95);
+        background: linear-gradient(
+          135deg,
+          rgba(94, 255, 155, 0.08) 0%,
+          rgba(0, 240, 255, 0.08) 100%
+        );
+        border: 1px solid rgba(94, 255, 155, 0.35);
+        border-radius: 999px;
+        cursor: pointer;
+        transition:
+          transform 0.15s ease,
+          box-shadow 0.2s ease,
+          border-color 0.2s ease;
+      }
+      .sources-toggle:hover {
+        transform: translateY(-1px);
+        border-color: rgba(94, 255, 155, 0.7);
+        box-shadow:
+          0 0 14px rgba(94, 255, 155, 0.35),
+          0 0 6px rgba(0, 240, 255, 0.25);
+      }
+      .sources-meta {
+        color: rgba(0, 240, 255, 0.7);
+        font-weight: 500;
+        font-size: 0.62rem;
+        padding-left: 0.35rem;
+        border-left: 1px solid rgba(94, 255, 155, 0.3);
+        margin-left: 0.1rem;
+      }
+      .sources-chev {
+        transition: transform 0.2s ease;
+      }
+      .sources-chev-open {
+        transform: rotate(180deg);
+      }
+      .sources-list {
+        margin-top: 0.5rem;
+        padding: 0.6rem;
+        border: 1px solid rgba(94, 255, 155, 0.18);
+        border-radius: 0.65rem;
+        background: linear-gradient(
+          135deg,
+          rgba(7, 11, 24, 0.85) 0%,
+          rgba(13, 18, 36, 0.85) 100%
+        );
+        box-shadow: inset 0 0 24px rgba(0, 240, 255, 0.04);
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        max-height: 28rem;
+        overflow-y: auto;
+      }
+      .source-row {
+        padding: 0.55rem 0.7rem;
+        border: 1px solid rgba(148, 163, 184, 0.15);
+        border-radius: 0.5rem;
+        background: rgba(15, 23, 42, 0.55);
+        scroll-margin-top: 6rem;
+        transition:
+          background-color 0.6s ease,
+          box-shadow 0.6s ease,
+          border-color 0.2s ease;
+      }
+      .source-row:hover {
+        border-color: rgba(0, 240, 255, 0.35);
+      }
+      .source-row-head {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        margin-bottom: 0.3rem;
+      }
+      .source-num {
+        color: #00f0ff;
+        font-weight: 700;
+        font-size: 0.7rem;
+      }
+      .source-file {
+        color: rgba(226, 232, 240, 0.9);
+        font-size: 0.7rem;
+        font-weight: 500;
+        max-width: 24rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .source-meta {
+        margin-left: auto;
+        color: rgba(148, 163, 184, 0.7);
+        font-size: 0.6rem;
+      }
+      .source-preview {
+        color: rgba(203, 213, 225, 0.85);
+        font-size: 0.72rem;
+        line-height: 1.45;
+        white-space: pre-wrap;
+        word-break: break-word;
+        max-height: 8rem;
+        overflow: hidden;
+        position: relative;
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          sans-serif;
+      }
+      .source-preview::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 1.5rem;
+        background: linear-gradient(
+          to bottom,
+          transparent,
+          rgba(15, 23, 42, 0.85)
+        );
+        pointer-events: none;
+      }
+
       /* Chat ambient backdrop: animated aurora + grid */
       .chat-canvas {
         position: relative;
@@ -2876,6 +3016,71 @@
                               <span>Export</span>
                             </button>
                           </div>
+                          <!-- assistant Sources panel: collapsible drawer of retrieved chunks -->
+                          <div
+                            x-show="m.role === 'assistant' && m.sources && m.sources.chunks && m.sources.chunks.length"
+                            class="sources-panel w-full max-w-[85%]"
+                            :data-msg-idx="i"
+                          >
+                            <button
+                              type="button"
+                              class="sources-toggle"
+                              @click="toggleSources(i)"
+                              :aria-expanded="m.sourcesOpen ? 'true' : 'false'"
+                            >
+                              <i data-lucide="library" class="w-3.5 h-3.5"></i>
+                              <span
+                                x-text="`Sources (${m.sources.counts ? m.sources.counts.chunks : (m.sources.chunks ? m.sources.chunks.length : 0)})`"
+                              ></span>
+                              <span
+                                class="sources-meta"
+                                x-show="m.sources.counts && (m.sources.counts.entities || m.sources.counts.relationships)"
+                                x-text="`${m.sources.counts.entities || 0}E · ${m.sources.counts.relationships || 0}R`"
+                              ></span>
+                              <i
+                                data-lucide="chevron-down"
+                                class="w-3.5 h-3.5 sources-chev"
+                                :class="m.sourcesOpen ? 'sources-chev-open' : ''"
+                              ></i>
+                            </button>
+                            <div
+                              class="sources-list"
+                              x-show="m.sourcesOpen"
+                              x-transition.opacity
+                            >
+                              <template
+                                x-for="(s, si) in m.sources.chunks"
+                                :key="si"
+                              >
+                                <div
+                                  class="source-row"
+                                  :id="`source-${i}-${s.reference_id}`"
+                                  :data-source-ref="s.reference_id"
+                                >
+                                  <div class="source-row-head">
+                                    <span
+                                      class="source-num"
+                                      x-text="`[${s.reference_id}]`"
+                                    ></span>
+                                    <span
+                                      class="source-file"
+                                      :title="s.file_path"
+                                      x-text="s.file_path || 'unknown'"
+                                    ></span>
+                                    <span
+                                      class="source-meta"
+                                      x-show="s.char_count"
+                                      x-text="s.truncated ? `${s.char_count} chars (preview)` : `${s.char_count} chars`"
+                                    ></span>
+                                  </div>
+                                  <div
+                                    class="source-preview"
+                                    x-text="s.preview"
+                                  ></div>
+                                </div>
+                              </template>
+                            </div>
+                          </div>
                           <!-- user message toolbar (Copy + Edit) -->
                           <div
                             x-show="m.role === 'user'"
@@ -5068,6 +5273,19 @@
                         );
                       }, 250);
                     }
+                  } else if (event === "sources") {
+                    // Pre-flight retrieval payload: chunks/references/counts.
+                    // Attach to the in-flight assistant message so the
+                    // collapsible Sources panel can render before the first
+                    // token arrives.
+                    const idx = this.currentChat.messages.length - 1;
+                    const updated = {
+                      ...live,
+                      sources: parsed,
+                      sourcesOpen: false,
+                    };
+                    live = updated;
+                    this.currentChat.messages.splice(idx, 1, updated);
                   } else if (event === "token" && parsed.text) {
                     // Replace the last message with a NEW object so Alpine's
                     // x-for picks up the change. Mutating live.content alone
@@ -5104,6 +5322,9 @@
                       updated.content = parsed.assistant.content;
                       updated.mode = parsed.assistant.mode;
                       updated.timing = parsed.assistant.timing || parsed.timing;
+                    }
+                    if (parsed.assistant?.sources) {
+                      updated.sources = parsed.assistant.sources;
                     }
                     live = updated;
                     this.currentChat.messages.splice(idx, 1, updated);
@@ -5307,6 +5528,37 @@
             const n = btn.getAttribute("data-cite");
             const idx = btn.getAttribute("data-msg-idx");
             if (!n || idx == null) return;
+            // Prefer the streamed Sources panel (richer preview). Fall back to
+            // the inline ### References list when no sources event arrived.
+            const msg = this.currentChat?.messages?.[Number(idx)];
+            const hasSources =
+              msg && msg.sources && Array.isArray(msg.sources.chunks)
+                ? msg.sources.chunks.some(
+                    (c) => String(c.reference_id) === String(n),
+                  )
+                : false;
+            if (hasSources) {
+              if (!msg.sourcesOpen) {
+                this.toggleSources(Number(idx), true);
+              }
+              this.$nextTick(() => {
+                const row = document.getElementById(`source-${idx}-${n}`);
+                if (row) {
+                  row.scrollIntoView({ behavior: "smooth", block: "center" });
+                  row.classList.remove("cite-flash");
+                  void row.offsetWidth;
+                  row.classList.add("cite-flash");
+                  return;
+                }
+                // Sources panel didn't have it after open — fall through to ref list.
+                this._scrollToRefList(idx, n);
+              });
+              return;
+            }
+            this._scrollToRefList(idx, n);
+          },
+
+          _scrollToRefList(idx, n) {
             const el = document.getElementById(`cite-${idx}-${n}`);
             if (!el) {
               this.toast(`Reference [${n}] not found in this answer`, "error");
@@ -5314,9 +5566,17 @@
             }
             el.scrollIntoView({ behavior: "smooth", block: "center" });
             el.classList.remove("cite-flash");
-            // restart animation
             void el.offsetWidth;
             el.classList.add("cite-flash");
+          },
+
+          toggleSources(i, forceOpen) {
+            const msgs = this.currentChat?.messages;
+            if (!msgs || !msgs[i]) return;
+            const cur = msgs[i];
+            const next = forceOpen === true ? true : !cur.sourcesOpen;
+            const updated = { ...cur, sourcesOpen: next };
+            msgs.splice(i, 1, updated);
           },
 
           scrollMsgs() {

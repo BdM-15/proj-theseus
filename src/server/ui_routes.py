@@ -46,6 +46,13 @@ QueryFunc = Callable[
     Awaitable[Union[str, AsyncIterator[str]]],
 ]
 
+# data_func signature: (text, mode, history, overrides) -> dict
+# Returns LightRAG aquery_data shape: {status, message, data: {chunks, entities, relationships, references}}.
+QueryDataFunc = Callable[
+    [str, str, list[dict], dict],
+    Awaitable[dict],
+]
+
 from src.core import get_settings, reset_settings
 
 logger = logging.getLogger(__name__)
@@ -283,6 +290,62 @@ _SAFE_WS = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+# Maximum characters per chunk preview shipped to the UI. Keeps the SSE event
+# small and the chat-file footprint reasonable on long conversations.
+_SOURCE_PREVIEW_CHARS = 800
+
+
+def _trim_sources(data: dict) -> dict:
+    """Project LightRAG aquery_data['data'] into a compact UI payload.
+
+    Keeps only the fields the Sources panel needs and truncates chunk text to
+    `_SOURCE_PREVIEW_CHARS`. The full chunk content already lives in LightRAG
+    storage; the UI only needs enough to preview and link back.
+    """
+    chunks_in = data.get("chunks") or []
+    refs_in = data.get("references") or []
+    ents_in = data.get("entities") or []
+    rels_in = data.get("relationships") or []
+
+    chunks_out = []
+    for c in chunks_in:
+        if not isinstance(c, dict):
+            continue
+        content = str(c.get("content") or "")
+        truncated = len(content) > _SOURCE_PREVIEW_CHARS
+        preview = content[:_SOURCE_PREVIEW_CHARS] + ("\u2026" if truncated else "")
+        chunks_out.append(
+            {
+                "reference_id": str(c.get("reference_id") or ""),
+                "chunk_id": str(c.get("chunk_id") or ""),
+                "file_path": str(c.get("file_path") or ""),
+                "preview": preview,
+                "char_count": len(content),
+                "truncated": truncated,
+            }
+        )
+
+    refs_out = [
+        {
+            "reference_id": str(r.get("reference_id") or ""),
+            "file_path": str(r.get("file_path") or ""),
+        }
+        for r in refs_in
+        if isinstance(r, dict)
+    ]
+
+    return {
+        "chunks": chunks_out,
+        "references": refs_out,
+        "counts": {
+            "chunks": len(chunks_out),
+            "entities": len(ents_in),
+            "relationships": len(rels_in),
+            "references": len(refs_out),
+        },
+    }
 
 
 def _new_chat_id() -> str:
@@ -981,16 +1044,22 @@ def _compute_intel() -> dict[str, Any]:
 def register_ui(
     app: FastAPI,
     query_func: QueryFunc,
+    data_func: QueryDataFunc | None = None,
 ) -> None:
     """
     Register the Project Theseus UI routes on an existing FastAPI app.
 
     Args:
         app: The FastAPI app produced by lightrag.api.lightrag_server.create_app.
-        query_func: Async callable (query_text, mode, history, stream) ->
-                    str | AsyncIterator[str]. The conversation_history is a
+        query_func: Async callable (query_text, mode, history, stream, overrides)
+                    -> str | AsyncIterator[str]. The conversation_history is a
                     list of {role, content} dicts; when stream=True the return
                     is an async iterator of token chunks.
+        data_func: Optional async callable (query_text, mode, history, overrides)
+                    -> dict that returns LightRAG aquery_data structured retrieval
+                    (chunks/entities/relationships/references). Used by the chat
+                    SSE endpoint to emit a `sources` event before streaming the
+                    answer. If None, no sources event is emitted.
     """
     if not _STATIC_DIR.exists():
         logger.warning("UI static dir missing: %s — UI will not be mounted", _STATIC_DIR)
@@ -1181,7 +1250,26 @@ def register_ui(
             t_first_token: float | None = None
             token_count = 0
             error_message: str | None = None
+            sources_payload: dict | None = None
             try:
+                # Pre-flight: fetch retrieved chunks/entities/relationships so
+                # the UI can render a Sources panel and wire the inline citation
+                # chips to actual source content. Failures here are non-fatal —
+                # the answer still streams normally.
+                if data_func is not None and mode != "bypass":
+                    try:
+                        data_result = await data_func(payload.content, mode, history, overrides)
+                        if isinstance(data_result, dict) and data_result.get("status") == "success":
+                            sources_payload = _trim_sources(data_result.get("data", {}))
+                            yield (
+                                "event: sources\ndata: "
+                                + json.dumps(sources_payload)
+                                + "\n\n"
+                            )
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning(
+                            "Sources pre-flight failed for chat %s: %s", chat_id, exc
+                        )
                 result = await query_func(payload.content, mode, history, True, overrides)
                 retrieve_ms = int((time.perf_counter() - t_start) * 1000)
                 # Iterator is in hand \u2014 LLM has started generating.
@@ -1253,6 +1341,8 @@ def register_ui(
                 "mode": mode,
                 "timing": timing,
             }
+            if sources_payload is not None:
+                assistant_msg["sources"] = sources_payload
             # Re-read so we don't clobber concurrent edits to the same chat file.
             try:
                 latest = _read_chat(chat_id)
