@@ -22,6 +22,7 @@
 | [ENHANCEMENT_FRAMEWORK.md](ENHANCEMENT_FRAMEWORK.md)                                | Upstream library enhancement mapping (LightRAG, RAG-Anything, MinerU, Instructor) |
 | [MINERU_3X_INTEGRATION_ASSESSMENT.md](MINERU_3X_INTEGRATION_ASSESSMENT.md)          | MinerU 3.0 upgrade assessment and integration notes                               |
 | [PROJECT_THESEUS_USE_CASE.md](PROJECT_THESEUS_USE_CASE.md)                          | Project Theseus use case and value proposition                                    |
+| [STYLE_GUIDE.md](STYLE_GUIDE.md)                                                    | UI styling rules: token system, `@apply` CDN constraint, component patterns       |
 | [White Paper](Ontology-Based-RAG-for-Government-Contracting-White-Paper.md)         | Academic foundation for ontology-based RAG in govcon                              |
 | [Why General-Purpose AI Fails](Why-General-Purpose-AI-Fails-Specialized-Domains.md) | Domain specialization thesis                                                      |
 
