@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Project Theseus favicon: Cretan labyrinth + magenta thread of Ariadne -->
+  <defs>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="0.6" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Dark rounded background -->
+  <rect width="32" height="32" rx="6" fill="#0a0e1a"/>
+  <rect x="0.5" y="0.5" width="31" height="31" rx="5.5" fill="none" stroke="#2c3a5e" stroke-width="1"/>
+
+  <!-- Cretan labyrinth (concentric squares with gaps) in neon cyan -->
+  <g fill="none" stroke="#00f0ff" stroke-width="1.6" stroke-linecap="square" filter="url(#glow)">
+    <!-- Outer ring with bottom gate -->
+    <path d="M5 5 H27 V27 H19 M13 27 H5 V5"/>
+    <!-- Second ring -->
+    <path d="M8 8 H24 V24 H19 M13 24 H8 V8"/>
+    <!-- Third ring -->
+    <path d="M11 11 H21 V21 H19 M13 21 H11 V11"/>
+    <!-- Center bar -->
+    <path d="M14 14 H18"/>
+  </g>
+
+  <!-- Ariadne's thread: single magenta dot at the center -->
+  <circle cx="16" cy="17" r="1.6" fill="#ff2bd6" filter="url(#glow)"/>
+</svg>
