@@ -19,6 +19,7 @@
 
 ### Recent commits on `main`
 
+- `58d7c85` — Merge `102-citation-chips`: inline `[N]` / `[N, M]` markers in assistant prose render as cyan pill chips. Click smooth-scrolls + cyan-flashes the matching `### References` entry. Skips code blocks and the References section. Orphan chips render gray. Bumped govcon_prompt to v3.2.0 with required-inline-citation rule on both `rag_response` and `naive_rag_response`.
 - `e29bd7c` — Merge `101-chat-message-actions`: per-message action toolbar (Copy / Regenerate / Export on assistant; Copy / Edit on user). Hover-revealed pill row, color-coded (cyan / magenta / lime / amber). Export emits `.md` with YAML frontmatter (chat, workspace, mode, total_ms) + originating Question above Answer. Edit-in-place / version pager intentionally deferred.
 - `9b2caee` — Merge `100-ui-theme-propagation`: vibrant aurora/glass treatment propagated to all panels (sidebar, topbar, navigation). Cyberpunk-mythology brand glyph (animated labyrinth + minotaur horns + circuit traces + Ariadne thread + glowing Θ core) replaces plain wordmark. 5-layer radial accent panel canvas (cyan/magenta/purple/lime/amber).
 - `421d9c0` — Merge `099-capture-chat-polish`: vibrant chat redesign + thinking indicator (animated aurora canvas, hero gradient buttons, magenta Prompt Library pulse, prompt-picker modal, live Retrieving→Thinking→Writing status row, `_ThinkStripper` for xAI Grok reasoning leak, purple/plum assistant bubble with magenta→cyan accent stripe, brain-circuit Shipley Mentor avatar, animated streaming bubble border).
@@ -63,12 +64,12 @@ Builds on the 099 chat polish. Each item is sized for its own branch.
 
 1. ~~**Theme propagation** (`100-ui-theme-propagation`)~~ ✅ Merged `9b2caee`.
 2. ~~**Per-message actions on assistant bubbles** (`101-chat-message-actions`)~~ ✅ Merged `e29bd7c`. Edit currently opens a fresh turn (preserves prior answer); destructive edit-in-place + version pager deferred.
-3. **Inline citation chips** (`102-citation-chips`) — _In progress._ Convert `[1]`, `[2]` text references in assistant responses into clickable chips that scroll/highlight the corresponding "References" entry. Requires structured citation parse on the markdown render path.
+3. ~~**Inline citation chips** (`102-citation-chips`)~~ ✅ Merged `58d7c85`. Chip click currently jumps to the in-message References list; richer source preview comes with `104-stream-sources`.
 4. **Workspace quick-switcher** (`103-workspace-cmdk`) — Promote the workspace modal to a Cmd-K / Ctrl-K palette: keyboard-first, type-to-filter, recent-first. Currently a click-only modal; switching workspaces is a frequent action that deserves keyboard speed.
 
 ### Functional / RAG continuation (added Apr 25)
 
-5. **Streaming source references** (`104-stream-sources`) — Emit `event: sources` over the chat SSE alongside tokens so the user sees retrieved chunks/entities before the prose settles. Server side: serialize `query_param.context_chunks` after retrieval; client side: render a collapsible "Sources (N)" panel that updates live. Also enables a "show me the chunks Theseus used" affordance for trust-building.
+5. **Streaming source references** (`104-stream-sources`) — _Next._ **Promoted ahead of `103` so citation chips can preview actual source content, not just scroll to a list.** Emit `event: sources` over the chat SSE alongside tokens so the user sees retrieved chunks/entities before the prose settles. Server side: serialize `query_param.context_chunks` after retrieval; client side: render a collapsible "Sources (N)" panel that updates live, and make the inline citation chips open the panel scrolled to the right chunk. Trust-building: "show me the chunks Theseus used."
 6. **Conversation memory mode** (`105-chat-memory`) — Currently each message is independent. Wire follow-up turns to actually carry the previous turn's retrieved context (the chat header already promises "multi-turn · follow-ups carry context"). Options: (a) pass previous N message pairs as `conversation_history` to LightRAG `aquery`, (b) reuse last turn's retrieved chunks instead of re-retrieving when the question is a clear follow-up. Need to balance cost vs accuracy.
 
 ### Bypass mode UX (lower priority, after 105)
