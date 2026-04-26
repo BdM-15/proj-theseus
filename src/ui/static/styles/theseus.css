@@ -336,8 +336,8 @@ details.acc .summary-actions {
   border-radius: 0.375rem;
   font-size: 11px;
   font-family:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-    "Liberation Mono", "Courier New", monospace;
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -528,7 +528,11 @@ details.acc .summary-actions {
   color: transparent;
 }
 .nav-group-magenta span:last-child {
-  background: linear-gradient(90deg, var(--neon-magenta), var(--neon-magenta-soft));
+  background: linear-gradient(
+    90deg,
+    var(--neon-magenta),
+    var(--neon-magenta-soft)
+  );
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -570,7 +574,12 @@ details.acc .summary-actions {
   bottom: 6px;
   width: 3px;
   border-radius: 0 2px 2px 0;
-  background: linear-gradient(180deg, var(--neon-cyan), var(--accent-purple), var(--neon-magenta));
+  background: linear-gradient(
+    180deg,
+    var(--neon-cyan),
+    var(--accent-purple),
+    var(--neon-magenta)
+  );
   box-shadow:
     0 0 10px rgba(var(--neon-cyan-rgb), 0.85),
     0 0 16px rgba(var(--neon-magenta-rgb), 0.55);
@@ -967,11 +976,7 @@ details.acc .summary-actions {
   left: 0;
   right: 0;
   height: 1.5rem;
-  background: linear-gradient(
-    to bottom,
-    transparent,
-    rgba(15, 23, 42, 0.85)
-  );
+  background: linear-gradient(to bottom, transparent, rgba(15, 23, 42, 0.85));
   pointer-events: none;
 }
 /* Content-type badge in source row head */
@@ -1100,11 +1105,7 @@ details.acc .summary-actions {
       transparent 60%
     ),
     linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.025) 1px,
-      transparent 1px
-    );
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
   background-size:
     200% 200%,
     200% 200%,
@@ -1313,7 +1314,12 @@ details.acc .summary-actions {
   bottom: 6px;
   width: 3px;
   border-radius: 0 2px 2px 0;
-  background: linear-gradient(180deg, var(--neon-cyan), var(--accent-purple), var(--neon-magenta));
+  background: linear-gradient(
+    180deg,
+    var(--neon-cyan),
+    var(--accent-purple),
+    var(--neon-magenta)
+  );
   box-shadow:
     0 0 10px rgba(var(--neon-cyan-rgb), 0.7),
     0 0 14px rgba(var(--neon-magenta-rgb), 0.4);
@@ -1550,7 +1556,11 @@ details.acc .summary-actions {
   inset: 0;
   background-image:
     linear-gradient(rgba(var(--neon-cyan-rgb), 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(var(--neon-magenta-rgb), 0.05) 1px, transparent 1px);
+    linear-gradient(
+      90deg,
+      rgba(var(--neon-magenta-rgb), 0.05) 1px,
+      transparent 1px
+    );
   background-size:
     24px 24px,
     24px 24px;
@@ -1704,13 +1714,7 @@ details.acc .summary-actions {
       rgba(var(--neon-amber-rgb), 0.08),
       transparent 75%
     ),
-    linear-gradient(
-      155deg,
-      #0f1430 0%,
-      #0c0f24 35%,
-      #130926 70%,
-      #0d0820 100%
-    );
+    linear-gradient(155deg, #0f1430 0%, #0c0f24 35%, #130926 70%, #0d0820 100%);
   background-size:
     140% 140%,
     140% 140%,
@@ -1726,7 +1730,11 @@ details.acc .summary-actions {
   inset: 0;
   background-image:
     linear-gradient(rgba(var(--neon-cyan-rgb), 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(var(--neon-magenta-rgb), 0.04) 1px, transparent 1px);
+    linear-gradient(
+      90deg,
+      rgba(var(--neon-magenta-rgb), 0.04) 1px,
+      transparent 1px
+    );
   background-size:
     48px 48px,
     48px 48px;
@@ -1864,7 +1872,7 @@ details.acc .summary-actions {
   text-decoration-color: var(--neon-cyan);
 }
 .markdown blockquote {
-  border-left: 3px solid var(--neon-cyan)66;
+  border-left: 3px solid var(--neon-cyan) 66;
   padding: 0.2em 0.8em;
   margin: 0.5em 0;
   color: var(--text-300);
@@ -1957,4 +1965,48 @@ details.acc .summary-actions {
     0 0 18px rgba(var(--neon-cyan-rgb), 0.25),
     0 0 2px rgba(var(--neon-cyan-rgb), 0.5) inset;
   font-size: 0.875rem;
+}
+
+/* === Restart overlay scene (Theseus vs Minotaur) === */
+.restart-scene {
+  filter: drop-shadow(0 0 24px rgba(var(--neon-cyan-rgb), 0.25))
+    drop-shadow(0 0 24px rgba(var(--neon-magenta-rgb), 0.2));
+}
+
+.restart-scene .rs-sword {
+  transform-origin: 0 -6px;
+  animation: rs-swing 1.4s ease-in-out infinite;
+}
+
+@keyframes rs-swing {
+  0%, 100% { transform: rotate(-10deg); }
+  50%      { transform: rotate(35deg); }
+}
+
+.restart-scene .rs-eye {
+  animation: rs-eye-flicker 0.9s ease-in-out infinite;
+}
+
+@keyframes rs-eye-flicker {
+  0%, 100% { fill: #ffeb00; opacity: 1; }
+  50%      { fill: #ff3b6b; opacity: 0.7; }
+}
+
+.restart-scene .rs-spark {
+  transform-origin: 88px 38px;
+  animation: rs-spark-pulse 0.7s ease-in-out infinite;
+}
+
+@keyframes rs-spark-pulse {
+  0%, 100% { opacity: 0; transform: translate(88px, 38px) scale(0.4) rotate(0deg); }
+  50%      { opacity: 1; transform: translate(88px, 38px) scale(1.2) rotate(45deg); }
+}
+
+.restart-scene .rs-thread {
+  stroke-dasharray: 4 6;
+  animation: rs-thread-flow 2s linear infinite;
+}
+
+@keyframes rs-thread-flow {
+  to { stroke-dashoffset: -20; }
 }

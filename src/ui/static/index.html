@@ -3871,12 +3871,161 @@
       class="fixed inset-0 z-[70] bg-ink-950/95 backdrop-blur-md flex items-center justify-center"
     >
       <div class="text-center">
-        <div
-          class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-neon-cyan to-neon-magenta flex items-center justify-center text-ink-950 font-bold shadow-glow text-2xl animate-pulse"
+        <!-- Theseus vs Minotaur scene -->
+        <svg
+          class="restart-scene mx-auto"
+          viewBox="0 0 160 120"
+          width="200"
+          height="150"
+          aria-label="Theseus battling the Minotaur"
         >
-          Î˜
-        </div>
-        <h2 class="mt-6 text-2xl font-semibold neon-text">
+          <defs>
+            <filter id="rs-glow" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="1.2" result="b" />
+              <feMerge>
+                <feMergeNode in="b" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+            <radialGradient id="rs-floor" cx="50%" cy="60%" r="60%">
+              <stop offset="0%" stop-color="#11172a" />
+              <stop offset="100%" stop-color="#05070d" />
+            </radialGradient>
+          </defs>
+
+          <!-- Arena -->
+          <rect
+            x="2"
+            y="2"
+            width="156"
+            height="116"
+            rx="10"
+            fill="url(#rs-floor)"
+            stroke="#2c3a5e"
+          />
+
+          <!-- Labyrinth walls (faint cyan) -->
+          <g
+            fill="none"
+            stroke="#00f0ff"
+            stroke-opacity="0.25"
+            stroke-width="1"
+          >
+            <path d="M14 14 H146 V106 H100 M60 106 H14 V14" />
+            <path d="M22 22 H138 V98 H100 M60 98 H22 V22" />
+            <path d="M30 30 H130 V90 H100 M60 90 H30 V30" />
+          </g>
+
+          <!-- Ariadne's thread (animated dash) -->
+          <path
+            class="rs-thread"
+            d="M14 110 Q 30 80 50 70 T 90 60"
+            fill="none"
+            stroke="#ff2bd6"
+            stroke-width="1.4"
+            stroke-linecap="round"
+            filter="url(#rs-glow)"
+          />
+
+          <!-- Minotaur (right side): horned bull silhouette -->
+          <g transform="translate(118 56)" filter="url(#rs-glow)">
+            <!-- horns -->
+            <path
+              d="M-10 -14 Q -14 -22 -8 -22 Q -6 -18 -6 -14 Z"
+              fill="#ff2bd6"
+            />
+            <path d="M10 -14 Q 14 -22 8 -22 Q 6 -18 6 -14 Z" fill="#ff2bd6" />
+            <!-- head -->
+            <ellipse
+              cx="0"
+              cy="-4"
+              rx="11"
+              ry="10"
+              fill="#ff2bd6"
+              fill-opacity="0.85"
+            />
+            <!-- snout -->
+            <ellipse
+              cx="0"
+              cy="4"
+              rx="6"
+              ry="4"
+              fill="#ff2bd6"
+              fill-opacity="0.7"
+            />
+            <!-- eyes (glowing) -->
+            <circle class="rs-eye" cx="-4" cy="-5" r="1.4" fill="#ffeb00" />
+            <circle class="rs-eye" cx="4" cy="-5" r="1.4" fill="#ffeb00" />
+            <!-- nostril -->
+            <circle cx="0" cy="5" r="0.8" fill="#0a0e1a" />
+            <!-- body -->
+            <path
+              d="M-12 8 Q -14 28 -6 32 L 6 32 Q 14 28 12 8 Z"
+              fill="#ff2bd6"
+              fill-opacity="0.6"
+            />
+          </g>
+
+          <!-- Theseus (left side): cyan figure with raised sword -->
+          <g transform="translate(50 60)" filter="url(#rs-glow)">
+            <!-- head -->
+            <circle cx="0" cy="-14" r="4" fill="#00f0ff" />
+            <!-- body -->
+            <path
+              d="M-4 -10 L 4 -10 L 6 8 L -6 8 Z"
+              fill="#00f0ff"
+              fill-opacity="0.85"
+            />
+            <!-- legs -->
+            <path
+              d="M-5 8 L -3 22 M 5 8 L 3 22"
+              stroke="#00f0ff"
+              stroke-width="2.5"
+              stroke-linecap="round"
+            />
+            <!-- shield arm -->
+            <circle
+              cx="-8"
+              cy="-2"
+              r="4"
+              fill="none"
+              stroke="#00f0ff"
+              stroke-width="1.5"
+            />
+            <!-- sword arm + blade (animated swing) -->
+            <g class="rs-sword">
+              <line
+                x1="0"
+                y1="-6"
+                x2="14"
+                y2="-22"
+                stroke="#7df9ff"
+                stroke-width="2.2"
+                stroke-linecap="round"
+              />
+              <line
+                x1="14"
+                y1="-22"
+                x2="20"
+                y2="-28"
+                stroke="#ffffff"
+                stroke-width="1.4"
+                stroke-linecap="round"
+              />
+            </g>
+          </g>
+
+          <!-- Clash spark between them -->
+          <g class="rs-spark" transform="translate(88 38)">
+            <path
+              d="M0 -8 L 2 -2 L 8 0 L 2 2 L 0 8 L -2 2 L -8 0 L -2 -2 Z"
+              fill="#ffeb00"
+              filter="url(#rs-glow)"
+            />
+          </g>
+        </svg>
+
+        <h2 class="mt-4 text-2xl font-semibold neon-text">
           <span x-show="!restartStuck">Restarting server…</span>
           <span x-show="restartStuck" class="text-neon-amber"
             >Restart taking longer than expected</span
