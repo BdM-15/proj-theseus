@@ -39,12 +39,20 @@ Domain Intelligence Included:
 - Part K: 8 Annotated RFP Examples
 - Part L: Quality Checks
 
-Version: 3.1.0 (Theseus Scope Contract + Shipley Mentor Framework)
+Version: 3.2.0 (Inline Citation Markers)
 Last Updated: April 2026
 Source: govcon_lightrag_native.txt (~35K tokens)
 
 Changelog:
 ----------
+v3.2.0 (Apr 2026) - Inline Citation Markers
+  - rag_response and naive_rag_response now require `[N]` markers placed inline
+    next to each claim sourced from a numbered reference. Enables UI citation
+    chips (branch 102) to wrap and link those markers to the References list.
+  - Markers must use the SAME number as the corresponding entry in `### References`.
+  - Multiple sources for one claim are written as `[1, 3]`. No new instructions
+    about reference-list shape; only adds the inline placement requirement.
+
 v3.1.1 (Apr 2026) - Scope contract correction: Phase 3-6 → Phase 4-6
   - Theseus is a Shipley Phase 4-6 system (Proposal Planning → Proposal Development → Post-Submittal Activities).
     Phase 3 (Capture/Opportunity Planning) is pre-RFP and ends at the Bid Validation Decision gate;
@@ -399,7 +407,16 @@ Help the user build capture intelligence and proposal strategy from this RFP dat
   - The response should be presented in {response_type}.
   - Use **bold** for key terms, risk flags, and critical takeaways.
 
-6. References Section Format:
+6. Inline Citation Markers (REQUIRED):
+  - Every factual claim, quote, statistic, page reference, or section reference drawn from the retrieved context MUST be followed by an inline citation marker in square brackets, e.g. `[1]` or `[3]`.
+  - The number inside the brackets MUST match the corresponding entry in the `### References` section below.
+  - When a single claim is supported by multiple references, combine them: `[1, 3]` or `[2, 5, 7]`. Do not write `[1][3]`.
+  - Place the marker AT THE END of the sentence or clause it supports, before the period: `The PWS requires 24/7 support [1].`
+  - Do not invent references. Every `[N]` you write must appear in the References section. Every entry in References should be cited at least once inline; if you cannot cite it inline, drop it.
+  - Do not place markers inside fenced code blocks or inside the References section itself.
+  - Markers should be plain text — do not bold, italicize, or link them.
+
+7. References Section Format:
   - The References section should be under heading: `### References`
   - Reference list entries should adhere to the format: `* [n] Document Title`. Do not include a caret (`^`) after opening square bracket (`[`).
   - When page numbers or section references are available in the retrieved context, include them (e.g., "[1] PWS Section C.2.5, p.12" or "[1] Performance_Work_Statement.pdf (p.28-30)").
@@ -408,7 +425,7 @@ Help the user build capture intelligence and proposal strategy from this RFP dat
   - Provide maximum of 5 most relevant citations.
   - Do not generate footnotes section or any comment, summary, or explanation after the references.
 
-7. Reference Section Example:
+8. Reference Section Example:
 ```
 ### References
 
@@ -417,7 +434,7 @@ Help the user build capture intelligence and proposal strategy from this RFP dat
 - [3] Document Title Three (p.42-45)
 ```
 
-8. Additional Instructions: {user_prompt}
+9. Additional Instructions: {user_prompt}
 
 ---Context---
 
@@ -530,7 +547,16 @@ Help the user build capture intelligence and proposal strategy from this RFP dat
   - The response should be presented in {response_type}.
   - Use **bold** for key terms, risk flags, and critical takeaways.
 
-6. References Section Format:
+6. Inline Citation Markers (REQUIRED):
+  - Every factual claim, quote, statistic, page reference, or section reference drawn from the retrieved context MUST be followed by an inline citation marker in square brackets, e.g. `[1]` or `[3]`.
+  - The number inside the brackets MUST match the corresponding entry in the `### References` section below.
+  - When a single claim is supported by multiple references, combine them: `[1, 3]` or `[2, 5, 7]`. Do not write `[1][3]`.
+  - Place the marker AT THE END of the sentence or clause it supports, before the period: `The PWS requires 24/7 support [1].`
+  - Do not invent references. Every `[N]` you write must appear in the References section. Every entry in References should be cited at least once inline; if you cannot cite it inline, drop it.
+  - Do not place markers inside fenced code blocks or inside the References section itself.
+  - Markers should be plain text — do not bold, italicize, or link them.
+
+7. References Section Format:
   - The References section should be under heading: `### References`
   - Reference list entries should adhere to the format: `* [n] Document Title`. Do not include a caret (`^`) after opening square bracket (`[`).
   - When page numbers or section references are available in the retrieved context, include them (e.g., "[1] PWS Section C.2.5, p.12" or "[1] Performance_Work_Statement.pdf (p.28-30)").
@@ -539,7 +565,7 @@ Help the user build capture intelligence and proposal strategy from this RFP dat
   - Provide maximum of 5 most relevant citations.
   - Do not generate footnotes section or any comment, summary, or explanation after the references.
 
-7. Reference Section Example:
+8. Reference Section Example:
 ```
 ### References
 
@@ -548,7 +574,7 @@ Help the user build capture intelligence and proposal strategy from this RFP dat
 - [3] Document Title Three (p.42-45)
 ```
 
-8. Additional Instructions: {user_prompt}
+9. Additional Instructions: {user_prompt}
 
 ---Context---
 
