@@ -739,6 +739,105 @@
         );
         pointer-events: none;
       }
+      /* Content-type badge in source row head */
+      .source-kind-badge {
+        font-size: 0.6rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        padding: 0.1rem 0.4rem;
+        border-radius: 0.3rem;
+        border: 1px solid;
+        line-height: 1.2;
+      }
+      .source-kind-text {
+        color: rgba(94, 255, 155, 0.95);
+        border-color: rgba(94, 255, 155, 0.4);
+        background: rgba(94, 255, 155, 0.08);
+      }
+      .source-kind-table {
+        color: #ffcd5e;
+        border-color: rgba(255, 205, 94, 0.5);
+        background: rgba(255, 205, 94, 0.08);
+      }
+      .source-kind-image {
+        color: #ff8af0;
+        border-color: rgba(255, 138, 240, 0.45);
+        background: rgba(255, 138, 240, 0.08);
+      }
+      .source-kind-equation {
+        color: #a78bfa;
+        border-color: rgba(167, 139, 250, 0.45);
+        background: rgba(167, 139, 250, 0.08);
+      }
+      .source-kind-unknown {
+        color: rgba(148, 163, 184, 0.85);
+        border-color: rgba(148, 163, 184, 0.3);
+        background: rgba(148, 163, 184, 0.06);
+      }
+      /* Caption (italic, just under header) */
+      .source-caption {
+        color: rgba(226, 232, 240, 0.92);
+        font-size: 0.72rem;
+        font-style: italic;
+        margin-bottom: 0.35rem;
+        line-height: 1.4;
+      }
+      /* Table summary card */
+      .source-tablecard {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.35rem 0.6rem;
+        border-radius: 0.4rem;
+        background: rgba(255, 205, 94, 0.07);
+        border: 1px dashed rgba(255, 205, 94, 0.35);
+        color: rgba(255, 205, 94, 0.95);
+        font-size: 0.7rem;
+        font-family:
+          "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, monospace;
+        margin-bottom: 0.35rem;
+      }
+      /* Raw expander */
+      .source-raw-wrap {
+        margin-top: 0.4rem;
+      }
+      .source-raw-toggle {
+        font-size: 0.6rem;
+        font-family:
+          "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, monospace;
+        color: rgba(148, 163, 184, 0.8);
+        background: transparent;
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        padding: 0.15rem 0.5rem;
+        border-radius: 0.3rem;
+        cursor: pointer;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        transition:
+          color 0.15s ease,
+          border-color 0.15s ease;
+      }
+      .source-raw-toggle:hover {
+        color: rgba(0, 240, 255, 0.95);
+        border-color: rgba(0, 240, 255, 0.5);
+      }
+      .source-raw {
+        margin-top: 0.4rem;
+        padding: 0.55rem 0.7rem;
+        background: rgba(2, 6, 23, 0.85);
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 0.4rem;
+        color: rgba(203, 213, 225, 0.78);
+        font-size: 0.62rem;
+        font-family:
+          "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, monospace;
+        line-height: 1.4;
+        max-height: 14rem;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
 
       /* Chat ambient backdrop: animated aurora + grid */
       .chat-canvas {
@@ -3056,6 +3155,7 @@
                                   class="source-row"
                                   :id="`source-${i}-${s.reference_id}`"
                                   :data-source-ref="s.reference_id"
+                                  x-data="{ raw: false, fmt: formatSource(s) }"
                                 >
                                   <div class="source-row-head">
                                     <span
@@ -3063,9 +3163,14 @@
                                       x-text="`[${s.reference_id}]`"
                                     ></span>
                                     <span
+                                      class="source-kind-badge"
+                                      :class="`source-kind-${fmt.kind}`"
+                                      x-text="fmt.badge"
+                                    ></span>
+                                    <span
                                       class="source-file"
                                       :title="s.file_path"
-                                      x-text="s.file_path || 'unknown'"
+                                      x-text="basename(s.file_path) || 'unknown'"
                                     ></span>
                                     <span
                                       class="source-meta"
@@ -3073,10 +3178,44 @@
                                       x-text="s.truncated ? `${s.char_count} chars (preview)` : `${s.char_count} chars`"
                                     ></span>
                                   </div>
+                                  <!-- Caption (table/image only, when present) -->
+                                  <div
+                                    class="source-caption"
+                                    x-show="fmt.caption"
+                                    x-text="fmt.caption"
+                                  ></div>
+                                  <!-- Table summary card -->
+                                  <div
+                                    class="source-tablecard"
+                                    x-show="fmt.kind === 'table' && fmt.tableSummary"
+                                  >
+                                    <i
+                                      data-lucide="table-2"
+                                      class="w-3.5 h-3.5"
+                                    ></i>
+                                    <span x-text="fmt.tableSummary"></span>
+                                  </div>
+                                  <!-- Body (text chunks, image alt-text, equation source) -->
                                   <div
                                     class="source-preview"
-                                    x-text="s.preview"
+                                    x-show="fmt.body && fmt.kind !== 'table'"
+                                    x-text="fmt.body"
                                   ></div>
+                                  <!-- Raw expander (always available) -->
+                                  <div class="source-raw-wrap">
+                                    <button
+                                      type="button"
+                                      class="source-raw-toggle"
+                                      @click="raw = !raw"
+                                      x-text="raw ? 'Hide raw' : 'Show raw'"
+                                    ></button>
+                                    <pre
+                                      class="source-raw"
+                                      x-show="raw"
+                                      x-transition.opacity
+                                      x-text="s.preview"
+                                    ></pre>
+                                  </div>
                                 </div>
                               </template>
                             </div>
@@ -5577,6 +5716,106 @@
             const next = forceOpen === true ? true : !cur.sourcesOpen;
             const updated = { ...cur, sourcesOpen: next };
             msgs.splice(i, 1, updated);
+          },
+
+          basename(path) {
+            if (!path) return "";
+            const norm = String(path).replace(/\\/g, "/");
+            const parts = norm.split("/");
+            return parts[parts.length - 1] || norm;
+          },
+
+          /**
+           * Parse a chunk preview into a structured card payload.
+           * MinerU + RAGAnything wrap multimodal content with predictable
+           * prefixes ("Table Analysis:", "Image Path:", "Caption:",
+           * "Structure:") that we detect to render compact badges instead of
+           * dumping raw HTML at the user. Pure heuristic — falls back to a
+           * "text" card when nothing matches.
+           *
+           * Returns { kind, badge, caption, body, tableSummary }.
+           */
+          formatSource(s) {
+            const raw = s && s.preview ? String(s.preview) : "";
+            const out = {
+              kind: "text",
+              badge: "TEXT",
+              caption: "",
+              body: raw,
+              tableSummary: "",
+            };
+            if (!raw) {
+              out.kind = "unknown";
+              out.badge = "EMPTY";
+              return out;
+            }
+            const head = raw.slice(0, 64).toLowerCase();
+            const isTable = /\btable analysis\b|\bstructure:\s*<table/i.test(
+              raw,
+            );
+            const isImage =
+              /\bimage analysis\b|\bimage path\s*:/i.test(raw) && !isTable;
+            const isEquation =
+              /\bequation analysis\b|\\begin\{equation\}|\$\$/i.test(head);
+
+            // Caption extraction (multi-modal blocks): "Caption: <text>" until newline.
+            const capMatch = raw.match(/(?:^|\n)\s*Caption\s*:\s*([^\n]+)/i);
+            if (capMatch) {
+              const cap = capMatch[1].trim();
+              if (cap && cap.toLowerCase() !== "none") out.caption = cap;
+            }
+
+            if (isTable) {
+              out.kind = "table";
+              out.badge = "TABLE";
+              // Parse the Structure: <table>...</table> blob client-side. The
+              // preview is truncated at 800 chars so the table is usually
+              // clipped — count complete <tr> rows we can see and report.
+              const structIdx = raw.search(/Structure\s*:/i);
+              const structHtml = structIdx >= 0 ? raw.slice(structIdx) : raw;
+              const trMatches = structHtml.match(/<tr[\s>]/gi) || [];
+              const firstTr = structHtml.match(/<tr[^>]*>[\s\S]*?<\/tr>/i);
+              const cellCount = firstTr
+                ? (firstTr[0].match(/<t[dh][\s>]/gi) || []).length
+                : 0;
+              const rowsLabel = trMatches.length
+                ? `${trMatches.length}${s.truncated ? "+" : ""} rows`
+                : "rows unknown";
+              const colsLabel = cellCount ? ` × ${cellCount} cols` : "";
+              out.tableSummary = `${rowsLabel}${colsLabel}${
+                s.truncated ? " (preview clipped)" : ""
+              }`;
+              out.body = "";
+              return out;
+            }
+
+            if (isImage) {
+              out.kind = "image";
+              out.badge = "IMAGE";
+              // Body is whatever VLM analysis text follows the path/caption.
+              // Strip the "Image Path:" line so we don't repeat the file path.
+              out.body = raw
+                .replace(/(?:^|\n)\s*Image Path\s*:\s*[^\n]+/i, "")
+                .replace(/(?:^|\n)\s*Caption\s*:\s*[^\n]+/i, "")
+                .replace(/^\s*Image Analysis\s*:?\s*/i, "")
+                .trim();
+              return out;
+            }
+
+            if (isEquation) {
+              out.kind = "equation";
+              out.badge = "EQN";
+              out.body = raw
+                .replace(/^\s*Equation Analysis\s*:?\s*/i, "")
+                .trim();
+              return out;
+            }
+
+            // Default: plain text chunk. Already readable.
+            out.kind = "text";
+            out.badge = "TEXT";
+            out.body = raw;
+            return out;
           },
 
           scrollMsgs() {
