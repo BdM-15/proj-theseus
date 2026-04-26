@@ -168,10 +168,16 @@ N. **Diff vs prior compute.** Cache last summary; show what changed since last e
 6. **`102-citation-chips`** — clickable `[N]` chips that scroll to the References block in each assistant message.
 7. **`103-workspace-cmdk`** — Cmd-K workspace quick-switcher.
 8. ~~**`104-stream-sources`**~~ ✅ Merged `c034c42` (Apr 26). SSE `event: sources` + collapsible Sources panel; chips open the panel.
-9. **`106-source-preview-polish`** — _Next._ Detect MinerU table/image blocks in chunk previews and render a compact card with a content-type badge + caption + collapsed raw expander; client-side `<table>` re-render or row/col summary. No re-indexing.
-10. **`105-chat-memory`** — multi-turn conversation_history wiring; honor the "follow-ups carry context" promise in the header.
-10. **`106-settings-delete-workspace`** — reuse `tools/workspace_cleanup.py`. (Was item 4 in prior plan; bumped behind UI polish run.)
-11. **`107-graph-quality-pass`** (formerly Tier 1A) — extraction prompt anchor discipline + Phase 2 normalization audit on `afcap6_drfp`. Re-extract and validate.
-12. **Iterate** Tier 1A until `afcap6_drfp` matrix renders cleanly without UI tightening.
-13. **Then** revisit issue #85 (RFP Intelligence overhaul) on top of clean data.
-14. Polish backlog items (Documents page, KG visualizer presets, Search page) interleaved between graph-quality re-runs.
+9. ~~**`106-source-preview-polish`**~~ ✅ Merged (Apr 26 — commit pending merge). MinerU prefix detection + content-type badges + table row/col summary + collapsible raw expander.
+10. **`103-workspace-cmdk`** — _Next._ Cmd-K workspace quick-switcher.
+11. **`105-chat-memory`** — multi-turn conversation_history wiring; honor the "follow-ups carry context" promise in the header.
+12. **`108-settings-delete-workspace`** — reuse `tools/workspace_cleanup.py`. (Renumbered from 106 after polish landed.)
+13. **`109-documents-processing-log`** — Documents tab: add a "Processing Log" window beneath the existing _Upload RFP_ and _Processed Documents_ cards. Stream/poll the per-document parsing + extraction + post-processing progress (MinerU phases, chunk count, entity/rel extraction batches, post-processing phase 1-6, errors). Reuse the existing log/status backend if available; otherwise tail `logs/server.log` filtered by workspace.
+14. **`107-graph-quality-pass`** (formerly Tier 1A) — extraction prompt anchor discipline + Phase 2 normalization audit on `afcap6_drfp`. Re-extract and validate.
+15. **Iterate** Tier 1A until `afcap6_drfp` matrix renders cleanly without UI tightening.
+16. **Then** revisit issue #85 (RFP Intelligence overhaul) on top of clean data.
+17. Polish backlog items (Documents page, KG visualizer presets, Search page) interleaved between graph-quality re-runs.
+
+### Backlog (deferred, no branch yet)
+
+- **Retrieval diversity / table-skew rebalance.** Tables (esp. MinerU `Table Analysis: <table>…` blobs) dominate retrieval over narrative chunks. Embedding density + chunk-size asymmetry + `mix` mode entity/rel pull all favor tables. Cheap levers (no re-index): post-rank diversity cap (≤40% table chunks), mode toggles per query, narrative chunk header prepending. Real fix (re-index): VLM-summarize tables at ingest so embedding sees prose while raw HTML stays available for display. Track when graph-quality work resumes.
