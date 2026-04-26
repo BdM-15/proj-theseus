@@ -19,6 +19,8 @@
 
 ### Recent commits on `main`
 
+- `e29bd7c` — Merge `101-chat-message-actions`: per-message action toolbar (Copy / Regenerate / Export on assistant; Copy / Edit on user). Hover-revealed pill row, color-coded (cyan / magenta / lime / amber). Export emits `.md` with YAML frontmatter (chat, workspace, mode, total_ms) + originating Question above Answer. Edit-in-place / version pager intentionally deferred.
+- `9b2caee` — Merge `100-ui-theme-propagation`: vibrant aurora/glass treatment propagated to all panels (sidebar, topbar, navigation). Cyberpunk-mythology brand glyph (animated labyrinth + minotaur horns + circuit traces + Ariadne thread + glowing Θ core) replaces plain wordmark. 5-layer radial accent panel canvas (cyan/magenta/purple/lime/amber).
 - `421d9c0` — Merge `099-capture-chat-polish`: vibrant chat redesign + thinking indicator (animated aurora canvas, hero gradient buttons, magenta Prompt Library pulse, prompt-picker modal, live Retrieving→Thinking→Writing status row, `_ThinkStripper` for xAI Grok reasoning leak, purple/plum assistant bubble with magenta→cyan accent stripe, brain-circuit Shipley Mentor avatar, animated streaming bubble border).
 - `779b898` — Merge `098-settings-query-params`: per-workspace query parameter settings panel.
 - `265f666` — `fix(inference): include subfactor entities as L↔M link targets` (cherry-picked from 096; the real bug fix worth keeping).
@@ -59,9 +61,9 @@
 
 Builds on the 099 chat polish. Each item is sized for its own branch.
 
-1. **Theme propagation** (`100-ui-theme-propagation`) — Apply the vibrant aurora/glass treatment used in Capture Chat to Documents, Intelligence, Settings, Workspaces, and Search panels. Goal: cohesive visual language across the app, not just chat. Reuse `chat-canvas`, `glass-bar`, `btn-hero-cyan`, `btn-hero-magenta`, gradient-text headings.
-2. **Per-message actions on assistant bubbles** (`101-chat-message-actions`) — Floating toolbar (Copy / Regenerate / Export / Cite source). Hover to reveal. Copy already exists for prompts; extend pattern.
-3. **Inline citation chips** (`102-citation-chips`) — Convert `[1]`, `[2]` text references in assistant responses into clickable chips that scroll/highlight the corresponding "References" entry. Requires structured citation parse on the markdown render path.
+1. ~~**Theme propagation** (`100-ui-theme-propagation`)~~ ✅ Merged `9b2caee`.
+2. ~~**Per-message actions on assistant bubbles** (`101-chat-message-actions`)~~ ✅ Merged `e29bd7c`. Edit currently opens a fresh turn (preserves prior answer); destructive edit-in-place + version pager deferred.
+3. **Inline citation chips** (`102-citation-chips`) — _In progress._ Convert `[1]`, `[2]` text references in assistant responses into clickable chips that scroll/highlight the corresponding "References" entry. Requires structured citation parse on the markdown render path.
 4. **Workspace quick-switcher** (`103-workspace-cmdk`) — Promote the workspace modal to a Cmd-K / Ctrl-K palette: keyboard-first, type-to-filter, recent-first. Currently a click-only modal; switching workspaces is a frequent action that deserves keyboard speed.
 
 ### Functional / RAG continuation (added Apr 25)
