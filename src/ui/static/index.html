@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Project Theseus â€” Capture Workbench</title>
+    <title>Project Theseus — Capture Workbench</title>
 
     <!-- Zero-build CDN stack -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -62,1815 +62,7 @@
       };
     </script>
 
-    <style>
-      html,
-      body {
-        background: #05070d;
-        color: #e6ecff;
-      }
-      body {
-        background-image:
-          radial-gradient(
-            circle at 12% -10%,
-            rgba(0, 240, 255, 0.08),
-            transparent 45%
-          ),
-          radial-gradient(
-            circle at 90% 0%,
-            rgba(255, 43, 214, 0.07),
-            transparent 50%
-          ),
-          linear-gradient(180deg, #05070d 0%, #070b16 100%);
-        min-height: 100vh;
-      }
-      .scanline {
-        background-image: repeating-linear-gradient(
-          0deg,
-          rgba(255, 255, 255, 0.015) 0 1px,
-          transparent 1px 3px
-        );
-      }
-      .neon-text {
-        text-shadow: 0 0 8px rgba(0, 240, 255, 0.55);
-      }
-      .magenta-text {
-        text-shadow: 0 0 8px rgba(255, 43, 214, 0.55);
-      }
-      .card {
-        background:
-          linear-gradient(
-            180deg,
-            rgba(255, 255, 255, 0.025) 0%,
-            rgba(255, 255, 255, 0) 60%
-          ),
-          #11172a;
-        @apply border border-edge-strong;
-        border-radius: 1rem;
-        box-shadow:
-          0 1px 0 rgba(255, 255, 255, 0.04) inset,
-          0 1px 0 rgba(0, 0, 0, 0.4),
-          0 12px 28px -16px rgba(0, 0, 0, 0.85);
-      }
-      .card-hover {
-        @apply transition;
-      }
-      .card-hover:hover {
-        @apply border-neon-cyan/40 shadow-glow;
-        transform: translateY(-1px);
-      }
-      /* Accented metric / quick-action card with a left neon stripe */
-      .card-accent {
-        position: relative;
-        overflow: hidden;
-      }
-      .card-accent::before {
-        content: "";
-        position: absolute;
-        left: 0;
-        top: 0;
-        bottom: 0;
-        width: 3px;
-        background: linear-gradient(
-          180deg,
-          var(--accent, #00f0ff) 0%,
-          rgba(255, 255, 255, 0) 100%
-        );
-        opacity: 0.85;
-      }
-      .accent-cyan {
-        --accent: #00f0ff;
-      }
-      .accent-magenta {
-        --accent: #ff2bd6;
-      }
-      .accent-lime {
-        --accent: #00ff9c;
-      }
-      .accent-amber {
-        --accent: #ffb020;
-      }
-      .accent-red {
-        --accent: #fb7185;
-      }
-      /* Soft inner glow for icon tiles */
-      .icon-tile {
-        @apply w-10 h-10 rounded-lg bg-ink-800 border border-edge-strong flex items-center justify-center;
-        box-shadow:
-          0 0 0 1px rgba(255, 255, 255, 0.02) inset,
-          0 6px 14px -8px rgba(0, 240, 255, 0.35);
-      }
-      .btn {
-        @apply inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition leading-none;
-      }
-      .btn > i,
-      .btn > svg {
-        flex: none;
-      }
-      .btn-primary {
-        @apply bg-neon-cyan/10 text-neon-cyan border border-neon-cyan/40 hover:bg-neon-cyan/20 hover:shadow-glow;
-      }
-      .btn-ghost {
-        @apply text-slate-300 hover:text-white hover:bg-white/5 border border-transparent;
-      }
-      .btn-danger {
-        @apply text-neon-red border border-neon-red/40 hover:bg-neon-red/10;
-      }
-      .btn-warn {
-        @apply text-neon-amber border border-neon-amber/40 hover:bg-neon-amber/10 hover:shadow-glow;
-      }
-      .btn-soft {
-        @apply text-slate-300 border border-edge-strong bg-ink-900/50 hover:border-neon-cyan/40 hover:text-neon-cyan hover:bg-neon-cyan/5;
-      }
-      /* Settings accordion section */
-      details.acc {
-        @apply card p-0 overflow-hidden transition;
-        position: relative;
-      }
-      details.acc::before {
-        content: "";
-        position: absolute;
-        left: 0;
-        top: 0;
-        bottom: 0;
-        width: 3px;
-        background: linear-gradient(
-          180deg,
-          var(--accent, #00f0ff) 0%,
-          rgba(255, 255, 255, 0) 100%
-        );
-        opacity: 0.9;
-        z-index: 1;
-      }
-      details.acc:hover {
-        border-color: rgba(0, 240, 255, 0.22);
-        transform: translateY(-1px);
-        box-shadow:
-          0 1px 0 rgba(255, 255, 255, 0.04) inset,
-          0 1px 0 rgba(0, 0, 0, 0.4),
-          0 16px 36px -18px rgba(0, 0, 0, 0.9);
-      }
-      details.acc > summary {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.75rem;
-        padding: 1.05rem 1.35rem 1.05rem 2rem;
-        cursor: pointer;
-        user-select: none;
-        list-style: none;
-        transition:
-          background 0.15s ease,
-          border-color 0.15s ease;
-      }
-      details.acc > summary:hover {
-        background: linear-gradient(
-          90deg,
-          rgba(0, 240, 255, 0.05) 0%,
-          rgba(168, 85, 247, 0.02) 100%
-        );
-      }
-      details.acc > summary::-webkit-details-marker,
-      details.acc > summary::marker {
-        display: none;
-        content: "";
-      }
-      details.acc > summary .acc-chevron {
-        @apply transition-transform text-slate-500 shrink-0;
-      }
-      details.acc[open] > summary .acc-chevron {
-        @apply rotate-90 text-neon-cyan;
-      }
-      details.acc[open] {
-        border-color: rgba(0, 240, 255, 0.25);
-      }
-      details.acc[open] > summary {
-        @apply border-b border-edge;
-        background: linear-gradient(
-          180deg,
-          rgba(0, 240, 255, 0.05) 0%,
-          rgba(10, 14, 26, 0) 100%
-        );
-      }
-      details.acc.danger[open] {
-        border-color: rgba(244, 63, 94, 0.4);
-      }
-      details.acc.danger[open] > summary {
-        background: linear-gradient(
-          180deg,
-          rgba(244, 63, 94, 0.08) 0%,
-          rgba(10, 14, 26, 0) 100%
-        );
-      }
-      details.acc > .acc-body {
-        padding: 1.5rem 1.5rem 1.5rem 2rem;
-      }
-      details.acc .summary-actions {
-        @apply flex items-center gap-2 shrink-0;
-      }
-      .pill {
-        @apply inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-mono uppercase tracking-wider;
-      }
-      /* Cyberpunk glowing status pill (document table) */
-      .status-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0.3rem 0.85rem;
-        border-radius: 9999px;
-        font-family: ui-monospace, "JetBrains Mono", "Fira Code", monospace;
-        font-size: 11px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.14em;
-        background: rgba(10, 14, 26, 0.85);
-        border: 1px solid currentColor;
-        color: #94a3b8;
-        text-shadow:
-          0 0 8px currentColor,
-          0 0 14px rgba(255, 255, 255, 0.12);
-        box-shadow:
-          inset 0 0 0 1px rgba(0, 0, 0, 0.4),
-          0 0 8px -1px currentColor,
-          0 0 18px -6px currentColor;
-        transition:
-          box-shadow 0.2s ease,
-          transform 0.2s ease;
-      }
-      .status-pill:hover {
-        transform: translateY(-1px);
-        box-shadow:
-          inset 0 0 0 1px rgba(0, 0, 0, 0.4),
-          0 0 14px -1px currentColor,
-          0 0 28px -4px currentColor;
-      }
-      .status-pill.is-processed {
-        color: #00ff9c;
-      }
-      .status-pill.is-processing {
-        color: #00f0ff;
-      }
-      .status-pill.is-pending {
-        color: #ffb020;
-      }
-      .status-pill.is-failed {
-        color: #fb7185;
-      }
-      .status-pill .sp-dot {
-        width: 7px;
-        height: 7px;
-        border-radius: 9999px;
-        background: currentColor;
-        box-shadow:
-          0 0 6px currentColor,
-          0 0 12px currentColor;
-        flex-shrink: 0;
-      }
-      .status-pill.is-processing .sp-dot {
-        animation: sp-pulse 1.2s ease-in-out infinite;
-      }
-      @keyframes sp-pulse {
-        0%,
-        100% {
-          opacity: 0.45;
-          transform: scale(0.8);
-        }
-        50% {
-          opacity: 1;
-          transform: scale(1.2);
-        }
-      }
-      .nav-item {
-        display: flex;
-        align-items: center;
-        gap: 0.6rem;
-        padding: 0.5rem 0.7rem;
-        border-radius: 0.7rem;
-        font-size: 0.875rem;
-        line-height: 1;
-        color: #cbd5e1;
-        cursor: pointer;
-        transition: all 0.18s ease;
-        position: relative;
-        background: linear-gradient(
-            180deg,
-            rgba(20, 26, 43, 0.55) 0%,
-            rgba(10, 14, 26, 0.55) 100%
-          )
-          padding-box;
-        border: 1px solid rgba(31, 42, 68, 0.7);
-      }
-      .nav-item:hover {
-        color: #fff;
-        transform: translateX(2px);
-        border-color: rgba(0, 240, 255, 0.45);
-        box-shadow:
-          0 0 0 1px rgba(0, 240, 255, 0.2),
-          0 6px 18px -10px rgba(168, 85, 247, 0.55);
-      }
-      .nav-item > .nav-icon-tile + span,
-      .nav-item > i,
-      .nav-item > svg {
-        flex: none;
-      }
-      .nav-icon-tile {
-        flex: none;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 1.6rem;
-        height: 1.6rem;
-        border-radius: 0.5rem;
-        transition: all 0.18s ease;
-      }
-
-      /* Per-accent icon tiles (used in sidebar + group dots) */
-      .tile-cyan {
-        background: linear-gradient(
-          135deg,
-          rgba(0, 240, 255, 0.25),
-          rgba(0, 240, 255, 0.08)
-        );
-        color: #00f0ff;
-        border: 1px solid rgba(0, 240, 255, 0.45);
-        box-shadow:
-          inset 0 0 8px rgba(0, 240, 255, 0.25),
-          0 0 10px -2px rgba(0, 240, 255, 0.4);
-      }
-      .tile-magenta {
-        background: linear-gradient(
-          135deg,
-          rgba(255, 43, 214, 0.25),
-          rgba(255, 43, 214, 0.08)
-        );
-        color: #ff8af0;
-        border: 1px solid rgba(255, 43, 214, 0.45);
-        box-shadow:
-          inset 0 0 8px rgba(255, 43, 214, 0.25),
-          0 0 10px -2px rgba(255, 43, 214, 0.4);
-      }
-      .tile-lime {
-        background: linear-gradient(
-          135deg,
-          rgba(0, 255, 156, 0.22),
-          rgba(0, 255, 156, 0.06)
-        );
-        color: #5eff9b;
-        border: 1px solid rgba(0, 255, 156, 0.45);
-        box-shadow:
-          inset 0 0 8px rgba(0, 255, 156, 0.22),
-          0 0 10px -2px rgba(0, 255, 156, 0.35);
-      }
-      .tile-amber {
-        background: linear-gradient(
-          135deg,
-          rgba(255, 176, 32, 0.25),
-          rgba(255, 176, 32, 0.08)
-        );
-        color: #ffcd5e;
-        border: 1px solid rgba(255, 176, 32, 0.5);
-        box-shadow:
-          inset 0 0 8px rgba(255, 176, 32, 0.25),
-          0 0 10px -2px rgba(255, 176, 32, 0.4);
-      }
-      .nav-group-dot {
-        width: 0.5rem;
-        height: 0.5rem;
-        border-radius: 9999px;
-        padding: 0;
-      }
-      .nav-group-label {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0 0.7rem;
-        margin-bottom: 0.45rem;
-        font-size: 10px;
-        font-family: "JetBrains Mono", ui-monospace, monospace;
-        text-transform: uppercase;
-        letter-spacing: 0.22em;
-        color: #94a3b8;
-      }
-      .nav-group-cyan span:last-child {
-        background: linear-gradient(90deg, #00f0ff, #7df9ff);
-        -webkit-background-clip: text;
-        background-clip: text;
-        color: transparent;
-      }
-      .nav-group-magenta span:last-child {
-        background: linear-gradient(90deg, #ff2bd6, #ff8af0);
-        -webkit-background-clip: text;
-        background-clip: text;
-        color: transparent;
-      }
-      .nav-group-lime span:last-child {
-        background: linear-gradient(90deg, #00ff9c, #5eff9b);
-        -webkit-background-clip: text;
-        background-clip: text;
-        color: transparent;
-      }
-      .nav-group-amber span:last-child {
-        background: linear-gradient(90deg, #ffb020, #ffcd5e);
-        -webkit-background-clip: text;
-        background-clip: text;
-        color: transparent;
-      }
-
-      /* Active nav item: bright gradient + ribbon + icon flash */
-      .nav-item-active {
-        color: #ffffff !important;
-        background: linear-gradient(
-          90deg,
-          rgba(0, 240, 255, 0.28) 0%,
-          rgba(168, 85, 247, 0.18) 50%,
-          rgba(255, 43, 214, 0.14) 100%
-        ) !important;
-        border-color: rgba(0, 240, 255, 0.55) !important;
-        box-shadow:
-          inset 0 0 0 1px rgba(0, 240, 255, 0.4),
-          0 0 28px -4px rgba(168, 85, 247, 0.65),
-          0 0 18px -2px rgba(0, 240, 255, 0.5) !important;
-        transform: translateX(2px);
-      }
-      .nav-item-active::before {
-        content: "";
-        position: absolute;
-        left: -1px;
-        top: 6px;
-        bottom: 6px;
-        width: 3px;
-        border-radius: 0 2px 2px 0;
-        background: linear-gradient(180deg, #00f0ff, #a855f7, #ff2bd6);
-        box-shadow:
-          0 0 10px rgba(0, 240, 255, 0.85),
-          0 0 16px rgba(255, 43, 214, 0.55);
-      }
-      .nav-item-active .nav-icon-tile {
-        transform: scale(1.08);
-        filter: brightness(1.2) saturate(1.3);
-      }
-      /* Animated status pulse on health pill */
-      @keyframes pulse-ring {
-        0% {
-          box-shadow: 0 0 0 0 rgba(0, 255, 156, 0.55);
-        }
-        70% {
-          box-shadow: 0 0 0 6px rgba(0, 255, 156, 0);
-        }
-        100% {
-          box-shadow: 0 0 0 0 rgba(0, 255, 156, 0);
-        }
-      }
-      .status-pulse {
-        animation: pulse-ring 2s infinite;
-      }
-      /* Subtle scanline overlay accent for the top command bar */
-      .scanlines {
-        background-image: repeating-linear-gradient(
-          0deg,
-          rgba(0, 240, 255, 0.025) 0 1px,
-          transparent 1px 4px
-        );
-      }
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #1c2338;
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #2c3a5e;
-      }
-
-      /* Chat bubbles */
-      .bubble-user {
-        background: linear-gradient(
-          135deg,
-          rgba(0, 240, 255, 0.18) 0%,
-          rgba(0, 240, 255, 0.06) 100%
-        );
-        border: 1px solid rgba(0, 240, 255, 0.35);
-        color: #e2e8f0;
-        box-shadow:
-          0 1px 0 rgba(255, 255, 255, 0.04) inset,
-          0 8px 24px -12px rgba(0, 240, 255, 0.35);
-      }
-      .bubble-assistant {
-        position: relative;
-        background: linear-gradient(
-          180deg,
-          rgba(24, 18, 40, 0.92) 0%,
-          rgba(15, 12, 28, 0.92) 100%
-        );
-        border: 1px solid rgba(168, 85, 247, 0.28);
-        color: #e2e8f0;
-        box-shadow:
-          0 1px 0 rgba(255, 255, 255, 0.04) inset,
-          0 10px 28px -14px rgba(168, 85, 247, 0.45),
-          0 4px 12px -6px rgba(0, 0, 0, 0.55);
-      }
-      /* Magentaâ†’purpleâ†’cyan accent stripe on the left edge of assistant bubbles */
-      .bubble-assistant::before {
-        content: "";
-        position: absolute;
-        left: -1px;
-        top: 8px;
-        bottom: 8px;
-        width: 3px;
-        border-radius: 0 2px 2px 0;
-        background: linear-gradient(
-          180deg,
-          #ff2bd6 0%,
-          #a855f7 50%,
-          #00f0ff 100%
-        );
-        box-shadow:
-          0 0 8px rgba(168, 85, 247, 0.55),
-          0 0 12px rgba(255, 43, 214, 0.35);
-        opacity: 0.85;
-      }
-      /* Faint inner sheen */
-      .bubble-assistant::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        border-radius: inherit;
-        pointer-events: none;
-        background: radial-gradient(
-          ellipse 120% 60% at 0% 0%,
-          rgba(168, 85, 247, 0.08),
-          transparent 60%
-        );
-      }
-
-      /* Assistant avatar badge â€” sits above-left of the bubble */
-      .assistant-avatar {
-        width: 28px;
-        height: 28px;
-        border-radius: 9999px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        background: linear-gradient(
-          135deg,
-          #a855f7 0%,
-          #ff2bd6 60%,
-          #00f0ff 100%
-        );
-        background-size: 180% 180%;
-        color: #0a0f1c;
-        font-weight: 800;
-        font-size: 11px;
-        letter-spacing: 0.05em;
-        box-shadow:
-          0 0 0 1px rgba(255, 255, 255, 0.15) inset,
-          0 4px 12px -2px rgba(168, 85, 247, 0.6),
-          0 0 16px rgba(255, 43, 214, 0.35);
-        animation: avatar-spin 6s ease-in-out infinite;
-      }
-      @keyframes avatar-spin {
-        0%,
-        100% {
-          background-position: 0% 50%;
-        }
-        50% {
-          background-position: 100% 50%;
-        }
-      }
-
-      /* Per-message action toolbar (Copy / Regenerate / Export / Edit). */
-      .msg-actions {
-        opacity: 0;
-        transform: translateY(-2px);
-        transition:
-          opacity 0.15s ease,
-          transform 0.15s ease;
-        margin-top: 0.25rem;
-      }
-      .flex.flex-col.gap-1:hover > .msg-actions,
-      .msg-actions:focus-within {
-        opacity: 1;
-        transform: translateY(0);
-      }
-      .msg-actions-user {
-        align-self: flex-end;
-      }
-      .msg-action-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.3rem;
-        padding: 0.2rem 0.55rem;
-        font-size: 10.5px;
-        font-family: "JetBrains Mono", ui-monospace, monospace;
-        letter-spacing: 0.05em;
-        color: #94a3b8;
-        background: rgba(10, 14, 26, 0.7);
-        border: 1px solid rgba(31, 42, 68, 0.9);
-        border-radius: 0.5rem;
-        cursor: pointer;
-        transition: all 0.15s ease;
-      }
-      .msg-action-btn:hover:not(:disabled) {
-        color: #00f0ff;
-        border-color: rgba(0, 240, 255, 0.55);
-        background: rgba(0, 240, 255, 0.08);
-        box-shadow: 0 0 12px -4px rgba(0, 240, 255, 0.6);
-      }
-      .msg-action-btn:disabled {
-        opacity: 0.35;
-        cursor: not-allowed;
-      }
-      .msg-action-regen:hover:not(:disabled) {
-        color: #ff8af0;
-        border-color: rgba(255, 43, 214, 0.55);
-        background: rgba(255, 43, 214, 0.08);
-        box-shadow: 0 0 12px -4px rgba(255, 43, 214, 0.6);
-      }
-      .msg-action-export:hover:not(:disabled) {
-        color: #5eff9b;
-        border-color: rgba(0, 255, 156, 0.55);
-        background: rgba(0, 255, 156, 0.08);
-        box-shadow: 0 0 12px -4px rgba(0, 255, 156, 0.55);
-      }
-      .msg-action-edit:hover:not(:disabled) {
-        color: #ffcd5e;
-        border-color: rgba(255, 176, 32, 0.55);
-        background: rgba(255, 176, 32, 0.08);
-        box-shadow: 0 0 12px -4px rgba(255, 176, 32, 0.55);
-      }
-
-      /* ----- Inline citation chips ([N] in assistant text) ----- */
-      .cite-chip {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 1.25rem;
-        height: 1.05rem;
-        padding: 0 0.3rem;
-        margin: 0 0.05rem;
-        border-radius: 0.4rem;
-        font-family: "JetBrains Mono", ui-monospace, monospace;
-        font-size: 0.65rem;
-        font-weight: 600;
-        line-height: 1;
-        color: #00f0ff;
-        background: rgba(0, 240, 255, 0.08);
-        border: 1px solid rgba(0, 240, 255, 0.4);
-        cursor: pointer;
-        vertical-align: baseline;
-        position: relative;
-        top: -1px;
-        transition: all 0.15s ease;
-      }
-      .cite-chip:hover {
-        background: rgba(0, 240, 255, 0.18);
-        border-color: rgba(0, 240, 255, 0.7);
-        box-shadow: 0 0 10px -2px rgba(0, 240, 255, 0.6);
-        transform: translateY(-1px);
-      }
-      .cite-chip:active {
-        transform: translateY(0);
-      }
-      .cite-chip-orphan {
-        color: #94a3b8;
-        background: rgba(148, 163, 184, 0.08);
-        border-color: rgba(148, 163, 184, 0.35);
-      }
-      .cite-chip-orphan:hover {
-        background: rgba(148, 163, 184, 0.15);
-        border-color: rgba(148, 163, 184, 0.55);
-        box-shadow: none;
-      }
-      /* Reference list item â€” flash on chip click */
-      .cite-target {
-        scroll-margin-top: 6rem;
-        border-radius: 0.4rem;
-        transition:
-          background-color 0.6s ease,
-          box-shadow 0.6s ease;
-      }
-      @keyframes cite-flash-anim {
-        0% {
-          background-color: rgba(0, 240, 255, 0.35);
-          box-shadow: 0 0 18px rgba(0, 240, 255, 0.55);
-        }
-        100% {
-          background-color: transparent;
-          box-shadow: none;
-        }
-      }
-      .cite-flash {
-        animation: cite-flash-anim 1.6s ease-out;
-      }
-
-      /* ========================================================
-         Sources Panel (per-message collapsible drawer)
-         ======================================================== */
-      .sources-panel {
-        margin-top: 0.35rem;
-        font-family:
-          "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, monospace;
-      }
-      .sources-toggle {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.45rem;
-        padding: 0.3rem 0.7rem;
-        font-size: 0.7rem;
-        font-weight: 600;
-        letter-spacing: 0.04em;
-        color: rgba(94, 255, 155, 0.95);
-        background: linear-gradient(
-          135deg,
-          rgba(94, 255, 155, 0.08) 0%,
-          rgba(0, 240, 255, 0.08) 100%
-        );
-        border: 1px solid rgba(94, 255, 155, 0.35);
-        border-radius: 999px;
-        cursor: pointer;
-        transition:
-          transform 0.15s ease,
-          box-shadow 0.2s ease,
-          border-color 0.2s ease;
-      }
-      .sources-toggle:hover {
-        transform: translateY(-1px);
-        border-color: rgba(94, 255, 155, 0.7);
-        box-shadow:
-          0 0 14px rgba(94, 255, 155, 0.35),
-          0 0 6px rgba(0, 240, 255, 0.25);
-      }
-      .sources-meta {
-        color: rgba(0, 240, 255, 0.7);
-        font-weight: 500;
-        font-size: 0.62rem;
-        padding-left: 0.35rem;
-        border-left: 1px solid rgba(94, 255, 155, 0.3);
-        margin-left: 0.1rem;
-      }
-      .sources-chev {
-        transition: transform 0.2s ease;
-      }
-      .sources-chev-open {
-        transform: rotate(180deg);
-      }
-      .sources-list {
-        margin-top: 0.5rem;
-        padding: 0.6rem;
-        border: 1px solid rgba(94, 255, 155, 0.18);
-        border-radius: 0.65rem;
-        background: linear-gradient(
-          135deg,
-          rgba(7, 11, 24, 0.85) 0%,
-          rgba(13, 18, 36, 0.85) 100%
-        );
-        box-shadow: inset 0 0 24px rgba(0, 240, 255, 0.04);
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
-        max-height: 28rem;
-        overflow-y: auto;
-      }
-      .source-row {
-        padding: 0.55rem 0.7rem;
-        border: 1px solid rgba(148, 163, 184, 0.15);
-        border-radius: 0.5rem;
-        background: rgba(15, 23, 42, 0.55);
-        scroll-margin-top: 6rem;
-        transition:
-          background-color 0.6s ease,
-          box-shadow 0.6s ease,
-          border-color 0.2s ease;
-      }
-      .source-row:hover {
-        border-color: rgba(0, 240, 255, 0.35);
-      }
-      .source-row-head {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        flex-wrap: wrap;
-        margin-bottom: 0.3rem;
-      }
-      .source-num {
-        color: #00f0ff;
-        font-weight: 700;
-        font-size: 0.7rem;
-      }
-      .source-file {
-        color: rgba(226, 232, 240, 0.9);
-        font-size: 0.7rem;
-        font-weight: 500;
-        max-width: 24rem;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      .source-meta {
-        margin-left: auto;
-        color: rgba(148, 163, 184, 0.7);
-        font-size: 0.6rem;
-      }
-      .source-preview {
-        color: rgba(203, 213, 225, 0.85);
-        font-size: 0.72rem;
-        line-height: 1.45;
-        white-space: pre-wrap;
-        word-break: break-word;
-        max-height: 8rem;
-        overflow: hidden;
-        position: relative;
-        font-family:
-          ui-sans-serif,
-          system-ui,
-          -apple-system,
-          "Segoe UI",
-          Roboto,
-          sans-serif;
-      }
-      .source-preview::after {
-        content: "";
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        height: 1.5rem;
-        background: linear-gradient(
-          to bottom,
-          transparent,
-          rgba(15, 23, 42, 0.85)
-        );
-        pointer-events: none;
-      }
-      /* Content-type badge in source row head */
-      .source-kind-badge {
-        font-size: 0.6rem;
-        font-weight: 700;
-        letter-spacing: 0.05em;
-        text-transform: uppercase;
-        padding: 0.1rem 0.4rem;
-        border-radius: 0.3rem;
-        border: 1px solid;
-        line-height: 1.2;
-      }
-      .source-kind-text {
-        color: rgba(94, 255, 155, 0.95);
-        border-color: rgba(94, 255, 155, 0.4);
-        background: rgba(94, 255, 155, 0.08);
-      }
-      .source-kind-table {
-        color: #ffcd5e;
-        border-color: rgba(255, 205, 94, 0.5);
-        background: rgba(255, 205, 94, 0.08);
-      }
-      .source-kind-image {
-        color: #ff8af0;
-        border-color: rgba(255, 138, 240, 0.45);
-        background: rgba(255, 138, 240, 0.08);
-      }
-      .source-kind-equation {
-        color: #a78bfa;
-        border-color: rgba(167, 139, 250, 0.45);
-        background: rgba(167, 139, 250, 0.08);
-      }
-      .source-kind-unknown {
-        color: rgba(148, 163, 184, 0.85);
-        border-color: rgba(148, 163, 184, 0.3);
-        background: rgba(148, 163, 184, 0.06);
-      }
-      /* Caption (italic, just under header) */
-      .source-caption {
-        color: rgba(226, 232, 240, 0.92);
-        font-size: 0.72rem;
-        font-style: italic;
-        margin-bottom: 0.35rem;
-        line-height: 1.4;
-      }
-      /* Table summary card */
-      .source-tablecard {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.4rem;
-        padding: 0.35rem 0.6rem;
-        border-radius: 0.4rem;
-        background: rgba(255, 205, 94, 0.07);
-        border: 1px dashed rgba(255, 205, 94, 0.35);
-        color: rgba(255, 205, 94, 0.95);
-        font-size: 0.7rem;
-        font-family:
-          "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, monospace;
-        margin-bottom: 0.35rem;
-      }
-      /* Raw expander */
-      .source-raw-wrap {
-        margin-top: 0.4rem;
-      }
-      .source-raw-toggle {
-        font-size: 0.6rem;
-        font-family:
-          "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, monospace;
-        color: rgba(148, 163, 184, 0.8);
-        background: transparent;
-        border: 1px solid rgba(148, 163, 184, 0.25);
-        padding: 0.15rem 0.5rem;
-        border-radius: 0.3rem;
-        cursor: pointer;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-        transition:
-          color 0.15s ease,
-          border-color 0.15s ease;
-      }
-      .source-raw-toggle:hover {
-        color: rgba(0, 240, 255, 0.95);
-        border-color: rgba(0, 240, 255, 0.5);
-      }
-      .source-raw {
-        margin-top: 0.4rem;
-        padding: 0.55rem 0.7rem;
-        background: rgba(2, 6, 23, 0.85);
-        border: 1px solid rgba(148, 163, 184, 0.18);
-        border-radius: 0.4rem;
-        color: rgba(203, 213, 225, 0.78);
-        font-size: 0.62rem;
-        font-family:
-          "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, monospace;
-        line-height: 1.4;
-        max-height: 14rem;
-        overflow: auto;
-        white-space: pre-wrap;
-        word-break: break-word;
-      }
-
-      /* Chat ambient backdrop: animated aurora + grid */
-      .chat-canvas {
-        position: relative;
-        background-color: #070b18;
-        background-image:
-          radial-gradient(
-            ellipse 70% 50% at 12% 8%,
-            rgba(0, 240, 255, 0.22),
-            transparent 60%
-          ),
-          radial-gradient(
-            ellipse 60% 50% at 92% 92%,
-            rgba(255, 43, 214, 0.18),
-            transparent 60%
-          ),
-          radial-gradient(
-            ellipse 50% 40% at 60% 40%,
-            rgba(168, 85, 247, 0.12),
-            transparent 65%
-          ),
-          radial-gradient(
-            ellipse 40% 40% at 30% 80%,
-            rgba(132, 255, 99, 0.08),
-            transparent 60%
-          ),
-          linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-          linear-gradient(
-            90deg,
-            rgba(255, 255, 255, 0.025) 1px,
-            transparent 1px
-          );
-        background-size:
-          200% 200%,
-          200% 200%,
-          180% 180%,
-          180% 180%,
-          32px 32px,
-          32px 32px;
-        animation: aurora-drift 22s ease-in-out infinite;
-      }
-      @keyframes aurora-drift {
-        0%,
-        100% {
-          background-position:
-            0% 0%,
-            100% 100%,
-            50% 50%,
-            30% 70%,
-            0 0,
-            0 0;
-        }
-        50% {
-          background-position:
-            20% 30%,
-            70% 60%,
-            60% 40%,
-            40% 60%,
-            0 0,
-            0 0;
-        }
-      }
-      .chat-canvas::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        pointer-events: none;
-        background: radial-gradient(
-          ellipse at top,
-          transparent 60%,
-          rgba(0, 0, 0, 0.5) 100%
-        );
-      }
-
-      /* Sidebar gradient + accent ribbon */
-      .chat-sidebar {
-        background:
-          radial-gradient(
-            ellipse 100% 40% at 50% 0%,
-            rgba(0, 240, 255, 0.07),
-            transparent 70%
-          ),
-          linear-gradient(
-            180deg,
-            rgba(13, 18, 32, 0.96) 0%,
-            rgba(8, 12, 24, 0.96) 100%
-          );
-        position: relative;
-      }
-      .chat-sidebar::after {
-        content: "";
-        position: absolute;
-        top: 0;
-        right: -1px;
-        bottom: 0;
-        width: 1px;
-        background: linear-gradient(
-          180deg,
-          transparent 0%,
-          rgba(0, 240, 255, 0.5) 15%,
-          rgba(168, 85, 247, 0.45) 50%,
-          rgba(255, 43, 214, 0.45) 85%,
-          transparent 100%
-        );
-        pointer-events: none;
-        animation: ribbon-shimmer 6s ease-in-out infinite;
-      }
-      @keyframes ribbon-shimmer {
-        0%,
-        100% {
-          opacity: 0.7;
-        }
-        50% {
-          opacity: 1;
-        }
-      }
-
-      /* Glassy chat header / composer */
-      .glass-bar {
-        background: linear-gradient(
-          180deg,
-          rgba(20, 27, 45, 0.7) 0%,
-          rgba(13, 18, 32, 0.55) 100%
-        );
-        backdrop-filter: blur(8px) saturate(160%);
-        -webkit-backdrop-filter: blur(8px) saturate(160%);
-      }
-      .composer-bar {
-        background: linear-gradient(
-          0deg,
-          rgba(8, 12, 24, 0.92) 0%,
-          rgba(13, 18, 32, 0.45) 100%
-        );
-        backdrop-filter: blur(10px) saturate(160%);
-        -webkit-backdrop-filter: blur(10px) saturate(160%);
-        border-top: 1px solid transparent;
-        border-image: linear-gradient(
-            90deg,
-            transparent,
-            rgba(0, 240, 255, 0.6),
-            rgba(168, 85, 247, 0.5),
-            rgba(255, 43, 214, 0.5),
-            transparent
-          )
-          1;
-      }
-
-      /* New-chat / send hero button: shimmering gradient */
-      .btn-hero-cyan {
-        background: linear-gradient(
-          110deg,
-          #00f0ff 0%,
-          #67e8f9 30%,
-          #ffffff 50%,
-          #67e8f9 70%,
-          #00f0ff 100%
-        );
-        background-size: 250% 100%;
-        background-position: 100% 0;
-        transition:
-          background-position 0.6s ease,
-          box-shadow 0.3s ease,
-          transform 0.12s ease;
-        box-shadow:
-          0 0 0 1px rgba(0, 240, 255, 0.5),
-          0 8px 24px -6px rgba(0, 240, 255, 0.6),
-          0 1px 0 rgba(255, 255, 255, 0.5) inset;
-      }
-      .btn-hero-cyan:hover {
-        background-position: 0% 0;
-        box-shadow:
-          0 0 0 1px rgba(0, 240, 255, 0.8),
-          0 12px 36px -6px rgba(0, 240, 255, 0.9),
-          0 0 24px rgba(0, 240, 255, 0.4),
-          0 1px 0 rgba(255, 255, 255, 0.6) inset;
-        transform: translateY(-1px);
-      }
-      .btn-hero-cyan:active {
-        transform: translateY(1px);
-      }
-      .btn-hero-cyan:disabled,
-      .btn-hero-cyan[disabled] {
-        background: #1a2238 !important;
-        color: #475569 !important;
-        box-shadow: none !important;
-        transform: none !important;
-        cursor: not-allowed;
-      }
-
-      /* Magenta hero variant for prompt library */
-      .btn-hero-magenta {
-        background: linear-gradient(
-          110deg,
-          rgba(255, 43, 214, 0.15) 0%,
-          rgba(168, 85, 247, 0.18) 50%,
-          rgba(255, 43, 214, 0.15) 100%
-        );
-        background-size: 200% 100%;
-        background-position: 0% 0;
-        color: #ff8af0;
-        border: 1px solid rgba(255, 43, 214, 0.45);
-        transition:
-          background-position 0.5s ease,
-          box-shadow 0.3s ease,
-          color 0.2s ease,
-          transform 0.12s ease;
-      }
-      .btn-hero-magenta:hover {
-        background-position: 100% 0;
-        color: #ffffff;
-        border-color: rgba(255, 43, 214, 0.8);
-        box-shadow:
-          0 0 0 1px rgba(255, 43, 214, 0.4),
-          0 8px 24px -6px rgba(255, 43, 214, 0.55),
-          0 0 18px rgba(255, 43, 214, 0.25);
-        transform: translateY(-1px);
-      }
-
-      /* Chat list item active glow ribbon */
-      .chat-item-active {
-        background: linear-gradient(
-          90deg,
-          rgba(0, 240, 255, 0.22) 0%,
-          rgba(168, 85, 247, 0.1) 60%,
-          transparent 100%
-        );
-        border-color: rgba(0, 240, 255, 0.55) !important;
-        box-shadow:
-          0 0 0 1px rgba(0, 240, 255, 0.2),
-          0 6px 20px -8px rgba(0, 240, 255, 0.55);
-        position: relative;
-      }
-      .chat-item-active::before {
-        content: "";
-        position: absolute;
-        left: 0;
-        top: 6px;
-        bottom: 6px;
-        width: 3px;
-        border-radius: 0 2px 2px 0;
-        background: linear-gradient(180deg, #00f0ff, #a855f7, #ff2bd6);
-        box-shadow:
-          0 0 10px rgba(0, 240, 255, 0.7),
-          0 0 14px rgba(255, 43, 214, 0.4);
-      }
-      .chat-item-active:hover {
-        transform: translateX(2px);
-        transition: transform 0.15s ease;
-      }
-
-      /* Animated gradient border for assistant bubble while streaming */
-      @keyframes border-spin {
-        0% {
-          background-position: 0% 50%;
-        }
-        100% {
-          background-position: 200% 50%;
-        }
-      }
-      .bubble-streaming {
-        position: relative;
-        background:
-          linear-gradient(
-              180deg,
-              rgba(24, 18, 40, 0.94) 0%,
-              rgba(15, 12, 28, 0.94) 100%
-            )
-            padding-box,
-          linear-gradient(
-              110deg,
-              #00f0ff 0%,
-              #a855f7 25%,
-              #ff2bd6 50%,
-              #a855f7 75%,
-              #00f0ff 100%
-            )
-            border-box;
-        background-size:
-          100% 100%,
-          200% 100%;
-        border: 1px solid transparent !important;
-        animation: border-spin 4s linear infinite;
-      }
-
-      /* Vibrant prompt library trigger pulse */
-      @keyframes lib-glow {
-        0%,
-        100% {
-          box-shadow: 0 0 0 0 rgba(255, 43, 214, 0);
-        }
-        50% {
-          box-shadow: 0 0 16px -2px rgba(255, 43, 214, 0.45);
-        }
-      }
-      .lib-pulse {
-        animation: lib-glow 3s ease-in-out infinite;
-      }
-
-      /* Send icon nudge on hover */
-      .btn-hero-cyan:hover [data-lucide="send-horizontal"] {
-        transform: translateX(2px);
-        transition: transform 0.18s ease;
-      }
-
-      /* Confetti dot pulse for thinking â€” colorful */
-      .dot-pulse-vivid span {
-        background: #00f0ff;
-        animation: dot-bounce 1s infinite ease-in-out both;
-        box-shadow: 0 0 8px rgba(0, 240, 255, 0.7);
-      }
-      .dot-pulse-vivid span:nth-child(2) {
-        background: #a855f7;
-        animation-delay: 0.15s;
-        box-shadow: 0 0 8px rgba(168, 85, 247, 0.7);
-      }
-      .dot-pulse-vivid span:nth-child(3) {
-        background: #ff2bd6;
-        animation-delay: 0.3s;
-        box-shadow: 0 0 8px rgba(255, 43, 214, 0.7);
-      }
-      .dot-pulse-vivid {
-        display: inline-flex;
-        gap: 4px;
-        align-items: center;
-      }
-      .dot-pulse-vivid span {
-        width: 7px;
-        height: 7px;
-        border-radius: 9999px;
-      }
-      @keyframes dot-bounce {
-        0%,
-        80%,
-        100% {
-          transform: scale(0.6);
-          opacity: 0.5;
-        }
-        40% {
-          transform: scale(1.1);
-          opacity: 1;
-        }
-      }
-
-      /* ========== PANEL THEMING (branch 100) ==========
-         Calmer cousins of .chat-canvas / .glass-bar so Documents,
-         Intelligence, Settings, Workspaces, Prompt Library all share
-         the Capture Chat visual language without overpowering data-dense
-         tables and forms. */
-
-      /* ----- Global topbar with animated gradient bottom edge ----- */
-      .topbar-vibrant {
-        position: relative;
-        background:
-          linear-gradient(
-            90deg,
-            rgba(0, 240, 255, 0.08) 0%,
-            rgba(168, 85, 247, 0.06) 50%,
-            rgba(255, 43, 214, 0.08) 100%
-          ),
-          rgba(5, 7, 13, 0.9);
-        backdrop-filter: blur(18px) saturate(160%);
-        -webkit-backdrop-filter: blur(18px) saturate(160%);
-        border-bottom: 1px solid rgba(0, 240, 255, 0.18);
-      }
-      @keyframes topbar-shimmer {
-        0% {
-          background-position: 0% 50%;
-        }
-        100% {
-          background-position: 200% 50%;
-        }
-      }
-      .topbar-vibrant::after {
-        content: "";
-        position: absolute;
-        left: 0;
-        right: 0;
-        bottom: -1px;
-        height: 2px;
-        background: linear-gradient(
-          90deg,
-          #00f0ff 0%,
-          #a855f7 25%,
-          #ff2bd6 50%,
-          #a855f7 75%,
-          #00f0ff 100%
-        );
-        background-size: 200% 100%;
-        animation: topbar-shimmer 8s linear infinite;
-        opacity: 0.85;
-        box-shadow:
-          0 0 14px rgba(0, 240, 255, 0.55),
-          0 0 22px rgba(168, 85, 247, 0.35);
-      }
-
-      /* ----- Topbar buttons (workspace + health + icon links) ----- */
-      .topbar-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0.4rem 0.7rem;
-        border-radius: 0.7rem;
-        background:
-          linear-gradient(
-              180deg,
-              rgba(20, 26, 43, 0.85) 0%,
-              rgba(10, 14, 26, 0.85) 100%
-            )
-            padding-box,
-          linear-gradient(
-              135deg,
-              rgba(0, 240, 255, 0.45),
-              rgba(168, 85, 247, 0.45),
-              rgba(255, 43, 214, 0.45)
-            )
-            border-box;
-        border: 1px solid transparent;
-        font-size: 0.8125rem;
-        color: #cbd5e1;
-        transition: all 0.18s ease;
-      }
-      .topbar-pill:hover {
-        transform: translateY(-1px);
-        box-shadow:
-          0 0 0 1px rgba(0, 240, 255, 0.4),
-          0 8px 22px -8px rgba(168, 85, 247, 0.5);
-      }
-      .topbar-icon-btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 2.25rem;
-        height: 2.25rem;
-        border-radius: 0.7rem;
-        background: rgba(20, 26, 43, 0.6);
-        border: 1px solid rgba(31, 42, 68, 1);
-        color: #94a3b8;
-        transition: all 0.18s ease;
-      }
-      .topbar-icon-btn:hover {
-        color: #00f0ff;
-        border-color: rgba(0, 240, 255, 0.55);
-        box-shadow:
-          0 0 0 1px rgba(0, 240, 255, 0.3),
-          0 0 18px -4px rgba(0, 240, 255, 0.55);
-        transform: translateY(-1px);
-      }
-
-      /* ----- Sidebar with animated accent ribbon on right edge ----- */
-      .sidebar-vibrant {
-        position: relative;
-        background:
-          radial-gradient(
-            ellipse 120% 50% at 50% -10%,
-            rgba(0, 240, 255, 0.22),
-            transparent 55%
-          ),
-          radial-gradient(
-            ellipse 120% 50% at 50% 110%,
-            rgba(255, 43, 214, 0.18),
-            transparent 55%
-          ),
-          radial-gradient(
-            ellipse 80% 80% at 50% 50%,
-            rgba(168, 85, 247, 0.1),
-            transparent 70%
-          ),
-          linear-gradient(180deg, #0d1224 0%, #0a0e1f 50%, #0d0a22 100%);
-        border-right: 1px solid rgba(31, 42, 68, 1);
-        overflow: hidden;
-      }
-      .sidebar-vibrant::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background-image:
-          linear-gradient(rgba(0, 240, 255, 0.06) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(255, 43, 214, 0.05) 1px, transparent 1px);
-        background-size:
-          24px 24px,
-          24px 24px;
-        pointer-events: none;
-        opacity: 0.6;
-      }
-      @keyframes sidebar-ribbon-shimmer {
-        0% {
-          background-position: 0% 0%;
-        }
-        100% {
-          background-position: 0% 200%;
-        }
-      }
-      .sidebar-vibrant::after {
-        content: "";
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        right: -1px;
-        width: 2px;
-        background: linear-gradient(
-          180deg,
-          #00f0ff 0%,
-          #a855f7 25%,
-          #ff2bd6 50%,
-          #a855f7 75%,
-          #00f0ff 100%
-        );
-        background-size: 100% 200%;
-        animation: sidebar-ribbon-shimmer 10s linear infinite;
-        opacity: 0.75;
-        box-shadow:
-          0 0 14px rgba(0, 240, 255, 0.55),
-          0 0 22px rgba(255, 43, 214, 0.35);
-      }
-
-      /* Brand tile glow on hover (for the labyrinth chip in topbar) */
-      .brand-tile {
-        position: relative;
-        transition: transform 0.2s ease;
-      }
-      .brand-tile:hover {
-        transform: rotate(-6deg) scale(1.08);
-      }
-      .brand-tile:hover .brand-labyrinth {
-        animation-duration: 6s;
-      }
-      @keyframes brand-labyrinth-pulse {
-        0%,
-        100% {
-          filter: drop-shadow(0 0 3px rgba(0, 240, 255, 0.55))
-            drop-shadow(0 0 6px rgba(255, 43, 214, 0.35));
-        }
-        50% {
-          filter: drop-shadow(0 0 6px rgba(0, 240, 255, 0.85))
-            drop-shadow(0 0 12px rgba(255, 43, 214, 0.6));
-        }
-      }
-      .brand-labyrinth {
-        animation: brand-labyrinth-pulse 4.5s ease-in-out infinite;
-      }
-      @keyframes brand-thread-trace {
-        0% {
-          stroke-dashoffset: 100;
-          opacity: 0.4;
-        }
-        45% {
-          opacity: 1;
-        }
-        70% {
-          stroke-dashoffset: 0;
-          opacity: 1;
-        }
-        90% {
-          stroke-dashoffset: 0;
-          opacity: 0.95;
-        }
-        100% {
-          stroke-dashoffset: 0;
-          opacity: 0;
-        }
-      }
-      .brand-thread {
-        animation: brand-thread-trace 6s ease-in-out infinite;
-      }
-      .brand-tile::after {
-        content: "";
-        position: absolute;
-        inset: -3px;
-        border-radius: 0.9rem;
-        background: linear-gradient(
-          135deg,
-          rgba(0, 240, 255, 0.6),
-          rgba(168, 85, 247, 0.5),
-          rgba(255, 43, 214, 0.6)
-        );
-        z-index: -1;
-        filter: blur(8px);
-        opacity: 0.7;
-      }
-
-      /* ========== PANEL THEMING (branch 100) ==========
-         Documents, Intelligence, Settings, Workspaces, Prompt Library all
-         share the Capture Chat visual language without overpowering
-         data-dense tables and forms.
-         ================================================ */
-      @keyframes panel-aurora-drift {
-        0% {
-          background-position:
-            0% 0%,
-            100% 0%,
-            50% 100%,
-            20% 40%,
-            0 0;
-        }
-        100% {
-          background-position:
-            15% 25%,
-            85% 15%,
-            55% 75%,
-            70% 60%,
-            0 0;
-        }
-      }
-      .panel-canvas {
-        position: relative;
-        background:
-          radial-gradient(
-            ellipse 65% 55% at 5% 0%,
-            rgba(0, 240, 255, 0.28),
-            transparent 65%
-          ),
-          radial-gradient(
-            ellipse 60% 50% at 100% 5%,
-            rgba(255, 43, 214, 0.25),
-            transparent 65%
-          ),
-          radial-gradient(
-            ellipse 80% 60% at 50% 110%,
-            rgba(168, 85, 247, 0.28),
-            transparent 70%
-          ),
-          radial-gradient(
-            ellipse 45% 45% at 80% 60%,
-            rgba(0, 255, 156, 0.1),
-            transparent 75%
-          ),
-          radial-gradient(
-            ellipse 45% 45% at 20% 70%,
-            rgba(255, 176, 32, 0.08),
-            transparent 75%
-          ),
-          linear-gradient(
-            155deg,
-            #0f1430 0%,
-            #0c0f24 35%,
-            #130926 70%,
-            #0d0820 100%
-          );
-        background-size:
-          140% 140%,
-          140% 140%,
-          160% 140%,
-          120% 120%,
-          120% 120%,
-          100% 100%;
-        animation: panel-aurora-drift 22s ease-in-out infinite alternate;
-      }
-      .panel-canvas::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background-image:
-          linear-gradient(rgba(0, 240, 255, 0.05) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(255, 43, 214, 0.04) 1px, transparent 1px);
-        background-size:
-          48px 48px,
-          48px 48px;
-        pointer-events: none;
-        opacity: 0.5;
-      }
-      .panel-canvas > * {
-        position: relative;
-        z-index: 1;
-      }
-
-      /* Frosted section heading bar (sibling of .glass-bar but slimmer). */
-      .glass-section-bar {
-        background:
-          linear-gradient(
-            90deg,
-            rgba(0, 240, 255, 0.18) 0%,
-            rgba(168, 85, 247, 0.14) 50%,
-            rgba(255, 43, 214, 0.18) 100%
-          ),
-          rgba(10, 14, 26, 0.85);
-        backdrop-filter: blur(14px) saturate(160%);
-        -webkit-backdrop-filter: blur(14px) saturate(160%);
-        border-bottom: 1px solid rgba(0, 240, 255, 0.45);
-        box-shadow:
-          0 1px 0 rgba(255, 43, 214, 0.25),
-          0 8px 24px -16px rgba(168, 85, 247, 0.5);
-      }
-
-      /* Gradient heading utility for section h1s. */
-      .h1-gradient {
-        background: linear-gradient(
-          92deg,
-          #00f0ff 0%,
-          #a855f7 50%,
-          #ff2bd6 100%
-        );
-        -webkit-background-clip: text;
-        background-clip: text;
-        color: transparent !important;
-        text-shadow: none;
-        -webkit-text-fill-color: transparent;
-        filter: drop-shadow(0 0 14px rgba(168, 85, 247, 0.35));
-      }
-
-      /* Modal frame: gradient border + frosted glass for workspace modal,
-         prompt picker, and any future overlays. */
-      .modal-canvas {
-        background:
-          linear-gradient(
-              180deg,
-              rgba(15, 20, 34, 0.92) 0%,
-              rgba(10, 14, 26, 0.92) 100%
-            )
-            padding-box,
-          linear-gradient(
-              135deg,
-              rgba(0, 240, 255, 0.55) 0%,
-              rgba(168, 85, 247, 0.55) 50%,
-              rgba(255, 43, 214, 0.55) 100%
-            )
-            border-box;
-        border: 1px solid transparent !important;
-        backdrop-filter: blur(18px) saturate(160%);
-        -webkit-backdrop-filter: blur(18px) saturate(160%);
-        box-shadow:
-          0 24px 60px -20px rgba(0, 0, 0, 0.7),
-          0 0 0 1px rgba(0, 240, 255, 0.1),
-          0 0 32px -8px rgba(168, 85, 247, 0.35);
-      }
-
-      .markdown p {
-        margin: 0.4em 0;
-      }
-      .markdown p:first-child {
-        margin-top: 0;
-      }
-      .markdown p:last-child {
-        margin-bottom: 0;
-      }
-      .markdown h1,
-      .markdown h2,
-      .markdown h3,
-      .markdown h4 {
-        font-weight: 600;
-        color: #e2e8f0;
-        margin: 0.8em 0 0.3em;
-        line-height: 1.25;
-      }
-      .markdown h1 {
-        font-size: 1.15em;
-        color: #00f0ff;
-      }
-      .markdown h2 {
-        font-size: 1.05em;
-        color: #7df9ff;
-      }
-      .markdown h3 {
-        font-size: 1em;
-      }
-      .markdown h4 {
-        font-size: 0.95em;
-        color: #cbd5e1;
-      }
-      .markdown ul,
-      .markdown ol {
-        margin: 0.4em 0;
-        padding-left: 1.4em;
-      }
-      .markdown ul {
-        list-style: disc;
-      }
-      .markdown ol {
-        list-style: decimal;
-      }
-      .markdown li {
-        margin: 0.15em 0;
-      }
-      .markdown li > p {
-        margin: 0.15em 0;
-      }
-      .markdown strong {
-        color: #f1f5f9;
-        font-weight: 600;
-      }
-      .markdown em {
-        color: #e2e8f0;
-      }
-      .markdown a {
-        color: #00f0ff;
-        text-decoration: underline;
-        text-decoration-color: rgba(0, 240, 255, 0.4);
-      }
-      .markdown a:hover {
-        text-decoration-color: #00f0ff;
-      }
-      .markdown blockquote {
-        border-left: 3px solid #00f0ff66;
-        padding: 0.2em 0.8em;
-        margin: 0.5em 0;
-        color: #cbd5e1;
-        background: rgba(0, 240, 255, 0.03);
-        border-radius: 0 4px 4px 0;
-      }
-      .markdown table {
-        border-collapse: collapse;
-        margin: 0.5em 0;
-        font-size: 0.9em;
-      }
-      .markdown th,
-      .markdown td {
-        border: 1px solid #1f2a44;
-        padding: 4px 8px;
-        text-align: left;
-      }
-      .markdown th {
-        background: #0f1422;
-        color: #e2e8f0;
-      }
-      .markdown hr {
-        border: 0;
-        border-top: 1px solid #1f2a44;
-        margin: 0.8em 0;
-      }
-      .markdown code {
-        background: rgba(0, 240, 255, 0.08);
-        padding: 0 4px;
-        border-radius: 3px;
-        font-family: "JetBrains Mono", monospace;
-        font-size: 0.9em;
-      }
-      .markdown pre {
-        background: #05070d;
-        padding: 10px;
-        border-radius: 6px;
-        overflow-x: auto;
-        border: 1px solid #1f2a44;
-      }
-
-      /* Loading dots */
-      .dot-pulse {
-        display: inline-flex;
-        gap: 4px;
-      }
-      .dot-pulse span {
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-        background: #00f0ff;
-        animation: dot 1.2s infinite ease-in-out;
-      }
-      .dot-pulse span:nth-child(2) {
-        animation-delay: 0.2s;
-      }
-      .dot-pulse span:nth-child(3) {
-        animation-delay: 0.4s;
-      }
-      @keyframes dot {
-        0%,
-        80%,
-        100% {
-          opacity: 0.2;
-          transform: translateY(0);
-        }
-        40% {
-          opacity: 1;
-          transform: translateY(-3px);
-        }
-      }
-
-      /* Toast */
-      .toast {
-        @apply fixed top-4 right-4 z-50 card px-4 py-3 shadow-glow text-sm;
-      }
-    </style>
+    <link rel="stylesheet" href="/ui/styles/theseus.css" />
   </head>
 
   <body
@@ -1889,7 +81,7 @@
       <div class="flex items-center gap-2.5 min-w-[220px]">
         <div
           class="brand-tile w-10 h-10 rounded-xl flex items-center justify-center"
-          title="Project Theseus â€” find the path through the labyrinth"
+          title="Project Theseus — find the path through the labyrinth"
         >
           <svg
             viewBox="0 0 40 40"
@@ -2036,7 +228,7 @@
             class="w-4 h-4 text-neon-cyan group-hover:text-neon-magenta transition"
           ></i>
           <span class="flex-1 text-left"
-            >Jump to view, chat, prompt, or workspaceâ€¦</span
+            >Jump to view, chat, prompt, or workspace…</span
           >
           <span
             class="text-[10px] font-mono text-neon-cyan border border-neon-cyan/40 px-1.5 py-0.5 rounded bg-neon-cyan/5"
@@ -2061,7 +253,7 @@
             </div>
             <div
               class="text-neon-cyan font-mono text-xs"
-              x-text="stats.workspace || 'â€”'"
+              x-text="stats.workspace || '—'"
             ></div>
           </div>
           <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-500"></i>
@@ -2081,7 +273,7 @@
             ></div>
             <div
               class="text-[10px] font-mono text-slate-500"
-              x-text="stats.graph_storage || 'â€”'"
+              x-text="stats.graph_storage || '—'"
             ></div>
           </div>
         </div>
@@ -2166,21 +358,21 @@
                 <span class="text-slate-500">lightrag</span
                 ><span
                   class="text-neon-cyan tabular-nums"
-                  x-text="stats.stack?.lightrag ? 'v' + stats.stack.lightrag : 'â€”'"
+                  x-text="stats.stack?.lightrag ? 'v' + stats.stack.lightrag : '—'"
                 ></span>
               </div>
               <div class="flex justify-between">
                 <span class="text-slate-500">raganything</span
                 ><span
                   class="text-neon-magenta tabular-nums"
-                  x-text="stats.stack?.raganything ? 'v' + stats.stack.raganything : 'â€”'"
+                  x-text="stats.stack?.raganything ? 'v' + stats.stack.raganything : '—'"
                 ></span>
               </div>
               <div class="flex justify-between">
                 <span class="text-slate-500">mineru</span
                 ><span
                   class="text-neon-lime tabular-nums"
-                  x-text="stats.stack?.mineru ? 'v' + stats.stack.mineru : 'â€”'"
+                  x-text="stats.stack?.mineru ? 'v' + stats.stack.mineru : '—'"
                 ></span>
               </div>
             </div>
@@ -2198,7 +390,7 @@
                 ><span
                   class="text-neon-cyan truncate text-right"
                   :title="stats.models?.extraction || ''"
-                  x-text="stats.models?.extraction || 'â€”'"
+                  x-text="stats.models?.extraction || '—'"
                 ></span>
               </div>
               <div class="flex justify-between gap-2">
@@ -2206,7 +398,7 @@
                 ><span
                   class="text-neon-magenta truncate text-right"
                   :title="stats.models?.reasoning || ''"
-                  x-text="stats.models?.reasoning || 'â€”'"
+                  x-text="stats.models?.reasoning || '—'"
                 ></span>
               </div>
               <div class="flex justify-between gap-2">
@@ -2214,7 +406,7 @@
                 ><span
                   class="text-neon-lime truncate text-right"
                   :title="stats.models?.embedding || ''"
-                  x-text="stats.models?.embedding || 'â€”'"
+                  x-text="stats.models?.embedding || '—'"
                 ></span>
               </div>
               <div class="flex justify-between gap-2">
@@ -2275,7 +467,7 @@
                   Workspace
                   <span
                     class="text-neon-cyan font-mono"
-                    x-text="stats.workspace || 'â€”'"
+                    x-text="stats.workspace || '—'"
                   ></span>
                   holds
                   <span
@@ -2447,7 +639,7 @@
                         >Start a capture chat</span
                       >
                       <span class="block text-[11px] text-slate-500"
-                        >Streaming Â· multi-turn Â· Shipley mentor</span
+                        >Streaming · multi-turn · Shipley mentor</span
                       >
                     </span>
                   </button>
@@ -2465,7 +657,7 @@
                         >Prompt Library</span
                       >
                       <span class="block text-[11px] text-slate-500">
-                        Shipley-aligned prompts Â· phases 3â€“6
+                        Shipley-aligned prompts · phases 3–6
                       </span>
                     </span>
                   </button>
@@ -2483,7 +675,7 @@
                         >Open Knowledge Graph</span
                       >
                       <span class="block text-[11px] text-slate-500"
-                        >Top-degree subgraph Â· up to 5,000 nodes</span
+                        >Top-degree subgraph · up to 5,000 nodes</span
                       >
                     </span>
                   </button>
@@ -2501,7 +693,7 @@
                         >RFP Intelligence</span
                       >
                       <span class="block text-[11px] text-slate-500"
-                        >Lâ†”M matrix Â· traceability Â· gaps</span
+                        >L↔M matrix · traceability · gaps</span
                       >
                     </span>
                   </button>
@@ -2970,7 +1162,7 @@
                       @input.debounce.300ms="searchLabels()"
                       @focus="graph.showLabelDropdown = true"
                       @blur="setTimeout(() => graph.showLabelDropdown = false, 200)"
-                      placeholder="* (everything) or typeâ€¦"
+                      placeholder="* (everything) or type…"
                       class="w-full bg-ink-900 border border-edge focus:border-neon-cyan/60 outline-none rounded-lg px-3 py-2 text-sm font-mono"
                     />
                     <div
@@ -3134,14 +1326,14 @@
                     <span class="dot-pulse"
                       ><span></span><span></span><span></span
                     ></span>
-                    loadingâ€¦
+                    loading…
                   </span>
                   <span x-show="!graph.loading && graph.stats.nodes">
                     <span
                       class="text-neon-cyan"
                       x-text="graph.stats.visibleNodes"
                     ></span
-                    >/<span x-text="graph.stats.nodes"></span> nodes Â·
+                    >/<span x-text="graph.stats.nodes"></span> nodes ·
                     <span
                       class="text-neon-magenta"
                       x-text="graph.stats.visibleEdges"
@@ -3246,7 +1438,7 @@
                         x-show="graph.chunksLoading"
                         class="text-xs text-slate-500"
                       >
-                        Loadingâ€¦
+                        Loading…
                       </div>
                       <div class="space-y-2" x-show="!graph.chunksLoading">
                         <template x-for="c in graph.chunks" :key="c.chunk_id">
@@ -3336,7 +1528,7 @@
                       >
                         <span x-text="c.message_count"></span>
                         <span>msgs</span>
-                        <span class="text-slate-700">Â·</span>
+                        <span class="text-slate-700">·</span>
                         <span class="text-neon-cyan/60" x-text="c.mode"></span>
                       </div>
                     </div>
@@ -3389,7 +1581,7 @@
                           <span
                             x-text="`${currentChat.messages.length} messages`"
                           ></span>
-                          <span class="text-slate-700">Â·</span>
+                          <span class="text-slate-700">·</span>
                           <span
                             class="inline-flex items-center gap-1 text-neon-cyan/80"
                             :title="`Up to ${stats?.chat?.history_pairs_cap ?? 20} prior user+assistant pairs travel with each query (UI_CHAT_HISTORY_TURNS).`"
@@ -3475,7 +1667,7 @@
                             <span
                               x-show="m.mode"
                               class="text-neon-cyan/70"
-                              x-text="'Â· ' + m.mode"
+                              x-text="'· ' + m.mode"
                             ></span>
                             <span
                               x-show="m.timing && m.timing.ttft_ms != null"
@@ -3543,7 +1735,7 @@
                               <span
                                 class="sources-meta"
                                 x-show="m.sources.counts && (m.sources.counts.entities || m.sources.counts.relationships)"
-                                x-text="`${m.sources.counts.entities || 0}E Â· ${m.sources.counts.relationships || 0}R`"
+                                x-text="`${m.sources.counts.entities || 0}E · ${m.sources.counts.relationships || 0}R`"
                               ></span>
                               <i
                                 data-lucide="chevron-down"
@@ -3673,11 +1865,11 @@
                           ><span></span><span></span><span></span
                         ></span>
                         <span class="text-neon-cyan/90 font-semibold"
-                          >Thinkingâ€¦</span
+                          >Thinking…</span
                         >
                         <span
                           class="text-slate-500"
-                          x-text="chatStatus.retrieve_ms != null ? '(context ' + (chatStatus.retrieve_ms/1000).toFixed(1) + 's Â· elapsed ' + thinkElapsed + 's)' : '(elapsed ' + thinkElapsed + 's)'"
+                          x-text="chatStatus.retrieve_ms != null ? '(context ' + (chatStatus.retrieve_ms/1000).toFixed(1) + 's · elapsed ' + thinkElapsed + 's)' : '(elapsed ' + thinkElapsed + 's)'"
                         ></span>
                       </div>
                       <!-- Live status: writing (tokens flowing) -->
@@ -3687,7 +1879,7 @@
                       >
                         <i data-lucide="cpu" class="w-3 h-3"></i>
                         <span
-                          x-text="'Writing Â· context ' + (chatStatus.retrieve_ms != null ? (chatStatus.retrieve_ms/1000).toFixed(1) + 's' : 'â€”') + ' Â· think ' + thinkElapsed + 's'"
+                          x-text="'Writing · context ' + (chatStatus.retrieve_ms != null ? (chatStatus.retrieve_ms/1000).toFixed(1) + 's' : '—') + ' · think ' + thinkElapsed + 's'"
                         ></span>
                       </div>
                     </div>
@@ -3707,11 +1899,11 @@
                             <span
                               class="opacity-70"
                               x-show="promptLibrary.length"
-                              x-text="'Â· ' + promptLibrary.length"
+                              x-text="'· ' + promptLibrary.length"
                             ></span>
                           </button>
                           <span class="text-[10px] font-mono text-slate-600"
-                            >Enter to send Â· Shift+Enter for newline</span
+                            >Enter to send · Shift+Enter for newline</span
                           >
                         </div>
                         <form class="relative" @submit.prevent="sendMessage()">
@@ -3719,7 +1911,7 @@
                             x-ref="composer"
                             x-model="composer"
                             rows="3"
-                            placeholder="Ask about Section L, traceability, win themesâ€¦"
+                            placeholder="Ask about Section L, traceability, win themes…"
                             class="w-full bg-ink-900 border border-edge focus:border-neon-cyan/60 focus:shadow-glow outline-none rounded-xl px-4 py-3 pr-28 text-sm resize-none transition"
                             @keydown.enter.prevent="if (!$event.shiftKey) sendMessage(); else composer += '\n'"
                             @keydown.ctrl.enter.prevent="sendMessage()"
@@ -3788,19 +1980,19 @@
                   <span class="dot-pulse"
                     ><span></span><span></span><span></span
                   ></span>
-                  computingâ€¦
+                  computing…
                 </span>
                 <span x-show="!intel.loading && intel.data">
                   <span
                     class="text-neon-cyan"
                     x-text="intel.data?.totals?.entities || 0"
                   ></span>
-                  entities Â·
+                  entities ·
                   <span
                     class="text-neon-magenta"
                     x-text="intel.data?.totals?.relationships || 0"
                   ></span>
-                  rels Â· generated
+                  rels · generated
                   <span
                     x-text="(intel.data?.generated_at || '').slice(11,19)"
                   ></span>
@@ -3814,13 +2006,13 @@
               </div>
             </div>
 
-            <!-- ===== Tab: Lâ†”M Matrix ===== -->
+            <!-- ===== Tab: L↔M Matrix ===== -->
             <div x-show="intel.tab === 'lm'" x-cloak class="space-y-6">
               <div class="card overflow-hidden">
                 <div
                   class="px-5 py-3 border-b border-edge flex items-center justify-between"
                 >
-                  <h2 class="font-semibold">Section L â†’ Section M Matrix</h2>
+                  <h2 class="font-semibold">Section L → Section M Matrix</h2>
                   <div class="flex items-center gap-3 text-[11px] font-mono">
                     <span class="text-slate-500">show:</span>
                     <label class="flex items-center gap-1.5"
@@ -3958,11 +2150,11 @@
                   class="px-5 py-3 border-b border-edge flex items-center justify-between"
                 >
                   <h2 class="font-semibold">
-                    Requirement â†’ Deliverable â†’ Standard / Metric
+                    Requirement → Deliverable → Standard / Metric
                   </h2>
                   <input
                     x-model="intel.traceFilter"
-                    placeholder="Filterâ€¦"
+                    placeholder="Filter…"
                     class="bg-ink-900 border border-edge rounded-md px-2 py-1 text-xs font-mono w-48"
                   />
                 </div>
@@ -4026,7 +2218,7 @@
                             <span
                               class="pill"
                               :class="row.complete ? 'bg-neon-lime/10 text-neon-lime border border-neon-lime/30' : 'bg-neon-amber/10 text-neon-amber border border-neon-amber/30'"
-                              x-text="row.complete ? 'OK' : 'â€¦'"
+                              x-text="row.complete ? 'OK' : '…'"
                             ></span>
                           </td>
                         </tr>
@@ -4154,7 +2346,7 @@
                       x-show="!bucket.items.length"
                       class="text-xs text-neon-lime"
                     >
-                      âœ“ None â€” nothing flagged.
+                      ✓ None — nothing flagged.
                     </div>
                   </div>
                 </div>
@@ -4178,7 +2370,7 @@
                 <input
                   type="text"
                   x-model="promptFilter"
-                  placeholder="Filter promptsâ€¦"
+                  placeholder="Filter prompts…"
                   class="bg-ink-900 border border-edge focus:border-neon-cyan/60 outline-none rounded-lg px-3 py-1.5 w-64"
                 />
                 <span
@@ -4272,7 +2464,7 @@
           <!-- ============== ACTIVITY LOG ============== -->
           <!--
             Live tail of the per-workspace processing log file
-            (rag_storage/<workspace>/<workspace>_processing.log) â€” the
+            (rag_storage/<workspace>/<workspace>_processing.log) — the
             long-lived end-to-end audit trail covering MinerU parsing,
             LightRAG extraction, post-processing phase 1-6, AND query-time
             retrieval / reranking. Subscribes to /api/ui/processing-log/stream
@@ -4290,9 +2482,8 @@
                     class="font-mono text-slate-400"
                     x-text="(stats && stats.workspace) ? `${stats.workspace}_processing.log` : 'workspace log'"
                   ></span>
-                  â€” covers ingestion (MinerU parse, extraction,
-                  post-processing phases) and queries (kw extract, retrieval,
-                  rerank).
+                  — covers ingestion (MinerU parse, extraction, post-processing
+                  phases) and queries (kw extract, retrieval, rerank).
                 </p>
               </div>
               <div class="flex items-center gap-2 text-xs font-mono">
@@ -4375,7 +2566,7 @@
                       class="w-6 h-6 mx-auto mb-2 text-slate-700"
                     ></i>
                     <div
-                      x-text="procLog.streaming ? 'No events match the current filters.' : 'Connecting to log streamâ€¦'"
+                      x-text="procLog.streaming ? 'No events match the current filters.' : 'Connecting to log stream…'"
                     ></div>
                   </div>
                 </template>
@@ -4489,7 +2680,7 @@
                     <div class="font-semibold">Active Workspace</div>
                     <div
                       class="text-[11px] font-mono text-slate-500 truncate"
-                      x-text="(stats.workspace || 'â€”') + ' Â· ' + (stats.documents ?? 0) + ' docs Â· ' + (stats.entities ?? 0) + ' entities'"
+                      x-text="(stats.workspace || '—') + ' · ' + (stats.documents ?? 0) + ' docs · ' + (stats.entities ?? 0) + ' entities'"
                     ></div>
                   </div>
                 </div>
@@ -4665,7 +2856,7 @@
                     <div class="font-semibold">Query Tuning</div>
                     <div
                       class="text-[11px] font-mono text-slate-500 truncate"
-                      x-text="querySettings.loaded ? `mode=${querySettings.values.mode} Â· top_k=${querySettings.values.top_k} Â· chunk_top_k=${querySettings.values.chunk_top_k} Â· rerank=${querySettings.values.enable_rerank ? 'on' : 'off'}` : 'loadingâ€¦'"
+                      x-text="querySettings.loaded ? `mode=${querySettings.values.mode} · top_k=${querySettings.values.top_k} · chunk_top_k=${querySettings.values.chunk_top_k} · rerank=${querySettings.values.enable_rerank ? 'on' : 'off'}` : 'loading…'"
                     ></div>
                   </div>
                 </div>
@@ -4686,7 +2877,7 @@
                   >
                     <i data-lucide="save" class="w-3.5 h-3.5"></i>
                     <span
-                      x-text="querySettings.saving ? 'Savingâ€¦' : 'Save'"
+                      x-text="querySettings.saving ? 'Saving…' : 'Save'"
                     ></span>
                   </button>
                 </div>
@@ -4699,7 +2890,7 @@
                   query.
                 </p>
                 <template x-if="!querySettings.loaded">
-                  <div class="text-xs text-slate-500 font-mono">loadingâ€¦</div>
+                  <div class="text-xs text-slate-500 font-mono">loading…</div>
                 </template>
 
                 <template x-if="querySettings.loaded">
@@ -4728,7 +2919,7 @@
                         <span class="text-xs text-slate-400 font-mono">
                           KG Top K
                           <span class="text-slate-600"
-                            >Â· entities/relations</span
+                            >· entities/relations</span
                           >
                         </span>
                         <input
@@ -4742,7 +2933,7 @@
                       <label class="block">
                         <span class="text-xs text-slate-400 font-mono">
                           Chunk Top K
-                          <span class="text-slate-600">Â· text chunks</span>
+                          <span class="text-slate-600">· text chunks</span>
                         </span>
                         <input
                           type="number"
@@ -4810,7 +3001,7 @@
                         <span class="text-xs text-slate-400 font-mono">
                           Min Rerank Score
                           <span class="text-slate-600"
-                            >Â· 0.0 = pass-through</span
+                            >· 0.0 = pass-through</span
                           >
                         </span>
                         <input
@@ -4858,14 +3049,14 @@
                       <span class="text-xs text-slate-400 font-mono">
                         Additional Output Prompt
                         <span class="text-slate-600"
-                          >Â· appended to LLM instructions</span
+                          >· appended to LLM instructions</span
                         >
                       </span>
                       <textarea
                         x-model="querySettings.values.user_prompt"
                         rows="3"
                         class="mt-1 w-full bg-ink-900/60 border border-edge rounded-lg px-3 py-2 text-sm font-mono focus:border-neon-cyan/60 outline-none resize-y"
-                        placeholder="Optional: extra instructions appended to every response (formatting, tone, constraints)â€¦"
+                        placeholder="Optional: extra instructions appended to every response (formatting, tone, constraints)…"
                       ></textarea>
                     </label>
                   </div>
@@ -4945,7 +3136,7 @@
               </div>
             </details>
 
-            <!-- ============== DANGER ZONE â€” workspace deletion ============== -->
+            <!-- ============== DANGER ZONE — workspace deletion ============== -->
             <!--
               Per-workspace cleanup + clean-slate reset. Uses helpers from
               tools/workspace_cleanup.py through /api/ui/workspaces/inventory
@@ -4966,7 +3157,7 @@
                   <div class="min-w-0">
                     <div class="font-semibold text-neon-red">Danger Zone</div>
                     <div class="text-[11px] font-mono text-slate-500 truncate">
-                      Delete workspaces Â· wipe everything
+                      Delete workspaces · wipe everything
                     </div>
                   </div>
                 </div>
@@ -4977,7 +3168,7 @@
                 >
                   <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
                   <span
-                    x-text="dangerZone.loading ? 'Scanningâ€¦' : 'Refresh'"
+                    x-text="dangerZone.loading ? 'Scanning…' : 'Refresh'"
                   ></span>
                 </button>
               </summary>
@@ -4985,7 +3176,7 @@
                 <p class="text-xs text-slate-500 mb-4 max-w-2xl">
                   Permanently remove a workspace's knowledge graph, derived
                   storage, or original source documents. The currently active
-                  workspace cannot be deleted â€” switch to another workspace
+                  workspace cannot be deleted — switch to another workspace
                   first.
                 </p>
 
@@ -5046,17 +3237,17 @@
                             <td
                               class="py-2 px-3 text-right tabular-nums"
                               :class="ws.neo4j_nodes ? 'text-neon-magenta' : 'text-slate-600'"
-                              x-text="ws.neo4j_nodes ? ws.neo4j_nodes.toLocaleString() : 'â€”'"
+                              x-text="ws.neo4j_nodes ? ws.neo4j_nodes.toLocaleString() : '—'"
                             ></td>
                             <td
                               class="py-2 px-3 text-right tabular-nums"
                               :class="ws.storage_mb !== null ? 'text-neon-cyan' : 'text-slate-600'"
-                              x-text="ws.storage_mb !== null ? ws.storage_mb + ' MB' : 'â€”'"
+                              x-text="ws.storage_mb !== null ? ws.storage_mb + ' MB' : '—'"
                             ></td>
                             <td
                               class="py-2 px-3 text-right tabular-nums"
                               :class="ws.inputs_files ? 'text-neon-amber' : 'text-slate-600'"
-                              x-text="ws.inputs_files ? ws.inputs_files + ' f / ' + ws.inputs_mb + ' MB' : 'â€”'"
+                              x-text="ws.inputs_files ? ws.inputs_files + ' f / ' + ws.inputs_mb + ' MB' : '—'"
                             ></td>
                             <td class="py-2 pl-3 text-right">
                               <button
@@ -5069,7 +3260,7 @@
                                   data-lucide="trash-2"
                                   class="w-3.5 h-3.5"
                                 ></i>
-                                <span>Deleteâ€¦</span>
+                                <span>Delete…</span>
                               </button>
                             </td>
                           </tr>
@@ -5087,7 +3278,7 @@
                         class="font-semibold text-sm flex items-center gap-2 text-neon-red"
                       >
                         <i data-lucide="biohazard" class="w-4 h-4"></i>
-                        Clean Slate â€” Wipe ALL Workspaces
+                        Clean Slate — Wipe ALL Workspaces
                       </h4>
                       <p class="text-xs text-slate-500 mt-1 max-w-2xl">
                         Deletes the selected buckets across every workspace and
@@ -5101,7 +3292,7 @@
                       :disabled="!dangerZone.loaded || !dangerZone.workspaces.length"
                     >
                       <i data-lucide="biohazard" class="w-3.5 h-3.5"></i>
-                      <span>Wipe everythingâ€¦</span>
+                      <span>Wipe everything…</span>
                     </button>
                   </div>
                 </div>
@@ -5140,7 +3331,7 @@
             x-ref="paletteInput"
             x-model="palette.query"
             @input="palette.cursor = 0"
-            placeholder="Search views, chats, prompts, workspacesâ€¦"
+            placeholder="Search views, chats, prompts, workspaces…"
             class="flex-1 bg-transparent outline-none text-sm placeholder-slate-500"
           />
           <span
@@ -5221,7 +3412,7 @@
             <input
               x-ref="promptPickerSearch"
               x-model="promptPicker.query"
-              placeholder="Filter prompts by title, category, or textâ€¦"
+              placeholder="Filter prompts by title, category, or text…"
               class="w-full bg-ink-900 border border-edge focus:border-neon-cyan/60 outline-none rounded-lg pl-9 pr-3 py-2 text-sm font-mono"
             />
           </div>
@@ -5353,8 +3544,8 @@
                   class="text-[11px] font-mono text-slate-500"
                   x-show="ws.has_data"
                 >
-                  <span x-text="ws.documents"></span> docs Â·
-                  <span x-text="ws.entities"></span> ents Â·
+                  <span x-text="ws.documents"></span> docs ·
+                  <span x-text="ws.entities"></span> ents ·
                   <span x-text="ws.chats"></span> chats
                 </div>
                 <div
@@ -5468,7 +3659,7 @@
                   Workspace storage (rag_storage/)
                 </div>
                 <div class="text-[11px] text-slate-500">
-                  KV stores, VDBs, chats, processing log, MinerU cache â€”
+                  KV stores, VDBs, chats, processing log, MinerU cache —
                   <span
                     x-text="deleteModal.target?.storage_mb !== null ? deleteModal.target.storage_mb + ' MB' : 'not present'"
                   ></span>
@@ -5494,7 +3685,7 @@
                 </div>
                 <div
                   class="text-[11px] text-slate-500"
-                  x-text="deleteModal.target?.inputs_files ? deleteModal.target.inputs_files + ' file(s) Â· ' + deleteModal.target.inputs_mb + ' MB' : 'no source files'"
+                  x-text="deleteModal.target?.inputs_files ? deleteModal.target.inputs_files + ' file(s) · ' + deleteModal.target.inputs_mb + ' MB' : 'no source files'"
                 ></div>
               </div>
             </label>
@@ -5505,7 +3696,7 @@
               >
                 Select all
               </button>
-              <span class="text-slate-700">Â·</span>
+              <span class="text-slate-700">·</span>
               <button
                 class="text-[11px] font-mono text-slate-500 hover:text-slate-300"
                 @click="deleteModalClearAll()"
@@ -5551,7 +3742,7 @@
           >
             <i data-lucide="trash-2" class="w-4 h-4"></i>
             <span
-              x-text="deleteModal.busy ? 'Deletingâ€¦' : 'Delete permanently'"
+              x-text="deleteModal.busy ? 'Deleting…' : 'Delete permanently'"
             ></span>
           </button>
         </div>
@@ -5665,7 +3856,7 @@
           >
             <i data-lucide="biohazard" class="w-4 h-4"></i>
             <span
-              x-text="wipeAllModal.busy ? 'Wipingâ€¦' : 'Wipe everything'"
+              x-text="wipeAllModal.busy ? 'Wiping…' : 'Wipe everything'"
             ></span>
           </button>
         </div>
@@ -5685,7 +3876,7 @@
           Î˜
         </div>
         <h2 class="mt-6 text-2xl font-semibold neon-text">
-          <span x-show="!restartStuck">Restarting serverâ€¦</span>
+          <span x-show="!restartStuck">Restarting server…</span>
           <span x-show="restartStuck" class="text-neon-amber"
             >Restart taking longer than expected</span
           >
@@ -5823,7 +4014,7 @@
           // log file. SSE source is opened lazily when Documents tab activates
           // and torn down on tab change to avoid leaking sockets across
           // navigations. The same log file feeds both ingestion and query
-          // audit views â€” the `category` selector decides which slice to show.
+          // audit views — the `category` selector decides which slice to show.
           procLog: {
             events: [],
             category: "processing", // processing | query | all
@@ -5858,7 +4049,7 @@
           restartTarget: "",
           restartStuck: false,
 
-          // Settings â†’ Danger Zone (workspace deletion)
+          // Settings → Danger Zone (workspace deletion)
           dangerZone: {
             loaded: false,
             loading: false,
@@ -5918,7 +4109,7 @@
           intel: {
             tab: "lm",
             tabs: [
-              { id: "lm", label: "Lâ†”M Matrix", icon: "arrow-left-right" },
+              { id: "lm", label: "L↔M Matrix", icon: "arrow-left-right" },
               { id: "trace", label: "Traceability", icon: "list-tree" },
               { id: "coverage", label: "Coverage", icon: "shield-check" },
               { id: "gaps", label: "Gaps", icon: "alert-triangle" },
@@ -5950,11 +4141,11 @@
           navSubtitle() {
             const m = {
               dashboard: "capture command overview",
-              documents: "ingest Â· MinerU Â· multimodal extraction",
-              graph: "33 entity types Â· 43 relationship types",
-              chat: "shipley mentor Â· RAG over the workspace",
-              intel: "Lâ†”M Â· traceability Â· coverage Â· gaps",
-              settings: "workspace Â· storage Â· models",
+              documents: "ingest · MinerU · multimodal extraction",
+              graph: "33 entity types · 43 relationship types",
+              chat: "shipley mentor · RAG over the workspace",
+              intel: "L↔M · traceability · coverage · gaps",
+              settings: "workspace · storage · models",
             };
             return m[this.active] || "";
           },
@@ -5976,7 +4167,7 @@
             return [
               {
                 label: "Documents",
-                value: this.stats.documents ?? "â€”",
+                value: this.stats.documents ?? "—",
                 icon: "file-text",
                 hint: "Processed in this workspace",
                 go: "documents",
@@ -5985,7 +4176,7 @@
               },
               {
                 label: "Entities",
-                value: this.stats.entities ?? "â€”",
+                value: this.stats.entities ?? "—",
                 icon: "sparkles",
                 hint: "33 govcon types",
                 go: "graph",
@@ -5994,7 +4185,7 @@
               },
               {
                 label: "Relationships",
-                value: this.stats.relationships ?? "â€”",
+                value: this.stats.relationships ?? "—",
                 icon: "link",
                 hint: "43 canonical types",
                 go: "graph",
@@ -6164,7 +4355,7 @@
           /**
            * Open the /api/ui/processing-log/stream EventSource. Snapshot arrives
            * as the first `snapshot` event; subsequent `event` messages append.
-           * Idempotent â€” opening twice is a no-op while the prior stream is
+           * Idempotent — opening twice is a no-op while the prior stream is
            * still healthy.
            */
           openProcLog() {
@@ -6234,7 +4425,7 @@
           /**
            * Apply the current dropdown filters to the captured event stream.
            * Returns a fresh array so Alpine re-renders on filter change.
-           * Two-stage filter: category (audit bucket) â†’ level (severity).
+           * Two-stage filter: category (audit bucket) → level (severity).
            */
           filteredProcLog() {
             const cat = this.procLog.category;
@@ -6300,8 +4491,7 @@
                       }
                     : u,
                 );
-                if (r.ok)
-                  this.toast(`${f.name} uploaded â€” extraction running`);
+                if (r.ok) this.toast(`${f.name} uploaded — extraction running`);
               } catch (e) {
                 this.uploads = this.uploads.map((u) =>
                   u.id === id ? { ...u, status: "error", msg: "network" } : u,
@@ -6729,7 +4919,7 @@
                 ta.setSelectionRange(ta.value.length, ta.value.length);
               }
             });
-            this.toast("Loaded into composer â€” edit and send", "info");
+            this.toast("Loaded into composer — edit and send", "info");
           },
 
           async regenerateMessage(idx) {
@@ -6838,7 +5028,7 @@
             // Capture the reactive proxy reference for the assistant
             // placeholder. We rebind `live` to a fresh plain object on each
             // SSE token (see below) so Alpine's array reactivity fires every
-            // chunk â€” mirroring the LightRAG webui pattern of returning a
+            // chunk — mirroring the LightRAG webui pattern of returning a
             // new array element per chunk instead of mutating in place.
             let live =
               this.currentChat.messages[this.currentChat.messages.length - 1];
@@ -7191,7 +5381,7 @@
                   row.classList.add("cite-flash");
                   return;
                 }
-                // Sources panel didn't have it after open â€” fall through to ref list.
+                // Sources panel didn't have it after open — fall through to ref list.
                 this._scrollToRefList(idx, n);
               });
               return;
@@ -7232,7 +5422,7 @@
            * Counts user+assistant *pairs* in the current chat (a pair = one
            * user prompt + the assistant reply that followed) and clamps to the
            * server-side cap from /api/ui/stats (UI_CHAT_HISTORY_TURNS,
-           * default 20). When the cap kicks in we show "N (max) â€” older trimmed"
+           * default 20). When the cap kicks in we show "N (max) — older trimmed"
            * so it's obvious why earlier turns stop influencing answers.
            */
           memoryLabel() {
@@ -7252,9 +5442,9 @@
               }
             }
             const inContext = Math.min(pairs, cap);
-            if (pairs === 0) return "multi-turn Â· follow-ups carry context";
+            if (pairs === 0) return "multi-turn · follow-ups carry context";
             if (pairs > cap)
-              return `${inContext} of ${pairs} turns in context Â· older trimmed`;
+              return `${inContext} of ${pairs} turns in context · older trimmed`;
             return `${inContext} turn${inContext === 1 ? "" : "s"} in context`;
           },
 
@@ -7263,7 +5453,7 @@
            * MinerU + RAGAnything wrap multimodal content with predictable
            * prefixes ("Table Analysis:", "Image Path:", "Caption:",
            * "Structure:") that we detect to render compact badges instead of
-           * dumping raw HTML at the user. Pure heuristic â€” falls back to a
+           * dumping raw HTML at the user. Pure heuristic — falls back to a
            * "text" card when nothing matches.
            *
            * Returns { kind, badge, caption, body, tableSummary }.
@@ -7303,7 +5493,7 @@
               out.badge = "TABLE";
               // Parse the Structure: <table>...</table> blob client-side. The
               // preview is truncated at 800 chars so the table is usually
-              // clipped â€” count complete <tr> rows we can see and report.
+              // clipped — count complete <tr> rows we can see and report.
               const structIdx = raw.search(/Structure\s*:/i);
               const structHtml = structIdx >= 0 ? raw.slice(structIdx) : raw;
               const trMatches = structHtml.match(/<tr[\s>]/gi) || [];
@@ -7811,7 +6001,7 @@
             }
           },
 
-          // ===== Danger Zone â€” workspace deletion =====
+          // ===== Danger Zone — workspace deletion =====
           async loadWorkspaceInventory() {
             this.dangerZone.loading = true;
             try {
@@ -7949,7 +6139,7 @@
                   confirm: "DELETE ALL",
                 }),
               });
-              this.toast("Wipe complete. Restarting serverâ€¦", "success");
+              this.toast("Wipe complete. Restarting server…", "success");
               this.wipeAllModal.open = false;
               this.restartTarget = this.stats.workspace || "server";
               this.restartStuck = false;
@@ -8034,7 +6224,7 @@
                   // Still the old process serving the previous workspace.
                 }
               } catch {
-                // Server is down mid-restart â€” expected; keep polling.
+                // Server is down mid-restart — expected; keep polling.
               }
               setTimeout(tick, 1000);
             };
@@ -8074,7 +6264,7 @@
                   },
                 }),
               );
-            // Workspace switch â€” one item per workspace + the modal opener
+            // Workspace switch — one item per workspace + the modal opener
             const activeWs = (this.stats && this.stats.workspace) || "";
             (this.wsModal.items || []).forEach((ws) => {
               const isActive = ws.name === activeWs;
@@ -8085,7 +6275,7 @@
                   ? `${ws.name}  (active)`
                   : `Switch to: ${ws.name}`,
                 hint: isActive
-                  ? "Current workspace â€” already loaded"
+                  ? "Current workspace — already loaded"
                   : `Restart server with workspace "${ws.name}"`,
                 icon: isActive ? "check-circle" : "layers",
                 action: () => {
@@ -8097,7 +6287,7 @@
             items.push({
               key: "ws:manage",
               kind: "workspace",
-              label: "Manage workspacesâ€¦",
+              label: "Manage workspaces…",
               hint: "Open workspace picker (create, switch, inspect)",
               icon: "settings-2",
               action: () => this.openWorkspaceModal(),
@@ -8143,7 +6333,7 @@
                 key: "chat:" + c.id,
                 kind: "chat",
                 label: c.title || "(untitled)",
-                hint: `${c.message_count} msgs Â· ${c.mode}`,
+                hint: `${c.message_count} msgs · ${c.mode}`,
                 icon: "message-square",
                 action: () => {
                   this.openChat(c.id);
@@ -8157,7 +6347,7 @@
                 key: "prompt:" + p.title,
                 kind: "prompt",
                 label: p.title,
-                hint: `Phase ${p.phase} Â· ${p.prompt.slice(0, 60)}â€¦`,
+                hint: `Phase ${p.phase} · ${p.prompt.slice(0, 60)}…`,
                 icon: "wand-sparkles",
                 action: () => {
                   this.composer = p.prompt;
