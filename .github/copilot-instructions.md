@@ -172,13 +172,18 @@ CONTEXT_FILTER_CONTENT_TYPES=text  # Content types in context
 - **Validation**: Always validate changes by running relevant tests (`pytest` or specific scripts).
 - **Cross-cutting awareness**: Before completing any feature branch, review the Cross-Cutting Change Checklist above if the change touches ontology, prompts, or domain vocabulary.
 
-### Frontend / UI (single-file Alpine + Tailwind CDN)
+### Frontend / UI (Alpine + Tailwind CDN, external CSS)
 
-- **Single source of truth**: `src/ui/static/index.html` (~6000 lines) — Alpine.js component `theseus()`, Tailwind via CDN, marked + DOMPurify for markdown, Lucide icons, Cytoscape for graphs. **No build step.**
-- **Tailwind config is duplicated**: the runtime config lives inline as `tailwind.config = {…}` in a `<script>` tag at the top of `index.html` (read by the CDN in the browser); the IDE-only mirror lives at `tailwind.config.js` (read by the VS Code Tailwind IntelliSense extension). **If you change one, mirror the other** — custom tokens (`neon-*`, `ink-*`, `edge-*`, `shadow-glow`, `shadow-magenta`) must match in both files or `@apply` warnings return.
-- **No server restart for UI changes** — hard-reload the browser (Ctrl+Shift+R) since `index.html` is served via `StaticFiles`.
+**Read [docs/STYLE_GUIDE.md](../docs/STYLE_GUIDE.md) before making any UI changes.**
+
+- **Two files**: `src/ui/static/index.html` (markup + Alpine `theseus()` component + inline `tailwind.config`) and `src/ui/static/styles/theseus.css` (all custom CSS — `:root` token block + components). **No build step**, no inline `<style>` block.
+- **CRITICAL — Tailwind Play CDN does NOT process `@apply` in `theseus.css`.** `@apply` only resolves inside an inline `<style>` block in HTML, which we no longer have. Writing `@apply` in `theseus.css` produces silent style failures. Always use raw CSS with the `var(--*)` token references defined in `:root`.
+- **Token system**: All colors live as CSS custom properties in `theseus.css` (`--neon-cyan`, `--ink-900`, `--edge-strong`, `--text-300`, etc.). For transparency, use the matching `--*-rgb` triplet inside `rgba()`: `rgba(var(--neon-cyan-rgb), 0.4)`. Do NOT add new hex literals for color variants — use the triplet + alpha.
+- **Tailwind config is duplicated**: the runtime config lives inline as `tailwind.config = {…}` in a `<script>` tag at the top of `index.html` (read by the CDN in the browser); the IDE-only mirror lives at `tailwind.config.js` (read by the VS Code Tailwind IntelliSense extension). **If you change one, mirror the other** — custom tokens (`neon-*`, `ink-*`, `edge-*`, `shadow-glow`, `shadow-magenta`) must match in both files. New CSS tokens added to `:root` should also be mirrored here if they need a Tailwind utility.
+- **No server restart for UI changes** — hard-reload the browser (Ctrl+Shift+R) since `index.html` and `theseus.css` are served via `StaticFiles`.
 - **Alpine state lives on `theseus()`**: workspace name is `this.stats.workspace` (NOT `activeWorkspace`); chat messages are `this.currentChat.messages[]`; toasts via `this.toast(msg, kind)`; scroll target is `this.$refs.msgs`.
 - **Re-render Lucide icons after dynamic markup**: existing `$watch` hooks on `currentChat`, `palette.open`, `wsModal.open`, etc. call `lucide.createIcons()` — add a watcher when introducing a new modal/overlay.
+- **UTF-8 only**: Save files as UTF-8 (no BOM round-trip through Windows-1252). If you see `Â·`, `â†'`, `â€"` etc. in the rendered UI, that's mojibake — repair targeted patterns before committing. PowerShell: always use `Out-File -Encoding utf8`.
 
 ---
 
