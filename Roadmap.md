@@ -64,15 +64,16 @@ Builds on the 099 chat polish. Each item is sized for its own branch.
 
 1. ~~**Theme propagation** (`100-ui-theme-propagation`)~~ ✅ Merged `9b2caee`.
 2. ~~**Per-message actions on assistant bubbles** (`101-chat-message-actions`)~~ ✅ Merged `e29bd7c`. Edit currently opens a fresh turn (preserves prior answer); destructive edit-in-place + version pager deferred.
-3. ~~**Inline citation chips** (`102-citation-chips`)~~ ✅ Merged `58d7c85`. Chip click currently jumps to the in-message References list; richer source preview comes with `104-stream-sources`.
+3. ~~**Inline citation chips** (`102-citation-chips`)~~ ✅ Merged `58d7c85`. Chip click now opens the streamed Sources panel from `104` (with fallback to inline References list).
 4. **Workspace quick-switcher** (`103-workspace-cmdk`) — Promote the workspace modal to a Cmd-K / Ctrl-K palette: keyboard-first, type-to-filter, recent-first. Currently a click-only modal; switching workspaces is a frequent action that deserves keyboard speed.
 
 ### Functional / RAG continuation (added Apr 25)
 
-5. **Streaming source references** (`104-stream-sources`) — _Next._ **Promoted ahead of `103` so citation chips can preview actual source content, not just scroll to a list.** Emit `event: sources` over the chat SSE alongside tokens so the user sees retrieved chunks/entities before the prose settles. Server side: serialize `query_param.context_chunks` after retrieval; client side: render a collapsible "Sources (N)" panel that updates live, and make the inline citation chips open the panel scrolled to the right chunk. Trust-building: "show me the chunks Theseus used."
-6. **Conversation memory mode** (`105-chat-memory`) — Currently each message is independent. Wire follow-up turns to actually carry the previous turn's retrieved context (the chat header already promises "multi-turn · follow-ups carry context"). Options: (a) pass previous N message pairs as `conversation_history` to LightRAG `aquery`, (b) reuse last turn's retrieved chunks instead of re-retrieving when the question is a clear follow-up. Need to balance cost vs accuracy.
+5. ~~**Streaming source references** (`104-stream-sources`)~~ ✅ Merged `c034c42`. SSE `event: sources` pre-flights `aquery_data` and ships chunks/references/counts before tokens; UI renders a collapsible "Sources (N)" drawer; inline `[N]` chips auto-open the drawer and scroll to the matching row. Tradeoff: retrieval runs twice per turn (acceptable for v1; can cache later). **Follow-up surfaced**: previews show raw HTML table dumps and `Table Analysis: / Image Path: / Structure:` blocks because that's what the LLM actually saw. See `106-source-preview-polish` below.
+6. **Source preview polish** (`106-source-preview-polish`) — _Next._ Make the Sources drawer human-readable without re-indexing. Scope: (a) detect MinerU/RAGAnything multimodal block prefixes (`Table Analysis:`, `Image Path:`, `Structure:`, `Caption:`) and render a compact card with a content-type badge (📊 Table / 🖼 Image / Σ Equation / 📄 Text), the caption when present, and a small "view raw" expander; (b) when `Structure:` contains a `<table>`, parse it client-side and either render as a styled HTML table (clean cases) or summarize as `47 rows × 8 cols, columns: …` (messy cases); (c) always show the raw block on demand. **Out of scope** (defer to a later branch): re-running the VLM at ingest to store a plain-English summary alongside each chunk — that requires re-indexing every workspace.
+7. **Conversation memory mode** (`105-chat-memory`) — Currently each message is independent. Wire follow-up turns to actually carry the previous turn's retrieved context (the chat header already promises "multi-turn · follow-ups carry context"). Options: (a) pass previous N message pairs as `conversation_history` to LightRAG `aquery`, (b) reuse last turn's retrieved chunks instead of re-retrieving when the question is a clear follow-up. Need to balance cost vs accuracy.
 
-### Bypass mode UX (lower priority, after 105)
+### Bypass mode UX (lower priority, after 105/106)
 
 - When user picks `bypass`, swap the chat header to make it explicit: "no retrieval — pure LLM." Today the header still says "RAG over the workspace." Misleading.
 
@@ -166,8 +167,9 @@ N. **Diff vs prior compute.** Cache last summary; show what changed since last e
 5. **`101-chat-message-actions`** — Copy / Regenerate / Export / Cite-source toolbar on assistant bubbles.
 6. **`102-citation-chips`** — clickable `[N]` chips that scroll to the References block in each assistant message.
 7. **`103-workspace-cmdk`** — Cmd-K workspace quick-switcher.
-8. **`104-stream-sources`** — SSE `event: sources` + collapsible Sources panel.
-9. **`105-chat-memory`** — multi-turn conversation_history wiring; honor the "follow-ups carry context" promise in the header.
+8. ~~**`104-stream-sources`**~~ ✅ Merged `c034c42` (Apr 26). SSE `event: sources` + collapsible Sources panel; chips open the panel.
+9. **`106-source-preview-polish`** — _Next._ Detect MinerU table/image blocks in chunk previews and render a compact card with a content-type badge + caption + collapsed raw expander; client-side `<table>` re-render or row/col summary. No re-indexing.
+10. **`105-chat-memory`** — multi-turn conversation_history wiring; honor the "follow-ups carry context" promise in the header.
 10. **`106-settings-delete-workspace`** — reuse `tools/workspace_cleanup.py`. (Was item 4 in prior plan; bumped behind UI polish run.)
 11. **`107-graph-quality-pass`** (formerly Tier 1A) — extraction prompt anchor discipline + Phase 2 normalization audit on `afcap6_drfp`. Re-extract and validate.
 12. **Iterate** Tier 1A until `afcap6_drfp` matrix renders cleanly without UI tightening.
