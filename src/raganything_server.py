@@ -189,7 +189,31 @@ async def main():
                 **param_kwargs,
             ),
         )
-    register_ui(app, _ui_query)
+
+    async def _ui_query_data(text: str, mode: str, history: list[dict], overrides: dict | None = None):
+        """UI data bridge: returns LightRAG aquery_data structured retrieval (chunks/entities/relationships/references) without LLM generation. Used by the chat SSE endpoint to emit a `sources` event before streaming the answer."""
+        from lightrag import QueryParam
+        overrides = dict(overrides or {})
+        min_score = overrides.pop("min_rerank_score", None)
+        if min_score is not None:
+            try:
+                rag_instance.lightrag.min_rerank_score = float(min_score)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed setting min_rerank_score=%r: %s", min_score, exc)
+        valid_fields = {f.name for f in QueryParam.__dataclass_fields__.values()}
+        param_kwargs = {k: v for k, v in overrides.items() if k in valid_fields}
+        # stream is irrelevant for aquery_data (no generation), drop it.
+        param_kwargs.pop("stream", None)
+        return await rag_instance.lightrag.aquery_data(
+            text,
+            param=QueryParam(
+                mode=mode,
+                conversation_history=history or [],
+                **param_kwargs,
+            ),
+        )
+
+    register_ui(app, _ui_query, _ui_query_data)
 
     # Consolidated startup banner — full pipeline detail in docs/ARCHITECTURE.md
     graph_storage = global_args.graph_storage if hasattr(global_args, 'graph_storage') else "NetworkXStorage"
