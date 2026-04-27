@@ -281,6 +281,16 @@ async def process_document_with_semantic_inference(
         total_duration = (datetime.now() - start_time).total_seconds()
         logger.info("✅ RAG-Anything processing complete")
         
+        # Backfill doc_status for tabular/image-only docs.
+        # RAG-Anything's insert_content_list only writes a doc_status row when
+        # the document has text-bearing blocks that flow through LightRAG's
+        # ainsert() path. Pure-tabular spreadsheets (e.g. staffing matrices) get
+        # their chunks/embeddings written directly and never appear in doc_status,
+        # so the UI silently undercounts processed docs. Probe and backfill here.
+        await _ensure_doc_status_processed(
+            rag_instance, file_path, file_name, doc_id, filtered_content, total_duration
+        )
+        
         # Dispatch document_complete event — triggers batch detection (sync)
         rag_instance.callback_manager.dispatch(
             "on_document_complete",
@@ -353,6 +363,75 @@ async def _record_failed_doc(
     except Exception as record_err:
         logger.error(
             f"⚠️  Could not record failed doc_status for {file_name}: {record_err}"
+        )
+
+
+async def _ensure_doc_status_processed(
+    rag_instance,
+    file_path: str,
+    file_name: str,
+    doc_id: Optional[str],
+    filtered_content: list,
+    duration_seconds: float,
+) -> None:
+    """
+    Backfill a `processed` doc_status row when RAG-Anything's pipeline didn't
+    write one. This happens for tabular/image-only documents (no text blocks),
+    where insert_content_list bypasses LightRAG.ainsert() and the doc never
+    enters the standard pending → processed lifecycle.
+
+    Idempotent: if a row already exists for this doc_id, leaves it alone.
+    """
+    if not doc_id:
+        return
+    try:
+        existing = await rag_instance.lightrag.doc_status.get_by_id(doc_id)
+        if existing:
+            return  # Already tracked by the standard pipeline — nothing to do.
+
+        # Derive a content_summary: first text-ish block if any, else type breakdown.
+        summary = None
+        for block in filtered_content:
+            if block.get("type") == "text":
+                text = (block.get("text") or "").strip()
+                if text:
+                    summary = text[:200]
+                    break
+        if not summary:
+            type_counts: dict[str, int] = {}
+            for block in filtered_content:
+                t = block.get("type", "unknown")
+                type_counts[t] = type_counts.get(t, 0) + 1
+            breakdown = ", ".join(f"{n} {t}" for t, n in sorted(type_counts.items()))
+            summary = f"[NON-TEXT] {file_name} ({breakdown})"
+
+        now = now_local_iso()
+        await rag_instance.lightrag.doc_status.upsert({
+            doc_id: {
+                "content_summary": summary,
+                "content_length": sum(
+                    len((b.get("text") or "")) for b in filtered_content
+                ),
+                "file_path": file_name,
+                "status": DocStatus.PROCESSED.value,
+                "created_at": now,
+                "updated_at": now,
+                "chunks_count": len(filtered_content),
+                "metadata": {
+                    "backfilled": True,
+                    "reason": "tabular_or_image_only",
+                    "duration_seconds": round(duration_seconds, 2),
+                },
+            }
+        })
+        logger.info(
+            f"📝 Backfilled PROCESSED doc_status for {file_name} "
+            f"(doc_id={doc_id}, blocks={len(filtered_content)}) — "
+            f"non-text content bypassed standard tracking"
+        )
+    except Exception as backfill_err:
+        logger.error(
+            f"⚠️  Could not backfill doc_status for {file_name}: {backfill_err}"
         )
 
 
