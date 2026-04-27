@@ -1,10 +1,12 @@
 ---
 name: competitive-intel
 description: PLACEHOLDER (roadmap) — incumbent and competitor intelligence for federal capture. Will gather public award history, recompete signals, incumbent strengths/weaknesses, and pricing comps from external sources (SAM.gov, USAspending, FPDS, GSA eLibrary) and overlay them on the active workspace. USE WHEN the user asks "who's the incumbent?", "what are competitors likely to bid?", "what was the last contract value?", or "give me a black-hat read on Bidder X". Currently emits a structured stub with TODO markers — full implementation tracked in the project roadmap. DO NOT USE FOR proposal drafting (use proposal-generator) or compliance audits (use compliance-auditor).
-category: intel
-version: 0.0.1
 license: MIT
-status: roadmap-placeholder
+metadata:
+  category: intel
+  version: 0.0.2
+  status: roadmap-placeholder
+  runtime: legacy
 ---
 
 # Competitive Intel — Roadmap Placeholder

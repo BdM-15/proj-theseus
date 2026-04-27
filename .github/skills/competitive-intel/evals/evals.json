@@ -1,0 +1,31 @@
+{
+  "skill": "competitive-intel",
+  "version": "0.0.2",
+  "notes": "Placeholder skill — evals verify the stub contract until real implementation lands.",
+  "evals": [
+    {
+      "id": "eval-001-incumbent-query",
+      "prompt": "Who is the incumbent on this contract?",
+      "expectations": [
+        {"kind": "response_contains", "value": "roadmap_placeholder"},
+        {"kind": "response_contains", "value": "competitive-intel is a roadmap placeholder"}
+      ]
+    },
+    {
+      "id": "eval-002-black-hat",
+      "prompt": "Give me a black-hat read on the top three likely competitors for this opportunity.",
+      "expectations": [
+        {"kind": "response_contains", "value": "roadmap_placeholder"},
+        {"kind": "response_contains", "value": "next_steps"}
+      ]
+    },
+    {
+      "id": "eval-003-pricing",
+      "prompt": "What is the typical award value for this NAICS at this magnitude?",
+      "expectations": [
+        {"kind": "response_contains", "value": "roadmap_placeholder"},
+        {"kind": "response_contains", "value": "USAspending"}
+      ]
+    }
+  ]
+}
