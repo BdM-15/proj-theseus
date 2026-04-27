@@ -34,7 +34,7 @@ Skills in this repo follow the `skill-creator` best-practices:
 - **Frontmatter `description` is pushy and precise** — names concrete triggers (e.g., "USE WHEN…"; "DO NOT USE FOR…") so the dispatcher can route confidently.
 - **Progressive disclosure** — `SKILL.md` stays under ~500 lines; deep references live in `references/*.md` and are loaded only when needed.
 - **Imperative voice** — "Extract the CLINs", not "You may want to extract the CLINs".
-- **Why, not just what** — every non-obvious step explains the GovCon rationale (Section L↔M golden thread, Shipley discriminator framing, etc.).
+- **Why, not just what** — every non-obvious step explains the GovCon rationale (the proposal_instruction ↔ evaluation_factor golden thread — UCF Section L↔M or non-UCF equivalent — Shipley discriminator framing, etc.).
 - **Output templates** — every skill that produces an artifact ships a template under `templates/`.
 - **Examples** — at least one worked example per skill (typically under `references/examples.md`).
 

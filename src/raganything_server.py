@@ -264,7 +264,7 @@ async def main():
     # Scope: Shipley Phase 4-6 (Proposal Planning → Proposal Development → Post-Submittal Activities)
     kg_modules = [
         ("Shipley Methodology",   "proposal mechanics · writing craft · color teams"),
-        ("Evaluation",            "Section M · SSEB · source-selection mechanics"),
+        ("Evaluation",            "Evaluation factors / SSEB / source-selection mechanics (UCF Section M or equiv)"),
         ("Regulations",           "FAR / DFARS clauses · compliance anchors"),
         ("Workload & Pricing",    "BOE · indirect rates · pricing discipline"),
         ("Lessons Learned",       "anti-patterns · explicit benefit linkage rule"),
@@ -292,7 +292,7 @@ async def main():
         ("", ""),
         # ── Ontology Schema ──────────────────────────────────────────────────────
         ("Schema",       f"{c.BOLD}{c.YELLOW}{len(VALID_ENTITY_TYPES)}{c.RESET} entity types  ·  {c.BOLD}{c.YELLOW}{len(VALID_RELATIONSHIP_TYPES)}{c.RESET} relationship types"),
-        ("Inference",    f"{c.CYAN}3 LLM algorithms{c.RESET}  {c.DIM}(L↔M mapping · document structure · orphan resolution){c.RESET}"),
+        ("Inference",    f"{c.CYAN}3 LLM algorithms{c.RESET}  {c.DIM}(instruction↔evaluation mapping · document structure · orphan resolution){c.RESET}"),
         ("", ""),
         # ── Knowledge Ontologies ─────────────────────────────────────────────────
         ("Knowledge KG", f"{c.BOLD}{c.MAGENTA}{len(kg_modules)} domain ontologies{c.RESET}  {c.DIM}injected for query enrichment{c.RESET}"),

@@ -1,6 +1,6 @@
-# Section L↔M Visualization Patterns
+# proposal_instruction ↔ evaluation_factor Visualization Patterns
 
-Three canonical visual layouts for showing the Section L↔M golden thread. Pick the one that matches the artifact format.
+Three canonical visual layouts for showing the proposal_instruction ↔ evaluation_factor golden thread (UCF Section L↔M or non-UCF equivalent — FAR 16 task order, FOPR, BPA call, OTA, agency-specific). Pick the one that matches the artifact format.
 
 ## Pattern A — Table (preferred for compliance matrices)
 

@@ -305,15 +305,117 @@ class SkillInstallPayload(BaseModel):
 
 
 def _default_max_entities_per_type() -> int:
-    """Read SKILL_MAX_ENTITIES_PER_TYPE from env, fall back to 40."""
-    raw = os.getenv("SKILL_MAX_ENTITIES_PER_TYPE")
+    """Active value (per-workspace override → env → 40)."""
+    return int(_read_skill_settings()["max_entities_per_type"])
+
+
+def _default_max_chunks_per_entity() -> int:
+    """Active value (per-workspace override → env → 2)."""
+    return int(_read_skill_settings()["max_chunks_per_entity"])
+
+
+def _default_max_relationships_per_entity() -> int:
+    """Active value (per-workspace override → env → 5)."""
+    return int(_read_skill_settings()["max_relationships_per_entity"])
+
+
+def _default_skill_retrieval_mode() -> str:
+    """Active retrieval mode (per-workspace override → env → 'hybrid').
+
+    Valid LightRAG modes: ``local`` (entity-anchored), ``global`` (relation-
+    anchored), ``hybrid`` (both), ``naive`` (pure chunk vector), ``mix`` (KG +
+    naive). ``off`` disables query-driven retrieval and falls back to the
+    Phase 1.5 bulk slice (file order, entity_types only).
+    """
+    return str(_read_skill_settings()["retrieval_mode"])
+
+
+def _default_skill_retrieval_top_k() -> int:
+    """Active retrieval top_k (per-workspace override → env → 60).
+
+    Caps how many entities the retrieval whitelist may contain. Anything
+    beyond is dropped before the slicer runs, so the briefing book stays
+    on-topic instead of bleeding into other RFP sections.
+    """
+    return int(_read_skill_settings()["retrieval_top_k"])
+
+
+# ---- Skill settings persistence (per-workspace JSON, mirrors query/) ------
+
+_VALID_SKILL_MODES = {"hybrid", "local", "global", "naive", "mix", "off"}
+
+
+def _env_int(key: str, default: int, lo: int, hi: int) -> int:
+    raw = os.getenv(key)
     if not raw:
-        return 40
+        return default
     try:
-        value = int(raw)
+        return max(lo, min(hi, int(raw)))
     except (TypeError, ValueError):
-        return 40
-    return max(1, min(500, value))
+        return default
+
+
+def _env_skill_mode() -> str:
+    raw = (os.getenv("SKILL_RETRIEVAL_MODE") or "mix").strip().lower()
+    return raw if raw in _VALID_SKILL_MODES else "mix"
+
+
+def _default_skill_settings() -> dict[str, Any]:
+    """Build the env-derived default skill settings dict.
+
+    These are the same numbers the Pydantic defaults use, surfaced as a
+    single dict so the Settings page can show "Reset to .env defaults".
+    """
+    return {
+        "max_entities_per_type": _env_int("SKILL_MAX_ENTITIES_PER_TYPE", 40, 1, 500),
+        "max_chunks_per_entity": _env_int("SKILL_MAX_CHUNKS_PER_ENTITY", 2, 0, 10),
+        "max_relationships_per_entity": _env_int(
+            "SKILL_MAX_RELATIONSHIPS_PER_ENTITY", 5, 0, 50
+        ),
+        "retrieval_mode": _env_skill_mode(),
+        "retrieval_top_k": _env_int("SKILL_RETRIEVAL_TOP_K", 60, 5, 500),
+    }
+
+
+def _skill_settings_path() -> Path:
+    """Path to per-workspace skill setting overrides."""
+    return _workspace_dir() / "ui_skill_settings.json"
+
+
+def _read_skill_settings() -> dict[str, Any]:
+    """Active skill settings (per-workspace override merged over env defaults)."""
+    merged = _default_skill_settings()
+    path = _skill_settings_path()
+    if not path.exists():
+        return merged
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(loaded, dict):
+            for key in list(merged.keys()):
+                if key in loaded:
+                    merged[key] = loaded[key]
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.warning("Failed reading %s, using defaults: %s", path, exc)
+    return merged
+
+
+def _write_skill_settings(data: dict[str, Any]) -> None:
+    """Persist skill settings atomically."""
+    path = _skill_settings_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.replace(path)
+
+
+class SkillSettingsUpdate(BaseModel):
+    """Per-workspace skill briefing-book + retrieval overrides."""
+
+    max_entities_per_type: Optional[int] = Field(default=None, ge=1, le=500)
+    max_chunks_per_entity: Optional[int] = Field(default=None, ge=0, le=10)
+    max_relationships_per_entity: Optional[int] = Field(default=None, ge=0, le=50)
+    retrieval_mode: Optional[str] = Field(default=None, max_length=20)
+    retrieval_top_k: Optional[int] = Field(default=None, ge=5, le=500)
 
 
 class SkillInvokePayload(BaseModel):
@@ -329,6 +431,42 @@ class SkillInvokePayload(BaseModel):
     )
     max_entities_per_type: int = Field(
         default_factory=_default_max_entities_per_type, ge=1, le=500
+    )
+    max_chunks_per_entity: int = Field(
+        default_factory=_default_max_chunks_per_entity,
+        ge=0,
+        le=10,
+        description=(
+            "Verbatim source-chunk count attached per entity (Phase 1.5 "
+            "source-grounding). 0 disables the chunks block."
+        ),
+    )
+    max_relationships_per_entity: int = Field(
+        default_factory=_default_max_relationships_per_entity,
+        ge=0,
+        le=50,
+        description=(
+            "KG edges attached per entity (incoming + outgoing combined, "
+            "deduped). 0 disables the relationships block."
+        ),
+    )
+    retrieval_mode: str = Field(
+        default_factory=_default_skill_retrieval_mode,
+        description=(
+            "Phase 1.6 query-driven retrieval mode: hybrid|local|global|naive|mix|off. "
+            "When not 'off', the user prompt + skill description run through "
+            "LightRAG aquery_data and only the resulting entities populate "
+            "the briefing book. Same retrieval pipeline the chat uses."
+        ),
+    )
+    retrieval_top_k: int = Field(
+        default_factory=_default_skill_retrieval_top_k,
+        ge=5,
+        le=500,
+        description=(
+            "Cap on retrieval-ranked entities promoted into the briefing book. "
+            "Higher = broader coverage, lower = tighter focus."
+        ),
     )
 
 
@@ -484,12 +622,12 @@ _PROMPT_LIBRARY: list[dict[str, str]] = [
      "prompt": "Build a SWOT analysis of our likely bid posture against this specific opportunity: strengths we can prove, weaknesses to mitigate, opportunities to ghost competitors, threats from incumbent advantage or scope drift. Anchor each entry in cited RFP language."},
 
     # ═════════════════ Phase 4 — Proposal Planning ═════════════════
-    {"phase": "4", "category": "Compliance", "title": "Full L↔M Compliance Matrix",
-     "prompt": "Generate a full Section L ↔ Section M compliance matrix. For every Section L instruction, list the linked Section M evaluation criterion, the responsible proposal volume, page-limit constraints, and any unmatched items as gaps."},
+    {"phase": "4", "category": "Compliance", "title": "Full Compliance Matrix (Instructions ↔ Evaluation)",
+     "prompt": "Generate a full proposal-instruction ↔ evaluation-factor compliance matrix. For every proposal_instruction (UCF Section L or equivalent — non-UCF task orders, FOPRs, BPA calls, OTAs may name the section differently or embed instructions inline in the PWS), list the linked evaluation_factor (UCF Section M or equivalent — including adjectival or LPTA schemes), the responsible proposal volume, page-limit constraints, and any unmatched items as gaps. Tag each row with instruction_source (UCF-L | non-UCF | PWS-inline | attachment) and evaluation_source (UCF-M | non-UCF | adjectival | LPTA). Do NOT emit GAP merely because an entity lacks a literal 'Section L' / 'Section M' heading."},
     {"phase": "4", "category": "Compliance", "title": "Cross-reference matrix (9-column)",
-     "prompt": "Create a proposal cross-reference matrix with nine columns: Section Number, Section Title, Proposal Instructions, Eval Criteria, SOW/PWS, Other, Author, Pages, Status. Populate Section Number/Title from the proposal outline implied by Section L, the Proposal Instructions column from Section L, the Eval Criteria column from Section M, and the SOW/PWS column from the statement-of-work paragraphs. Leave Author/Pages/Status blank for the team to fill."},
+     "prompt": "Create a proposal cross-reference matrix with nine columns: Section Number, Section Title, Proposal Instructions, Evaluation Criteria, SOW/PWS, Other, Author, Pages, Status. Populate Section Number/Title from the proposal outline implied by the proposal_instruction entities, the Proposal Instructions column from those proposal_instruction entities (UCF Section L or equivalent), the Evaluation Criteria column from the evaluation_factor entities (UCF Section M or equivalent), and the SOW/PWS column from the statement-of-work paragraphs. Works for UCF and non-UCF formats (FAR 16 task orders, FOPRs, BPA calls, OTAs, agency-specific). Leave Author/Pages/Status blank for the team to fill."},
     {"phase": "4", "category": "Compliance", "title": "Verify outline accuracy",
-     "prompt": "Verify the accuracy of the draft outline language against the actual Section L instructions, then verify the Eval Criteria column language against actual Section M, then verify the SOW/PWS column references against the actual statement of work. Surface any drift, paraphrase that loses meaning, or missing requirements."},
+     "prompt": "Verify the accuracy of the draft outline language against the actual proposal_instruction entities (UCF Section L or equivalent — may live in a named attachment or inline in the PWS for non-UCF solicitations), then verify the Evaluation Criteria column language against the actual evaluation_factor entities (UCF Section M or equivalent — including adjectival or LPTA schemes), then verify the SOW/PWS column references against the actual statement of work. Surface any drift, paraphrase that loses meaning, or missing requirements."},
     {"phase": "4", "category": "Compliance", "title": "Page limits & format constraints",
      "prompt": "List every page limit, font, margin, line spacing, file-format, naming-convention, and submission-mechanic constraint stated anywhere in the RFP. Cite the source clause for each. Flag conflicts."},
     {"phase": "4", "category": "Compliance", "title": "Submission checklist",
@@ -499,7 +637,7 @@ _PROMPT_LIBRARY: list[dict[str, str]] = [
     {"phase": "4", "category": "Strategy", "title": "Win themes & discriminators",
      "prompt": "Identify candidate win themes, discriminators, and proof points implied by the indexed RFP. Map each to the customer priority or pain point it addresses, and to the evaluation factor it would influence. Distinguish true discriminators (likely unique to us) from table stakes."},
     {"phase": "4", "category": "Strategy", "title": "Solution architecture brief",
-     "prompt": "Sketch a solution architecture brief: technical approach pillars, management approach pillars, staffing model assumptions, transition approach, and risk mitigations. Tie each pillar to the Section M evaluation factor it earns credit against and to the customer pain point it addresses."},
+     "prompt": "Sketch a solution architecture brief: technical approach pillars, management approach pillars, staffing model assumptions, transition approach, and risk mitigations. Tie each pillar to the evaluation_factor it earns credit against (UCF Section M or equivalent — including adjectival or LPTA schemes) and to the customer pain point it addresses."},
     {"phase": "4", "category": "Strategy", "title": "Ghost language opportunities",
      "prompt": "Identify themes and language we can ghost to highlight likely competitor weaknesses without naming them. Anchor each ghost in a customer pain point, a likely competitor gap, and the evaluation factor it would influence."},
     {"phase": "4", "category": "Pricing", "title": "Workload & BOE drivers",
@@ -517,13 +655,13 @@ _PROMPT_LIBRARY: list[dict[str, str]] = [
     {"phase": "5", "category": "Traceability", "title": "Requirements → Deliverables → BOE",
      "prompt": "Trace every shall/will requirement to its satisfying deliverable, performance standard, and workload metric. Flag any requirement with no satisfying deliverable as a coverage gap, and any deliverable with no parent requirement as scope creep."},
     {"phase": "5", "category": "Writing", "title": "Volume outline (Shipley-aligned)",
-     "prompt": "Produce a Shipley-aligned proposal volume outline. For each volume, list its sections, the page budget derived from Section L, the Section M factors it must answer, and the win theme(s) it should carry."},
+     "prompt": "Produce a Shipley-aligned proposal volume outline. For each volume, list its sections, the page budget derived from the relevant proposal_instruction entities (UCF Section L or equivalent), the evaluation_factor entities it must answer (UCF Section M or equivalent — including adjectival or LPTA schemes), and the win theme(s) it should carry."},
     {"phase": "5", "category": "Writing", "title": "Executive summary intro (pain → value prop)",
      "prompt": "Write the executive summary introduction by opening with the customer's most painful problem (framed as a burning question), then present our value proposition as the solution to that problem, then introduce our win theme and the relevant capabilities that prove we can deliver. Use active voice, short sentences, and no jargon. Cite the source for each customer pain point."},
     {"phase": "5", "category": "Writing", "title": "Executive summary full draft",
-     "prompt": "Draft a full executive summary: open with the customer's mission challenge, state our solution promise, surface three discriminators each backed by a quantified proof point, and close with a benefit-anchored call to action. Stay within the page limit Section L imposes (or 4 pages if unspecified)."},
+     "prompt": "Draft a full executive summary: open with the customer's mission challenge, state our solution promise, surface three discriminators each backed by a quantified proof point, and close with a benefit-anchored call to action. Stay within the page limit imposed by the relevant proposal_instruction entities (UCF Section L or equivalent — may live inline in the PWS or in a named attachment for non-UCF solicitations); default to 4 pages if no limit is stated."},
     {"phase": "5", "category": "Writing", "title": "Section storyboard",
-     "prompt": "Storyboard a single proposal section: the Section L instruction it answers, the Section M factors it earns, the win theme it carries, the proof points it cites, the graphic concepts, and the action caption for each graphic. Include placeholder counts for words and graphics so authors can budget."},
+     "prompt": "Storyboard a single proposal section: the proposal_instruction it answers (UCF Section L or equivalent), the evaluation_factor entities it earns (UCF Section M or equivalent), the win theme it carries, the proof points it cites, the graphic concepts, and the action caption for each graphic. Include placeholder counts for words and graphics so authors can budget."},
     {"phase": "5", "category": "Writing", "title": "Why-What-Who-How-When-Where-Wow framework",
      "prompt": "Develop a proposal section using the Why-What-Who-How-When-Where-Wow framework. Step 1 (Why): introductory paragraphs framed by the highest inherent risk and how our approach mitigates it. Step 2 (What): paragraphs detailing the benefits of our approach. Step 3 (Who): a sentence (with placeholder for names) describing who performs the work and their roles. Step 4 (How): paragraphs diving into implementation detail, mapped to the relevant statement-of-work paragraphs. Step 5 (When/Where): schedule and place-of-performance integration. Step 6 (Wow): the discriminator that lifts this section above competitor responses."},
     {"phase": "5", "category": "Writing", "title": "Capability narrative (active voice, 200-250 words)",
@@ -539,9 +677,9 @@ _PROMPT_LIBRARY: list[dict[str, str]] = [
     {"phase": "5", "category": "Writing", "title": "RFI question response",
      "prompt": "Respond to the RFI question: '{requirement_text}'. Use the indexed past-performance and capability content. Make the response substantive (not just keyword-checking), use the keywords once each, and add concrete examples, metrics, and past customer outcomes that demonstrate we have done this before."},
     {"phase": "5", "category": "Strategy", "title": "FAB chain for top discriminator",
-     "prompt": "For our most defensible discriminator, write a Feature → Advantage → Benefit chain grounded in cited proof points and tied to the relevant Section M evaluation factor and customer hot button."},
+     "prompt": "For our most defensible discriminator, write a Feature → Advantage → Benefit chain grounded in cited proof points and tied to the relevant evaluation_factor (UCF Section M or equivalent) and customer hot button."},
     {"phase": "5", "category": "Strategy", "title": "Strength & benefit identification (eval-anchored)",
-     "prompt": "Identify 3-4 strengths in our draft that meet the formal definition: 'an aspect of the proposal that has merit or exceeds specified requirements in a way advantageous to the government during contract performance.' For each strength: name the unique capability/method/technology, cite the proposal text, tie it to the specific Section M factor it influences, and articulate the quantifiable benefit (positive outcome) the customer gains. A benefit must be tangible, tied to evaluation criteria, and not merely 'potential value.'"},
+     "prompt": "Identify 3-4 strengths in our draft that meet the formal definition: 'an aspect of the proposal that has merit or exceeds specified requirements in a way advantageous to the government during contract performance.' For each strength: name the unique capability/method/technology, cite the proposal text, tie it to the specific evaluation_factor it influences (UCF Section M or equivalent — including adjectival or LPTA schemes), and articulate the quantifiable benefit (positive outcome) the customer gains. A benefit must be tangible, tied to evaluation criteria, and not merely 'potential value.'"},
     {"phase": "5", "category": "Strategy", "title": "Strength/benefit conciseness rewrite",
      "prompt": "Rewrite the provided strengths and benefits to be clear, concise, and table-cell-sized while preserving every quantitative claim and tie-back to evaluation criteria. Distinguish whether each item is genuinely a strength versus a benefit and reorganize accordingly. Output ready for a strength table."},
     {"phase": "5", "category": "Risk", "title": "Risk to operations from requirements",
@@ -556,16 +694,16 @@ _PROMPT_LIBRARY: list[dict[str, str]] = [
      "prompt": "Act as a Shipley-process expert performing a Red team review. For each response: provide detailed strengths, detailed weaknesses, and specific recommendations. Then provide a rewritten version of the answer that incorporates the recommendations. The rewrite must use active voice, mirror the existing response tone, reference appropriate doctrine where relevant, avoid blustery or overly complex language, avoid language patterns that signal LLM-generated text, and avoid em-dashes/en-dashes. Recommendations must be unbiased and worded as recommendations (not as commitments we are making)."},
     {"phase": "6", "category": "Review", "title": "Gold team executive narrative check",
      "prompt": "Read the executive summary and management volume openers as a Gold team would. Flag any place the customer's mission outcome is not the subject of the verbs, where benefits are not quantified, where discriminators read as table stakes, or where compliance language is missing."},
-    {"phase": "6", "category": "Review", "title": "Gap analysis vs Section M",
-     "prompt": "Run a gap analysis: for each Section M evaluation factor and subfactor, list the proposal sections, deliverables, and proof points that respond to it. Highlight unanswered factors, weakly-answered factors, and factors answered in the wrong volume."},
+    {"phase": "6", "category": "Review", "title": "Gap analysis vs evaluation factors",
+     "prompt": "Run a gap analysis: for each evaluation_factor and subfactor (UCF Section M or equivalent — including adjectival or LPTA schemes), list the proposal sections, deliverables, and proof points that respond to it. Highlight unanswered factors, weakly-answered factors, and factors answered in the wrong volume."},
     {"phase": "6", "category": "Review", "title": "Compliance review checklist",
-     "prompt": "Generate a Pink/Red-team-executable compliance review checklist organized by Section L instruction, with the matching Section M pass/fail criteria, the responsible volume, and a column for reviewer pass/fail/comment."},
+     "prompt": "Generate a Pink/Red-team-executable compliance review checklist organized by proposal_instruction (UCF Section L or equivalent), with the matching evaluation_factor pass/fail criteria (UCF Section M or equivalent), the responsible volume, and a column for reviewer pass/fail/comment."},
     {"phase": "6", "category": "Review", "title": "Strengths & benefits enhancement review",
      "prompt": "Review the draft strength table. For each row: assess whether the strength is genuinely advantageous to the customer (not just a feature), whether the benefit is tied to evaluation criteria, and whether the language is clear and concise. Provide specific suggestions: quantify outcomes, tighten unique-capability language, add a brief success story, detail forward benefits, and (if available) cite a customer testimonial. Output a revised, table-ready version."},
     {"phase": "6", "category": "Review", "title": "Reflect on win strategy",
      "prompt": "Review the win strategies and themes we've adopted. Identify any risks we haven't considered, opportunities we haven't pursued, competitor counter-moves we haven't anticipated, and proof gaps that would weaken the strategy under Red-team scrutiny."},
     {"phase": "6", "category": "Submission", "title": "Final compliance sweep",
-     "prompt": "Final pre-submission sweep: confirm every Section L instruction is answered, every Section M factor is addressed, every page limit is met, every required artifact (volumes, certifications, reps & certs, pricing, model contract, oral slides) is named, every cross-reference is intact, and every page footer/header complies with format constraints."},
+     "prompt": "Final pre-submission sweep: confirm every proposal_instruction (UCF Section L or equivalent) is answered, every evaluation_factor (UCF Section M or equivalent — including adjectival or LPTA schemes) is addressed, every page limit is met, every required artifact (volumes, certifications, reps & certs, pricing, model contract, oral slides) is named, every cross-reference is intact, and every page footer/header complies with format constraints."},
 ]
 
 
@@ -1898,6 +2036,44 @@ def register_ui(
             raise HTTPException(500, f"Failed resetting settings: {exc}") from exc
         return JSONResponse({"settings": _default_query_settings()})
 
+    # ---- Skill settings (per-workspace briefing-book + retrieval tunables) -
+    @app.get("/api/ui/settings/skills", tags=["theseus-ui"])
+    async def get_skill_settings() -> JSONResponse:
+        """Return active per-workspace skill settings + env-derived defaults."""
+        return JSONResponse({
+            "workspace": get_settings().workspace,
+            "settings": _read_skill_settings(),
+            "defaults": _default_skill_settings(),
+        })
+
+    @app.put("/api/ui/settings/skills", tags=["theseus-ui"])
+    async def update_skill_settings(payload: SkillSettingsUpdate) -> JSONResponse:
+        """Patch one or more skill settings. Unspecified fields keep current value."""
+        current = _read_skill_settings()
+        updates = payload.model_dump(exclude_none=True)
+        if "retrieval_mode" in updates:
+            mode = (updates["retrieval_mode"] or "").strip().lower()
+            if mode not in _VALID_SKILL_MODES:
+                raise HTTPException(400, f"Unsupported retrieval_mode: {mode}")
+            updates["retrieval_mode"] = mode
+        current.update(updates)
+        try:
+            _write_skill_settings(current)
+        except OSError as exc:
+            raise HTTPException(500, f"Failed writing settings: {exc}") from exc
+        return JSONResponse({"settings": current})
+
+    @app.post("/api/ui/settings/skills/reset", tags=["theseus-ui"])
+    async def reset_skill_settings() -> JSONResponse:
+        """Restore defaults by removing the per-workspace skill overrides file."""
+        path = _skill_settings_path()
+        try:
+            if path.exists():
+                path.unlink()
+        except OSError as exc:
+            raise HTTPException(500, f"Failed resetting settings: {exc}") from exc
+        return JSONResponse({"settings": _default_skill_settings()})
+
     # ---- Agent Skills (dual-use: VS Code/Copilot + Theseus UI) ------------
     #
     # Skills live in ``.github/skills/`` (the official agentskills.io
@@ -1911,25 +2087,45 @@ def register_ui(
     def _slice_workspace_entities(
         entity_types: Optional[list[str]],
         max_per_type: int,
+        max_chunks_per_entity: int = 2,
+        max_relationships_per_entity: int = 5,
+        relevant_entity_names: Optional[set[str]] = None,
     ) -> dict[str, Any]:
-        """Pull entity name/type/description triples from the active workspace.
+        """Build the source-grounded skill briefing book for the active workspace.
 
-        Reads ``vdb_entities.json`` (the canonical post-extraction VDB store)
-        directly so we can hand a typed entity slice to the skill prompt
-        without booting the full LightRAG instance. Returns a dict keyed by
-        entity_type with a list of trimmed entity dicts.
+        Returns a dict with three top-level keys (Phase 1.5 contract):
+
+        * ``entities`` — ``{entity_type: [{name, description, source_chunks}]}``
+          where ``source_chunks`` is the list of chunk IDs that produced the
+          entity (split from the LightRAG ``<SEP>``-joined ``source_id``).
+        * ``source_chunks`` — verbatim text + ``file_path`` for each chunk
+          referenced by the entity slice, capped at ``max_chunks_per_entity``
+          per entity to bound payload size. The model is instructed to quote
+          from these chunks (never paraphrase).
+        * ``relationships`` — typed KG edges where either endpoint is in the
+          entity slice, capped at ``max_relationships_per_entity`` per entity
+          (combined incoming + outgoing).
+
+        Reads the three VDB stores directly so we can hand the briefing book
+        to a skill prompt without booting the full LightRAG instance.
+
+        Phase 1.6: when ``relevant_entity_names`` is set (lowercased entity
+        name whitelist from the chat-grade retrieval helper), only entities in
+        that set survive the filter. ``entity_types`` and ``max_per_type``
+        still apply on top, so a tight retrieval result yields a tight slice.
         """
         ws_dir = _workspace_dir()
-        path = ws_dir / "vdb_entities.json"
-        if not path.exists():
-            return {}
+
+        # ---- Phase A: load entities slice -------------------------------
+        entities_path = ws_dir / "vdb_entities.json"
+        if not entities_path.exists():
+            return {"entities": {}, "source_chunks": [], "relationships": []}
         try:
-            raw = json.loads(path.read_text(encoding="utf-8"))
+            raw = json.loads(entities_path.read_text(encoding="utf-8"))
         except Exception as exc:  # noqa: BLE001
             logger.warning("Failed to read entity store for skill context: %s", exc)
-            return {}
+            return {"entities": {}, "source_chunks": [], "relationships": []}
 
-        # vdb_entities.json shape: {"embedding_dim": int, "data": [...], "matrix": "..."}
         records: list[dict[str, Any]] = []
         if isinstance(raw, dict) and isinstance(raw.get("data"), list):
             records = [r for r in raw["data"] if isinstance(r, dict)]
@@ -1945,20 +2141,209 @@ def register_ui(
 
         wanted = {t.lower() for t in entity_types} if entity_types else None
         bucketed: dict[str, list[dict[str, Any]]] = {}
+        # entity_name -> list[chunk_id] (preserves ordering for chunk capping)
+        entity_chunk_map: dict[str, list[str]] = {}
+        # entity_name (lower) -> True (membership set for relationship filter)
+        entity_name_set: set[str] = set()
+
         for ent in records:
             etype = str(ent.get("entity_type", "")).lower()
-            if wanted is None and etype in _NOISE_BUCKETS:
-                continue
+            name = ent.get("entity_name") or ent.get("name") or ""
+            name_lc = str(name).strip().lower()
+            # Phase 1.6: query-driven whitelist takes precedence. When the
+            # retrieval helper returned hits, only those entities pass —
+            # noise buckets are *kept* if they were retrieval-ranked because
+            # the user asked for them.
+            if relevant_entity_names is not None:
+                if not name_lc or name_lc not in relevant_entity_names:
+                    continue
+            else:
+                if wanted is None and etype in _NOISE_BUCKETS:
+                    continue
             if wanted and etype not in wanted:
                 continue
             bucket = bucketed.setdefault(etype or "unknown", [])
             if len(bucket) >= max_per_type:
                 continue
+            # LightRAG joins multi-source chunk IDs with the literal token "<SEP>"
+            raw_src = str(ent.get("source_id") or "")
+            chunk_ids = [c.strip() for c in raw_src.split("<SEP>") if c.strip()]
             bucket.append({
-                "name": ent.get("entity_name") or ent.get("name"),
+                "name": name,
                 "description": (ent.get("description") or "")[:400],
+                "source_chunks": chunk_ids[:max_chunks_per_entity] if max_chunks_per_entity > 0 else [],
             })
-        return bucketed
+            if name:
+                entity_chunk_map[name] = chunk_ids
+                entity_name_set.add(name_lc)
+
+        # ---- Phase B: collect verbatim source chunks --------------------
+        wanted_chunk_ids: set[str] = set()
+        if max_chunks_per_entity > 0:
+            for name, cids in entity_chunk_map.items():
+                for cid in cids[:max_chunks_per_entity]:
+                    wanted_chunk_ids.add(cid)
+
+        source_chunks: list[dict[str, Any]] = []
+        if wanted_chunk_ids:
+            chunks_path = ws_dir / "vdb_chunks.json"
+            if chunks_path.exists():
+                try:
+                    chunks_raw = json.loads(chunks_path.read_text(encoding="utf-8"))
+                    chunk_records: list[dict[str, Any]] = []
+                    if isinstance(chunks_raw, dict) and isinstance(chunks_raw.get("data"), list):
+                        chunk_records = [r for r in chunks_raw["data"] if isinstance(r, dict)]
+                    for rec in chunk_records:
+                        cid = rec.get("__id__")
+                        if cid not in wanted_chunk_ids:
+                            continue
+                        source_chunks.append({
+                            "chunk_id": cid,
+                            "file_path": rec.get("file_path"),
+                            "content": (rec.get("content") or "")[:1500],
+                        })
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Failed to read chunk store for skill context: %s", exc)
+
+        # ---- Phase C: collect KG relationships --------------------------
+        relationships: list[dict[str, Any]] = []
+        if max_relationships_per_entity > 0 and entity_name_set:
+            rels_path = ws_dir / "vdb_relationships.json"
+            if rels_path.exists():
+                try:
+                    rels_raw = json.loads(rels_path.read_text(encoding="utf-8"))
+                    rel_records: list[dict[str, Any]] = []
+                    if isinstance(rels_raw, dict) and isinstance(rels_raw.get("data"), list):
+                        rel_records = [r for r in rels_raw["data"] if isinstance(r, dict)]
+                    # Per-entity edge counter to enforce the cap fairly
+                    edge_count: dict[str, int] = {n: 0 for n in entity_name_set}
+                    for rec in rel_records:
+                        src = str(rec.get("src_id") or "")
+                        tgt = str(rec.get("tgt_id") or "")
+                        src_lc = src.lower()
+                        tgt_lc = tgt.lower()
+                        src_in = src_lc in entity_name_set
+                        tgt_in = tgt_lc in entity_name_set
+                        if not (src_in or tgt_in):
+                            continue
+                        # Throttle: don't emit if both sides have already hit cap
+                        if (
+                            (not src_in or edge_count.get(src_lc, 0) >= max_relationships_per_entity)
+                            and (not tgt_in or edge_count.get(tgt_lc, 0) >= max_relationships_per_entity)
+                        ):
+                            continue
+                        relationships.append({
+                            "src": src,
+                            "type": str(rec.get("keywords") or "").strip(),
+                            "tgt": tgt,
+                            "description": (rec.get("description") or "")[:300],
+                            "source_chunk": rec.get("source_id"),
+                        })
+                        if src_in:
+                            edge_count[src_lc] = edge_count.get(src_lc, 0) + 1
+                        if tgt_in:
+                            edge_count[tgt_lc] = edge_count.get(tgt_lc, 0) + 1
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Failed to read relationship store for skill context: %s", exc)
+
+        return {
+            "entities": bucketed,
+            "source_chunks": source_chunks,
+            "relationships": relationships,
+        }
+
+    async def _retrieve_relevant_entities_for_skill(
+        prompt: str,
+        skill_description: str,
+        mode: str,
+        top_k: int,
+    ) -> dict[str, Any]:
+        """Run LightRAG aquery_data to rank entities relevant to a skill request.
+
+        Returns a dict ``{names, chunk_ids, metadata}`` where ``names`` is a
+        lowercased entity-name whitelist for ``_slice_workspace_entities``,
+        ``chunk_ids`` are the retrieval-ranked chunk IDs (used to *augment*
+        the source-grounding block with chunks the entity-anchored slice may
+        not surface), and ``metadata`` describes what the retriever did so
+        the briefing book and run envelope can advertise it.
+
+        When ``mode == 'off'``, retrieval is skipped and an empty whitelist is
+        returned (caller falls back to the Phase 1.5 bulk slice). When
+        ``data_func`` is unavailable (server started without one), behaves as
+        if ``mode == 'off'``.
+        """
+        meta: dict[str, Any] = {
+            "mode": mode,
+            "top_k": top_k,
+            "matched_entities": 0,
+            "matched_chunks": 0,
+            "used": False,
+            "reason": "",
+        }
+        if mode == "off":
+            meta["reason"] = "retrieval disabled (mode=off)"
+            return {"names": set(), "chunk_ids": set(), "metadata": meta}
+        if data_func is None:
+            meta["reason"] = "server has no data_func; falling back to bulk slice"
+            return {"names": set(), "chunk_ids": set(), "metadata": meta}
+        # Compose the retrieval query: user prompt + a one-line skill hint so
+        # an empty user prompt still gets a focused slice (e.g., proposal-
+        # generator returns Section L/M-relevant entities when invoked with
+        # defaults).
+        user_prompt = (prompt or "").strip()
+        hint = (skill_description or "").strip()
+        if not user_prompt and not hint:
+            meta["reason"] = "empty prompt + skill description; bulk slice"
+            return {"names": set(), "chunk_ids": set(), "metadata": meta}
+        retrieval_query = (
+            f"{user_prompt}\n\n[Skill context: {hint}]" if hint else user_prompt
+        )
+        # chunk_top_k is bounded by top_k so chunk retrieval scales with the
+        # entity budget. enable_rerank stays at the workspace default so
+        # skill retrieval matches chat retrieval quality.
+        overrides = {
+            "top_k": top_k,
+            "chunk_top_k": min(top_k, 30),
+            "only_need_context": True,
+        }
+        try:
+            data = await data_func(retrieval_query, mode, [], overrides)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Skill retrieval failed (mode=%s): %s", mode, exc)
+            meta["reason"] = f"retrieval error: {exc}"
+            return {"names": set(), "chunk_ids": set(), "metadata": meta}
+
+        # aquery_data returns {status, message, data: {entities, relationships, chunks, references}}
+        payload = data.get("data") if isinstance(data, dict) else None
+        if not isinstance(payload, dict):
+            meta["reason"] = "retrieval returned no data block"
+            return {"names": set(), "chunk_ids": set(), "metadata": meta}
+
+        names: set[str] = set()
+        for ent in payload.get("entities") or []:
+            if not isinstance(ent, dict):
+                continue
+            n = ent.get("entity_name") or ent.get("entity_id") or ent.get("name")
+            if n:
+                names.add(str(n).strip().lower())
+        # Cap to top_k just in case the retriever overshoots.
+        if len(names) > top_k:
+            names = set(list(names)[:top_k])
+
+        chunk_ids: set[str] = set()
+        for c in payload.get("chunks") or []:
+            if not isinstance(c, dict):
+                continue
+            cid = c.get("chunk_id") or c.get("__id__")
+            if cid:
+                chunk_ids.add(str(cid))
+
+        meta["matched_entities"] = len(names)
+        meta["matched_chunks"] = len(chunk_ids)
+        meta["used"] = bool(names)
+        if not names:
+            meta["reason"] = "retrieval returned 0 entities; falling back to bulk slice"
+        return {"names": names, "chunk_ids": chunk_ids, "metadata": meta}
 
     @app.get("/api/ui/skills", tags=["theseus-ui"])
     async def list_skills_route() -> JSONResponse:
@@ -2018,9 +2403,28 @@ def register_ui(
                 "Skill invocation requires an llm_func; server was started without one",
             )
         mgr = get_skill_manager()
-        ctx = _slice_workspace_entities(
-            payload.entity_types, payload.max_entities_per_type
+        # Phase 1.6: run chat-grade retrieval first so the briefing book
+        # is query-targeted instead of file-order. Skill description is
+        # appended to the retrieval query so empty user prompts still
+        # produce a focused slice tied to the skill's stated purpose.
+        skill = mgr.get_skill(name)
+        skill_desc = skill.frontmatter.description if skill is not None else ""
+        retrieval = await _retrieve_relevant_entities_for_skill(
+            prompt=payload.prompt,
+            skill_description=skill_desc,
+            mode=payload.retrieval_mode,
+            top_k=payload.retrieval_top_k,
         )
+        whitelist = retrieval["names"] or None  # None => Phase 1.5 bulk slice
+        ctx = _slice_workspace_entities(
+            payload.entity_types,
+            payload.max_entities_per_type,
+            max_chunks_per_entity=payload.max_chunks_per_entity,
+            max_relationships_per_entity=payload.max_relationships_per_entity,
+            relevant_entity_names=whitelist,
+        )
+        # Surface retrieval provenance to the model + the run envelope.
+        ctx["retrieval_metadata"] = retrieval["metadata"]
         try:
             result = await mgr.invoke(
                 name,
@@ -2042,6 +2446,7 @@ def register_ui(
             "prompt_tokens_estimate": result.prompt_tokens_estimate,
             "run_id": result.run_id,
             "run_dir": result.run_dir,
+            "retrieval": retrieval["metadata"],
         })
 
     # NOTE: aggregate "all runs across skills" endpoint omitted because

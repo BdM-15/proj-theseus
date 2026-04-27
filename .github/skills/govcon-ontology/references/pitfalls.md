@@ -10,9 +10,9 @@ Battle-tested errors from real RFP extractions. Read this before starting any ex
 
 ## 2. `evaluation_factor` vs `proposal_instruction`
 
-- Section M → `evaluation_factor` (+ `subfactor`)
-- Section L → `proposal_instruction`
-  Linked by `GUIDES` (L → M) and `EVALUATED_BY` (M → L).
+- Evaluation criteria (UCF Section M or non-UCF equivalent) → `evaluation_factor` (+ `subfactor`)
+- Submission instructions (UCF Section L or non-UCF equivalent — may live inline in PWS or in a named attachment) → `proposal_instruction`
+  Linked by `GUIDES` (instruction → factor) and `EVALUATED_BY` (factor → instruction).
 
 ## 3. Wrong relationship direction
 
@@ -26,7 +26,7 @@ Battle-tested errors from real RFP extractions. Read this before starting any ex
 ## 4. `document` vs `document_section`
 
 - The whole RFP, an attachment, an amendment → `document`
-- Section L, Section C.5.1, Appendix A → `document_section`
+- Numbered/lettered headings such as Section L, Section C.5.1, Appendix A (UCF) or their non-UCF equivalents → `document_section`
   Sections live inside documents via `CHILD_OF`.
 
 ## 5. Tagging numbers as `workload_metric`

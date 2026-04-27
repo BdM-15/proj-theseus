@@ -80,7 +80,7 @@ TEST_QUERIES = [
         "id": "Q4",
         "category": "Requirement Traceability",
         "mode": "hybrid",
-        "query": "How do Section L submission instructions map to Section M evaluation criteria? Which instructions correspond to which evaluation factors?",
+        "query": "How do proposal_instruction items map to evaluation_factor entities (UCF Section L↔M or non-UCF equivalent)? Which instructions correspond to which evaluation factors?",
     },
     {
         "id": "Q5",

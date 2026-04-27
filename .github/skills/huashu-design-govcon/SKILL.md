@@ -1,8 +1,8 @@
 ---
 name: huashu-design-govcon
-description: High-fidelity design pipeline for federal GovCon proposals — produces HTML prototypes, editable PowerPoint, PDF compliance matrices, infographics, and short narrated animations from RFP knowledge-graph entities. USE WHEN the user asks for proposal slides, executive briefings, capability infographics, win-theme visuals, compliance matrices, traceability diagrams, or "make this look professional" for a government audience. DO NOT USE FOR raw text editing, code generation, or generic marketing collateral. Adapted from alchaincyf/huashu-design with clean/formal government aesthetics, tables-heavy layouts, anti-AI-slop guardrails, and automatic injection of CLINs, requirements, evaluation factors, and Section L↔M traceability from the active Theseus workspace.
+description: High-fidelity design pipeline for federal GovCon proposals — produces HTML prototypes, editable PowerPoint, PDF compliance matrices, infographics, and short narrated animations from RFP knowledge-graph entities. USE WHEN the user asks for proposal slides, executive briefings, capability infographics, win-theme visuals, compliance matrices, traceability diagrams, or "make this look professional" for a government audience. DO NOT USE FOR raw text editing, code generation, or generic marketing collateral. Adapted from alchaincyf/huashu-design with clean/formal government aesthetics, tables-heavy layouts, anti-AI-slop guardrails, and automatic injection of CLINs, requirements, evaluation factors, and proposal_instruction ↔ evaluation_factor traceability (UCF Section L↔M or non-UCF equivalent — FAR 16 task orders, FOPRs, BPA calls, OTAs, agency-specific formats) from the active Theseus workspace.
 category: design
-version: 0.1.0
+version: 0.2.0
 license: MIT
 upstream: https://github.com/alchaincyf/huashu-design
 ---
@@ -17,7 +17,7 @@ Trigger this skill when the user asks for any of:
 
 - Proposal slides / pitch deck / executive briefing
 - Capability or past-performance infographic
-- Section L ↔ M traceability matrix (visual)
+- proposal_instruction ↔ evaluation_factor traceability matrix (visual — UCF Section L↔M or non-UCF equivalent)
 - Compliance matrix as a polished PDF
 - Win-theme one-pager
 - Short narrated explainer animation (≤90 s)
@@ -47,7 +47,7 @@ The Theseus runtime injects an `entities` payload into your invocation context w
 - `requirements[]` — `{id, text, section, shall_count}`
 - `clins[]` — `{number, title, type, period}`
 - `evaluation_factors[]` — `{name, weight, subfactors[]}`
-- `proposal_instructions[]` — Section L items
+- `proposal_instructions[]` — submission instructions (UCF Section L or equivalent — may live inline in PWS or in a named attachment for non-UCF)
 - `strategic_themes[]` — win themes already extracted
 - `customer_priorities[]` — explicit hot-buttons
 - `pain_points[]` — government problem statements
@@ -118,5 +118,5 @@ When invoked, return a JSON envelope:
 - [`references/govcon_design_tokens.md`](./references/govcon_design_tokens.md) — full token system
 - [`references/anti_slop_checklist.md`](./references/anti_slop_checklist.md) — pre-export gate
 - [`references/critique_prompt.md`](./references/critique_prompt.md) — post-export self-review
-- [`references/section_lm_visualization.md`](./references/section_lm_visualization.md) — L↔M matrix patterns
+- [`references/section_lm_visualization.md`](./references/section_lm_visualization.md) — proposal_instruction ↔ evaluation_factor matrix patterns (UCF Section L↔M or non-UCF equivalent)
 - [`references/upstream_attribution.md`](./references/upstream_attribution.md) — what we kept and changed from `alchaincyf/huashu-design`

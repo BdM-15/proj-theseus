@@ -5,7 +5,7 @@
 Will cause Unacceptable rating or Compliance non-compliance:
 
 - `shall` requirement with no satisfying `deliverable` or `performance_standard` (C3)
-- Missing entire Section M factor coverage in the volumes
+- Missing entire `evaluation_factor` coverage in the volumes (UCF Section M or equivalent)
 - Cybersecurity cross-cut missing when CUI is in scope
 
 ## High
@@ -14,7 +14,7 @@ Likely to lower a technical score by ≥1 adjective:
 
 - Orphan clauses (C1)
 - Unresolved regulatory references (C2)
-- Asymmetric L↔M coverage (C4)
+- Asymmetric proposal_instruction ↔ evaluation_factor coverage (C4 — UCF Section L↔M or non-UCF equivalent)
 - Cybersecurity cross-cut partial (C6)
 
 ## Medium

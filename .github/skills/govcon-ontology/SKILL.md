@@ -1,8 +1,8 @@
 ---
 name: govcon-ontology
-description: Authoritative, agent-readable specification of Project Theseus's 33-entity / 35-relationship federal-contracting ontology. USE WHEN extracting entities or relationships from RFP / SOW / PWS / Section L / Section M / Section J text; validating extraction output; extending the ontology with a new entity type or relationship; debugging "why didn't it tag this as a CLIN?"; or when any agent (Copilot, sub-agent, Theseus runtime) needs to produce or consume Theseus-graph-compatible structured output. DO NOT USE FOR generic NER, non-federal contracting (state/local/commercial), or open-domain knowledge graphs. Acts as living documentation and a guardrail so agents extend the ontology consistently without spelunking source code.
+description: Authoritative, agent-readable specification of Project Theseus's 33-entity / 35-relationship federal-contracting ontology. USE WHEN extracting entities or relationships from any federal solicitation text — RFP, SOW, PWS, proposal instructions (UCF Section L or equivalent), evaluation criteria (UCF Section M or equivalent), attachments (UCF Section J or equivalent), FAR 16 task orders, FOPRs, BPA calls, OTAs, agency-specific formats; validating extraction output; extending the ontology with a new entity type or relationship; debugging "why didn't it tag this as a CLIN?"; or when any agent (Copilot, sub-agent, Theseus runtime) needs to produce or consume Theseus-graph-compatible structured output. The ontology is intentionally format-agnostic — entity types map to purpose, not UCF position. DO NOT USE FOR generic NER, non-federal contracting (state/local/commercial), or open-domain knowledge graphs. Acts as living documentation and a guardrail so agents extend the ontology consistently without spelunking source code.
 category: ontology
-version: 1.1.0
+version: 1.2.0
 license: MIT
 authoritative_source: src/ontology/schema.py
 ---
@@ -53,13 +53,13 @@ Always emit `type` as **lowercase snake_case**. Entity `name` should be a canoni
 
 ### Group C — Proposal & Evaluation Structure (5)
 
-| Type                         | Detect on                                           | Example name                           |
-| ---------------------------- | --------------------------------------------------- | -------------------------------------- |
-| `evaluation_factor`          | Section M factor headings + weights                 | `Technical Approach (40%)`             |
-| `subfactor`                  | Section M subfactor children                        | `Subfactor 1.2 Staffing (15%)`         |
-| `proposal_instruction`       | Section L "shall submit", page limits, format rules | `L.3.4 Submit Past Performance Volume` |
-| `proposal_volume`            | Volume I/II/III containers                          | `Volume I — Technical`                 |
-| `past_performance_reference` | Reference contract tables, CPARS rows               | `Contract W912-1234`                   |
+| Type                         | Detect on                                                                                                                 | Example name                           |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| `evaluation_factor`          | Factor headings + weights (UCF Section M or equivalent — incl. adjectival / LPTA)                                         | `Technical Approach (40%)`             |
+| `subfactor`                  | Factor children (UCF Section M or equivalent)                                                                             | `Subfactor 1.2 Staffing (15%)`         |
+| `proposal_instruction`       | "shall submit", page limits, format rules (UCF Section L or equivalent — may live inline in PWS or in a named attachment) | `L.3.4 Submit Past Performance Volume` |
+| `proposal_volume`            | Volume I/II/III containers                                                                                                | `Volume I — Technical`                 |
+| `past_performance_reference` | Reference contract tables, CPARS rows                                                                                     | `Contract W912-1234`                   |
 
 ### Group D — Strategic & Analytical Signals (3)
 
@@ -81,7 +81,7 @@ Always emit `relationship_type` as **UPPERCASE_SNAKE**. Subject is the **source*
 
 `CHILD_OF`, `ATTACHMENT_OF`, `CONTAINS`, `AMENDS`, `SUPERSEDED_BY`, `REFERENCES`
 
-### Evaluation & Proposal — the Section L↔M Golden Thread (5)
+### Evaluation & Proposal — the proposal_instruction ↔ evaluation_factor Golden Thread (5)
 
 `GUIDES` (instruction → factor), `EVALUATED_BY` (factor → instruction or evidence), `HAS_SUBFACTOR`, `MEASURED_BY`, `EVIDENCES`
 
@@ -138,10 +138,10 @@ Names not in `VALID_ENTITY_TYPES` / `VALID_RELATIONSHIP_TYPES` will be **silentl
 See [`references/pitfalls.md`](./references/pitfalls.md) for the full list. The top 5:
 
 1. **Tagging "shall" sentences as `clause`** — they are `requirement`. `clause` is reserved for FAR/DFARS/agency citations.
-2. **Confusing `evaluation_factor` and `proposal_instruction`** — Section M is `evaluation_factor`, Section L is `proposal_instruction`. They are linked by `GUIDES` / `EVALUATED_BY`.
+2. **Confusing `evaluation_factor` and `proposal_instruction`** — evaluation criteria (UCF Section M or equivalent) are `evaluation_factor`; submission instructions (UCF Section L or equivalent — may live inline in PWS or in a named attachment for non-UCF) are `proposal_instruction`. They are linked by `GUIDES` / `EVALUATED_BY`.
 3. **Emitting `MEASURES` instead of `MEASURED_BY`** — it gets coerced but pollutes the graph. Always pick the canonical direction.
 4. **Creating `document` entities for individual chapters** — chapters are `document_section`. `document` is for the whole RFP, attachments, amendments.
-5. **Missing the L↔M golden thread** — every `evaluation_factor` should ideally have at least one `proposal_instruction` linked via `GUIDES`. If not, leave it for post-processing inference rather than guessing.
+5. **Missing the proposal_instruction ↔ evaluation_factor golden thread** — every `evaluation_factor` should ideally have at least one `proposal_instruction` linked via `GUIDES`. If not, leave it for post-processing inference rather than guessing. Works on UCF (Section L↔M) and non-UCF solicitations alike.
 
 ## Extending the Ontology
 
@@ -162,5 +162,5 @@ To add a new entity or relationship type, follow the **Cross-Cutting Change Chec
 
 - [`references/pitfalls.md`](./references/pitfalls.md) — full list of common extraction errors
 - [`references/extraction_examples.md`](./references/extraction_examples.md) — worked examples per entity group
-- [`references/lm_golden_thread.md`](./references/lm_golden_thread.md) — Section L↔M deep dive
+- [`references/lm_golden_thread.md`](./references/lm_golden_thread.md) — proposal_instruction ↔ evaluation_factor golden thread deep dive (UCF Section L↔M or non-UCF equivalent)
 - [`references/relationship_directionality.md`](./references/relationship_directionality.md) — which side is source vs target for each rel type

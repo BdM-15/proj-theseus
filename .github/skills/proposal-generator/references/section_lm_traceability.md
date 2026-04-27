@@ -1,6 +1,6 @@
-# Section L↔M Traceability (proposal-generator)
+# proposal_instruction ↔ evaluation_factor Traceability (proposal-generator)
 
-See also: `govcon-ontology/references/lm_golden_thread.md` for the extraction-side view.
+Applies to UCF (Section L↔M) and non-UCF (FAR 16 task order, FOPR, BPA call, OTA, agency-specific) solicitations alike. See also: `govcon-ontology/references/lm_golden_thread.md` for the extraction-side view.
 
 When drafting a volume:
 

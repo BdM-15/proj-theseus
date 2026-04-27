@@ -122,7 +122,7 @@ def configure_raganything_args():
         "equipment",                # Physical assets: MHE, generators, batteries, GSE, CESE, watercraft, vehicles
         
         # Evaluation entities (semantic detection, may be embedded in non-standard sections)
-        "evaluation_factor",        # Scoring criteria (Section M content)
+        "evaluation_factor",        # Scoring criteria (UCF Section M content or non-UCF equivalent)
         "proposal_instruction",     # Format/page limits and submission mechanics regardless of section
         "proposal_volume",          # Volume containers and named proposal parts
         

@@ -2058,13 +2058,19 @@
               </div>
             </div>
 
-            <!-- ===== Tab: L↔M Matrix ===== -->
+            <!-- ===== Tab: Instructions ↔ Evaluation Matrix ===== -->
             <div x-show="intel.tab === 'lm'" x-cloak class="space-y-6">
               <div class="card overflow-hidden">
                 <div
                   class="px-5 py-3 border-b border-edge flex items-center justify-between"
                 >
-                  <h2 class="font-semibold">Section L → Section M Matrix</h2>
+                  <h2 class="font-semibold">
+                    Proposal Instructions → Evaluation Factors
+                    <span class="text-xs font-normal text-slate-500"
+                      >(UCF Section L → Section M, or equivalent for
+                      non-UCF)</span
+                    >
+                  </h2>
                   <div class="flex items-center gap-3 text-[11px] font-mono">
                     <span class="text-slate-500">show:</span>
                     <label class="flex items-center gap-1.5"
@@ -2092,10 +2098,16 @@
                     >
                       <tr class="border-b border-edge">
                         <th class="text-left px-5 py-2 w-1/3">
-                          Section L Instruction
+                          Proposal Instruction
+                          <span class="text-slate-600 normal-case"
+                            >(Section L / equiv)</span
+                          >
                         </th>
                         <th class="text-left px-5 py-2">
-                          Linked Section M Factor / Subfactor
+                          Linked Evaluation Factor / Subfactor
+                          <span class="text-slate-600 normal-case"
+                            >(Section M / equiv)</span
+                          >
                         </th>
                         <th class="px-5 py-2 w-20"></th>
                       </tr>
@@ -2151,7 +2163,7 @@
                           <td class="px-5 py-3 text-right">
                             <button
                               class="btn btn-ghost text-xs"
-                              @click="askIntel('Trace Section L instruction \\'' + row.instruction.id + '\\' to the Section M factors that evaluate it. Cite the source clauses.')"
+                              @click="askIntel('Trace proposal_instruction \\'' + row.instruction.id + '\\' (UCF Section L or equivalent) to the evaluation_factor entities (UCF Section M or equivalent) that evaluate it. Cite the source clauses.')"
                             >
                               <i
                                 data-lucide="message-square"
@@ -2175,7 +2187,11 @@
               <div class="card overflow-hidden" x-show="orphanFactors().length">
                 <div class="px-5 py-3 border-b border-edge">
                   <h2 class="font-semibold text-neon-amber">
-                    âš  Section M factors with no Section L instruction
+                    ⚠ Evaluation factors with no proposal instruction
+                    <span class="text-xs font-normal text-slate-500"
+                      >(Section M / equiv missing a Section L / equiv
+                      hook)</span
+                    >
                   </h2>
                 </div>
                 <ul class="divide-y divide-edge/40">
@@ -3540,6 +3556,178 @@
               </div>
             </details>
 
+            <!-- ===== Agent Skills Retrieval ===== -->
+            <details class="acc accent-amber" data-acc-key="skills">
+              <summary>
+                <div class="flex items-center gap-3 min-w-0">
+                  <i
+                    data-lucide="chevron-right"
+                    class="acc-chevron w-4 h-4"
+                  ></i>
+                  <i
+                    data-lucide="bot"
+                    class="w-4 h-4 text-neon-amber shrink-0"
+                  ></i>
+                  <div class="min-w-0">
+                    <div class="font-semibold">Agent Skills Retrieval</div>
+                    <div
+                      class="text-[11px] font-mono text-slate-500 truncate"
+                      x-text="skillSettings.loaded ? `mode=${skillSettings.values.retrieval_mode} · top_k=${skillSettings.values.retrieval_top_k} · entities/type=${skillSettings.values.max_entities_per_type} · chunks/entity=${skillSettings.values.max_chunks_per_entity}` : 'loading…'"
+                    ></div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2" @click.stop>
+                  <button
+                    class="btn btn-ghost text-xs"
+                    @click="resetSkillSettings()"
+                    :disabled="!skillSettings.loaded || skillSettings.saving"
+                    title="Reset to .env defaults"
+                  >
+                    <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                    Reset
+                  </button>
+                  <button
+                    class="btn btn-primary text-xs"
+                    @click="saveSkillSettings()"
+                    :disabled="!skillSettings.loaded || skillSettings.saving"
+                  >
+                    <i data-lucide="save" class="w-3.5 h-3.5"></i>
+                    <span
+                      x-text="skillSettings.saving ? 'Saving…' : 'Save'"
+                    ></span>
+                  </button>
+                </div>
+              </summary>
+              <div class="acc-body">
+                <p class="text-xs text-slate-500 mb-4 max-w-xl">
+                  Controls the briefing book and retrieval pipeline used when
+                  any agent skill is invoked against this workspace. Skills go
+                  through the same chat-grade hybrid retrieval as Capture Chat
+                  (LightRAG <code>aquery_data</code>), then the result is
+                  packaged with verbatim source chunks and KG relationships.
+                  Saved per workspace; takes effect on the next skill run.
+                </p>
+                <template x-if="!skillSettings.loaded">
+                  <div class="text-xs text-slate-500 font-mono">loading…</div>
+                </template>
+
+                <template x-if="skillSettings.loaded">
+                  <div class="space-y-5">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <label class="block">
+                        <span class="text-xs text-slate-400 font-mono">
+                          Retrieval Mode
+                          <span class="text-slate-600"
+                            >· same options as chat</span
+                          >
+                        </span>
+                        <select
+                          x-model="skillSettings.values.retrieval_mode"
+                          class="mt-1 w-full bg-ink-900/60 border border-edge rounded-lg px-3 py-2 text-sm font-mono focus:border-neon-amber/60 outline-none"
+                        >
+                          <option value="hybrid">
+                            hybrid (entity + relation)
+                          </option>
+                          <option value="local">local (entity-anchored)</option>
+                          <option value="global">
+                            global (relation-anchored)
+                          </option>
+                          <option value="mix">mix (KG + naive)</option>
+                          <option value="naive">
+                            naive (chunk vector only)
+                          </option>
+                          <option value="off">
+                            off (Phase 1.5 bulk slice)
+                          </option>
+                        </select>
+                      </label>
+                      <label class="block">
+                        <span class="text-xs text-slate-400 font-mono">
+                          Retrieval Top K
+                          <span class="text-slate-600"
+                            >· max ranked entities</span
+                          >
+                        </span>
+                        <input
+                          type="number"
+                          min="5"
+                          max="500"
+                          x-model.number="skillSettings.values.retrieval_top_k"
+                          :disabled="skillSettings.values.retrieval_mode === 'off'"
+                          class="mt-1 w-full bg-ink-900/60 border border-edge rounded-lg px-3 py-2 text-sm font-mono focus:border-neon-amber/60 outline-none disabled:opacity-40"
+                        />
+                      </label>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <label class="block">
+                        <span class="text-xs text-slate-400 font-mono">
+                          Entities per Type
+                          <span class="text-slate-600"
+                            >· cap on each bucket</span
+                          >
+                        </span>
+                        <input
+                          type="number"
+                          min="1"
+                          max="500"
+                          x-model.number="skillSettings.values.max_entities_per_type"
+                          class="mt-1 w-full bg-ink-900/60 border border-edge rounded-lg px-3 py-2 text-sm font-mono focus:border-neon-amber/60 outline-none"
+                        />
+                      </label>
+                      <label class="block">
+                        <span class="text-xs text-slate-400 font-mono">
+                          Source Chunks per Entity
+                          <span class="text-slate-600"
+                            >· verbatim RFP text</span
+                          >
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          max="10"
+                          x-model.number="skillSettings.values.max_chunks_per_entity"
+                          class="mt-1 w-full bg-ink-900/60 border border-edge rounded-lg px-3 py-2 text-sm font-mono focus:border-neon-amber/60 outline-none"
+                        />
+                      </label>
+                      <label class="block">
+                        <span class="text-xs text-slate-400 font-mono">
+                          KG Edges per Entity
+                          <span class="text-slate-600"
+                            >· in + out, deduped</span
+                          >
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          max="50"
+                          x-model.number="skillSettings.values.max_relationships_per_entity"
+                          class="mt-1 w-full bg-ink-900/60 border border-edge rounded-lg px-3 py-2 text-sm font-mono focus:border-neon-amber/60 outline-none"
+                        />
+                      </label>
+                    </div>
+
+                    <div
+                      class="text-[11px] text-slate-500 leading-relaxed bg-ink-900/40 border border-edge rounded-lg px-3 py-2 font-mono"
+                    >
+                      <div>
+                        <span class="text-neon-amber">mode=hybrid</span> mirrors
+                        the chat: ranks entities + relations + chunks against
+                        the user prompt and skill description. Tighter prompts
+                        produce tighter slices.
+                      </div>
+                      <div class="mt-1">
+                        <span class="text-neon-amber">mode=off</span> falls back
+                        to the Phase 1.5 bulk slice (file order, entity_types
+                        only) — useful for diagnosing whether retrieval is
+                        helping or hurting.
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </details>
+
             <!-- ===== Models & Storage ===== -->
             <details class="acc accent-magenta" data-acc-key="models">
               <summary>
@@ -4728,6 +4916,14 @@
             defaults: {},
           },
 
+          // Agent skill settings (per-workspace briefing-book + retrieval)
+          skillSettings: {
+            loaded: false,
+            saving: false,
+            values: {},
+            defaults: {},
+          },
+
           // Knowledge graph state
           cy: null,
           graph: {
@@ -4759,7 +4955,11 @@
           intel: {
             tab: "lm",
             tabs: [
-              { id: "lm", label: "L↔M Matrix", icon: "arrow-left-right" },
+              {
+                id: "lm",
+                label: "Instructions ↔ Evaluation",
+                icon: "arrow-left-right",
+              },
               { id: "trace", label: "Traceability", icon: "list-tree" },
               { id: "coverage", label: "Coverage", icon: "shield-check" },
               { id: "gaps", label: "Gaps", icon: "alert-triangle" },
@@ -4794,7 +4994,8 @@
               documents: "ingest · MinerU · multimodal extraction",
               graph: "33 entity types · 43 relationship types",
               chat: "shipley mentor · RAG over the workspace",
-              intel: "L↔M · traceability · coverage · gaps",
+              intel:
+                "instructions ↔ evaluation · traceability · coverage · gaps",
               settings: "workspace · storage · models",
             };
             return m[this.active] || "";
@@ -4873,6 +5074,7 @@
                   this.loadIntel();
                 if (this.active === "settings" && !this.querySettings.loaded)
                   this.loadQuerySettings();
+                this.loadSkillSettings();
                 if (this.active === "settings" && !this.dangerZone.loaded)
                   this.loadWorkspaceInventory();
                 // Documents tab: poll status_counts + pipeline_status while
@@ -7112,6 +7314,55 @@
             }
           },
 
+          // ----- Agent skill settings -----
+          async loadSkillSettings() {
+            try {
+              const data = await this.api("/api/ui/settings/skills");
+              this.skillSettings.values = { ...data.settings };
+              this.skillSettings.defaults = { ...data.defaults };
+              this.skillSettings.loaded = true;
+            } catch (e) {
+              this.toast(
+                "Failed loading skill settings: " + e.message,
+                "error",
+              );
+            }
+          },
+
+          async saveSkillSettings() {
+            this.skillSettings.saving = true;
+            try {
+              const data = await this.api("/api/ui/settings/skills", {
+                method: "PUT",
+                body: JSON.stringify(this.skillSettings.values),
+              });
+              this.skillSettings.values = { ...data.settings };
+              this.toast("Skill settings saved");
+            } catch (e) {
+              this.toast("Save failed: " + e.message, "error");
+            } finally {
+              this.skillSettings.saving = false;
+            }
+          },
+
+          async resetSkillSettings() {
+            if (
+              !confirm(
+                "Restore default skill retrieval settings for this workspace?",
+              )
+            )
+              return;
+            try {
+              const data = await this.api("/api/ui/settings/skills/reset", {
+                method: "POST",
+              });
+              this.skillSettings.values = { ...data.settings };
+              this.toast("Skill settings reset to defaults");
+            } catch (e) {
+              this.toast("Reset failed: " + e.message, "error");
+            }
+          },
+
           pollRestart() {
             // The server restarts via os.execv; the new process will report
             // stats.workspace === restartTarget. We poll until either:
@@ -7353,11 +7604,12 @@
               },
               {
                 id: "fact",
-                title: "Section M factors with no Section L hook",
-                subtitle: "Evaluation factors no instruction guides toward.",
+                title: "Evaluation factors with no proposal instruction hook",
+                subtitle:
+                  "Evaluation factors (UCF Section M or equivalent) that no proposal_instruction (UCF Section L or equivalent) guides toward.",
                 items: g.factors_no_instruction || [],
                 askPrefix:
-                  "Recommend Section L instructions to add for evaluation factor",
+                  "Recommend proposal_instruction entities (UCF Section L or equivalent) to add for evaluation factor",
               },
               {
                 id: "del",

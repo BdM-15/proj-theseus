@@ -1,6 +1,8 @@
-# Section L↔M Golden Thread
+# proposal_instruction ↔ evaluation_factor Golden Thread
 
-The single most important pattern in federal proposal evaluation. Every `evaluation_factor` (Section M) is **scored against** `proposal_instruction` items (Section L). Lose the link and the proposal becomes non-compliant on its face.
+The single most important pattern in federal proposal evaluation. Every `evaluation_factor` is **scored against** `proposal_instruction` items. Lose the link and the proposal becomes non-compliant on its face.
+
+**Format scope:** This pattern applies to UCF solicitations (Section L↔M) AND to non-UCF equivalents — FAR 16 task orders, Fair Opportunity Proposal Requests (FOPRs), BPA calls, OTAs, commercial item buys, and agency-specific formats. The entity types are format-agnostic; only the section labels change. Examples below use UCF labels for reader recognition — substitute the equivalent section / attachment / inline location for non-UCF.
 
 ## The Edges
 
@@ -14,16 +16,16 @@ The single most important pattern in federal proposal evaluation. Every `evaluat
 
 ## Extraction Heuristic
 
-When you see Section L language like "shall submit", "shall include", "shall describe":
+When you see proposal-instruction language like "shall submit", "shall include", "shall describe" (UCF Section L or non-UCF equivalent — inline PWS, named attachment, FOPR instructions section):
 
 - Emit a `proposal_instruction` entity.
-- Look for the matching Section M factor (often shares keywords). If found in the same chunk, emit `GUIDES` edge. If not, leave it for inference.
+- Look for the matching `evaluation_factor` (UCF Section M or equivalent — often shares keywords). If found in the same chunk, emit `GUIDES` edge. If not, leave it for inference.
 
-When you see Section M language like "the Government will evaluate":
+When you see evaluation-criteria language like "the Government will evaluate" (UCF Section M or non-UCF equivalent):
 
 - Emit an `evaluation_factor` entity.
-- The subject of "will evaluate" is usually the Section L instruction by name.
+- The subject of "will evaluate" is usually the `proposal_instruction` by name.
 
 ## Inference Pass
 
-The `infer_lm_links.py` algorithm runs after extraction and fills missing L↔M edges using semantic similarity + entity name overlap. Don't force these during extraction — let inference handle the cross-chunk matches.
+The `infer_lm_links.py` algorithm runs after extraction and fills missing `proposal_instruction` ↔ `evaluation_factor` edges using semantic similarity + entity name overlap. Don't force these during extraction — let inference handle the cross-chunk matches.

@@ -32,7 +32,7 @@ How it works
 
 Doc types
 ---------
-* ``solicitation`` — RFP, RFQ, FOPR, solicitation memorandum, Section L/M
+* ``solicitation`` — RFP, RFQ, FOPR, solicitation memorandum, UCF Sections L/M or non-UCF equivalent (FAR 16 task order, BPA call, OTA, agency-specific format)
 * ``pws``          — Performance Work Statement, SOW, SOO
 * ``cdrl_exhibit`` — CDRL list, Exhibit A, DD Form 1423
 * ``template``     — Customer-provided fillable template (CLIN cost estimate,
@@ -115,8 +115,10 @@ _CLASSIFICATION_RULES: list[tuple[str, str, list[str]]] = [
         "solicitation",
         (
             "Government solicitation document (FOPR / RFP / RFQ / solicitation "
-            "memorandum). Submission instructions (Section L) and evaluation "
-            "criteria (Section M / Factors) are authoritative. References to "
+            "memorandum). Submission instructions (proposal_instruction — UCF "
+            "Section L or non-UCF equivalent, may live inline in PWS or in a "
+            "named attachment) and evaluation criteria (evaluation_factor — UCF "
+            "Section M or non-UCF equivalent) are authoritative. References to "
             "the PWS, CDRLs, and attachments are pointers to other documents — "
             "not the PWS content itself."
         ),

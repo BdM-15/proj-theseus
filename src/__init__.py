@@ -68,7 +68,7 @@ inference/
   - 5 semantic inference algorithms:
     1. Document hierarchy (DOCUMENT → SECTION)
     2. Clause clustering (FAR/DFARS → sections)
-    3. Section L↔M mapping (instructions → evaluation)
+    3. Instruction↔evaluation mapping (proposal_instruction → evaluation_factor; UCF Section L↔M or non-UCF equivalent)
     4. Requirement evaluation (requirements → factors)
     5. Work-deliverable linking (SOW → deliverables)
 

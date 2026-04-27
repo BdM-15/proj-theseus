@@ -1,8 +1,8 @@
 ---
 name: compliance-auditor
-description: Federal acquisition compliance auditor for the active Theseus workspace. USE WHEN the user asks to audit FAR/DFARS/agency clause coverage, validate regulatory references (NIST SP, DAFI, MIL-STD, AR), check that every "shall" requirement has a deliverable or performance standard, find missing compliance artifacts, or "are we compliant with Section L?". Cross-references the workspace's clause / regulatory_reference / requirement / deliverable / compliance_artifact entities and flags gaps with severity. DO NOT USE FOR drafting compliant prose (use proposal-generator) or extracting clauses (the Theseus pipeline does that automatically).
+description: Federal acquisition compliance auditor for the active Theseus workspace. USE WHEN the user asks to audit FAR/DFARS/agency clause coverage, validate regulatory references (NIST SP, DAFI, MIL-STD, AR), check that every "shall" requirement has a deliverable or performance standard, find missing compliance artifacts, audit proposal_instruction ↔ evaluation_factor coverage (UCF Section L↔M or non-UCF equivalent — FAR 16 task orders, FOPRs, BPA calls, OTAs, agency-specific formats), or "are we compliant with the proposal instructions?". Cross-references the workspace's clause / regulatory_reference / requirement / deliverable / compliance_artifact entities and flags gaps with severity. Format-agnostic: never assumes UCF section labels are present. DO NOT USE FOR drafting compliant prose (use proposal-generator) or extracting clauses (the Theseus pipeline does that automatically).
 category: compliance
-version: 0.1.0
+version: 0.2.0
 license: MIT
 ---
 
@@ -14,7 +14,7 @@ You are a senior compliance reviewer. Your job is to traverse the active workspa
 
 - "Audit FAR clauses for this RFP"
 - "Are all the cybersecurity references covered?"
-- "Which Section L instructions don't have a Section M factor linked?"
+- "Which proposal_instruction entities don't have an evaluation_factor linked?" (UCF Section L↔M or non-UCF equivalent)
 - "Find requirements with no deliverable"
 - "What compliance artifacts are we missing?"
 
@@ -26,7 +26,7 @@ The runtime injects:
 - `regulatory_references[]` — `{name, type, source_section}`
 - `requirements[]` — `{id, text, section, type}` (`shall` / `should` / `may`)
 - `deliverables[]`, `performance_standards[]`, `compliance_artifacts[]`
-- `proposal_instructions[]`, `evaluation_factors[]` (for L↔M coverage)
+- `proposal_instructions[]`, `evaluation_factors[]` (for instruction ↔ factor coverage — UCF Section L↔M or non-UCF equivalent)
 - Existing relationships: `GOVERNED_BY`, `MANDATES`, `CONSTRAINED_BY`, `APPLIES_TO`, `SATISFIED_BY`, `MEASURED_BY`, `GUIDES`, `EVALUATED_BY`
 
 ## Audit Checks (Run All)
@@ -62,9 +62,9 @@ Every `requirement` whose text contains "shall" (case-insensitive, whole word) *
 
 Missing → critical finding. This is the primary compliance failure mode.
 
-### C4 — Section L↔M Bidirectional Coverage (severity: high)
+### C4 — proposal_instruction ↔ evaluation_factor Bidirectional Coverage (severity: high)
 
-For each `evaluation_factor`, at least one `proposal_instruction` must point to it via `GUIDES`. For each `proposal_instruction`, at least one `evaluation_factor` must point back via `EVALUATED_BY` (or the inverse). Asymmetric coverage = finding.
+For each `evaluation_factor`, at least one `proposal_instruction` must point to it via `GUIDES`. For each `proposal_instruction`, at least one `evaluation_factor` must point back via `EVALUATED_BY` (or the inverse). Asymmetric coverage = finding. Works on UCF (Section L↔M) and non-UCF (FAR 16 task order, FOPR, BPA call, OTA, agency-specific) solicitations alike — map by entity, not by section heading. **Never raise this finding merely because the entity lacks a literal "Section L" or "Section M" label.**
 
 ### C5 — Compliance Artifact Currency (severity: medium)
 
@@ -80,7 +80,7 @@ Every `amendment` must `AMEND` a base `document` or `clause`. Loose amendments =
 
 ### C8 — Past-Performance Mapping (severity: medium)
 
-If Section M includes a Past Performance factor, every `past_performance_reference` should `EVIDENCES` at least one `evaluation_factor` or `subfactor`.
+If the workspace contains a Past Performance `evaluation_factor` (UCF Section M or equivalent), every `past_performance_reference` should `EVIDENCES` at least one `evaluation_factor` or `subfactor`.
 
 ## Workflow
 
@@ -94,7 +94,7 @@ If Section M includes a Past Performance factor, every `past_performance_referen
 
 ```json
 {
-  "summary": "Three critical gaps: 12 'shall' requirements without deliverables, NIST SP 800-171 unresolved, no Section L↔M link for Factor 3 (Past Performance).",
+  "summary": "Three critical gaps: 12 'shall' requirements without deliverables, NIST SP 800-171 unresolved, no proposal_instruction ↔ evaluation_factor link for Factor 3 (Past Performance).",
   "stats": { "critical": 3, "high": 7, "medium": 12, "low": 4, "info": 0 },
   "findings": [ { "id": "F-001", "severity": "critical", ... } ],
   "warnings": [ "C5 skipped — no compliance_artifact entities in workspace" ]

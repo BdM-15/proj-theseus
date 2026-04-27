@@ -2,7 +2,7 @@
 
 Allocate pages proportional to evaluation factor weight, then adjust for risk.
 
-## Default split (within Section M weight)
+## Default split (within evaluation_factor weight — UCF Section M or equivalent)
 
 | Factor weight | Page share of Volume |
 | ------------- | -------------------- |

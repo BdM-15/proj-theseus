@@ -70,9 +70,24 @@
       <thead>
         <tr>
           <th>#</th>
-          <th>Section L Instruction</th>
-          <th>Section M Factor</th>
-          <th>Section C Requirement(s)</th>
+          <th>
+            Proposal Instruction
+            <span style="font-weight: 400; color: #64748b"
+              >(Section L / equiv)</span
+            >
+          </th>
+          <th>
+            Evaluation Factor
+            <span style="font-weight: 400; color: #64748b"
+              >(Section M / equiv)</span
+            >
+          </th>
+          <th>
+            Requirement(s)
+            <span style="font-weight: 400; color: #64748b"
+              >(Section C / SOW / PWS)</span
+            >
+          </th>
           <th>Volume / §</th>
           <th>Pages</th>
           <th>Status</th>
@@ -82,9 +97,9 @@
         {{#rows}}
         <tr>
           <td>{{n}}</td>
-          <td><code>{{l_id}}</code> {{l_text}}</td>
-          <td><code>{{m_id}}</code> {{m_name}}</td>
-          <td><code>{{c_ids}}</code></td>
+          <td><code>{{instruction_id}}</code> {{instruction_text}}</td>
+          <td><code>{{evaluation_id}}</code> {{evaluation_name}}</td>
+          <td><code>{{requirement_ids}}</code></td>
           <td>{{volume}}</td>
           <td>{{pages}}</td>
           <td class="{{status_class}}">{{status}}</td>

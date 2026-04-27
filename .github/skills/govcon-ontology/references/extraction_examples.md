@@ -2,7 +2,9 @@
 
 Each example shows source text → expected entities + relationships. Use as few-shot context.
 
-## Example 1 — Section L instruction
+**Format scope:** Examples below use UCF section labels (Section L, Section M, Section C) for reader recognition. The same entity emissions apply to non-UCF solicitations — FAR 16 task orders, FOPRs, BPA calls, OTAs, agency-specific formats — where instructions and evaluation criteria may live inline in the PWS, in a named attachment, or under different section headings. Map by purpose, not by section label.
+
+## Example 1 — proposal_instruction (UCF Section L or equivalent)
 
 **Source (L.3.4):** "The offeror shall submit a Past Performance Volume containing no more than five (5) reference contracts."
 
@@ -25,7 +27,7 @@ Each example shows source text → expected entities + relationships. Use as few
 }
 ```
 
-## Example 2 — Section M factor with subfactor
+## Example 2 — evaluation_factor with subfactor (UCF Section M or equivalent)
 
 **Source (M.2):** "Factor 2 — Technical Approach (40%) consists of Subfactor 2.1 — Solution Architecture (25%) and Subfactor 2.2 — Staffing (15%)."
 

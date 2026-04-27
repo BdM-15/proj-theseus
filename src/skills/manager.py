@@ -433,9 +433,14 @@ class SkillManager:
             workspace: Active workspace name (for telemetry / output envelope).
             user_prompt: Free-text user instruction (may be empty for
                 "use defaults" mode).
-            entity_payload: Dict of entity-type lists already pulled from the
-                workspace KG by the caller. Keys are pluralized entity types
-                (``requirements``, ``clins``, ``evaluation_factors``, ...).
+            entity_payload: Briefing book dict produced by the route layer
+                (Phase 1.5 contract). Expected top-level keys:
+                ``entities`` (``{entity_type: [{name, description,
+                source_chunks}]}``), ``source_chunks`` (verbatim RFP text
+                blocks the model is required to quote from), and
+                ``relationships`` (typed KG edges between sliced entities).
+                Falls back gracefully if older callers pass a flat
+                ``{entity_type: [...]}`` dict.
             llm: Async callable that takes a single composed prompt string
                 and returns the model's response. Lets the caller decide which
                 model / temperature to use.
@@ -452,11 +457,20 @@ class SkillManager:
         if len(payload_json) > budget:
             payload_json = payload_json[:budget] + "\n…[truncated]"
             warnings.append(
-                f"entity_payload truncated at {budget} chars (SKILL_MAX_PAYLOAD_CHARS); "
-                "raise the env var or pin entity_types to keep the slice intact"
+                f"briefing book truncated at {budget} chars (SKILL_MAX_PAYLOAD_CHARS); "
+                "raise the env var, narrow entity_types, or lower max_chunks_per_entity"
             )
 
-        entities_used = sorted(entity_payload.keys())
+        # Phase 1.5: ``entity_payload`` is now a briefing-book dict whose
+        # ``entities`` sub-dict holds the type buckets. Older callers may pass
+        # the flat shape — detect both and surface a single, accurate list.
+        if isinstance(entity_payload.get("entities"), dict):
+            entities_used = sorted(entity_payload["entities"].keys())
+        else:
+            entities_used = sorted(
+                k for k in entity_payload.keys()
+                if k not in {"source_chunks", "relationships", "retrieval_metadata"}
+            )
         composed = self._compose_prompt(skill, workspace, user_prompt, payload_json)
 
         started = datetime.now(timezone.utc)
@@ -502,15 +516,81 @@ class SkillManager:
     def _compose_prompt(
         skill: Skill, workspace: str, user_prompt: str, payload_json: str
     ) -> str:
-        """Compose the final LLM prompt: instructions + workspace + user ask."""
+        """Compose the final LLM prompt: instructions + workspace + user ask.
+
+        The Workspace Briefing Book block (Phase 1.5 + 1.6) packages four things:
+
+        * ``entities``           — typed entity buckets, each item carries the
+                                    ``source_chunks`` IDs that produced it.
+        * ``source_chunks``      — verbatim RFP text the model MUST quote from
+                                    (never paraphrase) when citing requirements,
+                                    proposal_instruction items (Section L or
+                                    equivalent), evaluation_factor items
+                                    (Section M or equivalent), deliverables, or
+                                    clauses.
+        * ``relationships``      — typed KG edges between the entities.
+        * ``retrieval_metadata`` — Phase 1.6 provenance: tells the model whether
+                                    the briefing book was query-targeted (chat-
+                                    grade hybrid retrieval) or a bulk slice, and
+                                    how many entities/chunks the retriever ranked
+                                    as relevant. The model uses this to decide
+                                    when to emit `GAP` for out-of-coverage asks.
+
+        Citation discipline is enforced in the rendered envelope so every
+        skill inherits the same source-of-truth contract.
+        """
         return (
             f"# Agent Skill: {skill.name} ({skill.frontmatter.version})\n"
             f"Active workspace: {workspace}\n\n"
             "## Skill Instructions\n"
             f"{skill.body_md.strip()}\n\n"
-            "## Workspace Entity Payload (JSON)\n"
-            "The following entities were extracted from the active workspace's "
-            "knowledge graph. Use them as the authoritative source of truth.\n\n"
+            "## Workspace Briefing Book (JSON)\n"
+            "This briefing book is the authoritative source of truth for the "
+            "active RFP workspace. It contains four sections:\n"
+            "  * `entities`           — typed entities (each carries `source_chunks`)\n"
+            "  * `source_chunks`      — verbatim RFP text blocks (quote from these)\n"
+            "  * `relationships`      — typed KG edges between entities\n"
+            "  * `retrieval_metadata` — how this slice was selected (chat-grade\n"
+            "    hybrid retrieval vs. bulk fallback); use it to gauge coverage.\n\n"
+            "### Citation Discipline (MANDATORY)\n"
+            "When you reference a requirement, deliverable, clause, "
+            "`proposal_instruction` (UCF Section L or equivalent — e.g. an "
+            "\"Instructions to Offerors\" section in a FAR 16 task order, FOPR, "
+            "BPA call, OTA, or agency-specific format), `evaluation_factor` "
+            "(UCF Section M or equivalent — e.g. \"Evaluation Criteria\", "
+            "adjectival rating scheme, or LPTA basis), or any other RFP "
+            "obligation:\n"
+            "  1. **Quote verbatim** from the matching `source_chunks[*].content` — "
+            "never paraphrase the RFP wording.\n"
+            "  2. **Cite the chunk_id inline** in the form `[chunk-xxxxxxxx]` so "
+            "the reader can trace any claim back to the source document.\n"
+            "  3. If a needed source chunk is missing from the briefing book, "
+            "emit a `GAP` marker rather than fabricating language.\n"
+            "  4. Use the `relationships` block to confirm "
+            "`proposal_instruction` ↔ `evaluation_factor` ↔ `requirement` "
+            "traceability — do not invent links the KG does not show.\n\n"
+            "### Coverage Discipline (Phase 1.6)\n"
+            "The briefing book was assembled by chat-grade hybrid retrieval over "
+            "the user request + skill description. Treat it as the *complete* "
+            "evidence set for this invocation:\n"
+            "  * Do **not** invent entities, factors, requirements, deliverables, "
+            "or clauses that are absent from the briefing book.\n"
+            "  * **This solicitation may use UCF or non-UCF format.** Map to the "
+            "actual `proposal_instruction` and `evaluation_factor` entities "
+            "regardless of section heading. Only emit `GAP` when no matching "
+            "instruction or evaluation criterion exists *anywhere* in the "
+            "briefing book — never because the entity lacks a literal \"Section "
+            "L\" or \"Section M\" label. Many federal task orders, FOPRs, BPA "
+            "calls, and OTAs put instructions inline in the PWS or in named "
+            "attachments.\n"
+            "  * If the user asks about a topic that is not represented in the "
+            "`entities` / `source_chunks` blocks (check `retrieval_metadata` for "
+            "coverage signals like low `matched_entities`), say so explicitly with "
+            "`GAP: insufficient retrieval coverage for <topic>` instead of "
+            "substituting unrelated content from another factor or section.\n"
+            "  * Stay inside the slice. If the user asks for the small business "
+            "participation outline, do not bleed in cybersecurity, transition, or "
+            "other factors unless the briefing book actually surfaces them.\n\n"
             "```json\n"
             f"{payload_json}\n"
             "```\n\n"
@@ -518,7 +598,8 @@ class SkillManager:
             f"{user_prompt.strip() if user_prompt.strip() else '(use skill defaults)'}\n\n"
             "## Output\n"
             "Follow the skill's Output Contract section exactly. If a JSON "
-            "envelope is specified, return only the JSON envelope.\n"
+            "envelope is specified, return only the JSON envelope. Inline "
+            "chunk-ID citations are required wherever you quote RFP text.\n"
         )
 
     # ---- Run persistence ----------------------------------------------
