@@ -1967,46 +1967,76 @@ details.acc .summary-actions {
   font-size: 0.875rem;
 }
 
-/* === Restart overlay scene (Theseus vs Minotaur) === */
+/* === Restart overlay scene (cyberpunk reactor power-up) === */
 .restart-scene {
-  filter: drop-shadow(0 0 24px rgba(var(--neon-cyan-rgb), 0.25))
-    drop-shadow(0 0 24px rgba(var(--neon-magenta-rgb), 0.2));
+  filter: drop-shadow(0 0 28px rgba(var(--neon-cyan-rgb), 0.45))
+    drop-shadow(0 0 32px rgba(var(--neon-magenta-rgb), 0.35));
 }
 
-.restart-scene .rs-sword {
-  transform-origin: 0 -6px;
-  animation: rs-swing 1.4s ease-in-out infinite;
+.restart-scene .rs-ring-outer {
+  animation: rs-rotate-cw 8s linear infinite;
+}
+.restart-scene .rs-ring-mid {
+  animation: rs-rotate-ccw 5s linear infinite;
+}
+.restart-scene .rs-hex {
+  animation: rs-hex-pulse 2.4s ease-in-out infinite;
+}
+.restart-scene .rs-beams {
+  animation: rs-beams-pulse 1.6s ease-in-out infinite;
+}
+.restart-scene .rs-core,
+.restart-scene .rs-core-glow {
+  transform-origin: 100px 100px;
+  animation: rs-core-pulse 1.4s ease-in-out infinite;
+}
+.restart-scene .rs-core-glow {
+  animation-duration: 2s;
+}
+.restart-scene .rs-spark-orbit {
+  animation: rs-rotate-cw 3.2s linear infinite;
 }
 
-@keyframes rs-swing {
-  0%, 100% { transform: rotate(-10deg); }
-  50%      { transform: rotate(35deg); }
+@keyframes rs-rotate-cw {
+  to {
+    transform: rotate(360deg);
+  }
 }
-
-.restart-scene .rs-eye {
-  animation: rs-eye-flicker 0.9s ease-in-out infinite;
+@keyframes rs-rotate-ccw {
+  to {
+    transform: rotate(-360deg);
+  }
 }
-
-@keyframes rs-eye-flicker {
-  0%, 100% { fill: #ffeb00; opacity: 1; }
-  50%      { fill: #ff3b6b; opacity: 0.7; }
+@keyframes rs-hex-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.04);
+  }
 }
-
-.restart-scene .rs-spark {
-  transform-origin: 88px 38px;
-  animation: rs-spark-pulse 0.7s ease-in-out infinite;
+@keyframes rs-beams-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.06);
+  }
 }
-
-@keyframes rs-spark-pulse {
-  0%, 100% { opacity: 0; transform: translate(88px, 38px) scale(0.4) rotate(0deg); }
-  50%      { opacity: 1; transform: translate(88px, 38px) scale(1.2) rotate(45deg); }
-}
-
-.restart-scene .rs-thread {
-  stroke-dasharray: 4 6;
-  animation: rs-thread-flow 2s linear infinite;
-}
-
-@keyframes rs-thread-flow {
-  to { stroke-dashoffset: -20; }
+@keyframes rs-core-pulse {
+  0%,
+  100% {
+    transform: scale(0.92);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
 }
