@@ -27,6 +27,8 @@ Integration Points:
 
 import logging
 from datetime import datetime, timezone
+
+from src.utils.time_utils import now_local
 from typing import TYPE_CHECKING
 
 from src.ontology.govcon_kg import (
@@ -93,7 +95,7 @@ async def bootstrap_govcon_ontology(
             "message": "Use force=True to re-bootstrap"
         }
     
-    start_time = datetime.now(timezone.utc)
+    start_time = now_local()
     logger.info(f"🚀 Bootstrapping GovCon domain ontology into {workspace_dir}...")
     
     try:
@@ -146,7 +148,7 @@ async def bootstrap_govcon_ontology(
         await lightrag.ainsert_custom_kg(custom_kg)
         
         # Write marker file
-        end_time = datetime.now(timezone.utc)
+        end_time = now_local()
         duration = (end_time - start_time).total_seconds()
         
         os.makedirs(workspace_dir, exist_ok=True)
