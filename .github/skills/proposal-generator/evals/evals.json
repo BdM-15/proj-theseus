@@ -1,0 +1,41 @@
+{
+  "skill_name": "proposal-generator",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Generate the compliance matrix for this RFP, mapping every proposal instruction to the corresponding evaluation factor and underlying requirement.",
+      "expected_output": "A JSON artifact at artifacts/proposal_draft.json whose compliance_matrix array contains one row per proposal_instruction entity in the workspace, each row populated with instruction_id, evaluation_id, requirement_ids, source_chunks, and a status of OK | PARTIAL | GAP. The final assistant message is a short cover note summarizing row counts.",
+      "expectations": [
+        "The skill called kg_entities at least once requesting types including 'proposal_instruction' and 'evaluation_factor'.",
+        "The skill called kg_chunks at least once with a query mentioning 'instructions', 'evaluation', or 'section L'/'section M'.",
+        "The skill called write_file with target path 'artifacts/proposal_draft.json'.",
+        "The persisted JSON contains a top-level 'compliance_matrix' array.",
+        "Every compliance_matrix row whose status is 'OK' carries at least one chunk_id in 'source_chunks'.",
+        "No row has status 'GAP' attributable solely to a missing 'Section L' or 'Section M' label."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Build win themes for this opportunity. Tie every theme to a customer_priority or pain_point in the workspace, and identify the discriminator and proof point.",
+      "expected_output": "Themes array in artifacts/proposal_draft.json where each theme object has theme, discriminator, proof, hot_button_id (matching a customer_priority or pain_point entity), and source_chunks. The cover note in the final assistant message lists the theme count.",
+      "expectations": [
+        "The skill called kg_entities requesting 'customer_priority' and 'pain_point' (and optionally 'past_performance_reference').",
+        "The skill read assets/theme_card.md via read_file before drafting themes.",
+        "Every theme.hot_button_id maps to an entity name returned by kg_entities.",
+        "No theme is phrased as a bare adjective-noun like 'Innovative Solutions' or 'World-Class Service'.",
+        "The artifact's themes array is non-empty if customer_priority or pain_point entities exist in the workspace."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Draft the executive summary for Volume I. It must address the customer mission, our top three discriminators, and call to action — maximum two pages.",
+      "expected_output": "executive_summary_md field populated in artifacts/proposal_draft.json. The summary references at least three discriminators that also appear in fab_chains, cites chunk_ids for any direct quotes, and stays under roughly 2 pages (~1200 words).",
+      "expectations": [
+        "The skill executed the spine + themes + FAB workflow steps before drafting the executive summary (assistant turns show kg_entities and theme drafting before executive_summary_md is written).",
+        "The skill read assets/executive_summary.md via read_file.",
+        "executive_summary_md in the artifact is non-empty and under 1500 words.",
+        "Every direct quote of RFP language in executive_summary_md is followed by an inline [chunk-xxxxxxxx] citation."
+      ]
+    }
+  ]
+}
