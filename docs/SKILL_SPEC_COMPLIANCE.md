@@ -4,12 +4,12 @@
 
 **Sub-phase status:**
 
-| Sub-phase | Scope                                                            | State           |
-| --------- | ---------------------------------------------------------------- | --------------- |
-| 2.0       | Vendor skill-creator + this audit doc + Copilot instructions     | ✅ Done (9134f0f) |
-| 2.1       | Tool-calling runtime (`src/skills/{tools,runtime,llm_chat}.py`)  | ✅ Done (b4b9e33) |
-| 2.2       | Migrate `proposal-generator` end-to-end                          | ✅ Done           |
-| 2.3       | Migrate remaining 4 skills + UI transcript drawer                | ⏳ Pending        |
+| Sub-phase | Scope                                                           | State             |
+| --------- | --------------------------------------------------------------- | ----------------- |
+| 2.0       | Vendor skill-creator + this audit doc + Copilot instructions    | ✅ Done (9134f0f) |
+| 2.1       | Tool-calling runtime (`src/skills/{tools,runtime,llm_chat}.py`) | ✅ Done (b4b9e33) |
+| 2.2       | Migrate `proposal-generator` end-to-end                         | ✅ Done           |
+| 2.3       | Migrate remaining 4 skills + UI transcript drawer               | ⏳ Pending        |
 
 This document audits every skill under `.github/skills/` against the open
 [Agent Skills specification](https://agentskills.io/specification) and
@@ -148,14 +148,14 @@ Copy this checklist:
 
 ### 3.6 `proposal-generator`
 
-| Gap                                                      | Action                                                                                                                                               | Sub-phase | State |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ----- |
-| `category`, `version` at top level                       | Moved under `metadata:` (now `metadata.runtime: tools`, `metadata.category`, `metadata.version: 0.3.0`, `metadata.status`)                            | 2.2       | ✅    |
-| **`templates/` directory name**                          | Renamed to `assets/` via `git mv`; all in-body links updated                                                                                          | 2.2       | ✅    |
+| Gap                                                      | Action                                                                                                                                                                                                          | Sub-phase | State |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ----- |
+| `category`, `version` at top level                       | Moved under `metadata:` (now `metadata.runtime: tools`, `metadata.category`, `metadata.version: 0.3.0`, `metadata.status`)                                                                                      | 2.2       | ✅    |
+| **`templates/` directory name**                          | Renamed to `assets/` via `git mv`; all in-body links updated                                                                                                                                                    | 2.2       | ✅    |
 | Body has Workflow section but no executable script chain | Body rewritten as a 10-step numbered checklist that invokes `kg_entities`, `kg_query`, `kg_chunks`, `read_file`, `write_file`. No bundled scripts needed for v0.3 — entire flow runs through the runtime tools. | 2.2       | ✅    |
-| No `evals/evals.json`                                    | Added 3 evals: compliance matrix, win themes, executive summary. Each carries verifiable expectations on tool-call patterns + artifact contents.      | 2.2       | ✅    |
-| Implicit briefing-book dependency                        | Removed — runtime no longer pre-builds briefing book for tools-mode skills (route layer skips it). Skill fetches what it needs via `kg_entities` + `kg_chunks`. | 2.2       | ✅    |
-| Output persistence                                       | Final draft saved to `<run_dir>/artifacts/proposal_draft.json` via `write_file`; cover note (counts + warnings + chunk_ids) returned as the assistant message. | 2.2       | ✅    |
+| No `evals/evals.json`                                    | Added 3 evals: compliance matrix, win themes, executive summary. Each carries verifiable expectations on tool-call patterns + artifact contents.                                                                | 2.2       | ✅    |
+| Implicit briefing-book dependency                        | Removed — runtime no longer pre-builds briefing book for tools-mode skills (route layer skips it). Skill fetches what it needs via `kg_entities` + `kg_chunks`.                                                 | 2.2       | ✅    |
+| Output persistence                                       | Final draft saved to `<run_dir>/artifacts/proposal_draft.json` via `write_file`; cover note (counts + warnings + chunk_ids) returned as the assistant message.                                                  | 2.2       | ✅    |
 
 ---
 

@@ -275,7 +275,12 @@ async def tool_write_file(ctx: ToolContext, path: str, content: str) -> ToolResu
         )
     artifacts_root = ctx.run_dir / "artifacts"
     artifacts_root.mkdir(parents=True, exist_ok=True)
-    target = _safe_join(artifacts_root, path)
+    # Tolerate a leading "artifacts/" or "artifacts\\" prefix from the model
+    # (the SKILL.md often references the full path including artifacts/).
+    cleaned = path.lstrip("/\\")
+    if cleaned.lower().startswith("artifacts/") or cleaned.lower().startswith("artifacts\\"):
+        cleaned = cleaned[len("artifacts/"):]
+    target = _safe_join(artifacts_root, cleaned)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(content, encoding="utf-8")
     rel = target.relative_to(ctx.run_dir.resolve()).as_posix()
