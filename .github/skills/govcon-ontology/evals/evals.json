@@ -1,0 +1,32 @@
+{
+  "skill": "govcon-ontology",
+  "version": "1.2.1",
+  "notes": "Pure-reference skill — evals verify the agent answers in Theseus ontology vocabulary using only the bundled references and refuses non-Theseus / non-federal scope.",
+  "evals": [
+    {
+      "id": "eval-001-entity-classification",
+      "prompt": "How would Theseus classify the line \"The Contractor shall provide 24/7 help desk coverage IAW NIST SP 800-171\"?",
+      "expectations": [
+        {"kind": "response_contains", "value": "requirement"},
+        {"kind": "response_contains", "value": "regulatory_reference"},
+        {"kind": "response_contains", "value": "NIST SP 800-171"}
+      ]
+    },
+    {
+      "id": "eval-002-relationship-directionality",
+      "prompt": "Which relationship type connects a proposal_instruction to an evaluation_factor, and in which direction?",
+      "expectations": [
+        {"kind": "response_contains", "value": "EVALUATED_BY"},
+        {"kind": "response_contains", "value": "proposal_instruction"},
+        {"kind": "response_contains", "value": "evaluation_factor"}
+      ]
+    },
+    {
+      "id": "eval-003-out-of-scope-refusal",
+      "prompt": "Use the Theseus ontology to model a Shopify e-commerce product catalog with customers and orders.",
+      "expectations": [
+        {"kind": "response_contains_any", "value": ["federal", "not applicable", "out of scope", "DO NOT USE", "non-federal"]}
+      ]
+    }
+  ]
+}
