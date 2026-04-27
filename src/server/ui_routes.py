@@ -2409,6 +2409,47 @@ def register_ui(
         # produce a focused slice tied to the skill's stated purpose.
         skill = mgr.get_skill(name)
         skill_desc = skill.frontmatter.description if skill is not None else ""
+        # Determine effective runtime mode (env override > frontmatter).
+        env_mode = os.getenv("SKILL_RUNTIME_MODE", "").strip().lower()
+        if env_mode in {"tools", "legacy"}:
+            effective_mode = env_mode
+        elif skill is not None:
+            effective_mode = skill.frontmatter.runtime_mode
+        else:
+            effective_mode = "legacy"
+
+        if effective_mode == "tools":
+            # Tools-mode: skip pre-built briefing book — the runtime fetches
+            # via kg_entities / kg_chunks / kg_query / read_file as the model
+            # works through the skill checklist.
+            try:
+                result = await mgr.invoke(
+                    name,
+                    workspace=get_settings().workspace,
+                    user_prompt=payload.prompt,
+                    entity_payload={},
+                    llm=llm_func,
+                    workspace_root=_workspace_dir(),
+                    slice_fn=_slice_workspace_entities,
+                    retrieve_fn=_retrieve_relevant_entities_for_skill,
+                )
+            except KeyError as exc:
+                raise HTTPException(404, str(exc)) from exc
+            return JSONResponse({
+                "skill": result.skill,
+                "workspace": result.workspace,
+                "response": result.response,
+                "entities_used": result.entities_used,
+                "warnings": result.warnings,
+                "elapsed_ms": result.elapsed_ms,
+                "prompt_tokens_estimate": result.prompt_tokens_estimate,
+                "run_id": result.run_id,
+                "run_dir": result.run_dir,
+                "runtime_mode": "tools",
+                "retrieval": {"mode": "tools", "used": True, "reason": "tools-mode runtime"},
+            })
+
+        # Legacy single-shot path (Phase 1.6 chat-grade retrieval pre-build).
         retrieval = await _retrieve_relevant_entities_for_skill(
             prompt=payload.prompt,
             skill_description=skill_desc,
@@ -2446,6 +2487,7 @@ def register_ui(
             "prompt_tokens_estimate": result.prompt_tokens_estimate,
             "run_id": result.run_id,
             "run_dir": result.run_dir,
+            "runtime_mode": "legacy",
             "retrieval": retrieval["metadata"],
         })
 

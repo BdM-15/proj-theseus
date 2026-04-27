@@ -93,7 +93,16 @@ _INSTALL_LEDGER = _PLATFORM_DIR / "skills.json"
 
 @dataclass
 class SkillFrontmatter:
-    """Parsed YAML frontmatter from a SKILL.md file."""
+    """Parsed YAML frontmatter from a SKILL.md file.
+
+    Spec-conformant top-level fields (per agentskills.io): ``name``,
+    ``description``, ``license``, ``compatibility``, ``metadata``,
+    ``allowed-tools``. The legacy fields ``category``, ``version``,
+    ``upstream``, ``status`` are still parsed at the top level for
+    backward compatibility with our pre-2.0 skills, but new skills MUST
+    nest those under ``metadata:`` per the spec (see
+    ``docs/SKILL_SPEC_COMPLIANCE.md``).
+    """
 
     name: str
     description: str
@@ -102,7 +111,21 @@ class SkillFrontmatter:
     license: str = ""
     upstream: str = ""
     status: str = ""
+    # Spec-only fields (may be absent in legacy skills)
+    compatibility: str = ""
+    metadata: dict[str, Any] = field(default_factory=dict)
+    allowed_tools: list[str] = field(default_factory=list)
+    # Anything else parsed but not recognised
     extras: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def runtime_mode(self) -> str:
+        """Skill runtime mode: ``"tools"`` (multi-turn tool-calling) or
+        ``"legacy"`` (single-shot prompt stuffing). Default ``legacy`` until a
+        skill opts in via ``metadata.runtime: tools``.
+        """
+        raw = str(self.metadata.get("runtime", "")).strip().lower()
+        return "tools" if raw == "tools" else "legacy"
 
 
 @dataclass
@@ -115,7 +138,8 @@ class Skill:
     frontmatter: SkillFrontmatter
     body_md: str
     has_scripts: bool = False
-    has_templates: bool = False
+    has_templates: bool = False  # deprecated alias for has_assets (templates/ -> assets/ rename per spec)
+    has_assets: bool = False
     has_references: bool = False
     has_evals: bool = False
     installed_at: str = ""
@@ -136,8 +160,10 @@ class Skill:
             "status": fm.status,
             "has_scripts": self.has_scripts,
             "has_templates": self.has_templates,
+            "has_assets": self.has_assets,
             "has_references": self.has_references,
             "has_evals": self.has_evals,
+            "runtime_mode": fm.runtime_mode,
             "source": self.source,
             "source_url": self.source_url,
             "installed_at": self.installed_at,
@@ -182,20 +208,64 @@ class SkillRunSummary:
 # ---------------------------------------------------------------------------
 
 _FRONTMATTER_FENCE = "---"
-_KNOWN_KEYS = {"name", "description", "category", "version", "license", "upstream", "status"}
+# Spec-conformant top-level fields per agentskills.io. We continue to recognise
+# the legacy fields (category/version/upstream/status) at the top level for
+# backward compatibility; new skills should nest those under ``metadata:``.
+_SPEC_TOP_LEVEL = {"name", "description", "license", "compatibility", "metadata", "allowed-tools"}
+_LEGACY_TOP_LEVEL = {"category", "version", "upstream", "status"}
+_KNOWN_KEYS = _SPEC_TOP_LEVEL | _LEGACY_TOP_LEVEL
+
+
+def _coerce_scalar(val: str) -> Any:
+    """Best-effort scalar coercion for our minimal YAML dialect."""
+    s = val.strip()
+    if not s:
+        return ""
+    if (s.startswith('"') and s.endswith('"')) or (
+        s.startswith("'") and s.endswith("'")
+    ):
+        return s[1:-1]
+    low = s.lower()
+    if low in {"true", "false"}:
+        return low == "true"
+    if low in {"null", "none", "~"}:
+        return None
+    try:
+        if "." not in s and "e" not in low:
+            return int(s)
+        return float(s)
+    except ValueError:
+        return s
+
+
+def _parse_inline_list(val: str) -> list[Any]:
+    """Parse a flow-style YAML list ``[a, b, c]``. Falls back to whitespace-split."""
+    s = val.strip()
+    if s.startswith("[") and s.endswith("]"):
+        inner = s[1:-1].strip()
+        if not inner:
+            return []
+        return [_coerce_scalar(p) for p in re.split(r"\s*,\s*", inner)]
+    return [_coerce_scalar(p) for p in s.split() if p]
 
 
 def _parse_frontmatter(text: str) -> tuple[SkillFrontmatter, str]:
     """Split a SKILL.md into frontmatter and body.
 
-    Supports only the small subset our skills use: top-level ``key: value``
-    pairs (string values, optionally quoted). Multi-line values, lists, and
-    nested mappings are not used by our SKILL files; if encountered we emit
-    a warning and store them in ``extras`` as raw text.
+    Supports the subset of YAML our skills actually use:
+
+    * Top-level scalar ``key: value`` pairs (strings, ints, floats, bools).
+    * A single nested block under ``metadata:`` whose immediate children are
+      either scalars or single-level lists. The spec uses ``metadata:`` as
+      the escape hatch for custom keys, so this is the only nesting we need.
+    * Flow-style inline lists (``allowed-tools: [Read, Write]``).
+
+    Multi-line strings, deeply nested mappings, and YAML anchors are NOT
+    supported. Encountered unparseable lines are stored under
+    ``extras['_unparsed']`` so the loader can warn but still succeed.
     """
     lines = text.splitlines()
     if not lines or lines[0].strip() != _FRONTMATTER_FENCE:
-        # No frontmatter — body only.
         return SkillFrontmatter(name="", description=""), text
 
     end_idx = -1
@@ -212,32 +282,112 @@ def _parse_frontmatter(text: str) -> tuple[SkillFrontmatter, str]:
 
     parsed: dict[str, Any] = {}
     extras: dict[str, Any] = {}
+    metadata: dict[str, Any] = {}
+    in_metadata_block = False
+    metadata_indent = -1
+    pending_list_key: Optional[str] = None
+    pending_list_indent = -1
+    pending_list_target: Optional[dict[str, Any]] = None
+
     for raw in front_lines:
+        # Comment / blank
         if not raw.strip() or raw.lstrip().startswith("#"):
             continue
+
+        stripped = raw.lstrip()
+        indent = len(raw) - len(stripped)
+
+        # Continuation of a block-style YAML list "key:\n  - item\n  - item"
+        if pending_list_key is not None and stripped.startswith("-") and indent > pending_list_indent:
+            item = stripped[1:].strip()
+            if pending_list_target is not None:
+                pending_list_target.setdefault(pending_list_key, []).append(_coerce_scalar(item))
+            continue
+        else:
+            pending_list_key = None
+            pending_list_target = None
+
+        # Inside metadata: block (any line indented past metadata_indent)
+        if in_metadata_block and indent > metadata_indent:
+            m = re.match(r"^([A-Za-z_][A-Za-z0-9_-]*)\s*:\s*(.*)$", stripped)
+            if not m:
+                extras.setdefault("_unparsed", []).append(raw)
+                continue
+            key, val = m.group(1), m.group(2)
+            if not val.strip():
+                # Block-style list follows
+                pending_list_key = key
+                pending_list_indent = indent
+                pending_list_target = metadata
+                metadata.setdefault(key, [])
+                continue
+            if val.strip().startswith("["):
+                metadata[key] = _parse_inline_list(val)
+            else:
+                metadata[key] = _coerce_scalar(val)
+            continue
+
+        # Returned to top level
+        in_metadata_block = False
+        metadata_indent = -1
+
         m = re.match(r"^([A-Za-z_][A-Za-z0-9_-]*)\s*:\s*(.*)$", raw)
         if not m:
             extras.setdefault("_unparsed", []).append(raw)
             continue
-        key, val = m.group(1), m.group(2).strip()
-        # Strip optional matching quotes.
-        if (val.startswith('"') and val.endswith('"')) or (
-            val.startswith("'") and val.endswith("'")
-        ):
-            val = val[1:-1]
+        key, val = m.group(1), m.group(2)
+
+        if key == "metadata" and not val.strip():
+            in_metadata_block = True
+            metadata_indent = indent
+            continue
+
+        if key == "metadata" and val.strip().startswith("{"):
+            # Inline mapping — minimal support
+            inner = val.strip()[1:-1].strip() if val.strip().endswith("}") else ""
+            for pair in re.split(r"\s*,\s*", inner) if inner else []:
+                if ":" in pair:
+                    k2, v2 = pair.split(":", 1)
+                    metadata[k2.strip()] = _coerce_scalar(v2)
+            continue
+
+        if key == "allowed-tools":
+            parsed[key] = _parse_inline_list(val) if val.strip().startswith("[") else val.strip().split()
+            continue
+
+        if not val.strip():
+            # Block-style list at top level (only allowed-tools really uses this)
+            pending_list_key = key
+            pending_list_indent = indent
+            pending_list_target = parsed
+            parsed.setdefault(key, [])
+            continue
+
+        coerced = _coerce_scalar(val)
         if key in _KNOWN_KEYS:
-            parsed[key] = val
+            parsed[key] = coerced
         else:
-            extras[key] = val
+            extras[key] = coerced
+
+    # Promote legacy fields nested under metadata to the dataclass attrs so
+    # consumers (UI summary, copilot-instructions audit) see a single source
+    # of truth, while keeping the metadata dict intact for the runtime.
+    def _meta_or_top(key: str, default: Any) -> Any:
+        if key in metadata:
+            return metadata[key]
+        return parsed.get(key, default)
 
     fm = SkillFrontmatter(
-        name=parsed.get("name", ""),
-        description=parsed.get("description", ""),
-        category=parsed.get("category", "other"),
-        version=parsed.get("version", "0.0.0"),
-        license=parsed.get("license", ""),
-        upstream=parsed.get("upstream", ""),
-        status=parsed.get("status", ""),
+        name=str(parsed.get("name", "")),
+        description=str(parsed.get("description", "")),
+        category=str(_meta_or_top("category", "other")),
+        version=str(_meta_or_top("version", "0.0.0")),
+        license=str(parsed.get("license", "")),
+        upstream=str(_meta_or_top("upstream", "")),
+        status=str(_meta_or_top("status", "")),
+        compatibility=str(parsed.get("compatibility", "")),
+        metadata=metadata,
+        allowed_tools=list(parsed.get("allowed-tools", []) or []),
         extras=extras,
     )
     return fm, body
@@ -307,6 +457,7 @@ class SkillManager:
             body_md=body,
             has_scripts=(folder / "scripts").is_dir(),
             has_templates=(folder / "templates").is_dir(),
+            has_assets=(folder / "assets").is_dir(),
             has_references=(folder / "references").is_dir(),
             has_evals=(folder / "evals").is_dir(),
             installed_at=ledger_entry.get("installed_at", ""),
@@ -425,6 +576,9 @@ class SkillManager:
         llm: Callable[[str], Awaitable[str]],
         max_payload_chars: Optional[int] = None,
         workspace_root: Optional[Path] = None,
+        slice_fn: Optional[Callable[..., dict[str, Any]]] = None,
+        retrieve_fn: Optional[Callable[..., Awaitable[dict[str, Any]]]] = None,
+        runtime_mode_override: Optional[str] = None,
     ) -> SkillInvocationResult:
         """Run a skill against an injected workspace context.
 
@@ -446,11 +600,63 @@ class SkillManager:
                 model / temperature to use.
             max_payload_chars: Hard cap on the JSON-serialized entity payload
                 included in the prompt (truncated with a marker if exceeded).
+            slice_fn: Optional Phase 1.5 KG slice callable (route layer's
+                ``_slice_workspace_entities``). Required for tools-mode skills
+                that call ``kg_entities``.
+            retrieve_fn: Optional Phase 1.6 retrieval callable (route layer's
+                ``_retrieve_relevant_entities_for_skill``). Required for
+                tools-mode skills that call ``kg_chunks``.
+            runtime_mode_override: Force ``"tools"`` or ``"legacy"`` regardless
+                of what the skill's ``metadata.runtime`` declares. Used by the
+                env var ``SKILL_RUNTIME_MODE`` and tests.
         """
         skill = self.get_skill(name)
         if skill is None:
             raise KeyError(f"Unknown skill: {name}")
 
+        # Resolve runtime mode: explicit override > env var > frontmatter > default.
+        env_override = os.getenv("SKILL_RUNTIME_MODE", "").strip().lower()
+        if runtime_mode_override in {"tools", "legacy"}:
+            mode = runtime_mode_override
+        elif env_override in {"tools", "legacy"}:
+            mode = env_override
+        else:
+            mode = skill.frontmatter.runtime_mode
+
+        if mode == "tools":
+            return await self._invoke_tools_mode(
+                skill=skill,
+                workspace=workspace,
+                user_prompt=user_prompt,
+                workspace_root=workspace_root,
+                slice_fn=slice_fn,
+                retrieve_fn=retrieve_fn,
+            )
+        return await self._invoke_legacy_mode(
+            skill=skill,
+            workspace=workspace,
+            user_prompt=user_prompt,
+            entity_payload=entity_payload,
+            llm=llm,
+            max_payload_chars=max_payload_chars,
+            workspace_root=workspace_root,
+        )
+
+    # ---- Legacy single-shot path (pre-2.1) ---------------------------
+
+    async def _invoke_legacy_mode(
+        self,
+        *,
+        skill: "Skill",
+        workspace: str,
+        user_prompt: str,
+        entity_payload: dict[str, Any],
+        llm: Callable[[str], Awaitable[str]],
+        max_payload_chars: Optional[int],
+        workspace_root: Optional[Path],
+    ) -> SkillInvocationResult:
+        """Original single-shot dispatch — pre-builds briefing book and calls llm once."""
+        name = skill.name
         warnings: list[str] = []
         budget = max_payload_chars if max_payload_chars is not None else DEFAULT_SKILL_MAX_PAYLOAD_CHARS
         payload_json = json.dumps(entity_payload, ensure_ascii=False, indent=2)
@@ -511,6 +717,161 @@ class SkillManager:
             run_id=run_id,
             run_dir=run_dir,
         )
+
+    # ---- Tools-mode multi-turn loop (2.1) -----------------------------
+
+    async def _invoke_tools_mode(
+        self,
+        *,
+        skill: "Skill",
+        workspace: str,
+        user_prompt: str,
+        workspace_root: Optional[Path],
+        slice_fn: Optional[Callable[..., dict[str, Any]]],
+        retrieve_fn: Optional[Callable[..., Awaitable[dict[str, Any]]]],
+    ) -> SkillInvocationResult:
+        """Multi-turn tool-calling dispatch.
+
+        The skill body is the workflow contract. The runtime gives the model
+        six tools (read_file, run_script, write_file, kg_query, kg_entities,
+        kg_chunks) and lets it drive itself to a final answer. Every tool call
+        is captured in ``transcript.json`` for grounding audit.
+
+        Requires ``workspace_root`` so the run folder (with artifacts/ and
+        tool_outputs/) can be created up front; the runtime writes
+        ``transcript.json`` after every turn so a crash leaves a usable
+        partial trace.
+        """
+        # Local imports keep the openai dep optional for legacy-mode users.
+        from src.skills.runtime import run_tool_loop
+        from src.skills.tools import ToolContext
+
+        if workspace_root is None:
+            raise RuntimeError(
+                "tools-mode skills require workspace_root for run persistence"
+            )
+
+        warnings: list[str] = []
+        started = datetime.now(timezone.utc)
+        ts = started.strftime("%Y%m%d_%H%M%S")
+        slug = _slugify_for_filename(user_prompt) or "run"
+        run_id = f"{ts}_{slug}"
+        run_dir = self._runs_root(workspace_root, skill.name) / run_id
+        run_dir.mkdir(parents=True, exist_ok=True)
+        (run_dir / "artifacts").mkdir(exist_ok=True)
+        (run_dir / "tool_outputs").mkdir(exist_ok=True)
+
+        # Honour an env-tunable turn cap so operators can throttle cost.
+        max_turns = _env_int("SKILL_TOOLS_MAX_TURNS", 12)
+
+        ctx = ToolContext(
+            skill_name=skill.name,
+            skill_dir=Path(skill.path),
+            run_dir=run_dir,
+            workspace_dir=workspace_root,
+            workspace_name=workspace,
+            slice_fn=slice_fn,
+            retrieve_fn=retrieve_fn,
+        )
+
+        loop_result = await run_tool_loop(
+            skill_name=skill.name,
+            skill_body=skill.body_md,
+            user_prompt=user_prompt,
+            ctx=ctx,
+            max_turns=max_turns,
+        )
+        warnings.extend(loop_result.warnings)
+        elapsed_ms = int((datetime.now(timezone.utc) - started).total_seconds() * 1000)
+
+        # Persist the run envelope. The transcript itself is already written
+        # incrementally by the runtime; we just stamp the human-readable
+        # summary here.
+        try:
+            self._persist_tools_run(
+                run_dir=run_dir,
+                run_id=run_id,
+                skill_name=skill.name,
+                workspace=workspace,
+                user_prompt=user_prompt,
+                response=loop_result.response,
+                turns=loop_result.turns,
+                tool_calls=loop_result.tool_calls,
+                finish_reason=loop_result.finish_reason,
+                usage_total=loop_result.usage_total,
+                warnings=warnings,
+                elapsed_ms=elapsed_ms,
+                started_at=started,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to persist tools-mode run for %s: %s", skill.name, exc)
+            warnings.append(f"persistence failed: {exc}")
+
+        self._touch_invocation(skill.name)
+
+        return SkillInvocationResult(
+            skill=skill.name,
+            workspace=workspace,
+            response=loop_result.response,
+            entities_used=[],  # tools-mode discovers entities through tool calls
+            warnings=warnings,
+            elapsed_ms=elapsed_ms,
+            prompt_tokens_estimate=int(loop_result.usage_total.get("total_tokens", 0)),
+            run_id=run_id,
+            run_dir=str(run_dir.resolve()),
+        )
+
+    @staticmethod
+    def _persist_tools_run(
+        *,
+        run_dir: Path,
+        run_id: str,
+        skill_name: str,
+        workspace: str,
+        user_prompt: str,
+        response: str,
+        turns: int,
+        tool_calls: int,
+        finish_reason: str,
+        usage_total: dict[str, int],
+        warnings: list[str],
+        elapsed_ms: int,
+        started_at: datetime,
+    ) -> None:
+        """Write run.md + response.md for a tools-mode invocation.
+
+        ``transcript.json`` is owned by the runtime (so it survives crashes),
+        but we cross-reference it from the envelope for the UI.
+        """
+        envelope = (
+            "---\n"
+            f"run_id: {run_id}\n"
+            f"skill: {skill_name}\n"
+            f"workspace: {workspace}\n"
+            f"runtime: tools\n"
+            f"created_at: {started_at.isoformat()}\n"
+            f"elapsed_ms: {elapsed_ms}\n"
+            f"turns: {turns}\n"
+            f"tool_calls: {tool_calls}\n"
+            f"finish_reason: {finish_reason}\n"
+            f"prompt_tokens: {usage_total.get('prompt_tokens', 0)}\n"
+            f"completion_tokens: {usage_total.get('completion_tokens', 0)}\n"
+            f"total_tokens: {usage_total.get('total_tokens', 0)}\n"
+            f"response_chars: {len(response)}\n"
+            "---\n\n"
+            "# Skill Run (tools mode)\n\n"
+            "## User Prompt\n\n"
+            f"{user_prompt.strip() or '(skill defaults)'}\n\n"
+            "## Warnings\n\n"
+            + ("\n".join(f"- {w}" for w in warnings) if warnings else "- (none)")
+            + "\n\n## See also\n\n"
+            "- `response.md` — final assistant message\n"
+            "- `transcript.json` — full turn-by-turn record (tool calls + results)\n"
+            "- `tool_outputs/` — raw stdout/stderr from `run_script` calls\n"
+            "- `artifacts/` — files the skill wrote with `write_file`\n"
+        )
+        (run_dir / "run.md").write_text(envelope, encoding="utf-8")
+        (run_dir / "response.md").write_text(response or "", encoding="utf-8")
 
     @staticmethod
     def _compose_prompt(
