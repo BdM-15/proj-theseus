@@ -1,0 +1,70 @@
+<!doctype html>
+<!-- GovCon one-pager — vertical 8.5x11, 3-band hierarchy. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>{{title}}</title>
+    <style>
+      @page {
+        size: Letter;
+        margin: 0.75in;
+      }
+      body {
+        font-family: "Source Sans 3", Calibri, sans-serif;
+        color: #0f172a;
+        background: #f8fafc;
+        margin: 0;
+      }
+      .band {
+        padding: 24px 0;
+        border-bottom: 1px solid #94a3b8;
+      }
+      .band-hero {
+        background: #0a2540;
+        color: #fff;
+        padding: 32px 0.75in;
+      }
+      .band-hero h1 {
+        font-family: "Source Serif 4", Georgia, serif;
+        font-size: 28pt;
+        margin: 0 0 8px;
+      }
+      .band-hero p {
+        font-size: 14pt;
+        margin: 0;
+        color: #94a3b8;
+      }
+      .band-evidence {
+        padding: 24px 0.75in;
+      }
+      .band-evidence h2 {
+        font-family: "Source Serif 4", Georgia, serif;
+        color: #0a2540;
+        font-size: 16pt;
+        margin: 0 0 12px;
+      }
+      .band-cta {
+        padding: 24px 0.75in;
+        background: #f1f5f9;
+      }
+      .accent {
+        color: #b8860b;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <section class="band band-hero">
+      <h1>{{title}}</h1>
+      <p>{{subtitle}}</p>
+    </section>
+    <section class="band band-evidence">
+      <h2>Why us, why now</h2>
+      {{evidence_html}}
+    </section>
+    <section class="band band-cta">
+      <h2>Next step</h2>
+      <p>{{cta}}</p>
+    </section>
+  </body>
+</html>

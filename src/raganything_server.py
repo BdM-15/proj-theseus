@@ -213,7 +213,21 @@ async def main():
             ),
         )
 
-    register_ui(app, _ui_query, _ui_query_data)
+    async def _ui_llm(prompt: str) -> str:
+        """Skill-invocation bridge: call the underlying LLM directly.
+
+        Used by ``/api/ui/skills/{name}/invoke`` to dispatch a fully-composed
+        skill prompt to the configured chat model without routing through the
+        RAG query template (skills compose their own prompts that already
+        include workspace entity context).
+        """
+        llm = getattr(rag_instance.lightrag, "llm_model_func", None)
+        if llm is None:
+            raise RuntimeError("LightRAG instance has no llm_model_func configured")
+        result = await llm(prompt, system_prompt=None, history_messages=[])
+        return result if isinstance(result, str) else str(result)
+
+    register_ui(app, _ui_query, _ui_query_data, llm_func=_ui_llm)
 
     # Consolidated startup banner — full pipeline detail in docs/ARCHITECTURE.md
     graph_storage = global_args.graph_storage if hasattr(global_args, 'graph_storage') else "NetworkXStorage"

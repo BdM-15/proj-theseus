@@ -297,6 +297,41 @@ class QuerySettingsUpdate(BaseModel):
     user_prompt: Optional[str] = Field(default=None, max_length=20000)
 
 
+class SkillInstallPayload(BaseModel):
+    """Body for POST /api/ui/skills/install."""
+
+    url: str = Field(..., description="https://github.com/<org>/<repo> URL")
+    name: Optional[str] = Field(None, description="Override target skill slug")
+
+
+def _default_max_entities_per_type() -> int:
+    """Read SKILL_MAX_ENTITIES_PER_TYPE from env, fall back to 40."""
+    raw = os.getenv("SKILL_MAX_ENTITIES_PER_TYPE")
+    if not raw:
+        return 40
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return 40
+    return max(1, min(500, value))
+
+
+class SkillInvokePayload(BaseModel):
+    """Body for POST /api/ui/skills/{name}/invoke."""
+
+    prompt: str = Field("", description="Free-text user instruction; may be empty")
+    entity_types: Optional[list[str]] = Field(
+        None,
+        description=(
+            "Restrict the workspace context payload to these entity_types. "
+            "Defaults to the skill's recommended slice (see SKILL.md)."
+        ),
+    )
+    max_entities_per_type: int = Field(
+        default_factory=_default_max_entities_per_type, ge=1, le=500
+    )
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -1076,10 +1111,14 @@ def _compute_intel() -> dict[str, Any]:
 # Registration
 # ---------------------------------------------------------------------------
 
+LlmFunc = Callable[[str], Awaitable[str]]
+
+
 def register_ui(
     app: FastAPI,
     query_func: QueryFunc,
     data_func: QueryDataFunc | None = None,
+    llm_func: LlmFunc | None = None,
 ) -> None:
     """
     Register the Project Theseus UI routes on an existing FastAPI app.
@@ -1858,5 +1897,184 @@ def register_ui(
         except OSError as exc:
             raise HTTPException(500, f"Failed resetting settings: {exc}") from exc
         return JSONResponse({"settings": _default_query_settings()})
+
+    # ---- Agent Skills (dual-use: VS Code/Copilot + Theseus UI) ------------
+    #
+    # Skills live in ``.github/skills/`` (the official agentskills.io
+    # location). The same SKILL.md files are read by Copilot when the repo is
+    # opened in VS Code, AND by these endpoints when invoked from the
+    # Theseus UI Skills page. Invocation pulls a workspace entity slice
+    # from the active KG and dispatches the composed prompt to ``llm_func``.
+
+    from src.skills import get_skill_manager
+
+    def _slice_workspace_entities(
+        entity_types: Optional[list[str]],
+        max_per_type: int,
+    ) -> dict[str, Any]:
+        """Pull entity name/type/description triples from the active workspace.
+
+        Reads ``vdb_entities.json`` (the canonical post-extraction VDB store)
+        directly so we can hand a typed entity slice to the skill prompt
+        without booting the full LightRAG instance. Returns a dict keyed by
+        entity_type with a list of trimmed entity dicts.
+        """
+        ws_dir = _workspace_dir()
+        path = ws_dir / "vdb_entities.json"
+        if not path.exists():
+            return {}
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to read entity store for skill context: %s", exc)
+            return {}
+
+        # vdb_entities.json shape: {"embedding_dim": int, "data": [...], "matrix": "..."}
+        records: list[dict[str, Any]] = []
+        if isinstance(raw, dict) and isinstance(raw.get("data"), list):
+            records = [r for r in raw["data"] if isinstance(r, dict)]
+        elif isinstance(raw, list):
+            records = [r for r in raw if isinstance(r, dict)]
+
+        # When the UI doesn't pin entity_types, drop framework-noise buckets
+        # so the budget is spent on RFP-specific content. ``concept`` is the
+        # bucket where Shipley/methodology entities live (BD Lifecycle, color
+        # team reviews, etc.) — useful as background but not RFP source of
+        # truth. ``unknown`` is unclassified extraction residue.
+        _NOISE_BUCKETS = {"concept", "unknown"}
+
+        wanted = {t.lower() for t in entity_types} if entity_types else None
+        bucketed: dict[str, list[dict[str, Any]]] = {}
+        for ent in records:
+            etype = str(ent.get("entity_type", "")).lower()
+            if wanted is None and etype in _NOISE_BUCKETS:
+                continue
+            if wanted and etype not in wanted:
+                continue
+            bucket = bucketed.setdefault(etype or "unknown", [])
+            if len(bucket) >= max_per_type:
+                continue
+            bucket.append({
+                "name": ent.get("entity_name") or ent.get("name"),
+                "description": (ent.get("description") or "")[:400],
+            })
+        return bucketed
+
+    @app.get("/api/ui/skills", tags=["theseus-ui"])
+    async def list_skills_route() -> JSONResponse:
+        """List all discovered agent skills (built-in + installed)."""
+        mgr = get_skill_manager()
+        return JSONResponse({"skills": mgr.list_skills()})
+
+    @app.post("/api/ui/skills/refresh", tags=["theseus-ui"])
+    async def refresh_skills_route() -> JSONResponse:
+        """Re-walk ``.github/skills/`` (call after editing skill files)."""
+        mgr = get_skill_manager()
+        mgr.discover()
+        return JSONResponse({"skills": mgr.list_skills()})
+
+    @app.get("/api/ui/skills/{name}", tags=["theseus-ui"])
+    async def get_skill_route(name: str) -> JSONResponse:
+        """Return full SKILL.md body + supporting-file inventory."""
+        mgr = get_skill_manager()
+        detail = mgr.get_skill_detail(name)
+        if detail is None:
+            raise HTTPException(404, f"Unknown skill: {name}")
+        return JSONResponse(detail)
+
+    @app.post("/api/ui/skills/install", tags=["theseus-ui"])
+    async def install_skill_route(payload: SkillInstallPayload) -> JSONResponse:
+        """Install a skill from a GitHub repo URL (https only, github.com only)."""
+        mgr = get_skill_manager()
+        try:
+            skill = await mgr.install_from_github(payload.url, name=payload.name)
+        except FileExistsError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        except (ValueError, RuntimeError) as exc:
+            raise HTTPException(400, str(exc)) from exc
+        return JSONResponse({"skill": skill.to_summary()})
+
+    @app.delete("/api/ui/skills/{name}", tags=["theseus-ui"])
+    async def uninstall_skill_route(name: str) -> JSONResponse:
+        """Remove an installed (non-builtin) skill."""
+        mgr = get_skill_manager()
+        try:
+            removed = await mgr.uninstall(name)
+        except PermissionError as exc:
+            raise HTTPException(403, str(exc)) from exc
+        if not removed:
+            raise HTTPException(404, f"Unknown skill: {name}")
+        return JSONResponse({"removed": name})
+
+    @app.post("/api/ui/skills/{name}/invoke", tags=["theseus-ui"])
+    async def invoke_skill_route(
+        name: str,
+        payload: SkillInvokePayload,
+    ) -> JSONResponse:
+        """Run the named skill against the active workspace entity slice."""
+        if llm_func is None:
+            raise HTTPException(
+                503,
+                "Skill invocation requires an llm_func; server was started without one",
+            )
+        mgr = get_skill_manager()
+        ctx = _slice_workspace_entities(
+            payload.entity_types, payload.max_entities_per_type
+        )
+        try:
+            result = await mgr.invoke(
+                name,
+                workspace=get_settings().workspace,
+                user_prompt=payload.prompt,
+                entity_payload=ctx,
+                llm=llm_func,
+                workspace_root=_workspace_dir(),
+            )
+        except KeyError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        return JSONResponse({
+            "skill": result.skill,
+            "workspace": result.workspace,
+            "response": result.response,
+            "entities_used": result.entities_used,
+            "warnings": result.warnings,
+            "elapsed_ms": result.elapsed_ms,
+            "prompt_tokens_estimate": result.prompt_tokens_estimate,
+            "run_id": result.run_id,
+            "run_dir": result.run_dir,
+        })
+
+    # NOTE: aggregate "all runs across skills" endpoint omitted because
+    # /api/ui/skills/runs would shadow /api/ui/skills/{name} (registered above).
+    # If needed, add it under a distinct prefix like /api/ui/skill-runs.
+
+    @app.get("/api/ui/skills/{name}/runs", tags=["theseus-ui"])
+    async def list_skill_runs_route(name: str, limit: int = 50) -> JSONResponse:
+        """List persisted runs for a single skill in the active workspace."""
+        mgr = get_skill_manager()
+        runs = mgr.list_runs(_workspace_dir(), skill_name=name, limit=limit)
+        return JSONResponse({
+            "workspace": get_settings().workspace,
+            "skill": name,
+            "runs": runs,
+        })
+
+    @app.get("/api/ui/skills/{name}/runs/{run_id}", tags=["theseus-ui"])
+    async def get_skill_run_route(name: str, run_id: str) -> JSONResponse:
+        """Return the full content of one persisted skill run."""
+        mgr = get_skill_manager()
+        run = mgr.get_run(_workspace_dir(), name, run_id)
+        if run is None:
+            raise HTTPException(404, f"Unknown run: {name}/{run_id}")
+        return JSONResponse(run)
+
+    @app.delete("/api/ui/skills/{name}/runs/{run_id}", tags=["theseus-ui"])
+    async def delete_skill_run_route(name: str, run_id: str) -> JSONResponse:
+        """Delete a persisted skill run from disk."""
+        mgr = get_skill_manager()
+        ok = mgr.delete_run(_workspace_dir(), name, run_id)
+        if not ok:
+            raise HTTPException(404, f"Unknown or unsafe run id: {name}/{run_id}")
+        return JSONResponse({"removed": run_id})
 
     logger.info("✅ Project Theseus UI mounted at /ui (static: %s)", _STATIC_DIR)

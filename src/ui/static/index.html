@@ -2513,6 +2513,430 @@
             </div>
           </section>
 
+          <!-- ============== AGENT SKILLS ============== -->
+          <!--
+            Dual-use Agent Skills page. Skills live in .github/skills/ and are
+            read by both VS Code/Copilot AND this UI via /api/ui/skills.
+            Cards open a detail drawer; "Run" composes a skill prompt with a
+            workspace entity slice and dispatches it to the configured LLM.
+          -->
+          <section x-show="active === 'skills'" x-cloak>
+            <div class="flex items-end justify-between mb-5 flex-wrap gap-3">
+              <div>
+                <h1 class="text-2xl font-bold tracking-tight">
+                  <span class="h1-gradient">Agent Skills</span>
+                </h1>
+                <p class="text-sm text-slate-500 mt-1">
+                  Discoverable, installable, invocable agent skills — the same
+                  files Copilot reads from
+                  <code class="font-mono text-neon-cyan">.github/skills/</code>.
+                </p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button
+                  class="pill bg-ink-800 border border-edge text-slate-300 hover:text-neon-cyan hover:border-neon-cyan/50 px-3 py-1.5 text-xs"
+                  @click="loadSkills(true)"
+                  :disabled="skills.loading"
+                >
+                  <i
+                    data-lucide="refresh-cw"
+                    class="w-3.5 h-3.5 inline mr-1"
+                  ></i>
+                  Refresh
+                </button>
+                <button
+                  class="pill bg-neon-magenta/10 border border-neon-magenta/40 text-neon-magenta hover:bg-neon-magenta/20 px-3 py-1.5 text-xs"
+                  @click="skills.installModal = true"
+                >
+                  <i data-lucide="download" class="w-3.5 h-3.5 inline mr-1"></i>
+                  Install from GitHub
+                </button>
+              </div>
+            </div>
+
+            <div
+              x-show="skills.error"
+              class="card border border-red-500/40 bg-red-500/5 p-3 mb-4 text-sm text-red-300"
+              x-text="skills.error"
+            ></div>
+
+            <div
+              x-show="!skills.loading && skills.items.length === 0"
+              class="text-sm text-slate-500 italic"
+            >
+              No skills discovered. Check that
+              <code class="font-mono">.github/skills/</code> exists.
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              <template x-for="s in skills.items" :key="s.name">
+                <div
+                  class="card card-accent p-4 flex flex-col gap-3 cursor-pointer card-hover border-neon-magenta/30"
+                  @click="openSkill(s.name)"
+                >
+                  <div class="flex items-start justify-between gap-2">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <i
+                        data-lucide="wand-2"
+                        class="w-4 h-4 text-neon-magenta flex-shrink-0"
+                      ></i>
+                      <h3
+                        class="text-sm font-semibold text-slate-100 leading-snug truncate"
+                        x-text="s.name"
+                      ></h3>
+                    </div>
+                    <span
+                      class="pill bg-ink-800 text-slate-400 border border-edge whitespace-nowrap text-[10px]"
+                      x-text="s.category || 'other'"
+                    ></span>
+                  </div>
+                  <p
+                    class="text-xs text-slate-400 leading-snug line-clamp-3"
+                    x-text="s.description"
+                  ></p>
+                  <div
+                    class="flex items-center gap-2 text-[10px] font-mono text-slate-500 mt-auto"
+                  >
+                    <span x-text="'v' + (s.version || '0.0.0')"></span>
+                    <span
+                      x-show="s.source === 'installed'"
+                      class="text-neon-magenta"
+                    >
+                      installed
+                    </span>
+                    <span
+                      x-show="s.status"
+                      class="text-amber-400"
+                      x-text="s.status"
+                    ></span>
+                    <span class="ml-auto" x-show="s.has_references">refs</span>
+                    <span x-show="s.has_templates">tpl</span>
+                    <span x-show="s.has_scripts">scripts</span>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+            <!-- Skill detail drawer -->
+            <div
+              x-show="skills.detailOpen"
+              x-cloak
+              x-transition.opacity
+              class="fixed inset-0 z-[80] bg-black/70 flex items-stretch justify-end"
+              @click.self="skills.detailOpen = false"
+            >
+              <div
+                class="w-full max-w-2xl h-full bg-ink-900 border-l border-edge-strong overflow-y-auto pt-16"
+                @click.stop
+              >
+                <div
+                  class="bg-ink-900 border-b border-edge p-4 flex items-start justify-between gap-3"
+                >
+                  <div class="min-w-0 flex-1">
+                    <h2
+                      class="text-lg font-semibold text-slate-100 break-words"
+                      x-text="skills.current?.name"
+                    ></h2>
+                    <p
+                      class="text-xs text-slate-400 mt-1 whitespace-pre-wrap"
+                      x-text="skills.current?.description"
+                    ></p>
+                  </div>
+                  <button
+                    @click="skills.detailOpen = false"
+                    class="shrink-0 text-slate-400 hover:text-neon-magenta mt-0.5"
+                  >
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                  </button>
+                </div>
+
+                <div class="p-4 space-y-4">
+                  <div class="flex flex-wrap gap-2 text-[10px] font-mono">
+                    <span
+                      class="pill border border-edge bg-ink-800 text-slate-400"
+                      x-text="'v' + (skills.current?.version || '0.0.0')"
+                    ></span>
+                    <span
+                      class="pill border border-edge bg-ink-800 text-slate-400"
+                      x-text="skills.current?.category"
+                    ></span>
+                    <span
+                      x-show="skills.current?.license"
+                      class="pill border border-edge bg-ink-800 text-slate-400"
+                      x-text="skills.current?.license"
+                    ></span>
+                    <span
+                      x-show="skills.current?.upstream"
+                      class="pill border border-edge bg-ink-800 text-neon-cyan"
+                      x-text="'upstream: ' + skills.current?.upstream"
+                    ></span>
+                    <span
+                      x-show="skills.current?.source === 'installed'"
+                      class="pill border border-neon-magenta/40 bg-neon-magenta/10 text-neon-magenta"
+                      >installed</span
+                    >
+                  </div>
+
+                  <div>
+                    <label class="text-xs font-mono text-slate-400 mb-1 block"
+                      >User Prompt (optional)</label
+                    >
+                    <textarea
+                      x-model="skills.invokePrompt"
+                      rows="3"
+                      placeholder="Describe what you want this skill to do (or leave empty for defaults)…"
+                      class="w-full bg-ink-800 border border-edge focus:border-neon-magenta/60 outline-none rounded-lg px-3 py-2 text-sm font-mono"
+                    ></textarea>
+                  </div>
+
+                  <div class="flex items-center gap-2">
+                    <button
+                      @click="invokeSkill()"
+                      :disabled="skills.invoking"
+                      class="pill bg-neon-magenta/10 border border-neon-magenta/40 text-neon-magenta hover:bg-neon-magenta/20 px-4 py-2 text-xs"
+                    >
+                      <i data-lucide="play" class="w-3.5 h-3.5 inline mr-1"></i>
+                      <span
+                        x-text="skills.invoking ? 'Running…' : 'Run on Active Workspace'"
+                      ></span>
+                    </button>
+                    <button
+                      x-show="skills.current?.source === 'installed'"
+                      @click="uninstallSkill()"
+                      class="pill bg-red-500/10 border border-red-500/40 text-red-300 hover:bg-red-500/20 px-3 py-2 text-xs"
+                    >
+                      <i
+                        data-lucide="trash-2"
+                        class="w-3.5 h-3.5 inline mr-1"
+                      ></i>
+                      Uninstall
+                    </button>
+                  </div>
+
+                  <div x-show="skills.invokeResult">
+                    <h3 class="text-xs font-mono text-slate-400 mb-1">
+                      Output
+                    </h3>
+                    <pre
+                      class="bg-ink-800 border border-edge rounded-lg p-3 text-xs text-slate-200 whitespace-pre-wrap font-mono max-h-96 overflow-auto"
+                      x-text="skills.invokeResult"
+                    ></pre>
+                    <p class="text-[10px] text-slate-500 mt-1 font-mono">
+                      Entities used:
+                      <span
+                        x-text="(skills.invokeMeta?.entities_used || []).join(', ') || '(none)'"
+                      ></span>
+                      ·
+                      <span
+                        x-text="skills.invokeMeta?.elapsed_ms + 'ms'"
+                      ></span>
+                      <template x-if="skills.invokeMeta?.run_id">
+                        <span>
+                          ·
+                          <span
+                            class="text-neon-cyan"
+                            x-text="skills.invokeMeta.run_id"
+                          ></span>
+                        </span>
+                      </template>
+                    </p>
+                    <p
+                      x-show="skills.invokeMeta?.run_dir"
+                      class="text-[10px] text-slate-500 mt-1 font-mono break-all"
+                    >
+                      Saved to:
+                      <span
+                        class="text-slate-400"
+                        x-text="skills.invokeMeta?.run_dir"
+                      ></span>
+                    </p>
+                  </div>
+
+                  <div x-show="skills.detailOpen">
+                    <div class="flex items-center justify-between mb-1">
+                      <h3 class="text-xs font-mono text-slate-400">
+                        Recent Runs
+                        <span
+                          class="text-slate-600"
+                          x-text="'(' + skills.runs.length + ')'"
+                        ></span>
+                      </h3>
+                      <button
+                        @click="loadSkillRuns(skills.current?.name)"
+                        class="text-[10px] text-slate-500 hover:text-neon-cyan font-mono"
+                      >
+                        <i data-lucide="refresh-cw" class="w-3 h-3 inline"></i>
+                        refresh
+                      </button>
+                    </div>
+                    <div
+                      x-show="skills.runsLoading"
+                      class="text-[10px] font-mono text-slate-500"
+                    >
+                      Loading runs…
+                    </div>
+                    <div
+                      x-show="!skills.runsLoading && skills.runs.length === 0"
+                      class="text-[10px] font-mono text-slate-600 italic"
+                    >
+                      No saved runs for this skill in the active workspace yet.
+                    </div>
+                    <ul class="space-y-1">
+                      <template x-for="run in skills.runs" :key="run.run_id">
+                        <li
+                          class="bg-ink-800/60 border border-edge rounded-md p-2 text-[11px] font-mono hover:border-neon-cyan/40 transition-colors"
+                        >
+                          <div class="flex items-start justify-between gap-2">
+                            <button
+                              @click="loadSkillRun(skills.current?.name, run.run_id)"
+                              class="text-left flex-1 min-w-0"
+                            >
+                              <div
+                                class="text-neon-cyan truncate"
+                                x-text="run.run_id"
+                              ></div>
+                              <div
+                                class="text-slate-400 mt-0.5 truncate"
+                                x-text="run.prompt_preview || '(skill defaults)'"
+                              ></div>
+                              <div class="text-slate-600 mt-0.5">
+                                <span x-text="run.created_at"></span>
+                                ·
+                                <span
+                                  x-text="(run.elapsed_ms || 0) + 'ms'"
+                                ></span>
+                                ·
+                                <span
+                                  x-text="(run.response_chars || 0) + ' chars'"
+                                ></span>
+                              </div>
+                            </button>
+                            <button
+                              @click="deleteSkillRun(skills.current?.name, run.run_id)"
+                              class="text-slate-600 hover:text-red-400"
+                              title="Delete run"
+                            >
+                              <i data-lucide="x" class="w-3 h-3"></i>
+                            </button>
+                          </div>
+                        </li>
+                      </template>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h3 class="text-xs font-mono text-slate-400 mb-1">
+                      SKILL.md
+                    </h3>
+                    <pre
+                      class="bg-ink-800 border border-edge rounded-lg p-3 text-xs text-slate-300 whitespace-pre-wrap max-h-96 overflow-auto"
+                      x-text="skills.current?.body_md"
+                    ></pre>
+                  </div>
+
+                  <template x-if="(skills.current?.references || []).length">
+                    <div>
+                      <h3 class="text-xs font-mono text-slate-400 mb-1">
+                        References
+                      </h3>
+                      <ul class="text-xs text-slate-300 space-y-1">
+                        <template
+                          x-for="r in skills.current.references"
+                          :key="r.name"
+                        >
+                          <li class="font-mono">
+                            · <span x-text="r.name"></span>
+                          </li>
+                        </template>
+                      </ul>
+                    </div>
+                  </template>
+
+                  <template x-if="(skills.current?.templates || []).length">
+                    <div>
+                      <h3 class="text-xs font-mono text-slate-400 mb-1">
+                        Templates
+                      </h3>
+                      <ul class="text-xs text-slate-300 space-y-1">
+                        <template
+                          x-for="t in skills.current.templates"
+                          :key="t.name"
+                        >
+                          <li class="font-mono">
+                            · <span x-text="t.name"></span>
+                          </li>
+                        </template>
+                      </ul>
+                    </div>
+                  </template>
+
+                  <template x-if="(skills.current?.scripts || []).length">
+                    <div>
+                      <h3 class="text-xs font-mono text-slate-400 mb-1">
+                        Scripts
+                      </h3>
+                      <ul class="text-xs text-slate-300 space-y-1">
+                        <template
+                          x-for="s in skills.current.scripts"
+                          :key="s.name"
+                        >
+                          <li class="font-mono">
+                            · <span x-text="s.name"></span>
+                          </li>
+                        </template>
+                      </ul>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
+
+            <!-- Install modal -->
+            <div
+              x-show="skills.installModal"
+              x-cloak
+              x-transition.opacity
+              class="fixed inset-0 z-[80] bg-black/70 flex items-center justify-center p-4"
+              @click.self="skills.installModal = false"
+            >
+              <div
+                class="card bg-ink-900 border border-edge-strong w-full max-w-md p-5"
+              >
+                <h2 class="text-lg font-semibold text-slate-100 mb-3">
+                  Install Skill from GitHub
+                </h2>
+                <p class="text-xs text-slate-400 mb-3">
+                  Paste a GitHub repo URL. The repo must contain a
+                  <code class="font-mono text-neon-cyan">SKILL.md</code> at its
+                  root.
+                </p>
+                <input
+                  type="url"
+                  x-model="skills.installUrl"
+                  placeholder="https://github.com/org/repo"
+                  class="w-full bg-ink-800 border border-edge focus:border-neon-magenta/60 outline-none rounded-lg px-3 py-2 text-sm font-mono mb-3"
+                />
+                <div class="flex justify-end gap-2">
+                  <button
+                    @click="skills.installModal = false"
+                    class="pill bg-ink-800 border border-edge text-slate-300 px-3 py-1.5 text-xs"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    @click="installSkill()"
+                    :disabled="skills.installing || !skills.installUrl"
+                    class="pill bg-neon-magenta/10 border border-neon-magenta/40 text-neon-magenta px-3 py-1.5 text-xs"
+                  >
+                    <span
+                      x-text="skills.installing ? 'Installing…' : 'Install'"
+                    ></span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <!-- ============== ACTIVITY LOG ============== -->
           <!--
             Live tail of the per-workspace processing log file
@@ -4167,6 +4591,12 @@
                   accent: "magenta",
                 },
                 {
+                  id: "skills",
+                  label: "Agent Skills",
+                  icon: "wand-2",
+                  accent: "magenta",
+                },
+                {
                   id: "activity",
                   label: "Activity Log",
                   icon: "activity",
@@ -4235,6 +4665,24 @@
           promptLibrary: [],
           promptFilter: "",
           promptPicker: { open: false, query: "" },
+          // Agent Skills page state
+          skills: {
+            items: [],
+            loading: false,
+            error: null,
+            loaded: false,
+            detailOpen: false,
+            current: null,
+            invokePrompt: "",
+            invoking: false,
+            invokeResult: "",
+            invokeMeta: null,
+            installModal: false,
+            installUrl: "",
+            installing: false,
+            runs: [],
+            runsLoading: false,
+          },
           // Streaming UI helpers
           streamLiveContent: "",
           thinkStartedAt: null,
@@ -4438,6 +4886,9 @@
                 // user navigates away from the Activity Log page.
                 if (this.active === "activity") this.openProcLog();
                 else this.closeProcLog();
+                // Skills page: lazy-load on first visit, refresh on demand.
+                if (this.active === "skills" && !this.skills.loaded)
+                  this.loadSkills();
               }),
             );
             this.$watch("documents", () =>
@@ -5011,6 +5462,180 @@
               this.promptLibrary = r.prompts || [];
             } catch {
               this.promptLibrary = [];
+            }
+          },
+
+          // ----- Agent Skills (dual-use page) -----
+          async loadSkills(force = false) {
+            this.skills.loading = true;
+            this.skills.error = null;
+            try {
+              const url = force ? "/api/ui/skills/refresh" : "/api/ui/skills";
+              const r = await this.api(url, force ? { method: "POST" } : {});
+              this.skills.items = r.skills || [];
+              this.skills.loaded = true;
+            } catch (e) {
+              this.skills.error = "Failed to load skills: " + (e?.message || e);
+              this.skills.items = [];
+            } finally {
+              this.skills.loading = false;
+              this.$nextTick(() => lucide.createIcons());
+            }
+          },
+          async openSkill(name) {
+            this.skills.invokeResult = "";
+            this.skills.invokeMeta = null;
+            this.skills.invokePrompt = "";
+            this.skills.runs = [];
+            try {
+              const detail = await this.api(
+                "/api/ui/skills/" + encodeURIComponent(name),
+              );
+              this.skills.current = detail;
+              this.skills.detailOpen = true;
+              this.$nextTick(() => lucide.createIcons());
+              this.loadSkillRuns(name);
+            } catch (e) {
+              this.toast("Failed to load skill: " + (e?.message || e), "error");
+            }
+          },
+          async invokeSkill() {
+            if (!this.skills.current) return;
+            this.skills.invoking = true;
+            this.skills.invokeResult = "";
+            this.skills.invokeMeta = null;
+            try {
+              const r = await this.api(
+                "/api/ui/skills/" +
+                  encodeURIComponent(this.skills.current.name) +
+                  "/invoke",
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    prompt: this.skills.invokePrompt || "",
+                  }),
+                },
+              );
+              this.skills.invokeResult = r.response || "(empty response)";
+              this.skills.invokeMeta = {
+                entities_used: r.entities_used,
+                elapsed_ms: r.elapsed_ms,
+                warnings: r.warnings,
+                run_id: r.run_id,
+                run_dir: r.run_dir,
+              };
+              if ((r.warnings || []).length)
+                this.toast(r.warnings.join("; "), "warn");
+              if (r.run_id) {
+                this.toast("Saved run " + r.run_id, "ok");
+                this.loadSkillRuns(this.skills.current.name);
+              }
+            } catch (e) {
+              this.toast(
+                "Skill invocation failed: " + (e?.message || e),
+                "error",
+              );
+            } finally {
+              this.skills.invoking = false;
+              this.$nextTick(() => lucide.createIcons());
+            }
+          },
+          async loadSkillRuns(name) {
+            if (!name) return;
+            this.skills.runsLoading = true;
+            try {
+              const r = await this.api(
+                "/api/ui/skills/" + encodeURIComponent(name) + "/runs",
+              );
+              this.skills.runs = r.runs || [];
+            } catch (e) {
+              // Non-fatal: workspace may have no runs yet.
+              this.skills.runs = [];
+            } finally {
+              this.skills.runsLoading = false;
+              this.$nextTick(() => lucide.createIcons());
+            }
+          },
+          async loadSkillRun(name, runId) {
+            if (!name || !runId) return;
+            try {
+              const r = await this.api(
+                "/api/ui/skills/" +
+                  encodeURIComponent(name) +
+                  "/runs/" +
+                  encodeURIComponent(runId),
+              );
+              this.skills.invokeResult = r.response || "(empty)";
+              this.skills.invokePrompt = r.metadata?.prompt_preview || "";
+              this.skills.invokeMeta = {
+                entities_used: r.metadata?.entities_used || [],
+                elapsed_ms: r.metadata?.elapsed_ms || 0,
+                warnings: [],
+                run_id: r.run_id,
+                run_dir: r.run_dir,
+              };
+              this.$nextTick(() => lucide.createIcons());
+            } catch (e) {
+              this.toast("Failed to load run: " + (e?.message || e), "error");
+            }
+          },
+          async deleteSkillRun(name, runId) {
+            if (!name || !runId) return;
+            if (
+              !confirm(
+                `Delete run ${runId}? This removes the saved files on disk.`,
+              )
+            )
+              return;
+            try {
+              await this.api(
+                "/api/ui/skills/" +
+                  encodeURIComponent(name) +
+                  "/runs/" +
+                  encodeURIComponent(runId),
+                { method: "DELETE" },
+              );
+              this.toast("Run deleted", "ok");
+              this.loadSkillRuns(name);
+            } catch (e) {
+              this.toast("Delete failed: " + (e?.message || e), "error");
+            }
+          },
+          async installSkill() {
+            const url = (this.skills.installUrl || "").trim();
+            if (!url) return;
+            this.skills.installing = true;
+            try {
+              await this.api("/api/ui/skills/install", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ url }),
+              });
+              this.skills.installModal = false;
+              this.skills.installUrl = "";
+              this.toast("Skill installed", "ok");
+              await this.loadSkills(true);
+            } catch (e) {
+              this.toast("Install failed: " + (e?.message || e), "error");
+            } finally {
+              this.skills.installing = false;
+            }
+          },
+          async uninstallSkill() {
+            if (!this.skills.current) return;
+            const name = this.skills.current.name;
+            if (!confirm(`Uninstall skill "${name}"?`)) return;
+            try {
+              await this.api("/api/ui/skills/" + encodeURIComponent(name), {
+                method: "DELETE",
+              });
+              this.skills.detailOpen = false;
+              this.skills.current = null;
+              this.toast("Skill removed", "ok");
+              await this.loadSkills(true);
+            } catch (e) {
+              this.toast("Uninstall failed: " + (e?.message || e), "error");
             }
           },
 

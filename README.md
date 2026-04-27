@@ -265,8 +265,22 @@ proj-theseus/
 ├── rag_storage/                  # Per-workspace KG data (KV stores + VDB + mineru/)
 ├── inputs/uploaded/              # Drop-zone for new RFPs (scan moves to __enqueued__/)
 ├── docs/                         # Architecture, white papers, style guide, use cases
-└── tools/                        # Neo4j ops, ontology validation, workspace cleanup
+├── tools/                        # Neo4j ops, ontology validation, workspace cleanup
+├── .github/skills/               # Agent Skills (dual-use: Copilot + Theseus runtime)
+└── theseus-skills/               # Organizational mirror / pointers (see docs/SKILLS.md)
 ```
+
+### Agent Skills (Tools → Agent Skills)
+
+Project Theseus ships a **dual-use Agent Skills platform**: the same `SKILL.md` files in `.github/skills/` are read by **GitHub Copilot / VS Code** when the repo is open AND by the in-app **Tools → Agent Skills** page when invoked against an active workspace. Built-in skills:
+
+- `huashu-design-govcon` — Compliant slides, one-pagers, compliance-matrix PDFs
+- `govcon-ontology` — Authoritative reference for the 33 entity / 35 relationship schema
+- `proposal-generator` — Shipley capture mentor: compliance spine → win themes → FAB
+- `compliance-auditor` — 8-check audit (clauses, regs, L↔M, cyber, amendments, …)
+- `competitive-intel` — Roadmap placeholder (SAM.gov / USAspending integration TODO)
+
+See [docs/SKILLS.md](docs/SKILLS.md) for the full platform docs and authoring guide.
 
 ---
 

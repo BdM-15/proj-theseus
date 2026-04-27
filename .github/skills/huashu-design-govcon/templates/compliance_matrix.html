@@ -1,0 +1,96 @@
+<!doctype html>
+<!-- GovCon compliance matrix — 4 columns, federal-printable. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Compliance Matrix — {{program_name}}</title>
+    <style>
+      body {
+        font-family: "Source Sans 3", Calibri, sans-serif;
+        color: #0f172a;
+        background: #f8fafc;
+        margin: 0.75in;
+      }
+      h1 {
+        font-family: "Source Serif 4", Georgia, serif;
+        font-size: 22pt;
+        color: #0a2540;
+        margin: 0 0 8px;
+      }
+      .meta {
+        font-size: 9pt;
+        color: #475569;
+        margin-bottom: 20px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11pt;
+      }
+      th {
+        background: #0a2540;
+        color: #fff;
+        font-weight: 600;
+        text-align: left;
+        padding: 8px 10px;
+        border: 1px solid #475569;
+      }
+      td {
+        padding: 8px 10px;
+        border: 1px solid #94a3b8;
+        vertical-align: top;
+      }
+      tr:nth-child(even) td {
+        background: #f1f5f9;
+      }
+      code {
+        font-family: "JetBrains Mono", Consolas, monospace;
+        font-size: 10pt;
+      }
+      .ok {
+        color: #15803d;
+        font-weight: 600;
+      }
+      .partial {
+        color: #b45309;
+        font-weight: 600;
+      }
+      .gap {
+        color: #b91c1c;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Compliance Matrix — {{program_name}}</h1>
+    <p class="meta">
+      Generated {{generated_at}} · Workspace: <code>{{workspace}}</code>
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Section L Instruction</th>
+          <th>Section M Factor</th>
+          <th>Section C Requirement(s)</th>
+          <th>Volume / §</th>
+          <th>Pages</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#rows}}
+        <tr>
+          <td>{{n}}</td>
+          <td><code>{{l_id}}</code> {{l_text}}</td>
+          <td><code>{{m_id}}</code> {{m_name}}</td>
+          <td><code>{{c_ids}}</code></td>
+          <td>{{volume}}</td>
+          <td>{{pages}}</td>
+          <td class="{{status_class}}">{{status}}</td>
+        </tr>
+        {{/rows}}
+      </tbody>
+    </table>
+  </body>
+</html>

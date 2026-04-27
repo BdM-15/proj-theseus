@@ -1,0 +1,45 @@
+# GovCon Design Tokens
+
+Authoritative palette and typography for `huashu-design-govcon` exports. These tokens are deliberately conservative — federal evaluators are unimpressed by neon and gradients.
+
+## Palette
+
+| Token               | Hex       | Use                                                      |
+| ------------------- | --------- | -------------------------------------------------------- |
+| `--gc-navy-900`     | `#0A2540` | Primary header bar, key callouts                         |
+| `--gc-navy-700`     | `#1E3A5F` | Section dividers, table header rows                      |
+| `--gc-slate-600`    | `#475569` | Body text, secondary headings                            |
+| `--gc-slate-400`    | `#94A3B8` | Captions, footnotes                                      |
+| `--gc-bone-50`      | `#F8FAFC` | Page background                                          |
+| `--gc-paper-100`    | `#F1F5F9` | Alternating table rows                                   |
+| `--gc-ink-900`      | `#0F172A` | Primary text on bone                                     |
+| `--gc-gold-700`     | `#B8860B` | Accent only — single-use highlights, never as background |
+| `--gc-status-green` | `#15803D` | Compliance OK                                            |
+| `--gc-status-amber` | `#B45309` | Compliance partial                                       |
+| `--gc-status-red`   | `#B91C1C` | Compliance gap (use sparingly)                           |
+
+**Forbidden:** purple-pink gradients, any neon (cyan, magenta, lime), >2 accent colors per artifact, drop shadows on body text.
+
+## Typography
+
+- **Display / H1–H2:** Source Serif 4 (fallback: Georgia, "Times New Roman", serif). Weight 600 for H1, 500 for H2.
+- **Body:** Source Sans 3 (fallback: Calibri, "Segoe UI", sans-serif). Weight 400 body, 600 emphasis.
+- **Mono:** JetBrains Mono (fallback: Consolas, "Courier New", monospace). Use only for clause IDs, CLINs, file paths.
+- **Sizes (slides 16:9, 1920×1080):** H1 56pt, H2 36pt, body 22pt, caption 16pt, footer 14pt.
+- **Sizes (PDF letter):** H1 22pt, H2 16pt, body 11pt, caption 9pt.
+
+## Spacing
+
+8-point grid. Page margins 0.75" minimum (federal evaluators print). No element closer than 24px to a slide edge.
+
+## Iconography
+
+- **Allowed:** [Lucide](https://lucide.dev/) line icons at 1.5px stroke, slate-600.
+- **Forbidden:** filled glyphs, multi-color icons, emoji.
+
+## Tables (preferred over diagrams for compliance content)
+
+- Header row: navy-900 background, white text, 600 weight.
+- Alternating rows: bone-50 / paper-100.
+- Borders: 1px slate-400, never thicker.
+- Status cells: status-green / status-amber / status-red text on white. Never colored cell background — federal printers degrade them.

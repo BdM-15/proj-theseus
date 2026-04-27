@@ -1,0 +1,78 @@
+<!doctype html>
+<!--
+  GovCon slide master — 16:9, 1920x1080.
+  Tokens come from references/govcon_design_tokens.md.
+  Body content slot: <main data-slot="body">…</main>
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>{{slide_title}}</title>
+    <style>
+      :root {
+        --gc-navy-900: #0a2540;
+        --gc-slate-600: #475569;
+        --gc-slate-400: #94a3b8;
+        --gc-bone-50: #f8fafc;
+        --gc-paper-100: #f1f5f9;
+        --gc-ink-900: #0f172a;
+        --gc-gold-700: #b8860b;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: var(--gc-bone-50);
+        color: var(--gc-ink-900);
+        font-family: "Source Sans 3", "Calibri", "Segoe UI", sans-serif;
+      }
+      .slide {
+        width: 1920px;
+        height: 1080px;
+        padding: 96px 120px;
+        display: flex;
+        flex-direction: column;
+      }
+      h1 {
+        font-family: "Source Serif 4", Georgia, serif;
+        font-weight: 600;
+        font-size: 56pt;
+        color: var(--gc-navy-900);
+        margin: 0 0 8px;
+      }
+      .subtitle {
+        font-size: 22pt;
+        color: var(--gc-slate-600);
+        margin: 0 0 48px;
+      }
+      main {
+        flex: 1;
+        font-size: 22pt;
+        line-height: 1.45;
+      }
+      footer {
+        font-size: 14pt;
+        color: var(--gc-slate-400);
+        border-top: 1px solid var(--gc-slate-400);
+        padding-top: 16px;
+        display: flex;
+        justify-content: space-between;
+      }
+      .accent {
+        color: var(--gc-gold-700);
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="slide">
+      <h1>{{slide_title}}</h1>
+      <p class="subtitle">{{slide_subtitle}}</p>
+      <main data-slot="body">{{body}}</main>
+      <footer>
+        <span>{{program_name}} · {{volume_name}}</span>
+        <span>{{page_no}} / {{page_total}}</span>
+      </footer>
+    </div>
+  </body>
+</html>
