@@ -26,6 +26,8 @@ from typing import Optional
 from fastapi import UploadFile, File, BackgroundTasks, Query
 from fastapi.responses import JSONResponse
 from lightrag.api.config import global_args
+from lightrag.base import DocStatus
+from lightrag.utils import compute_mdhash_id
 from raganything.callbacks import ProcessingCallback
 
 from src.core import get_settings
@@ -228,25 +230,26 @@ async def process_document_with_semantic_inference(
     mineru_backend = settings.mineru_backend
     
     start_time = datetime.now()
-    
-    content_list, doc_id = await rag_instance.parse_document(
-        file_path=file_path,
-        parse_method="auto",
-        backend=mineru_backend
-    )
-    
-    parse_duration = (datetime.now() - start_time).total_seconds()
-    
-    # Dispatch parse_complete event (sync — dispatch calls handlers synchronously)
-    rag_instance.callback_manager.dispatch(
-        "on_parse_complete",
-        file_path=file_path,
-        content_blocks=len(content_list),
-        doc_id=doc_id,
-        duration_seconds=parse_duration
-    )
+    doc_id: Optional[str] = None
     
     try:
+        content_list, doc_id = await rag_instance.parse_document(
+            file_path=file_path,
+            parse_method="auto",
+            backend=mineru_backend
+        )
+        
+        parse_duration = (datetime.now() - start_time).total_seconds()
+        
+        # Dispatch parse_complete event (sync — dispatch calls handlers synchronously)
+        rag_instance.callback_manager.dispatch(
+            "on_parse_complete",
+            file_path=file_path,
+            content_blocks=len(content_list),
+            doc_id=doc_id,
+            duration_seconds=parse_duration
+        )
+        
         # Filter out MinerU discarded content types
         DISCARDED_TYPES = {
             "discarded", "header", "footer", "page_number",
@@ -296,6 +299,11 @@ async def process_document_with_semantic_inference(
         }
     
     except Exception as e:
+        # Record failure in doc_status so it surfaces in the UI Failed card
+        # (without this, errors are silent — neither the success nor failed path
+        # writes a status entry, so the UI shows nothing).
+        await _record_failed_doc(rag_instance, file_path, file_name, doc_id, str(e))
+        
         # Dispatch error event so batch detection still works (sync)
         rag_instance.callback_manager.dispatch(
             "on_document_error",
@@ -304,6 +312,47 @@ async def process_document_with_semantic_inference(
             error=str(e)
         )
         raise
+
+
+async def _record_failed_doc(
+    rag_instance,
+    file_path: str,
+    file_name: str,
+    doc_id: Optional[str],
+    error_msg: str,
+) -> None:
+    """
+    Write a `failed` doc_status entry so the failure is visible in the UI.
+    
+    If parse succeeded and we have the real content-hash doc_id, use it (so the
+    failed entry overwrites any prior `processing` row). If parse failed before
+    a doc_id was assigned, derive a stable `failed-<md5(file_path)>` id so retries
+    can find/replace the entry.
+    """
+    try:
+        if not doc_id:
+            doc_id = compute_mdhash_id(file_path, prefix="failed-")
+        now = datetime.now().isoformat()
+        truncated_err = error_msg[:500]
+        await rag_instance.lightrag.doc_status.upsert({
+            doc_id: {
+                "content_summary": f"[FAILED] {file_name}",
+                "content_length": 0,
+                "file_path": file_name,
+                "status": DocStatus.FAILED.value,
+                "created_at": now,
+                "updated_at": now,
+                "chunks_count": 0,
+                "error_msg": truncated_err,
+            }
+        })
+        logger.warning(
+            f"📛 Recorded FAILED doc_status for {file_name} (doc_id={doc_id}): {truncated_err}"
+        )
+    except Exception as record_err:
+        logger.error(
+            f"⚠️  Could not record failed doc_status for {file_name}: {record_err}"
+        )
 
 
 # ============================================================================
