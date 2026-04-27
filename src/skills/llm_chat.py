@@ -57,10 +57,19 @@ def _client_kwargs() -> dict[str, str]:
 
 
 def _resolve_model() -> str:
-    model = os.getenv("LLM_MODEL", "").strip()
-    if not model:
-        raise RuntimeError("LLM_MODEL not set — skill tool runtime cannot pick a model")
-    return model
+    # Theseus uses role-specific model env vars (no single LLM_MODEL).
+    # Skills are multi-turn reasoning agents → prefer REASONING_LLM_NAME,
+    # then fall back to POST_PROCESSING_LLM_NAME, EXTRACTION_LLM_NAME,
+    # and finally a generic LLM_MODEL for portability.
+    for var in ("LLM_MODEL", "REASONING_LLM_NAME", "POST_PROCESSING_LLM_NAME", "EXTRACTION_LLM_NAME"):
+        val = os.getenv(var, "").strip()
+        if val:
+            return val
+    raise RuntimeError(
+        "No LLM model env var set (looked for LLM_MODEL, REASONING_LLM_NAME, "
+        "POST_PROCESSING_LLM_NAME, EXTRACTION_LLM_NAME) — skill tool runtime "
+        "cannot pick a model"
+    )
 
 
 async def chat_with_tools(
