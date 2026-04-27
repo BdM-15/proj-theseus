@@ -143,6 +143,63 @@ CONTEXT_FILTER_CONTENT_TYPES=text  # Content types in context
 
 ---
 
+## ⚠️ Agent Skills — Open Spec Compliance
+
+Theseus implements the open [Agent Skills specification](https://agentskills.io/specification) (originated by Anthropic, adopted by Claude Code, Cursor, Copilot, Junie, Roo Code, Goose, Amp). Skills live under `.github/skills/<name>/` and are discovered/invoked by `src/skills/manager.py`.
+
+**Authoritative audit + migration plan:** [docs/SKILL_SPEC_COMPLIANCE.md](../docs/SKILL_SPEC_COMPLIANCE.md). Read it before modifying any skill or the runtime.
+
+**Foundational meta-skill:** [.github/skills/skill-creator/](../.github/skills/skill-creator/) — vendored from `anthropics/skills` (Apache-2.0). Use it to author/refine/evaluate every other skill. See its [UPSTREAM.md](../.github/skills/skill-creator/UPSTREAM.md) for re-vendor instructions and the Claude.ai-specific runtime adaptation (Theseus is single-process; upstream assumes Claude Code parallel subagents).
+
+### Spec rules (the only ones that matter)
+
+1. **Frontmatter — six allowed fields only:** `name` (required, max 64 chars, lowercase + hyphens, no `anthropic`/`claude`), `description` (required, max 1024 chars, third-person, "pushy" with both **what** + **when**), `license`, `compatibility`, `metadata` (escape hatch for custom keys), `allowed-tools` (experimental). **Anything else at the top level is non-conformant — move it under `metadata:`.**
+2. **Directory layout:** `SKILL.md` (required, body <500 lines), `scripts/` (executed via `run_script` tool, NOT loaded into context), `references/` (loaded on demand, one level deep), `assets/` (templates/icons/fonts used in output — **NOT `templates/`**), `evals/evals.json` (test prompts).
+3. **Workflow lives in the SKILL.md body** as a numbered Markdown checklist invoking tools — **never** as a custom YAML field. The runtime gives the model tools and lets the body drive.
+4. **Naming:** gerund preferred (`processing-pdfs`), noun phrases acceptable. Avoid `helper`, `utils`, `tools`, `documents`.
+5. **Progressive disclosure:** metadata (~100 tokens, always loaded) → SKILL.md body (loaded on activation) → bundled resources (loaded only when the body references them).
+
+### Theseus runtime architecture (Option B — tools-fetch model)
+
+Skills run as **multi-turn tool-calling agents**, not single-shot prompt dumps. The `SkillManager` exposes a small tool registry to the LLM:
+
+| Tool                                | Purpose                                                       | Backed by                            |
+| ----------------------------------- | ------------------------------------------------------------- | ------------------------------------ |
+| `read_file(path)`                   | Read `references/`, `assets/`, `scripts/` as text (read-only) | filesystem                           |
+| `run_script(path, stdin?, timeout)` | Execute `scripts/*.py`/`*.sh` in subprocess sandbox           | subprocess (cwd locked to skill dir) |
+| `write_file(path, content)`         | Persist artifacts (confined to `<run_dir>/artifacts/`)        | filesystem (sandboxed)               |
+| `kg_query(cypher)`                  | Deterministic structural queries against active workspace KG  | Neo4j client                         |
+| `kg_entities(types[], limit)`       | Typed entity slicing                                          | existing `_slice_entities` logic     |
+| `kg_chunks(query, top_k, mode)`     | Chat-grade hybrid retrieval (Phase 1.6)                       | `aquery_data(...)` pipeline          |
+
+Every tool call is captured in `<run_dir>/transcript.json` for grounding audit. **The skill body is the contract; the transcript is the proof.** This mirrors how a human analyst works: read the assignment → query the KG → fetch supporting chunks → run scripts → write the draft → cite sources.
+
+### Cross-cutting rules for ANY skill change
+
+When modifying a skill or the runtime, you MUST:
+
+1. **Frontmatter audit:** Verify only the 6 spec fields at top level. Move `version`, `category`, `status`, `authoritative_source`, `upstream`, etc. under `metadata:`.
+2. **Directory naming:** If the skill has a `templates/` folder, it must be renamed to `assets/` (and `Skill.has_templates` references in `manager.py` updated to `has_assets`).
+3. **Body length:** Stay under 500 lines. Move long content into `references/*.md`.
+4. **Workflow as checklist:** Body must contain an explicit numbered checklist invoking the tools above. No implicit "use the briefing book" assumptions.
+5. **`evals/evals.json` present:** Every skill needs at least 3 test prompts using the schema in `.github/skills/skill-creator/references/schemas.md`.
+6. **UTF-8 only:** Save SKILL.md as UTF-8 (no BOM round-trip through Windows-1252). PowerShell: `Out-File -Encoding utf8`. Watch for mojibake (`â€"`, `â†'`, `â†"`) in existing files.
+7. **Spec portability:** The same SKILL.md must run unmodified in Claude Code, Cursor, Copilot. Theseus-specific behavior goes under `metadata:` — never as new top-level YAML keys.
+8. **Audit doc updated:** If you discover a new gap or close one, update `docs/SKILL_SPEC_COMPLIANCE.md` in the same commit.
+
+**Rule:** No PR that touches `.github/skills/` or `src/skills/` should be committed without confirming all 8 areas above.
+
+### Sub-phase migration state (current)
+
+| Sub-phase | Scope                                                        | State      |
+| --------- | ------------------------------------------------------------ | ---------- |
+| 2.0       | Vendor skill-creator + audit doc                             | ✅ Done    |
+| 2.1       | Tool-calling runtime in `src/skills/manager.py`              | ⏳ Pending |
+| 2.2       | Migrate `proposal-generator` end-to-end (proves the pattern) | ⏳ Pending |
+| 2.3       | Migrate remaining 4 skills + UI transcript drawer            | ⏳ Pending |
+
+---
+
 ## Development Guidelines
 
 ### Coding Style & Conventions
