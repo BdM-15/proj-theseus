@@ -1,41 +1,43 @@
-# GovCon Capture Vibe: Ontology-Based RAG for Government Contract Analysis
+# Project Theseus — Capture Workbench
 
-**Project Theseus - Government Contracting Intelligence Platform**
+**Ontology-Based RAG for Federal RFP Capture & Proposal Intelligence**
 
-[![Version](https://img.shields.io/badge/version-0.3.0-blue.svg)](https://github.com/BdM-15/govcon-capture-vibe)
+[![Version](https://img.shields.io/badge/version-0.4.0-blue.svg)](https://github.com/BdM-15/proj-theseus)
 [![Python](https://img.shields.io/badge/python-3.13+-green.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
 
 ## Executive Summary
 
-An **Ontology-Based RAG system** for federal RFP analysis that transforms generic document processing into specialized government contracting intelligence. Uses **RAG-Anything** (multimodal ingestion) + **LightRAG** (knowledge graph/queries) with **xAI Grok** cloud processing for **~12x speedup** over local processing.
+Project Theseus is a **capture workbench** for federal RFP analysis. It pairs a domain-specific government contracting ontology with **RAG-Anything** (multimodal ingestion via MinerU) + **LightRAG** (knowledge graph + hybrid retrieval) and **xAI Grok** cloud LLMs, then surfaces the result through a custom **Capture Workbench UI** (Capture Chat + Intel Panels) backed by a Shipley-mentor query persona.
 
 ### Core Innovation
 
-**Government Contracting Ontology + LLM-Powered Relationship Inference** enables:
+**Government contracting ontology + LLM-powered relationship inference + Shipley-aligned query persona** enables:
 
-- **Section L↔M mapping** (submission instructions → evaluation factors)
-- **Requirement traceability** across RFP sections
-- **Shipley methodology compliance** classification
-- **Annex/attachment linkage** to parent documents
+- **Section L ↔ M mapping** (submission instructions → evaluation factors)
+- **Requirement traceability** across Sections C / L / M / J
+- **Shipley methodology** in queries — discriminators, win themes, hot buttons, proof points, FAB chains, ghost language, compliance matrix
+- **Annex / attachment linkage** to parent documents (`CHILD_OF`, `ATTACHMENT_OF`)
+- **Multimodal awareness** — tables, images, and equations are analyzed by a VLM with the same govcon vocabulary as the text extractor
 
 ### Architecture Stack
 
-| Component             | Technology                                                            | Purpose                                               |
-| --------------------- | --------------------------------------------------------------------- | ----------------------------------------------------- |
-| **Document Parsing**  | [MinerU](https://github.com/opendatalab/MinerU) 3.0+ via RAG-Anything | Multimodal PDF extraction (tables, images, equations) |
-| **RAG Orchestration** | [RAG-Anything](https://github.com/HKUDS/RAG-Anything) v1.2.10+        | Document processing pipeline coordination             |
-| **Knowledge Graph**   | [LightRAG](https://github.com/HKUDS/LightRAG) v1.4.13+                | Graph construction with WebUI (pip: `lightrag-hku`)   |
-| **LLM**               | xAI Grok-4.1-fast (dual-model routing)                                | Extraction: non-reasoning, Query: reasoning (~$2/RFP) |
-| **Embeddings**        | OpenAI text-embedding-3-large                                         | 3072-dimensional vector similarity                    |
-| **Graph Storage**     | Neo4j 5.25 Community / NetworkX                                       | Enterprise graph with APOC or local fallback          |
-| **Structured Output** | [Instructor](https://github.com/jxnl/instructor) + Pydantic           | Schema-enforced LLM responses                         |
+| Component             | Technology                                                           | Purpose                                                                                |
+| --------------------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| **Document Parsing**  | [MinerU](https://github.com/opendatalab/MinerU) 3.x via RAG-Anything | Multimodal PDF / DOCX / XLSX extraction (tables, images, equations)                    |
+| **RAG Orchestration** | [RAG-Anything](https://github.com/HKUDS/RAG-Anything) v1.2.10+       | Multimodal document pipeline + context-aware processing                                |
+| **Knowledge Graph**   | [LightRAG](https://github.com/HKUDS/LightRAG) v1.4.13+               | Graph construction + hybrid retrieval (pip: `lightrag-hku`)                            |
+| **LLM**               | xAI Grok (dual-model routing)                                        | `grok-4-1-fast-non-reasoning` (extraction) + `grok-4.20-reasoning` (query / inference) |
+| **Embeddings**        | OpenAI `text-embedding-3-large`                                      | 3072-dim vectors (must use OpenAI endpoint, not xAI)                                   |
+| **Graph Storage**     | Neo4j 5.25 Community (preferred) / NetworkX fallback                 | Per-workspace isolation, Cypher + APOC                                                 |
+| **Structured Output** | [Instructor](https://github.com/jxnl/instructor) + Pydantic          | Schema-enforced LLM responses with retry                                               |
+| **Frontend**          | Alpine.js + Tailwind (Play CDN) + Cytoscape, zero-build              | Capture Workbench UI served from `src/ui/static/`                                      |
 
-**Why Generic RAG Fails for Government Contracting:**
+**Why generic RAG fails for federal capture work:**
 
-Generic LightRAG cannot understand government contracting concepts - it can't distinguish CLINs from generic line items, won't recognize Section L↔M evaluation relationships, and doesn't know "shall" vs "should" requirement classifications.
+Vanilla LightRAG can't tell a CLIN from a generic line item, doesn't recognize the Section L ↔ M golden thread, can't trace deliverables back to requirements and evaluation factors, and gives no Shipley-style strategic framing on top of retrieved evidence.
 
-**Our Solution**: 18 specialized entity types + 8 LLM inference algorithms for relationship enrichment.
+**Our solution**: a curated **33-entity / 35-relationship-type** ontology, **3 inference algorithms** that enrich the graph after extraction, and a **Shipley-mentor query persona** that turns hybrid retrieval into capture-ready answers.
 
 ---
 
@@ -52,14 +54,14 @@ Generic LightRAG cannot understand government contracting concepts - it can't di
 
 ```powershell
 # 1. Clone and setup
-git clone https://github.com/BdM-15/govcon-capture-vibe.git
-cd govcon-capture-vibe
+git clone https://github.com/BdM-15/proj-theseus.git
+cd proj-theseus
 
-# 2. Install dependencies (includes raganything, lightrag-hku, xai-sdk)
+# 2. Install dependencies (raganything, lightrag-hku, xai-sdk, instructor, mineru[core])
 uv sync
 
 # 3. Configure environment
-cp .env.example .env
+copy .env.example .env
 # Edit .env with your API keys:
 #   LLM_BINDING_API_KEY=xai-your-key
 #   EMBEDDING_BINDING_API_KEY=sk-proj-your-openai-key
@@ -71,46 +73,71 @@ cp .env.example .env
 python app.py
 ```
 
+> **GPU note (Windows):** `uv sync` may downgrade PyTorch to a CPU-only wheel, which silently disables MinerU GPU acceleration. Reinstall the CUDA build manually if MinerU drops to CPU (see comments in `pyproject.toml`).
+
 ### Usage
 
-1. **Access WebUI**: http://localhost:9621/webui
-2. **Upload RFP PDF**: Drag & drop or use upload button
-3. **Automatic Processing**: 6-step pipeline runs automatically
-4. **Query Knowledge Graph**: Use chat interface or API
+1. **Capture Workbench UI** (primary): http://localhost:9621/ui — Capture Chat, Intel Panels, KG viewer, document drawer.
+2. **LightRAG WebUI** (built-in fallback): http://localhost:9621/webui — raw LightRAG document manager + chat.
+3. **Upload an RFP**: drop a PDF / DOCX / XLSX into `inputs/uploaded/`, then click **Scan inputs** in the workbench (or POST to `/scan-rfp`). MinerU + extraction + post-processing run automatically and the graph appears in the active workspace.
+4. **Query**: ask the workbench in plain English ("Walk me through how Section L.3.4 maps to Section M.2") and Theseus answers as a Shipley capture mentor with cited evidence.
 
 ---
 
 ## Processing Pipeline
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    6-Step Processing Pipeline                       │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  1. DOCUMENT UPLOAD                                                 │
-│     └── PDF/DOCX → /documents/upload endpoint                       │
-│                                                                     │
-│  2. MINERU PARSING (via RAG-Anything)                              │
-│     └── Tables, images, text extraction with structure preservation │
-│                                                                     │
-│  3. LIGHTRAG CHUNKING                                              │
-│     └── 4,096 tokens/chunk with 15% overlap (~614 tokens)          │
-│                                                                     │
-│  4. ENTITY EXTRACTION (xAI Grok + Instructor)                      │
-│     └── 18 government contracting entity types                      │
-│     └── Pydantic schema validation                                  │
-│                                                                     │
-│  5. RELATIONSHIP EXTRACTION                                         │
-│     └── LightRAG native relationship inference                      │
-│                                                                     │
-│  6. SEMANTIC POST-PROCESSING                                        │
-│     └── 8 LLM-powered relationship inference algorithms             │
-│     └── Section L↔M mapping, requirement traceability              │
-│                                                                     │
-│  OUTPUT: Neo4j Knowledge Graph + LightRAG WebUI                    │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│                    8-Step Capture Pipeline                               │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  1. DOCUMENT INGEST                                                      │
+│     └─ inputs/uploaded/ → /scan-rfp → inputs/__enqueued__/               │
+│                                                                          │
+│  2. MINERU PARSING (via RAG-Anything, GPU-accelerated)                   │
+│     └─ text + tables + images + equations + page-aware context           │
+│                                                                          │
+│  3. MULTIMODAL ANALYSIS (VLM, govcon-aware prompts)                      │
+│     └─ Tables/images/equations described with the same 33-entity         │
+│        vocabulary the text extractor uses                                │
+│                                                                          │
+│  4. CHUNKING                                                             │
+│     └─ Configurable via CHUNK_SIZE (default 4,096 tokens, ~15% overlap)  │
+│                                                                          │
+│  5. ENTITY EXTRACTION (xAI Grok + Instructor + Pydantic)                 │
+│     └─ 33 government contracting entity types, schema-validated          │
+│                                                                          │
+│  6. RELATIONSHIP EXTRACTION                                              │
+│     └─ 35 canonical relationship types from the same prompt pass         │
+│                                                                          │
+│  7. SEMANTIC POST-PROCESSING (auto-triggered after batch completes)      │
+│     ├─ Phase 1  Data load (entities, relationships, chunks)              │
+│     ├─ Phase 2  Entity normalization                                     │
+│     ├─ Phase 3  Relationship retyping (entity-pair aware)                │
+│     ├─ Phase 4  Inference algorithms (L↔M, doc structure, orphans)       │
+│     ├─ Phase 5  Workload enrichment (BOE category tagging, optional)     │
+│     └─ Phase 6  VDB synchronization                                      │
+│                                                                          │
+│  8. QUERY (Shipley mentor persona)                                       │
+│     └─ Hybrid retrieval → answer with discriminators, hot buttons,       │
+│        FAB chains, compliance citations                                  │
+│                                                                          │
+│  OUTPUT: Per-workspace KG (Neo4j or NetworkX) + Capture Workbench UI     │
+│                                                                          │
+└──────────────────────────────────────────────────────────────────────────┘
 ```
+
+### The Three Prompt Systems
+
+Theseus runs three independently-registered prompt systems that share a single ontology vocabulary. **All three must stay aligned** — see [.github/copilot-instructions.md](.github/copilot-instructions.md) for the cross-cutting change checklist.
+
+| System                         | Purpose                                           | Source                                                                                   |
+| ------------------------------ | ------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| **1. LightRAG Extraction**     | Entity/relationship extraction from text chunks   | `prompts/extraction/govcon_lightrag_native.txt` → `prompts/govcon_prompt.py`             |
+| **2. LightRAG Query/Response** | Shipley-mentor RAG answering + keyword extraction | `prompts/govcon_prompt.py` (`rag_response`, `naive_rag_response`, `keywords_extraction`) |
+| **3. RAGAnything Multimodal**  | Table / image / equation VLM analysis             | `prompts/multimodal/govcon_multimodal_prompts.py`                                        |
+
+Algorithm-specific inference prompts live under `prompts/relationship_inference/` and are loaded by modules in `src/inference/`.
 
 ---
 
@@ -178,47 +205,67 @@ The ontology is organized into four functional groups for maximum extraction pre
 | `compliance_artifact` | Certifications, ATOs, accreditations        | "ISO 9001:2015 Certification" |
 | `concept`             | Residual abstract ideas and processes       | "CONUS operations"            |
 
-### 8 Semantic Post-Processing Algorithms
+### 35 Relationship Types
 
-| Algorithm                         | Purpose                      | Relationships Created    |
-| --------------------------------- | ---------------------------- | ------------------------ |
-| 1. Instruction-Evaluation Linking | Section L → M mapping        | `GUIDES`, `EVALUATED_BY` |
-| 2. Evaluation Hierarchy           | Factor → subfactor structure | `PARENT_OF`, `CHILD_OF`  |
-| 3. Requirement-Evaluation Mapping | Requirements → factors       | `EVALUATED_BY`           |
-| 4. Deliverable Traceability       | CDRLs → requirements         | `PRODUCES`, `REFERENCES` |
-| 5. Document Hierarchy             | Section structure            | `PARENT_OF`, `CHILD_OF`  |
-| 6. Semantic Concept Linking       | Topic-based connections      | `RELATED_TO`             |
-| 7. Heuristic Pattern Matching     | CDRL cross-references        | `REFERENCES`             |
-| 8. Orphan Pattern Resolution      | Unlinked entity cleanup      | Various                  |
+Defined in `src/ontology/schema.py` → `VALID_RELATIONSHIP_TYPES`, organized by functional group:
+
+- **Structural** — `CHILD_OF`, `ATTACHMENT_OF`, `CONTAINS`, `AMENDS`, `SUPERSEDED_BY`, `REFERENCES`
+- **Evaluation & Proposal (Section L ↔ M golden thread)** — `GUIDES`, `EVALUATED_BY`, `HAS_SUBFACTOR`, `MEASURED_BY`, `EVIDENCES`
+- **Work & Deliverables (traceability chain)** — `PRODUCES`, `SATISFIED_BY`, `TRACKED_BY`, `SUBMITTED_TO`, `STAFFED_BY`, `PRICED_UNDER`, `FUNDS`, `QUANTIFIES`
+- **Authority & Governance** — `GOVERNED_BY`, `MANDATES`, `CONSTRAINED_BY`, `DEFINES`, `APPLIES_TO`
+- **Resource & Operational** — `HAS_EQUIPMENT`, `PROVIDED_BY`, `COORDINATED_WITH`, `REPORTED_TO`
+- **Strategic & Capture Intelligence** — `ADDRESSES`, `RESOLVES`, `SUPPORTS`, `RELATED_TO`
+- **Inference-only** (added by post-processing) — `REQUIRES`, `ENABLED_BY`, `RESPONSIBLE_FOR`
+
+### Inference Algorithms
+
+Post-processing runs after every batch completes. The current production algorithms live in `src/inference/algorithms/`:
+
+| Module                        | Purpose                                                           | Edges produced                                            |
+| ----------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------- |
+| `infer_lm_links.py`           | Section L ↔ M mapping (instruction ↔ evaluation factor)           | `GUIDES`, `EVALUATED_BY`                                  |
+| `infer_document_structure.py` | Document hierarchy (DOCUMENT → SECTION → SUBSECTION; attachments) | `CHILD_OF`, `ATTACHMENT_OF`, `CONTAINS`                   |
+| `resolve_orphans.py`          | Re-link unconnected entities to nearest legitimate parent         | `REQUIRES`, `ENABLED_BY`, `RESPONSIBLE_FOR`, `RELATED_TO` |
+
+Orchestration: `src/inference/semantic_post_processor.py` (6-phase pipeline) and `src/inference/algorithms/orchestrator.py`. Workload enrichment lives alongside as an opt-in pass.
 
 ---
 
 ## Project Structure
 
 ```
-govcon-capture-vibe/
-├── app.py                      # Entry point (Neo4j Docker management, startup)
+proj-theseus/
+├── app.py                        # Entry point (Neo4j Docker management, server bootstrap)
+├── docker-compose.neo4j.yml      # Neo4j 5.25 + APOC + GDS
 ├── src/
-│   ├── raganything_server.py   # Main server (RAG-Anything + LightRAG WebUI)
+│   ├── raganything_server.py     # Main server: wires LightRAG, RAG-Anything, UI, routes
 │   ├── server/
-│   │   ├── config.py           # 33 entity types, LightRAG global_args
-│   │   └── routes.py           # Custom /insert, /documents/upload endpoints
-│   ├── extraction/             # Entity extraction with Instructor + Pydantic
+│   │   ├── config.py             # LightRAG global_args (loads .env first)
+│   │   ├── initialization.py     # Registers all 3 prompt systems + RAG-Anything
+│   │   ├── routes.py             # Custom endpoints (/scan-rfp, /insert, batch tracker)
+│   │   └── ui_routes.py          # Workbench API (Intel Panels, chats, workspace ops)
+│   ├── ui/static/                # Capture Workbench UI (Alpine + Tailwind, zero-build)
+│   │   ├── index.html            # `theseus()` Alpine component + tailwind config
+│   │   └── styles/theseus.css    # Token system (:root) + components — see STYLE_GUIDE
+│   ├── extraction/               # Custom entity extraction (Instructor + Pydantic)
 │   ├── inference/
-│   │   ├── semantic_post_processor.py  # 8 relationship algorithms
-│   │   └── workload_enrichment.py      # BOE category tagging
+│   │   ├── semantic_post_processor.py   # 6-phase post-processing orchestrator
+│   │   ├── algorithms/                  # L↔M, doc-structure, orphan resolution
+│   │   ├── workload_enrichment.py       # BOE category tagging (opt-in)
+│   │   └── vdb_sync.py                  # Vector DB resync after retyping
 │   ├── ontology/
-│   │   └── schema.py           # Pydantic models for all entity types
-│   ├── processors/             # Document processing utilities
-│   ├── core/                   # Shared utilities
-│   └── utils/                  # Logging, helpers
+│   │   └── schema.py             # 33 entity types + 35 relationship types (canonical)
+│   ├── core/                     # Shared config helpers
+│   └── utils/                    # Logging, time helpers (America/Chicago)
 ├── prompts/
-│   ├── extraction/             # Entity extraction prompts (~170K tokens)
-│   └── relationship_inference/ # Post-processing prompts
-├── rag_storage/                # Per-workspace knowledge graphs
-├── inputs/                     # RFP document uploads
-├── docs/                       # Architecture, Neo4j guides, roadmaps
-└── tools/                      # Neo4j workspace management, validation scripts
+│   ├── govcon_prompt.py          # System 2 — query/response (Shipley mentor)
+│   ├── extraction/               # System 1 — entity/relationship extraction
+│   ├── multimodal/               # System 3 — RAG-Anything VLM prompts
+│   └── relationship_inference/   # Per-algorithm inference prompts
+├── rag_storage/                  # Per-workspace KG data (KV stores + VDB + mineru/)
+├── inputs/uploaded/              # Drop-zone for new RFPs (scan moves to __enqueued__/)
+├── docs/                         # Architecture, white papers, style guide, use cases
+└── tools/                        # Neo4j ops, ontology validation, workspace cleanup
 ```
 
 ---
@@ -259,8 +306,8 @@ NEO4J_PASSWORD=your-password
 # ============================================================================
 CHUNK_SIZE=4096                     # Tokens per chunk
 CHUNK_OVERLAP_SIZE=600              # 15% overlap
-LLM_MAX_ASYNC=16                    # LLM extraction concurrency
-EMBEDDING_MAX_ASYNC=16              # Embedding API concurrency
+MAX_ASYNC=16                        # LLM extraction concurrency (matches ARCHITECTURE.md)
+EMBEDDING_FUNC_MAX_ASYNC=16         # Embedding API concurrency
 ```
 
 ### Neo4j Setup (Recommended)
@@ -281,21 +328,25 @@ docker run -d --name neo4j \
 
 ## API Endpoints
 
-### Document Processing
+### Document Processing & Query
 
-| Endpoint            | Method | Description                                                                     |
-| ------------------- | ------ | ------------------------------------------------------------------------------- |
-| `/documents/upload` | POST   | Upload RFP (triggers full pipeline)                                             |
-| `/insert`           | POST   | Alternative upload with workspace selection                                     |
-| `/query`            | POST   | Query knowledge graph (natural language)                                        |
-| `/query/data`       | POST   | Structured data retrieval (entities, relationships, chunks) for agent workflows |
-| `/health`           | GET    | Server health check                                                             |
+| Endpoint            | Method | Description                                                                      |
+| ------------------- | ------ | -------------------------------------------------------------------------------- |
+| `/scan-rfp`         | POST   | Scan `inputs/uploaded/` and enqueue new files into the active workspace pipeline |
+| `/documents/upload` | POST   | Direct upload (LightRAG-native; triggers full multimodal + post-processing run)  |
+| `/insert`           | POST   | Alternative insert path with explicit workspace selection                        |
+| `/query`            | POST   | Hybrid query against the active workspace (Shipley mentor persona)               |
+| `/query/data`       | POST   | Structured retrieval (entities, relationships, chunks) for downstream agents     |
+| `/health`           | GET    | Server health check                                                              |
 
-### LightRAG WebUI (Built-in)
+### Workbench / Intel Panel APIs
 
-- **Document Manager**: http://localhost:9621/webui
-- **Knowledge Graph Viewer**: Interactive graph visualization
-- **Chat Interface**: Natural language queries with citations
+Served under `/api/ui/` by `src/server/ui_routes.py` — feeds the Capture Workbench front-end (workspace stats, panel rows, saved chats, exports). See open issues [#87–#114](https://github.com/BdM-15/proj-theseus/issues) for the in-flight Tier 2 / Tier 3 panel work.
+
+### UI Surfaces
+
+- **Capture Workbench** (primary): http://localhost:9621/ui — Capture Chat with Shipley mentor, Intel Panels (L↔M, requirements, deliverables, past performance, etc.), KG viewer, document drawer
+- **LightRAG WebUI** (fallback): http://localhost:9621/webui — vanilla LightRAG document manager + KG visualization
 
 ---
 
@@ -321,36 +372,19 @@ docker run -d --name neo4j \
 
 ---
 
-## GitHub Issues & Roadmap
+## Roadmap & Open Issues
 
-### Active Optimization Issues
+The full backlog is tracked in [GitHub Issues #87 – #114](https://github.com/BdM-15/proj-theseus/issues). High-level groupings:
 
-| Issue                                                                                           | Priority  | Estimated Savings   |
-| ----------------------------------------------------------------------------------------------- | --------- | ------------------- |
-| [#14: Prompt Compression](https://github.com/BdM-15/govcon-capture-vibe/issues/14)              | HIGH      | 50% token reduction |
-| [#15: Remove Redundant Algorithms 1-3](https://github.com/BdM-15/govcon-capture-vibe/issues/15) | HIGH      | ~4 min/RFP          |
-| [#16: Integrate Workload Enrichment](https://github.com/BdM-15/govcon-capture-vibe/issues/16)   | MEDIUM    | 60 sec/RFP          |
-| [#17: Parallel Chunk Processing](https://github.com/BdM-15/govcon-capture-vibe/issues/17)       | MEDIUM    | 75% time reduction  |
-| [#18: Increase Chunk Size to 16K](https://github.com/BdM-15/govcon-capture-vibe/issues/18)      | MEDIUM    | 50% fewer chunks    |
-| [#19: Fine-Tuned SLM Strategy](https://github.com/BdM-15/govcon-capture-vibe/issues/19)         | LONG-TERM | 85% cost reduction  |
+| Group                          | Examples                                                                                                                                                                                                                                               |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Tier 1 — graph quality**     | #88 confidence + provenance on edges, #93 orphan candidate links                                                                                                                                                                                       |
+| **Tier 2 — Intel Panels**      | #87 Past Performance, #99 Tech Inventory, #100 Innovation Signals, #96 Glossary, #97 Hot Buttons, #101 Deliverable Catalog                                                                                                                             |
+| **Tier 3 — quality of life**   | #109 "Ask Theseus" pre-filled chat buttons, #103 CSV/XLSX export, #110 diff vs prior run                                                                                                                                                               |
+| **UI / UX polish**             | #98 documents drawer, #92 KG presets, #91 search explorer, #94 .env knobs, #95 no-active-ws state, #90 chat latency, #89 bypass UX                                                                                                                     |
+| **Future panels & dashboards** | #108 activity feed, #113 health card, #102 notification center, #111 full Compliance Matrix, #106 Requirements Browser, #105 Win-Strategy view, #107 Risk Register, #112 Doc Structure tree, #104 section deep-dive drawer, #114 saved chats + pinning |
 
-### Strategic Feature Issues
-
-| Issue                                                                                            | Description                                    |
-| ------------------------------------------------------------------------------------------------ | ---------------------------------------------- |
-| [#20: Cross-RFP Knowledge Accumulation](https://github.com/BdM-15/govcon-capture-vibe/issues/20) | Pattern recognition across RFPs                |
-| [#21: Strategic Intelligence](https://github.com/BdM-15/govcon-capture-vibe/issues/21)           | Competitive analysis, proposal reuse           |
-| [#22: Performance Analytics](https://github.com/BdM-15/govcon-capture-vibe/issues/22)            | A/B testing, metrics dashboard                 |
-| [#23: Core Capture Intelligence](https://github.com/BdM-15/govcon-capture-vibe/issues/23)        | Proposal outline, compliance matrix generators |
-
-### Quality Issues
-
-| Issue                                                                                                    | Description                           |
-| -------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| [#9: Entity Extraction Prompt Enhancement](https://github.com/BdM-15/govcon-capture-vibe/issues/9)       | Performance metrics, strategic themes |
-| [#11: Pydantic Enforcement for Post-Processing](https://github.com/BdM-15/govcon-capture-vibe/issues/11) | Schema validation for relationships   |
-| [#12: Custom GovCon Query Prompts](https://github.com/BdM-15/govcon-capture-vibe/issues/12)              | Optimized retrieval prompts           |
-| [#13: LLM JSON Response Failures](https://github.com/BdM-15/govcon-capture-vibe/issues/13)               | Truncation handling                   |
+Three silent-failure surfaces have already been plugged on `main`: extraction-time exceptions (#115), local-timezone timestamps (#116), and tabular-only document invisibility in `doc_status` (#117).
 
 ---
 
@@ -405,13 +439,16 @@ dependencies = [
 
 ## Documentation
 
-| Document                                                                         | Description                  |
-| -------------------------------------------------------------------------------- | ---------------------------- |
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md)                                          | System architecture overview |
-| [NEO4J_USER_GUIDE.md](docs/neo4j/NEO4J_USER_GUIDE.md)                            | Neo4j setup and usage        |
-| [NEO4J_SETUP_GUIDE.md](docs/neo4j/NEO4J_SETUP_GUIDE.md)                          | Docker configuration         |
-| [FEATURE_ROADMAP.md](docs/capture-intelligence/FEATURE_ROADMAP.md)               | Feature development plan     |
-| [White Paper](docs/Ontology-Based-RAG-for-Government-Contracting-White-Paper.md) | Technical deep-dive          |
+| Document                                                                                                                               | Description                                            |
+| -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)                                                                                           | System architecture, ADRs, performance metrics         |
+| [docs/STYLE_GUIDE.md](docs/STYLE_GUIDE.md)                                                                                             | Capture Workbench UI conventions (read before UI work) |
+| [docs/PROJECT_THESEUS_USE_CASE.md](docs/PROJECT_THESEUS_USE_CASE.md)                                                                   | End-to-end capture-team use case                       |
+| [docs/ENHANCEMENT_FRAMEWORK.md](docs/ENHANCEMENT_FRAMEWORK.md)                                                                         | Upstream library enhancement mapping                   |
+| [docs/MINERU_3X_INTEGRATION_ASSESSMENT.md](docs/MINERU_3X_INTEGRATION_ASSESSMENT.md)                                                   | MinerU 3.0 upgrade notes                               |
+| [docs/Ontology-Based-RAG-for-Government-Contracting-White-Paper.md](docs/Ontology-Based-RAG-for-Government-Contracting-White-Paper.md) | Technical white paper                                  |
+| [docs/Why-General-Purpose-AI-Fails-Specialized-Domains.md](docs/Why-General-Purpose-AI-Fails-Specialized-Domains.md)                   | Domain-specialization argument                         |
+| [.github/copilot-instructions.md](.github/copilot-instructions.md)                                                                     | Agent rules + cross-cutting prompt change checklist    |
 
 ---
 
@@ -423,7 +460,7 @@ dependencies = [
 4. **Push** to branch (`git push origin feature/amazing-feature`)
 5. **Open** a Pull Request
 
-See [GitHub Issues](https://github.com/BdM-15/govcon-capture-vibe/issues) for current priorities.
+See [GitHub Issues](https://github.com/BdM-15/proj-theseus/issues) for current priorities.
 
 ---
 
@@ -444,6 +481,6 @@ MIT License - See [LICENSE](LICENSE) for details.
 ---
 
 **Last Updated**: April 2026  
-**Version**: 0.3.0  
-**Status**: Production-ready with Neo4j enterprise storage  
-**Processing**: ~$2/RFP with xAI Grok + OpenAI embeddings
+**Version**: 0.4.0  
+**Status**: Production capture workbench — Neo4j storage, multimodal ingest, Shipley-mentor querying  
+**Processing cost**: ~$2 per ~425-page RFP (xAI Grok + OpenAI embeddings)
