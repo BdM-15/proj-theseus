@@ -485,6 +485,14 @@ class SkillManager:
         detail = skill.to_summary()
         detail["body_md"] = skill.body_md
         detail["references"] = self._list_subdir(Path(skill.path) / "references", ".md")
+        detail["assets"] = self._list_subdir(
+            Path(skill.path) / "assets",
+            ".md", ".html", ".txt", ".css", ".svg", ".png", ".jpg", ".jpeg",
+            ".json", ".jsx", ".js", ".mjs", ".mp3", ".mp4", ".gif",
+        )
+        # Deprecated alias for back-compat — spec renamed templates/ -> assets/.
+        # Kept so any pre-2.3 skill that still ships a templates/ folder is still
+        # listed in /api/ui/skills/{name} until it migrates.
         detail["templates"] = self._list_subdir(
             Path(skill.path) / "templates", ".md", ".html", ".txt"
         )
