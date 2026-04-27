@@ -31,6 +31,7 @@ from lightrag.utils import compute_mdhash_id
 from raganything.callbacks import ProcessingCallback
 
 from src.core import get_settings
+from src.utils.time_utils import now_local_iso
 
 logger = logging.getLogger(__name__)
 
@@ -332,7 +333,7 @@ async def _record_failed_doc(
     try:
         if not doc_id:
             doc_id = compute_mdhash_id(file_path, prefix="failed-")
-        now = datetime.now().isoformat()
+        now = now_local_iso()
         truncated_err = error_msg[:500]
         await rag_instance.lightrag.doc_status.upsert({
             doc_id: {

@@ -305,8 +305,12 @@ _SAFE_ID = re.compile(r"^[A-Za-z0-9_-]{6,64}$")
 _SAFE_WS = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 
 
+from src.utils.time_utils import now_local_iso as _now_local_iso
+
+
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    """ISO timestamp in America/Chicago (CST/CDT)."""
+    return _now_local_iso(timespec="seconds")
 
 
 # Maximum characters per chunk preview shipped to the UI. Keeps the SSE event

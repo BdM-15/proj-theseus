@@ -31,6 +31,7 @@ from raganything import RAGAnything, RAGAnythingConfig
 # V3 unified prompt loaded directly from file - no prompt_loader needed
 from src.ontology.schema import VALID_ENTITY_TYPES
 from src.core import get_settings
+from src.utils.time_utils import to_local_iso
 
 logger = logging.getLogger(__name__)
 
@@ -567,6 +568,13 @@ async def initialize_raganything():
                 elif status_value not in VALID_STATUSES:
                     logger.warning(f"Unknown status '{status_value}' for doc {doc_id}, mapping to PROCESSING")
                     filtered_doc_data['status'] = DocStatus.PROCESSING.value
+            
+            # LightRAG hardcodes datetime.now(timezone.utc).isoformat() for
+            # created_at/updated_at — convert to America/Chicago so the UI
+            # documents table shows consistent local time.
+            for ts_field in ('created_at', 'updated_at'):
+                if ts_field in filtered_doc_data and filtered_doc_data[ts_field]:
+                    filtered_doc_data[ts_field] = to_local_iso(filtered_doc_data[ts_field])
             
             filtered_data[doc_id] = filtered_doc_data
         return await original_upsert(filtered_data)
