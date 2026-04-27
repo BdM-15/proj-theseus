@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en" class="dark">
   <head>
     <meta charset="utf-8" />
@@ -3922,157 +3922,131 @@
       class="fixed inset-0 z-[70] bg-ink-950/95 backdrop-blur-md flex items-center justify-center"
     >
       <div class="text-center">
-        <!-- Theseus vs Minotaur scene -->
+        <!-- Cyberpunk reactor power-up -->
         <svg
           class="restart-scene mx-auto"
-          viewBox="0 0 160 120"
-          width="200"
-          height="150"
-          aria-label="Theseus battling the Minotaur"
+          viewBox="0 0 200 200"
+          width="220"
+          height="220"
+          aria-label="Reactor powering up"
         >
           <defs>
-            <filter id="rs-glow" x="-30%" y="-30%" width="160%" height="160%">
-              <feGaussianBlur stdDeviation="1.2" result="b" />
+            <radialGradient id="rs-core" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#ffffff" stop-opacity="1" />
+              <stop offset="35%" stop-color="#7df9ff" stop-opacity="0.95" />
+              <stop offset="70%" stop-color="#00f0ff" stop-opacity="0.55" />
+              <stop offset="100%" stop-color="#00f0ff" stop-opacity="0" />
+            </radialGradient>
+            <radialGradient id="rs-aura" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#ff2bd6" stop-opacity="0.6" />
+              <stop offset="60%" stop-color="#ff2bd6" stop-opacity="0.1" />
+              <stop offset="100%" stop-color="#ff2bd6" stop-opacity="0" />
+            </radialGradient>
+            <filter id="rs-glow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="2.2" result="b" />
               <feMerge>
                 <feMergeNode in="b" />
                 <feMergeNode in="SourceGraphic" />
               </feMerge>
             </filter>
-            <radialGradient id="rs-floor" cx="50%" cy="60%" r="60%">
-              <stop offset="0%" stop-color="#11172a" />
-              <stop offset="100%" stop-color="#05070d" />
-            </radialGradient>
           </defs>
 
-          <!-- Arena -->
-          <rect
-            x="2"
-            y="2"
-            width="156"
-            height="116"
-            rx="10"
-            fill="url(#rs-floor)"
-            stroke="#2c3a5e"
-          />
+          <!-- Magenta aura halo -->
+          <circle cx="100" cy="100" r="92" fill="url(#rs-aura)" />
 
-          <!-- Labyrinth walls (faint cyan) -->
-          <g
-            fill="none"
-            stroke="#00f0ff"
-            stroke-opacity="0.25"
-            stroke-width="1"
-          >
-            <path d="M14 14 H146 V106 H100 M60 106 H14 V14" />
-            <path d="M22 22 H138 V98 H100 M60 98 H22 V22" />
-            <path d="M30 30 H130 V90 H100 M60 90 H30 V30" />
-          </g>
-
-          <!-- Ariadne's thread (animated dash) -->
-          <path
-            class="rs-thread"
-            d="M14 110 Q 30 80 50 70 T 90 60"
-            fill="none"
-            stroke="#ff2bd6"
-            stroke-width="1.4"
-            stroke-linecap="round"
-            filter="url(#rs-glow)"
-          />
-
-          <!-- Minotaur (right side): horned bull silhouette -->
-          <g transform="translate(118 56)" filter="url(#rs-glow)">
-            <!-- horns -->
-            <path
-              d="M-10 -14 Q -14 -22 -8 -22 Q -6 -18 -6 -14 Z"
-              fill="#ff2bd6"
-            />
-            <path d="M10 -14 Q 14 -22 8 -22 Q 6 -18 6 -14 Z" fill="#ff2bd6" />
-            <!-- head -->
-            <ellipse
-              cx="0"
-              cy="-4"
-              rx="11"
-              ry="10"
-              fill="#ff2bd6"
-              fill-opacity="0.85"
-            />
-            <!-- snout -->
-            <ellipse
-              cx="0"
-              cy="4"
-              rx="6"
-              ry="4"
-              fill="#ff2bd6"
-              fill-opacity="0.7"
-            />
-            <!-- eyes (glowing) -->
-            <circle class="rs-eye" cx="-4" cy="-5" r="1.4" fill="#ffeb00" />
-            <circle class="rs-eye" cx="4" cy="-5" r="1.4" fill="#ffeb00" />
-            <!-- nostril -->
-            <circle cx="0" cy="5" r="0.8" fill="#0a0e1a" />
-            <!-- body -->
-            <path
-              d="M-12 8 Q -14 28 -6 32 L 6 32 Q 14 28 12 8 Z"
-              fill="#ff2bd6"
-              fill-opacity="0.6"
-            />
-          </g>
-
-          <!-- Theseus (left side): cyan figure with raised sword -->
-          <g transform="translate(50 60)" filter="url(#rs-glow)">
-            <!-- head -->
-            <circle cx="0" cy="-14" r="4" fill="#00f0ff" />
-            <!-- body -->
-            <path
-              d="M-4 -10 L 4 -10 L 6 8 L -6 8 Z"
-              fill="#00f0ff"
-              fill-opacity="0.85"
-            />
-            <!-- legs -->
-            <path
-              d="M-5 8 L -3 22 M 5 8 L 3 22"
-              stroke="#00f0ff"
-              stroke-width="2.5"
-              stroke-linecap="round"
-            />
-            <!-- shield arm -->
+          <!-- Outer rotating ring (cyan, dashed) -->
+          <g class="rs-ring-outer" style="transform-origin: 100px 100px">
             <circle
-              cx="-8"
-              cy="-2"
-              r="4"
+              cx="100"
+              cy="100"
+              r="78"
               fill="none"
               stroke="#00f0ff"
-              stroke-width="1.5"
+              stroke-width="1.4"
+              stroke-dasharray="6 10"
+              opacity="0.85"
+              filter="url(#rs-glow)"
             />
-            <!-- sword arm + blade (animated swing) -->
-            <g class="rs-sword">
-              <line
-                x1="0"
-                y1="-6"
-                x2="14"
-                y2="-22"
-                stroke="#7df9ff"
-                stroke-width="2.2"
-                stroke-linecap="round"
-              />
-              <line
-                x1="14"
-                y1="-22"
-                x2="20"
-                y2="-28"
-                stroke="#ffffff"
-                stroke-width="1.4"
-                stroke-linecap="round"
-              />
+            <!-- Tick marks at 12/3/6/9 -->
+            <g stroke="#00f0ff" stroke-width="2" stroke-linecap="round" filter="url(#rs-glow)">
+              <line x1="100" y1="14" x2="100" y2="24" />
+              <line x1="186" y1="100" x2="176" y2="100" />
+              <line x1="100" y1="186" x2="100" y2="176" />
+              <line x1="14" y1="100" x2="24" y2="100" />
             </g>
           </g>
 
-          <!-- Clash spark between them -->
-          <g class="rs-spark" transform="translate(88 38)">
-            <path
-              d="M0 -8 L 2 -2 L 8 0 L 2 2 L 0 8 L -2 2 L -8 0 L -2 -2 Z"
-              fill="#ffeb00"
+          <!-- Mid counter-rotating ring (magenta, segmented) -->
+          <g class="rs-ring-mid" style="transform-origin: 100px 100px">
+            <circle
+              cx="100"
+              cy="100"
+              r="60"
+              fill="none"
+              stroke="#ff2bd6"
+              stroke-width="1.6"
+              stroke-dasharray="22 8"
+              opacity="0.9"
               filter="url(#rs-glow)"
             />
+          </g>
+
+          <!-- Inner hexagonal frame -->
+          <g
+            class="rs-hex"
+            fill="none"
+            stroke="#7df9ff"
+            stroke-width="1.2"
+            stroke-linejoin="round"
+            opacity="0.75"
+            filter="url(#rs-glow)"
+            style="transform-origin: 100px 100px"
+          >
+            <polygon points="100,55 139,77 139,123 100,145 61,123 61,77" />
+          </g>
+
+          <!-- Energy beams radiating from core -->
+          <g
+            class="rs-beams"
+            stroke="#7df9ff"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            opacity="0.85"
+            filter="url(#rs-glow)"
+            style="transform-origin: 100px 100px"
+          >
+            <line x1="100" y1="100" x2="100" y2="40" />
+            <line x1="100" y1="100" x2="160" y2="100" />
+            <line x1="100" y1="100" x2="100" y2="160" />
+            <line x1="100" y1="100" x2="40" y2="100" />
+            <line x1="100" y1="100" x2="142" y2="58" />
+            <line x1="100" y1="100" x2="142" y2="142" />
+            <line x1="100" y1="100" x2="58" y2="142" />
+            <line x1="100" y1="100" x2="58" y2="58" />
+          </g>
+
+          <!-- Pulsing core orb -->
+          <circle
+            class="rs-core-glow"
+            cx="100"
+            cy="100"
+            r="36"
+            fill="url(#rs-core)"
+          />
+          <circle
+            class="rs-core"
+            cx="100"
+            cy="100"
+            r="14"
+            fill="#ffffff"
+            filter="url(#rs-glow)"
+          />
+
+          <!-- Data ticks orbiting outer ring (3 sparks) -->
+          <g class="rs-spark-orbit" style="transform-origin: 100px 100px">
+            <circle cx="100" cy="22" r="2.4" fill="#ffeb00" filter="url(#rs-glow)" />
+            <circle cx="174" cy="143" r="2" fill="#ff2bd6" filter="url(#rs-glow)" />
+            <circle cx="26" cy="143" r="2" fill="#00f0ff" filter="url(#rs-glow)" />
           </g>
         </svg>
 
