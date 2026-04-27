@@ -115,6 +115,8 @@ These give the canonical row/section structure you must follow.
 
 Populate the matrix from the entities + chunks gathered. Every row must trace to a real entity. Mark unmappable cells `GAP` and list them in the final warnings.
 
+**EMIT EVERY ROW. NO TRUNCATION.** One row per `(proposal_instruction, evaluation_factor)` pair returned by step 2 (or per distinct `proposal_instruction` if step 2 was unavailable). Do NOT emit "representative samples", "selected rows", or any subset. If step 2 returned 72 rows, the matrix MUST contain 72 rows. Counting and audit depend on completeness — partial matrices are treated as a failed run.
+
 | Proposal Instruction | Evaluation Factor | Requirement(s) | Volume / Section | Page Limit | Status |
 | -------------------- | ----------------- | -------------- | ---------------- | ---------- | ------ |
 
@@ -205,7 +207,7 @@ After `write_file` succeeds, return a short Markdown cover note:
 ```
 Saved proposal draft to artifacts/proposal_draft.json.
 
-- Compliance matrix rows: N (OK: x, PARTIAL: y, GAP: z)
+- Compliance matrix rows: N (OK: x, PARTIAL: y, GAP: z)  ← MUST equal the row count from step 2
 - Themes: N
 - FAB chains: N
 - Volumes outlined: N
@@ -216,6 +218,8 @@ Top warnings:
 
 Sources cited: chunk-aaaa, chunk-bbbb, ...
 ```
+
+If matrix row count is less than the step-2 trace count, that is a bug — emit a warning `truncated: matrix has X rows, trace returned Y` and re-run the row build until parity is reached.
 
 Do not duplicate the full JSON in the assistant message — the user opens the artifact for the full draft.
 
