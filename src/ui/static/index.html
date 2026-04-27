@@ -917,8 +917,8 @@
                   <h2 class="font-semibold">Upload</h2>
                 </div>
                 <p class="text-xs text-slate-500 mb-4">
-                  Drop files directly. Inference auto-fires after the batch
-                  idles.
+                  Drop one or many files. Each is staged and the batch is
+                  enqueued — extraction runs in the background.
                 </p>
 
                 <label
@@ -3968,7 +3968,12 @@
               filter="url(#rs-glow)"
             />
             <!-- Tick marks at 12/3/6/9 -->
-            <g stroke="#00f0ff" stroke-width="2" stroke-linecap="round" filter="url(#rs-glow)">
+            <g
+              stroke="#00f0ff"
+              stroke-width="2"
+              stroke-linecap="round"
+              filter="url(#rs-glow)"
+            >
               <line x1="100" y1="14" x2="100" y2="24" />
               <line x1="186" y1="100" x2="176" y2="100" />
               <line x1="100" y1="186" x2="100" y2="176" />
@@ -4044,9 +4049,27 @@
 
           <!-- Data ticks orbiting outer ring (3 sparks) -->
           <g class="rs-spark-orbit" style="transform-origin: 100px 100px">
-            <circle cx="100" cy="22" r="2.4" fill="#ffeb00" filter="url(#rs-glow)" />
-            <circle cx="174" cy="143" r="2" fill="#ff2bd6" filter="url(#rs-glow)" />
-            <circle cx="26" cy="143" r="2" fill="#00f0ff" filter="url(#rs-glow)" />
+            <circle
+              cx="100"
+              cy="22"
+              r="2.4"
+              fill="#ffeb00"
+              filter="url(#rs-glow)"
+            />
+            <circle
+              cx="174"
+              cy="143"
+              r="2"
+              fill="#ff2bd6"
+              filter="url(#rs-glow)"
+            />
+            <circle
+              cx="26"
+              cy="143"
+              r="2"
+              fill="#00f0ff"
+              filter="url(#rs-glow)"
+            />
           </g>
         </svg>
 
@@ -4651,13 +4674,24 @@
 
           async uploadFiles(fileList) {
             const files = Array.from(fileList || []);
-            for (const f of files) {
+            if (!files.length) return;
+
+            // Two-phase flow (matches LightRAG WebUI UX):
+            //   1. POST every file in PARALLEL to /documents/upload?stage_only=true
+            //      so the browser side completes near-instantly regardless of
+            //      how many files were dropped.
+            //   2. Once all files have landed in inputs/<workspace>/, fire a
+            //      single /scan-rfp call that hands the batch off to the
+            //      server's background pipeline (MinerU + extraction +
+            //      semantic post-processing). The user is free to keep
+            //      working while it runs.
+            const tasks = files.map(async (f) => {
               const id = Math.random().toString(36).slice(2);
               this.uploads.unshift({ id, name: f.name, status: "uploading" });
               const fd = new FormData();
               fd.append("file", f);
               try {
-                const r = await fetch("/documents/upload", {
+                const r = await fetch("/documents/upload?stage_only=true", {
                   method: "POST",
                   body: fd,
                 });
@@ -4671,17 +4705,47 @@
                       }
                     : u,
                 );
-                if (r.ok) this.toast(`${f.name} uploaded — extraction running`);
+                return r.ok;
               } catch (e) {
                 this.uploads = this.uploads.map((u) =>
                   u.id === id ? { ...u, status: "error", msg: "network" } : u,
                 );
-                this.toast(`Upload failed: ${f.name}`, "error");
+                return false;
               }
+            });
+
+            const results = await Promise.all(tasks);
+            const okCount = results.filter(Boolean).length;
+            const failCount = results.length - okCount;
+
+            if (okCount === 0) {
+              this.toast(`Upload failed for all ${failCount} file(s)`, "error");
+              return;
             }
+
+            // Kick off the background batch scan. The /scan-rfp endpoint
+            // returns immediately after enqueuing — extraction runs async on
+            // the server and post-processing fires when the batch idles.
+            try {
+              this.docStats.scanning = true;
+              const r = await this.api("/scan-rfp", { method: "POST" });
+              const msg = failCount
+                ? `${okCount} file(s) queued (${failCount} failed) — extraction running`
+                : `${okCount} file(s) queued — extraction running`;
+              this.toast(r.message || msg);
+            } catch (e) {
+              this.toast(
+                `Files staged but scan failed to start: ${e.message}`,
+                "error",
+              );
+            } finally {
+              this.docStats.scanning = false;
+            }
+
             setTimeout(() => {
               this.loadDocuments();
               this.loadStats();
+              this.loadDocStats();
             }, 1500);
           },
 
