@@ -1,0 +1,11 @@
+{
+  "name": "ecfr",
+  "description": "eCFR (Electronic Code of Federal Regulations) MCP server (1102tools/federal-contracting-mcps). 13 read-only tools over the live eCFR API: FAR / DFARS / agency FAR supplement text, structure, search, version history, and clause lookup. No API key required.",
+  "command": ["uvx", "--from", "ecfr-mcp==0.2.6", "ecfr-mcp"],
+  "env_required": [],
+  "env_optional": [],
+  "vendored_from": "https://github.com/1102tools/federal-contracting-mcps/tree/main/servers/ecfr-mcp",
+  "vendored_commit": "aef1961378b3e5c380270bec48ed47a4f7bed4fc",
+  "vendored_at": "2026-04-28",
+  "license": "MIT"
+}
