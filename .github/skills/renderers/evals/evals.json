@@ -1,6 +1,6 @@
 {
   "skill_name": "renderers",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Smoke prompts for the universal artifact renderer library. Most production usage happens indirectly via consumer-skill script_paths; these evals exercise direct activation paths.",
   "evals": [
     {
@@ -32,6 +32,17 @@
         "Does NOT attempt to draft proposal content",
         "Names proposal-generator as the correct authoring skill",
         "Offers to render the resulting Markdown once proposal-generator produces it"
+      ]
+    },
+    {
+      "id": "render_xlsx_envelope",
+      "prompt": "I have a proposal_draft.json envelope at artifacts/proposal_draft.json with compliance_matrix, themes, and fab_chains arrays. Render it to artifacts/compliance_matrix.xlsx with workbook title 'Compliance Matrix \u2014 Program X'.",
+      "expected_behavior": "Skill calls run_script on scripts/render_xlsx.py with --input, --output, --title flags. Reports the output path. Each top-level array in the envelope becomes a separate sheet; non-array fields (executive_summary_md, warnings) are correctly ignored.",
+      "success_criteria": [
+        "Uses run_script tool with scripts/render_xlsx.py",
+        "Passes --title argument",
+        "Confirms exit_code == 0 and reports artifact path",
+        "Mentions that compliance_matrix / themes / fab_chains became separate sheets"
       ]
     }
   ]

@@ -5,13 +5,13 @@ license: MIT
 metadata:
   runtime: tools
   category: proposal
-  version: 0.5.0
+  version: 0.6.0
   status: active
   # Phase 3b: opt-in cross-skill access to huashu-design's renderer scripts
   # so the optional render step (12) can produce PPTX/PDF artifacts via
   # run_script without per-skill wrapper shims.
-  # Phase 3d: the `renderers` utility skill owns format-conversion scripts
-  # (DOCX now, XLSX next). All consumer skills opt in the same way.
+  # Phase 3d/3e: the `renderers` utility skill owns format-conversion scripts
+  # (DOCX, XLSX). All consumer skills opt in the same way.
   script_paths:
     - ../huashu-design/scripts
     - ../renderers/scripts
@@ -215,12 +215,13 @@ If the user explicitly requested a slide deck, PDF brief, or one-pager, render i
 
 **Renderer reference:**
 
-| Output | Script                                          | Required args                                                                      | Toolchain       |
-| ------ | ----------------------------------------------- | ---------------------------------------------------------------------------------- | --------------- |
-| PDF    | `../huashu-design/scripts/export_deck_pdf.mjs`  | `--slides <dir> --out <file.pdf> [--width --height]`                               | Node + Chromium |
-| PPTX   | `../huashu-design/scripts/export_deck_pptx.mjs` | (see script header — load via `read_file` if needed)                               | Node + Chromium |
-| Video  | `../huashu-design/scripts/render-video.js`      | (see script header — requires bundled ffmpeg)                                      | Node + ffmpeg   |
-| DOCX   | `../renderers/scripts/render_docx.py`           | `--input <md> --output <docx> [--reference <docx>] [--toc] [--metadata KEY=VALUE]` | Pandoc on PATH  |
+| Output | Script                                          | Required args                                                                      | Toolchain              |
+| ------ | ----------------------------------------------- | ---------------------------------------------------------------------------------- | ---------------------- |
+| PDF    | `../huashu-design/scripts/export_deck_pdf.mjs`  | `--slides <dir> --out <file.pdf> [--width --height]`                               | Node + Chromium        |
+| PPTX   | `../huashu-design/scripts/export_deck_pptx.mjs` | (see script header — load via `read_file` if needed)                               | Node + Chromium        |
+| Video  | `../huashu-design/scripts/render-video.js`      | (see script header — requires bundled ffmpeg)                                      | Node + ffmpeg          |
+| DOCX   | `../renderers/scripts/render_docx.py`           | `--input <md> --output <docx> [--reference <docx>] [--toc] [--metadata KEY=VALUE]` | Pandoc on PATH         |
+| XLSX   | `../renderers/scripts/render_xlsx.py`           | `--input <json> --output <xlsx> [--sheet <name>] [--title <text>]`                 | openpyxl (Python venv) |
 
 Renderers live in dedicated utility skills (`huashu-design` for visual artifacts, `renderers` for office formats) and are opted in via this skill's `metadata.script_paths`. Future consumer skills follow the same pattern — no per-skill renderer code.
 
@@ -251,6 +252,32 @@ Federal proposals are typically submitted as DOCX, often on an agency- or compan
    Add `"--reference", "{artifacts}/reference.docx"` if a template was supplied. Confirm `exit_code == 0`. If `exit_code == 127`, Pandoc is not installed — surface the install hint from stderr to the user (see `docs/PHASE_3D_TOOLCHAIN.md`).
 
 4. Add the produced filename to the cover note's "Artifacts" section.
+
+### 12c. Render the compliance matrix as an Excel workbook (optional)
+
+Federal contracting officers expect the compliance matrix as a sortable, filterable spreadsheet. The XLSX renderer consumes the same `proposal_draft.json` envelope you wrote in step 11 and produces one workbook with separate sheets for `compliance_matrix`, `themes`, `fab_chains`, and `volume_outlines` (any top-level array-of-objects key becomes a sheet; non-array fields like `executive_summary_md` and `warnings` are correctly ignored).
+
+1. Confirm `artifacts/proposal_draft.json` exists from step 11.
+2. Invoke the XLSX renderer (lives in the `renderers` utility skill) via `run_script`:
+
+   ```json
+   {
+     "path": "../renderers/scripts/render_xlsx.py",
+     "args": [
+       "--input",
+       "{artifacts}/proposal_draft.json",
+       "--output",
+       "{artifacts}/compliance_matrix.xlsx",
+       "--title",
+       "Compliance Matrix — <program name>"
+     ],
+     "timeout": 30
+   }
+   ```
+
+   Confirm `exit_code == 0`. The workbook will have a frozen header, autofilter, and conditional row fills (green=OK, yellow=PARTIAL, red=GAP) on any sheet that contains a `status` column. If `exit_code == 127`, openpyxl is missing from the venv — surface the install hint from stderr (see `docs/PHASE_3E_TOOLCHAIN.md`).
+
+3. Add the produced filename to the cover note's "Artifacts" section.
 
 ## Output Contract
 
