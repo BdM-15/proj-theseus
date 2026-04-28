@@ -10,18 +10,18 @@ items live in GitHub issues now.
 
 ## Status snapshot
 
-| Phase   | Scope                                                | State            | Evidence                                                     |
-| ------- | ---------------------------------------------------- | ---------------- | ------------------------------------------------------------ |
-| **1**   | Output persistence (`skill_runs/` + Recent Runs)     | ✅ Done          | `7833d76`                                                    |
-| **1.5** | Source-grounded briefing book (verbatim citations)   | ✅ Done          | `ad5d8d9`                                                    |
-| **1.6** | Chat-grade hybrid retrieval (mix mode + reranker)    | ✅ Done          | `ad5d8d9`                                                    |
-| **2.0** | Open Skills spec compliance — vendor skill-creator   | ✅ Done          | `9134f0f`                                                    |
-| **2.1** | Tool-calling runtime (imperative agent loop)         | ✅ Done          | `b4b9e33`                                                    |
-| **2.2** | Migrate `proposal-generator` to tools-mode           | ✅ Done          | `7f4e75b`, `914a4eb`, `4cf5c42`, `1bfb99b`                   |
-| **2.3** | Migrate remaining 4 skills + UI transcript drawer    | ✅ Done          | `98980a7`, `2dc8e1a`, `55d694b`, `d3cf024`, `90610d7`, `fe716a4`, `5bba9be` |
-| **3**   | Artifact renderers (HTML → PPTX/PDF/MP4/DOCX/XLSX)   | ⏳ Re-scoped     | See §Phase 3 below                                           |
-| **4**   | External datasources (SAM.gov, USAspending, FPDS)    | ⏳ Not started   | `competitive-intel` is a stub                                |
-| **5**   | Skills invoking other skills (sub-agents)            | ⏳ Not started   | needs `invoke_skill` tool                                    |
+| Phase   | Scope                                              | State                     | Evidence                                                                    |
+| ------- | -------------------------------------------------- | ------------------------- | --------------------------------------------------------------------------- |
+| **1**   | Output persistence (`skill_runs/` + Recent Runs)   | ✅ Done                   | `7833d76`                                                                   |
+| **1.5** | Source-grounded briefing book (verbatim citations) | ✅ Done                   | `ad5d8d9`                                                                   |
+| **1.6** | Chat-grade hybrid retrieval (mix mode + reranker)  | ✅ Done                   | `ad5d8d9`                                                                   |
+| **2.0** | Open Skills spec compliance — vendor skill-creator | ✅ Done                   | `9134f0f`                                                                   |
+| **2.1** | Tool-calling runtime (imperative agent loop)       | ✅ Done                   | `b4b9e33`                                                                   |
+| **2.2** | Migrate `proposal-generator` to tools-mode         | ✅ Done                   | `7f4e75b`, `914a4eb`, `4cf5c42`, `1bfb99b`                                  |
+| **2.3** | Migrate remaining 4 skills + UI transcript drawer  | ✅ Done                   | `98980a7`, `2dc8e1a`, `55d694b`, `d3cf024`, `90610d7`, `fe716a4`, `5bba9be` |
+| **3**   | Artifact renderers (HTML → PPTX/PDF/MP4/DOCX/XLSX) | 🟡 3a done, 3b–3e pending | See §Phase 3 below                                                          |
+| **4**   | External datasources (SAM.gov, USAspending, FPDS)  | ⏳ Not started            | `competitive-intel` is a stub                                               |
+| **5**   | Skills invoking other skills (sub-agents)          | ⏳ Not started            | needs `invoke_skill` tool                                                   |
 
 ---
 
@@ -67,15 +67,15 @@ We properly vendored `huashu-design` in sub-phase 2.3 (`d3cf024`). It
 ships **all five rendering toolchains as `scripts/`**, which the
 tools-mode runtime can execute today via `run_script`:
 
-| Renderer             | Script                                                                               | Output                          |
-| -------------------- | ------------------------------------------------------------------------------------ | ------------------------------- |
-| HTML → PPTX          | [scripts/html2pptx.js](../.github/skills/huashu-design/scripts/html2pptx.js)         | editable .pptx (text frames)    |
-| HTML deck → PDF      | [scripts/export_deck_pdf.mjs](../.github/skills/huashu-design/scripts/export_deck_pdf.mjs) | .pdf                            |
-| HTML deck stages → PDF | [scripts/export_deck_stage_pdf.mjs](../.github/skills/huashu-design/scripts/export_deck_stage_pdf.mjs) | .pdf (per-stage)                |
-| HTML animation → MP4/GIF | [scripts/render-video.js](../.github/skills/huashu-design/scripts/render-video.js)  | .mp4 / .gif (25fps + 60fps interp) |
-| Format conversion    | [scripts/convert-formats.sh](../.github/skills/huashu-design/scripts/convert-formats.sh) | .png / .svg                     |
-| Add BGM/SFX          | [scripts/add-music.sh](../.github/skills/huashu-design/scripts/add-music.sh)         | scored .mp4                     |
-| Playwright verify    | [scripts/verify.py](../.github/skills/huashu-design/scripts/verify.py)               | smoke-test .html                |
+| Renderer                 | Script                                                                                                 | Output                             |
+| ------------------------ | ------------------------------------------------------------------------------------------------------ | ---------------------------------- |
+| HTML → PPTX              | [scripts/html2pptx.js](../.github/skills/huashu-design/scripts/html2pptx.js)                           | editable .pptx (text frames)       |
+| HTML deck → PDF          | [scripts/export_deck_pdf.mjs](../.github/skills/huashu-design/scripts/export_deck_pdf.mjs)             | .pdf                               |
+| HTML deck stages → PDF   | [scripts/export_deck_stage_pdf.mjs](../.github/skills/huashu-design/scripts/export_deck_stage_pdf.mjs) | .pdf (per-stage)                   |
+| HTML animation → MP4/GIF | [scripts/render-video.js](../.github/skills/huashu-design/scripts/render-video.js)                     | .mp4 / .gif (25fps + 60fps interp) |
+| Format conversion        | [scripts/convert-formats.sh](../.github/skills/huashu-design/scripts/convert-formats.sh)               | .png / .svg                        |
+| Add BGM/SFX              | [scripts/add-music.sh](../.github/skills/huashu-design/scripts/add-music.sh)                           | scored .mp4                        |
+| Playwright verify        | [scripts/verify.py](../.github/skills/huashu-design/scripts/verify.py)                                 | smoke-test .html                   |
 
 `proposal-generator` already produces the matching HTML inputs in
 [assets/](../.github/skills/proposal-generator/assets/):
@@ -85,23 +85,28 @@ tools-mode runtime can execute today via `run_script`:
 - `one_pager.html`
 - `theme_card.html`
 
-### Re-scoped Phase 3
+### Re-scoped Phase 3 (sub-phases)
 
 **Original "build five renderers from scratch" → "wire huashu-design's
 existing scripts into a system tool the runtime exposes."**
 
-| Item                                                                                                    | Status                       |
-| ------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| Toolchain prereqs (Node, Playwright, ffmpeg) installed in `.venv` / repo `package.json`                 | ⏳ Not done                  |
-| `proposal-generator` SKILL.md updated to reference `huashu-design` scripts via absolute paths in `run_script` | ⏳ Not done                  |
-| Drawer "Download artifacts" section recognizes binary mimetypes (.pptx/.pdf/.mp4/.gif)                  | ⏳ Not done                  |
-| DOCX renderer (Pandoc MD → DOCX) for proposal volumes                                                   | ⏳ Still needed — huashu doesn't ship this |
-| XLSX renderer (openpyxl) for compliance matrix                                                          | ⏳ Still needed — huashu doesn't ship this |
-| `template.render` runtime tool                                                                          | ❌ Dropped — superseded by `run_script` + huashu scripts |
+| Sub-phase | Item                                                                                                | Status      | Evidence                                                                           |
+| --------- | --------------------------------------------------------------------------------------------------- | ----------- | ---------------------------------------------------------------------------------- |
+| **3a**    | Toolchain install (Node + Playwright + Chromium via huashu `package.json`)                          | ✅ Done     | `docs/PHASE_3A_TOOLCHAIN.md`; smoke-tested `export_deck_pdf.mjs` → 23KB vector PDF |
+| **3b**    | `proposal-generator` SKILL.md references `huashu-design` scripts via absolute paths in `run_script` | ⏳ Not done |                                                                                    |
+| **3c**    | Drawer "Download artifacts" section recognizes binary mimetypes (.pptx/.pdf/.mp4/.gif)              | ⏳ Not done |                                                                                    |
+| **3d**    | DOCX renderer (Pandoc MD → DOCX) for proposal volumes — huashu doesn't ship this                    | ⏳ Not done |                                                                                    |
+| **3e**    | XLSX renderer (openpyxl) for compliance matrix — huashu doesn't ship this                           | ⏳ Not done |                                                                                    |
+| —         | `template.render` runtime tool                                                                      | ❌ Dropped  | Superseded by `run_script` + huashu scripts                                        |
 
 **Net effect:** Phase 3 shrinks from "build five renderers" to "install
-the toolchain + add two govcon-specific renderers (DOCX, XLSX) that
-huashu doesn't cover."
+the toolchain + wire huashu + add two govcon-specific renderers (DOCX,
+XLSX) that huashu doesn't cover."
+
+**Phase 3a notes (2026-04-28):** Playwright bundles its own ffmpeg, so
+no system ffmpeg install is needed for video work. Pandoc remains
+deferred to 3d. Python deps untouched; snapshots in `tools/_dep_snapshots/`
+(gitignored) provide rollback.
 
 ---
 
@@ -125,15 +130,15 @@ Don't hallucinate award history — fetch and cite.
 
 ### Re-scoped Phase 4
 
-| Item                                                                                                         | Status         |
-| ------------------------------------------------------------------------------------------------------------ | -------------- |
-| `src/skills/datasources/sam_gov.py` — SAM.gov Opportunities + Entity client (API key from `SAM_API_KEY` env) | ⏳ Not started |
-| `src/skills/datasources/usaspending.py` — USAspending award search (no key required)                         | ⏳ Not started |
-| `src/skills/datasources/fpds.py` — FPDS Atom feed parser (no key required)                                   | ⏳ Not started |
-| `src/skills/datasources/cache.py` — Disk cache to `rag_storage/_platform/intel_cache/`, TTL per source       | ⏳ Not started |
-| Runtime tools: `intel_search_opportunities`, `intel_award_history`, `intel_vendor_profile`                   | ⏳ Not started |
-| Tools restricted to skills with `metadata.datasources: [sam_gov, usaspending, ...]` declared                  | ⏳ Not started |
-| `competitive-intel` SKILL.md migrated from `legacy` placeholder → `tools` mode using the new tools           | ⏳ Not started |
+| Item                                                                                                         | Status                                                                           |
+| ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| `src/skills/datasources/sam_gov.py` — SAM.gov Opportunities + Entity client (API key from `SAM_API_KEY` env) | ⏳ Not started                                                                   |
+| `src/skills/datasources/usaspending.py` — USAspending award search (no key required)                         | ⏳ Not started                                                                   |
+| `src/skills/datasources/fpds.py` — FPDS Atom feed parser (no key required)                                   | ⏳ Not started                                                                   |
+| `src/skills/datasources/cache.py` — Disk cache to `rag_storage/_platform/intel_cache/`, TTL per source       | ⏳ Not started                                                                   |
+| Runtime tools: `intel_search_opportunities`, `intel_award_history`, `intel_vendor_profile`                   | ⏳ Not started                                                                   |
+| Tools restricted to skills with `metadata.datasources: [sam_gov, usaspending, ...]` declared                 | ⏳ Not started                                                                   |
+| `competitive-intel` SKILL.md migrated from `legacy` placeholder → `tools` mode using the new tools           | ⏳ Not started                                                                   |
 | GSA eLibrary client                                                                                          | 🔵 Deferred — lower priority; schedules are mostly relevant for GSA-vehicle bids |
 
 **Net effect:** Phase 4 stays roughly the same scope as originally
@@ -160,7 +165,7 @@ Three things make Phase 5 simpler than originally specced:
    full agent loop (with its own SKILL.md + tools + transcript).
 2. **huashu-design is a skill, not a tool.** When `proposal-generator`
    wants a slide deck rendered, it should `invoke_skill("huashu-design",
-   "render this slide_master.html as PPTX")` — not call `html2pptx.js`
+"render this slide_master.html as PPTX")` — not call `html2pptx.js`
    directly. This keeps each skill in charge of its own quality bar
    (huashu's Playwright verify step, design critique, etc.).
 3. **Transcript composition is the hard part.** When skill A invokes
@@ -172,7 +177,7 @@ Three things make Phase 5 simpler than originally specced:
 | Item                                                                                                                 | Status         |
 | -------------------------------------------------------------------------------------------------------------------- | -------------- |
 | `invoke_skill(name, prompt)` runtime tool                                                                            | ⏳ Not started |
-| Nested run_dirs: invoked skill's `<run_dir>` lives at `<caller_run_dir>/sub_skills/<name>_<timestamp>/`              | ⏳ Not started |
+| Nested run*dirs: invoked skill's `<run_dir>` lives at `<caller_run_dir>/sub_skills/<name>*<timestamp>/`              | ⏳ Not started |
 | Transcript merging: caller's `transcript.json` records `tool: invoke_skill` with a pointer to the sub-skill's run_id | ⏳ Not started |
 | UI drawer: nested skill runs render as collapsible sub-trees in the parent transcript                                | ⏳ Not started |
 | Loop guard: max nesting depth 3, max sub-skill turns 20 (configurable)                                               | ⏳ Not started |
@@ -188,8 +193,8 @@ drawer made multi-turn runs first-class in the UI.
 
 ## End-to-end target (post-Phase 5)
 
-Single user prompt: *"Draft a Volume 1 Technical for the AFCAP V ADAB
-ISS RFP, with a black-hat read on the incumbent and an exec one-pager."*
+Single user prompt: _"Draft a Volume 1 Technical for the AFCAP V ADAB
+ISS RFP, with a black-hat read on the incumbent and an exec one-pager."_
 
 ```
 proposal-generator (caller)
@@ -225,17 +230,19 @@ own capture team" in concrete terms.**
 
 ## Dropped from original roadmap
 
-| Original item                              | Reason dropped                                                                          |
-| ------------------------------------------ | --------------------------------------------------------------------------------------- |
+| Original item                               | Reason dropped                                                                          |
+| ------------------------------------------- | --------------------------------------------------------------------------------------- |
 | Phase 2 declarative `workflow:` frontmatter | Open Skills spec uses imperative tools-mode; declarative chains are strictly weaker.    |
-| `template.render` tool                     | `run_script` + huashu's `html2pptx.js` / `export_deck_pdf.mjs` cover the same surface.  |
-| "Phase 2.5" placeholder                    | Was speculative — no longer needed; tools-mode delivered multi-step capability cleanly. |
+| `template.render` tool                      | `run_script` + huashu's `html2pptx.js` / `export_deck_pdf.mjs` cover the same surface.  |
+| "Phase 2.5" placeholder                     | Was speculative — no longer needed; tools-mode delivered multi-step capability cleanly. |
 
 ---
 
 ## Sequencing recommendation
 
-1. **Phase 3 toolchain install + wire-up** (small, high visible impact)
-2. **Phase 3 DOCX + XLSX renderers** (the two huashu doesn't cover)
-3. **Phase 4 SAM.gov + USAspending clients** (highest-leverage external data)
-4. **Phase 5 `invoke_skill`** (only valuable once 3 + 4 produce real outputs)
+1. ~~**Phase 3a toolchain install**~~ ✅ Done 2026-04-28
+2. **Phase 3b wire `proposal-generator` → huashu via `run_script`** (small, proves the pattern)
+3. **Phase 3c drawer binary mimetype support** (UI side of 3b)
+4. **Phase 3d + 3e DOCX/XLSX renderers** (the two huashu doesn't cover)
+5. **Phase 4 SAM.gov + USAspending clients** (highest-leverage external data)
+6. **Phase 5 `invoke_skill`** (only valuable once 3 + 4 produce real outputs)

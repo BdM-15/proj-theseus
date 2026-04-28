@@ -222,3 +222,20 @@ credentials/
 docs/Clean_Prompt_Library.xlsx
 tools/_prompt_xlsx_dump.json
 
+
+# ============================================================================
+# Node (huashu-design renderer toolchain)
+# ============================================================================
+node_modules/
+package-lock.json
+.github/skills/huashu-design/node_modules/
+
+# Dep snapshots (Phase 3a backups)
+tools/_dep_snapshots/
+
+
+# Stray UI test response artifacts (loose at repo root)
+/response.json
+/skill_response.json
+/skill_invocation_response.json
+
