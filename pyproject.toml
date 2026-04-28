@@ -72,6 +72,11 @@ explicit = true
 torch = { index = "pytorch-cu124" }
 torchvision = { index = "pytorch-cu124" }
 
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]
+
 # Note: raganything[all]>=1.2.10 bundles:
 # - lightrag-hku (knowledge graph + WebUI)
 # - mineru[core] (MinerU 3.x multimodal document parsing - includes shapely,

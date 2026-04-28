@@ -246,24 +246,32 @@ When modifying a skill or the runtime, you MUST:
 
 ## Testing & Validation
 
-**MANDATORY**: Always activate virtual environment (`.venv`) before running tests.
+**MANDATORY**: Always run tests from the project `.venv` (managed by `uv`).
+
+### Dependency Management (uv, not pip)
+
+- This project uses **uv** to manage `.venv`. The venv intentionally has **no `pip`** — all installs go through `uv` so they're reflected in `pyproject.toml` + `uv.lock`.
+- **NEVER** run `pip install <pkg>` (it will fail or leak into another Python). If a tool is missing from `.venv`, declare it in `pyproject.toml` and run `uv sync`.
+  - Runtime dep: `uv add <pkg>`
+  - Dev/test dep: `uv add --dev <pkg>` (lands in `[dependency-groups] dev`, installed by `uv sync` by default)
+- After any `uv sync`, verify CUDA torch survived: `python -c "import torch; print(torch.cuda.is_available())"`. The `[tool.uv.sources]` block pins torch/torchvision to the `pytorch-cu124` index so resyncs should preserve GPU builds, but a CPU downgrade has happened historically.
 
 ### Running Tests
 
 1.  **Quick Validation Scripts**:
     - Refer to `tests/TEST_SCRIPTS_README.md` for specific scenarios.
-    - Example: `python tests/test_neo4j_quick.py`
+    - Example: `.\.venv\Scripts\python.exe tests/test_neo4j_quick.py`
 2.  **Full Suite**:
-    - Run `python -m pytest tests` to run the standard test suite.
+    - `.\.venv\Scripts\python.exe -m pytest tests` (pytest is declared in `[dependency-groups] dev`).
     - Use markers if available (check `tests/pytest.ini` if present).
 3.  **Prompt Signal Tests**:
-    - `python tools/test_query_prompt.py --workspace <name> --query-id M2` — Tests mentor persona signal detection
+    - `.\.venv\Scripts\python.exe tools/test_query_prompt.py --workspace <name> --query-id M2` — Tests mentor persona signal detection
     - Signal categories: `shipley_terms`, `mentoring_language`, `risk_flags`, `reasoning_chain`
     - Note: Tests query against cached LLM responses. Re-process workspace under new prompts for fresh results.
 
 ### Environment Setup
 
-- Monitor terminal prompt for `(.venv)` indicator.
+- Monitor terminal prompt for `(.venv)` indicator, or invoke `.\.venv\Scripts\python.exe` directly.
 - Ensure `.env` is configured correctly for the test environment (e.g., `GRAPH_STORAGE`, `NEO4J_URI`).
 
 ---
