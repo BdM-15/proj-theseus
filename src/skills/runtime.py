@@ -27,6 +27,7 @@ from src.skills.tools import (
     ToolContext,
     ToolError,
     ToolSpec,
+    build_mcp_tool_specs,
     build_tool_specs,
     serialize_tool_payload_for_model,
 )
@@ -203,6 +204,11 @@ async def run_tool_loop(
         turn/tool-call counts, and aggregate token usage.
     """
     specs = build_tool_specs()
+    if ctx.mcp_sessions:
+        # Phase 4a: append one ToolSpec per discovered MCP tool so the model
+        # sees them alongside the in-process tools. Naming convention
+        # ``mcp__<server>__<tool>`` keeps the namespace collision-free.
+        specs.extend(build_mcp_tool_specs(ctx.mcp_sessions))
     specs_by_name = {s.name: s for s in specs}
     tool_schemas = [s.to_openai() for s in specs]
 

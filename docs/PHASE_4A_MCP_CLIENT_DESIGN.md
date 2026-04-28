@@ -46,7 +46,7 @@ This is the strict prerequisite for Phases 4c–4i (vendored MCPs + skills).
 │  - MCPRegistry: discovers tools/mcps/* on startup              │
 │  - MCPSession: spawns one subprocess per declared MCP per run  │
 │  - MCPTool: adapts JSON-RPC tool schema → ToolSpec             │
-│  - JSON-RPC stdio framing (Content-Length header)              │
+│  - JSON-RPC stdio framing (newline-delimited JSON)             │
 │  - Lifecycle: handshake, list_tools, call_tool, shutdown       │
 └────────────────────────────────────────────────────────────────┘
                           │
@@ -94,19 +94,24 @@ proc = await asyncio.create_subprocess_exec(
 
 ### 4.2 JSON-RPC framing
 
-MCP uses LSP-style framing on stdio:
+MCP uses **newline-delimited JSON** on stdio (per the official MCP spec):
+each JSON-RPC message is a single line of JSON terminated by `\n`, with no
+embedded newlines inside the message.
 
 ```
-Content-Length: 123\r\n\r\n{"jsonrpc":"2.0","id":1,"method":"initialize",...}
+{"jsonrpc":"2.0","id":1,"method":"initialize",...}\n
+{"jsonrpc":"2.0","id":2,"method":"tools/list",...}\n
 ```
 
 Implement a tiny reader that:
-1. Reads headers until blank line
-2. Reads exactly `Content-Length` bytes of body
-3. Parses JSON, dispatches by `id`
+1. Calls `stdout.readline()` in a loop
+2. Strips whitespace, parses JSON, dispatches by `id`
+3. Drops malformed lines with a warning (defensive against chatty servers)
 
-Use `asyncio.Queue` per session to serialize writes (MCP allows pipelining
-but we don't need it).
+A single background task per session demuxes responses into
+per-request `asyncio.Future` instances keyed by integer id. Writes are
+serialized through the subprocess's stdin pipe; we don't need an explicit
+queue because the dispatch loop is sequential within a turn.
 
 ### 4.3 Handshake
 

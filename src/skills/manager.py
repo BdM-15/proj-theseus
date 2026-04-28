@@ -128,6 +128,25 @@ class SkillFrontmatter:
         raw = str(self.metadata.get("runtime", "")).strip().lower()
         return "tools" if raw == "tools" else "legacy"
 
+    @property
+    def required_mcps(self) -> list[str]:
+        """MCP server aliases the skill is allowed to talk to.
+
+        Phase 4b: declared via ``metadata.mcps: [usaspending, sam_gov]`` in
+        the SKILL.md frontmatter. Default is empty (closed) — a skill that
+        does not declare ``metadata.mcps`` gets zero MCP tools, mirroring the
+        opt-in security shape of ``metadata.script_paths``. Accepts either a
+        flow-style list or a single string for ergonomics.
+        """
+        raw = self.metadata.get("mcps")
+        if raw is None:
+            return []
+        if isinstance(raw, str):
+            return [raw.strip()] if raw.strip() else []
+        if isinstance(raw, list):
+            return [str(x).strip() for x in raw if str(x).strip()]
+        return []
+
 
 @dataclass
 class Skill:
@@ -410,12 +429,20 @@ class SkillManager:
         self,
         skills_dir: Path = _SKILLS_DIR,
         ledger_path: Path = _INSTALL_LEDGER,
+        mcps_root: Optional[Path] = None,
     ) -> None:
         self.skills_dir = skills_dir
         self.ledger_path = ledger_path
         self._skills: dict[str, Skill] = {}
         self._lock = asyncio.Lock()
         self._ledger: dict[str, dict[str, Any]] = {}
+        # Phase 4a: MCP client subsystem. Lazy-imported so legacy-mode
+        # deployments without any MCPs installed pay zero cost.
+        from src.skills.mcp_client import MCPRegistry
+
+        if mcps_root is None:
+            mcps_root = _REPO_ROOT / "tools" / "mcps"
+        self._mcp_registry = MCPRegistry.from_root(mcps_root)
 
     # ---- Discovery ----------------------------------------------------
 
@@ -814,13 +841,56 @@ class SkillManager:
             extra_script_roots=extra_script_roots,
         )
 
-        loop_result = await run_tool_loop(
-            skill_name=skill.name,
-            skill_body=skill.body_md,
-            user_prompt=user_prompt,
-            ctx=ctx,
-            max_turns=max_turns,
-        )
+        # Phase 4a: spawn one subprocess per declared MCP for this run.
+        # The registry handles unknown / failed MCPs gracefully (warns and
+        # omits them) so partial failures do not abort the run.
+        requested_mcps = skill.frontmatter.required_mcps
+        if requested_mcps:
+            try:
+                ctx.mcp_sessions = await self._mcp_registry.start_run_sessions(
+                    run_id=run_id, requested=requested_mcps
+                )
+                started_names = sorted(ctx.mcp_sessions)
+                missing = [m for m in requested_mcps if m not in ctx.mcp_sessions]
+                if missing:
+                    warnings.append(
+                        f"MCP servers requested but not started: {missing}"
+                    )
+                if started_names:
+                    logger.info(
+                        "skill %s run %s: MCP sessions live: %s",
+                        skill.name,
+                        run_id,
+                        started_names,
+                    )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "MCP startup failed for skill %s run %s: %s",
+                    skill.name,
+                    run_id,
+                    exc,
+                )
+                warnings.append(f"MCP startup failed: {exc}")
+
+        try:
+            loop_result = await run_tool_loop(
+                skill_name=skill.name,
+                skill_body=skill.body_md,
+                user_prompt=user_prompt,
+                ctx=ctx,
+                max_turns=max_turns,
+            )
+        finally:
+            # Phase 4a: reap MCP subprocesses. Must run on every exit path
+            # (success, exception, turn-cap forced summary) so abandoned
+            # Node/Python child procs don't accumulate across runs.
+            if ctx.mcp_sessions:
+                try:
+                    await self._mcp_registry.shutdown_run(run_id)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning(
+                        "MCP shutdown failed for run %s: %s", run_id, exc
+                    )
         warnings.extend(loop_result.warnings)
         elapsed_ms = int((datetime.now(timezone.utc) - started).total_seconds() * 1000)
 
