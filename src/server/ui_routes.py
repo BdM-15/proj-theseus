@@ -2569,6 +2569,27 @@ def register_ui(
             filename=path.name,
         )
 
+    @app.get("/api/ui/studio", tags=["theseus-ui"])
+    async def list_studio_deliverables_route(limit: int = 500) -> JSONResponse:
+        """List every artifact across every skill run in the active workspace.
+
+        Powers the Studio sidebar entry (Phase 6a). Pure index over the
+        Phase 3 on-disk layout — no new schema. Each row carries enough to
+        render a table row and deep-link back to the originating run via
+        ``/api/ui/skills/{name}/runs/{run_id}/artifacts/{filename}``.
+        """
+        mgr = get_skill_manager()
+        deliverables = await asyncio.to_thread(
+            mgr.list_deliverables, _workspace_dir(), limit
+        )
+        return JSONResponse(
+            {
+                "workspace": get_settings().workspace,
+                "count": len(deliverables),
+                "deliverables": deliverables,
+            }
+        )
+
     # ------------------------------------------------------------------
     # Phase 4e — MCP Servers Settings panel
     # ------------------------------------------------------------------
