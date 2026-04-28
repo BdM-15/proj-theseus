@@ -4,13 +4,13 @@ This skill is a verbatim copy of <https://github.com/alchaincyf/huashu-design>
 ("Huashu Design" by Huasheng / 花叔), used here under its **Personal Use
 License**. See [`LICENSE`](LICENSE) for the full text.
 
-| Field            | Value                                              |
-| ---------------- | -------------------------------------------------- |
-| Upstream repo    | https://github.com/alchaincyf/huashu-design        |
-| Vendored at SHA  | `23f60d9b4304f20851469987c6e2c92242b94a45`         |
-| Vendored on      | 2026-04-27                                         |
-| License          | Personal Use License (see [`LICENSE`](LICENSE))    |
-| Vendoring branch | `120-skills-spec-compliance`                       |
+| Field            | Value                                           |
+| ---------------- | ----------------------------------------------- |
+| Upstream repo    | https://github.com/alchaincyf/huashu-design     |
+| Vendored at SHA  | `23f60d9b4304f20851469987c6e2c92242b94a45`      |
+| Vendored on      | 2026-04-27                                      |
+| License          | Personal Use License (see [`LICENSE`](LICENSE)) |
+| Vendoring branch | `120-skills-spec-compliance`                    |
 
 ## License posture
 
@@ -21,7 +21,7 @@ authorization, including:
 - Personal creation (own articles, videos, side projects, social posts)
 - Sharing demos / tutorials based on this skill
 - Derivative skills in personal repos (with attribution `Derived from
-  alchaincyf/huashu-design`)
+alchaincyf/huashu-design`)
 
 It **forbids** integration into company / team / commercial products,
 paid client deliverables, and resale without prior written authorization
@@ -30,8 +30,7 @@ from Huasheng.
 **Theseus is a personal capture/proposal tool used by a single owner for
 personal federal-contracting work.** Use here is in scope of the Personal
 Use clause. If Theseus is ever offered as a product, paid service, or
-client deliverable, this skill MUST be removed or relicensed first. Same
-applies to the derivative overlay [`huashu-design-govcon/`](../huashu-design-govcon/).
+client deliverable, this skill MUST be removed or relicensed first.
 
 ## Why vendored
 
@@ -49,9 +48,12 @@ applies to the derivative overlay [`huashu-design-govcon/`](../huashu-design-gov
    5-dimension expert critique (`references/critique-guide.md`).
 6. **6 BGM tracks + ~40 SFX clips** (`assets/bgm-*.mp3`, `assets/sfx/`).
 
-Theseus uses these primitives directly via the upstream skill, and layers
-KG-driven govcon content on top via the
-[`huashu-design-govcon/`](../huashu-design-govcon/) overlay skill.
+Theseus uses these primitives directly via the upstream skill. Govcon
+content (compliance matrices, theme cards, one-pagers, etc.) is drafted
+by the [`proposal-generator/`](../proposal-generator/) skill — which
+ships the govcon HTML render templates and design tokens — and the
+user then invokes `huashu-design` to convert that content into PPTX /
+PDF / MP4. The two skills are independent; there is no overlay layer.
 
 ## Adaptation notes
 

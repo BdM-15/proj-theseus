@@ -1,6 +1,6 @@
 ---
 name: proposal-generator
-description: Shipley-methodology federal proposal outline and section drafter. USE WHEN the user asks to draft a proposal volume, build an outline from the proposal_instruction ↔ evaluation_factor traceability (UCF Section L/M or equivalent for non-UCF — FAR 16 task orders, FOPRs, BPA calls, OTAs, agency-specific formats), generate a compliance matrix, write win themes, draft an executive summary, propose FAB (Feature → Advantage → Benefit) chains, identify discriminators, or "respond to this RFP". Pulls requirements, evaluation factors, instructions, customer priorities, and pain points from the active Theseus workspace KG and produces an evidence-cited draft. Format-agnostic: never assumes UCF section labels are present. DO NOT USE FOR design/visual work (use huashu-design-govcon), clause compliance auditing only (use compliance-auditor), or extracting new entities (use govcon-ontology + the Theseus pipeline).
+description: Shipley-methodology federal proposal outline and section drafter. USE WHEN the user asks to draft a proposal volume, build an outline from the proposal_instruction ↔ evaluation_factor traceability (UCF Section L/M or equivalent for non-UCF — FAR 16 task orders, FOPRs, BPA calls, OTAs, agency-specific formats), generate a compliance matrix, write win themes, draft an executive summary, propose FAB (Feature → Advantage → Benefit) chains, identify discriminators, or "respond to this RFP". Pulls requirements, evaluation factors, instructions, customer priorities, and pain points from the active Theseus workspace KG and produces an evidence-cited draft. Also ships govcon HTML render templates (compliance_matrix, one_pager, slide_master, theme_card) under assets/ — hand the rendered content off to the `huashu-design` skill for PPTX / PDF / animation export. Format-agnostic: never assumes UCF section labels are present. DO NOT USE FOR clause compliance auditing only (use compliance-auditor) or extracting new entities (use govcon-ontology + the Theseus pipeline).
 license: MIT
 metadata:
   runtime: tools
@@ -101,7 +101,7 @@ Capture the `chunk_id` of every chunk you intend to quote.
 
 ### 4. Read templates from the skill bundle
 
-Use `read_file` to load each template before populating it:
+Use `read_file` to load each markdown template before populating it:
 
 - `assets/compliance_matrix.md`
 - `assets/theme_card.md`
@@ -110,6 +110,15 @@ Use `read_file` to load each template before populating it:
 - `assets/executive_summary.md`
 
 These give the canonical row/section structure you must follow.
+
+**HTML render templates** (for handoff to `huashu-design` if a visual artifact is requested):
+
+- `assets/compliance_matrix.html` — Pentagram-style federal compliance matrix
+- `assets/one_pager.html` — capability one-pager
+- `assets/slide_master.html` — base slide for executive briefings
+- `assets/theme_card.html` — win theme card
+
+Design vocabulary lives in `references/govcon_design_tokens.md` (palette, typography, table rules — federal evaluators are unimpressed by neon and gradients). Do NOT use these for the JSON envelope; they are content scaffolds for the visual handoff.
 
 ### 5. Build the compliance spine FIRST
 
@@ -155,9 +164,17 @@ If page budgets are unclear, `read_file references/page_budget_heuristics.md`.
 
 Only after spine + themes + FAB chains exist. Per `assets/executive_summary.md`: customer mission → understanding of pain points → solution shape → top 3 discriminators → call to action. Maximum 2 pages.
 
-### 10. Write the JSON envelope
+### 10. Self-critique + anti-slop gate
+
+Before writing the envelope: `read_file references/anti_slop_checklist.md` and `references/critique_prompt.md`. Run the critique against your own draft. If any item fails (invented entity, generic adjective-noun theme, FAB benefit that restates the feature, missing chunk citation, etc.), iterate — do not ship.
+
+For proposal_instruction ↔ evaluation_factor visualization choices, see `references/section_lm_visualization.md` (Pattern A table for compliance matrices is preferred; Sankey only for executive briefings).
+
+### 11. Write the JSON envelope
 
 Save the final output to `artifacts/proposal_draft.json` via `write_file`, matching the Output Contract below. The final assistant message returned to the user should be a short cover note that summarizes counts (matrix rows, themes, FAB chains, warnings) and points at the artifact path.
+
+**Visual handoff (optional):** if the user asked for slides / PDF / a one-pager, name the relevant `assets/*.html` template(s) in your cover note and instruct the user to invoke the `huashu-design` skill with the JSON content as input. Do NOT attempt to render PPTX/PDF/MP4 directly — that is `huashu-design`'s job (its `scripts/html2pptx.js`, `scripts/render-video.js`, `scripts/export_deck_pdf.mjs` are the canonical renderers).
 
 ## Output Contract
 

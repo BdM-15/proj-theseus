@@ -55,9 +55,9 @@ The body is Markdown — write **imperative instructions** (the agent's playbook
 
 | Slug                                                                    | Category   | What it does                                                           |
 | ----------------------------------------------------------------------- | ---------- | ---------------------------------------------------------------------- |
-| [huashu-design-govcon](../.github/skills/huashu-design-govcon/SKILL.md) | design     | Compliant slides, one-pagers, compliance-matrix PDFs from KG entities  |
+| [huashu-design](../.github/skills/huashu-design/SKILL.md)               | design     | Vendored upstream HTML→PPTX/PDF/MP4 design engine (Personal Use License). Drive with `proposal-generator` content for govcon visuals. |
 | [govcon-ontology](../.github/skills/govcon-ontology/SKILL.md)           | ontology   | Authoritative reference for the 33 entity / 35 relationship schema     |
-| [proposal-generator](../.github/skills/proposal-generator/SKILL.md)     | proposal   | Shipley capture mentor: compliance spine → win themes → FAB → outlines |
+| [proposal-generator](../.github/skills/proposal-generator/SKILL.md)     | proposal   | Shipley capture mentor: compliance spine → win themes → FAB → outlines + govcon HTML render templates |
 | [compliance-auditor](../.github/skills/compliance-auditor/SKILL.md)     | compliance | 8-check audit (clause coverage, regulatory resolution, L↔M, cyber, …)  |
 | [competitive-intel](../.github/skills/competitive-intel/SKILL.md)       | intel      | Roadmap placeholder for competitor / black-hat workflows               |
 

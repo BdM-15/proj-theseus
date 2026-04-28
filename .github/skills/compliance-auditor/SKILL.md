@@ -198,6 +198,8 @@ Saved compliance audit to artifacts/compliance_audit.json.
 Sources cited: chunk-aaaa, chunk-bbbb, ...
 ```
 
+**Visual handoff (optional):** if the user wants the report formatted as a one-pager / slide deck for distribution, point them at `proposal-generator`'s `assets/compliance_matrix.html` template and the `huashu-design` skill (which owns the HTML→PPTX/PDF render pipeline). This skill is intentionally text-and-JSON only — production rendering is not its job.
+
 If `findings.length` ≠ sum of `stats`, that is a bug — emit a warning `count mismatch: findings=X, stats sum=Y` and recompute.
 
 Do not duplicate the full JSON in the assistant message — the user opens the artifact for the full report.

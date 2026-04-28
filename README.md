@@ -274,9 +274,9 @@ proj-theseus/
 
 Project Theseus ships a **dual-use Agent Skills platform**: the same `SKILL.md` files in `.github/skills/` are read by **GitHub Copilot / VS Code** when the repo is open AND by the in-app **Tools → Agent Skills** page when invoked against an active workspace. Built-in skills:
 
-- `huashu-design-govcon` — Compliant slides, one-pagers, compliance-matrix PDFs
+- `huashu-design` — Vendored HTML→PPTX/PDF/MP4 design engine (Personal Use License); pair with `proposal-generator` content for govcon visuals
 - `govcon-ontology` — Authoritative reference for the 33 entity / 35 relationship schema
-- `proposal-generator` — Shipley capture mentor: compliance spine → win themes → FAB
+- `proposal-generator` — Shipley capture mentor: compliance spine → win themes → FAB → govcon HTML render templates
 - `compliance-auditor` — 8-check audit (clauses, regs, L↔M, cyber, amendments, …)
 - `competitive-intel` — Roadmap placeholder (SAM.gov / USAspending integration TODO)
 

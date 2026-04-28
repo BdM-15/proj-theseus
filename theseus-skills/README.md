@@ -12,7 +12,7 @@ We do **not** duplicate skill content here — both VS Code/Copilot and the Thes
 
 | Skill                | Source of truth                        | Theseus runtime adapter        |
 | -------------------- | -------------------------------------- | ------------------------------ |
-| huashu-design-govcon | `.github/skills/huashu-design-govcon/` | `src/skills/manager.py` (auto) |
+| huashu-design        | `.github/skills/huashu-design/` (vendored — see UPSTREAM.md) | `src/skills/manager.py` (auto) |
 | govcon-ontology      | `.github/skills/govcon-ontology/`      | `src/skills/manager.py` (auto) |
 | proposal-generator   | `.github/skills/proposal-generator/`   | `src/skills/manager.py` (auto) |
 | compliance-auditor   | `.github/skills/compliance-auditor/`   | `src/skills/manager.py` (auto) |

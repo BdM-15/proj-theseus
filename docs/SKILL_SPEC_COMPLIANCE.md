@@ -91,7 +91,7 @@ Copy this checklist:
 | `competitive-intel`        |         60 | references                                       | `category`, `version`, `status`               | ⚠️ Extras at top level     |
 | `compliance-auditor`       |        116 | references                                       | `category`, `version`                         | ⚠️ Extras at top level     |
 | `govcon-ontology`          |        166 | references                                       | `category`, `version`, `authoritative_source` | ⚠️ Extras at top level     |
-| `huashu-design-govcon`     |        122 | references, scripts, **templates**               | `category`, `version`, `upstream`             | ⚠️ Extras + wrong dir name |
+| `huashu-design-govcon`     |  (removed) | n/a                                              | n/a                                           | ⚠️ Removed in 2.3 — superseded by vendored `huashu-design` (engine) + `proposal-generator` (govcon content + HTML render templates). See §3.5. |
 | `proposal-generator`       |        200 | references, **assets**, evals                    | none (`metadata:` block)                      | ✅ Yes (2.2)               |
 
 **All bodies are under the 500-line limit.** ✅
@@ -136,15 +136,25 @@ Copy this checklist:
 | Pure-reference skill — no scripts needed                   | Body checklist should be: 1) read_file references, 2) answer using only ontology vocabulary, 3) refuse if asked about non-Theseus concepts | 2.3       |
 | No `evals/evals.json`                                      | Add 3 test prompts (entity type lookup, relationship semantics, vocabulary extension request)                                              | 2.3       |
 
-### 3.5 `huashu-design-govcon`
+### 3.5 `huashu-design-govcon` — REMOVED in sub-phase 2.3
 
-| Gap                                                                    | Action                                                                                                                                              | Sub-phase |
-| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| `category`, `version`, `upstream` at top level                         | Move under `metadata:`                                                                                                                              | 2.3       |
-| **`templates/` directory name**                                        | Rename to `assets/` per spec                                                                                                                        | 2.3       |
-| Already has `scripts/` (html2pdf.sh, html2pptx.js, render_video.py) ✅ | Verify scripts work via the new `run_script` tool sandbox                                                                                           | 2.2       |
-| No `evals/evals.json`                                                  | Add 3 test prompts (compliance matrix PDF, capability infographic, exec briefing slides)                                                            | 2.3       |
-| Body needs explicit tool-call workflow                                 | Rewrite to: `kg_query` for matrix data → render `assets/*.mustache` via chevron → `run_script("scripts/html2pdf.sh")` → `write_file` final artifact | 2.3       |
+Original plan was to migrate this hand-rolled overlay to spec compliance. During 2.3 the underlying assumption collapsed: the upstream [`alchaincyf/huashu-design`](https://github.com/alchaincyf/huashu-design) was vendored verbatim under its Personal Use License (see [`.github/skills/huashu-design/UPSTREAM.md`](../.github/skills/huashu-design/UPSTREAM.md)), and the overlay's actual govcon-specific value (KG-driven content + 4 HTML render templates + design tokens + anti-slop checklist) belongs alongside the content drafter, not as a third skill straddling content and presentation.
+
+**Resolution:**
+
+- Salvaged into `proposal-generator/`:
+  - `references/anti_slop_checklist.md`
+  - `references/critique_prompt.md`
+  - `references/govcon_design_tokens.md`
+  - `references/section_lm_visualization.md`
+  - `assets/compliance_matrix.html`, `one_pager.html`, `slide_master.html`, `theme_card.html`
+- Deleted (duplicates of vendored upstream): `scripts/html2pdf.sh`, `scripts/html2pptx.js`, `scripts/render_video.py`. The canonical renderers live in `huashu-design/scripts/{html2pptx.js, render-video.js, export_deck_*.mjs, convert-formats.sh}`.
+- Deleted (obsolete): `references/upstream_attribution.md`, `SKILL.md`, the directory itself.
+- `proposal-generator/SKILL.md` updated with: visual-handoff guidance pointing at `huashu-design`, new step 10 (anti-slop self-critique gate), reference list extended.
+- `compliance-auditor/SKILL.md` updated with visual-handoff guidance.
+- All `huashu-design-govcon` references scrubbed from `README.md`, `.github/skills/README.md`, `theseus-skills/README.md`, `docs/SKILLS.md`, `huashu-design/UPSTREAM.md`.
+
+The "design domain" is now cleanly split: `huashu-design` (vendored, format-agnostic engine) + `proposal-generator` (govcon content + render templates). Either can be invoked independently.
 
 ### 3.6 `proposal-generator`
 
@@ -165,14 +175,15 @@ Copy this checklist:
 
 Several existing skills contain `â€"`, `â†'`, `â†”`, `â€"` — UTF-8 round-tripped
 through Windows-1252. Symptoms visible in `competitive-intel`,
-`compliance-auditor`, `huashu-design-govcon`, `proposal-generator`,
+`compliance-auditor`, `proposal-generator`,
 `govcon-ontology`. **Repair during the 2.2/2.3 rewrites** so we don't
 introduce a separate "fix encoding" commit. PowerShell rule per
 `.github/copilot-instructions.md`: always `Out-File -Encoding utf8`.
 
 ### 4.2 `templates/` → `assets/` rename
 
-Affects `huashu-design-govcon` and `proposal-generator`. Also requires
+Affects `proposal-generator` (and originally `huashu-design-govcon`, since
+removed). Also requires
 updating `src/skills/manager.py` lines that probe for the `templates`
 subdirectory:
 
@@ -253,7 +264,7 @@ These adaptations are notes, not code changes for 2.0 — they inform sub-phase
 | **2.0**   | Vendor skill-creator + this audit doc                        | skill-creator only                                                           | This commit     |
 | **2.1**   | Tool-calling runtime in `src/skills/manager.py`              | None — runtime only                                                          | Separate commit |
 | **2.2**   | Migrate `proposal-generator` end-to-end (proves the pattern) | proposal-generator                                                           | Separate commit |
-| **2.3**   | Migrate remaining 4 skills + UI transcript drawer            | competitive-intel, compliance-auditor, govcon-ontology, huashu-design-govcon | Separate commit |
+| **2.3**   | Migrate remaining 4 skills + UI transcript drawer            | competitive-intel, compliance-auditor, govcon-ontology; **`huashu-design-govcon` removed** — superseded by vendored `huashu-design` + `proposal-generator` salvage (see §3.5) | Separate commit |
 
 Each sub-phase commit MUST be approved by the user before being created
 (per the MANDATORY rule in `.github/copilot-instructions.md`).
