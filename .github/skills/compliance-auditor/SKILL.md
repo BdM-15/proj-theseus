@@ -1,12 +1,18 @@
 ---
 name: compliance-auditor
-description: Federal acquisition compliance auditor for the active Theseus workspace. USE WHEN the user asks to audit FAR/DFARS/agency clause coverage, validate regulatory references (NIST SP, DAFI, MIL-STD, AR), check that every "shall" requirement has a deliverable or performance standard, find missing compliance artifacts, audit proposal_instruction ↔ evaluation_factor coverage (UCF Section L↔M or non-UCF equivalent — FAR 16 task orders, FOPRs, BPA calls, OTAs, agency-specific formats), or "are we compliant with the proposal instructions?". Cross-references the workspace's clause / regulatory_reference / requirement / deliverable / compliance_artifact entities and flags gaps with severity. Format-agnostic: never assumes UCF section labels are present. DO NOT USE FOR drafting compliant prose (use proposal-generator) or extracting clauses (the Theseus pipeline does that automatically).
+description: Federal acquisition compliance auditor for the active Theseus workspace, backed by live FAR/DFARS text via the vendored `ecfr` MCP. USE WHEN the user asks to audit FAR/DFARS clause coverage, validate that cited clauses actually exist in eCFR (catch fabricated or typo'd numbers), check whether a cited clause has been amended since the solicitation issued, validate regulatory references (NIST SP, DAFI, MIL-STD), check that every "shall" requirement has a deliverable, find missing compliance artifacts, audit proposal_instruction ↔ evaluation_factor coverage (UCF Section L↔M or non-UCF equivalent — FAR 16 task orders, FOPRs, BPA calls, OTAs), or "are we compliant with the proposal instructions?". Cross-references the workspace's clause / regulatory_reference / requirement / deliverable / compliance_artifact entities against live eCFR and flags gaps with severity. Format-agnostic. DO NOT USE FOR drafting compliant prose (use proposal-generator) or extracting clauses (Theseus pipeline does that automatically).
 license: MIT
 metadata:
   runtime: tools
   category: compliance
-  version: 0.3.0
+  version: 0.4.0
   status: active
+  # Phase 4f.2: declare which vendored MCP servers this skill needs.
+  # The runtime exposes only these MCPs to the agent loop, namespaced
+  # as `mcp__ecfr__<tool>`. Skills that omit `metadata.mcps` get zero
+  # MCP tools — closed-by-default, mirroring `metadata.script_paths`.
+  mcps:
+    - ecfr
 ---
 
 # Compliance Auditor
@@ -101,9 +107,10 @@ Use `read_file` to load:
 - `references/severity_rubric.md` — calibrate every severity assignment
 - `references/far_dfars_quickref.md` — clause family lookups
 - `references/cybersecurity_crosscut.md` — NIST/CMMC/FedRAMP coverage rules
+- `references/ecfr_tools.md` — curated eCFR MCP tools, clause-number normalization, deferral rules for C9/C10
 - `assets/finding.md` — canonical finding object shape
 
-### 5. Run all eight checks (C1–C8)
+### 5. Run all ten checks (C1–C10)
 
 Each check produces zero or more findings. Use the schema in `assets/finding.md`. Severities per `references/severity_rubric.md`.
 
@@ -144,6 +151,14 @@ Every `amendment` must have an outbound `AMENDS` edge to a base `document` or `c
 #### C8 — Past-Performance Mapping _(severity: medium)_
 
 If a Past Performance `evaluation_factor` exists (UCF Section M or equivalent), every `past_performance_reference` should have an `EVIDENCES` edge to ≥1 `evaluation_factor` or `subfactor`.
+
+#### C9 — Clause Existence Validation _(severity: critical, eCFR-grounded)_
+
+For every `clause` entity whose name normalizes to a FAR/DFARS section identifier (per `references/ecfr_tools.md`), call `mcp__ecfr__lookup_far_clause` with that section_id. If the upstream returns 404, empty content, or an explicit "not found" payload, raise a **critical** finding — the workspace is citing a clause that does not exist in the live eCFR (likely fabricated, typo'd, or extracted from the wrong revision). Each finding MUST include the queried section identifier in the evidence string and at least one workspace `chunk_id` showing where the clause was cited. Skip entities whose name does not match the normalization regex (emit one `info` finding noting how many clauses were skipped). If the `ecfr` MCP is not available in this run, defer C9 with one `info` finding per the deferral rule in `references/ecfr_tools.md`.
+
+#### C10 — Clause Currency Drift _(severity: medium, eCFR-grounded)_
+
+For every clause that resolved successfully in C9, call `mcp__ecfr__get_version_history` for the same section_id. If the most-recent eCFR amendment date is **after** the workspace's solicitation issuance date (look for it in the workspace `document` or `solicitation` entities — fall back to `kg_chunks` for "issued" / "amendment" / "effective date" if no entity carries it), raise a **medium** finding noting both dates. Optionally call `mcp__ecfr__compare_versions` to surface what changed; include a one-sentence diff summary in the finding evidence. If no issuance date can be extracted, emit one `info` finding noting C10 was deferred (do NOT fabricate a date).
 
 **EMIT EVERY FINDING. NO TRUNCATION.** One finding per failing entity. If C3 surfaces 27 unsatisfied `shall` requirements, the report MUST contain 27 findings. Aggregating into "27 shall requirements missing deliverables" is a failed run.
 
@@ -209,6 +224,7 @@ Do not duplicate the full JSON in the assistant message — the user opens the a
 - [`references/far_dfars_quickref.md`](./references/far_dfars_quickref.md) — Common clause families and what they govern
 - [`references/cybersecurity_crosscut.md`](./references/cybersecurity_crosscut.md) — NIST / CMMC / FedRAMP coverage patterns
 - [`references/severity_rubric.md`](./references/severity_rubric.md) — Detailed severity examples
+- [`references/ecfr_tools.md`](./references/ecfr_tools.md) — eCFR MCP tool reference, clause-number normalization, C9/C10 deferral rules
 
 ## Assets
 
