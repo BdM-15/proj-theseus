@@ -278,32 +278,53 @@ When modifying a skill or the runtime, you MUST:
 
 ## Branch Management Strategy
 
+This is a **single-developer personal project**. The workflow is intentionally lightweight — feature branches for isolation, fast-forward merges to integrate, no PRs unless the user explicitly asks.
+
 ### **NEVER Work Directly on `main` Branch**
 
-**Rule**: ALL development happens on feature branches.
+ALL development happens on feature branches. `main` is updated only via fast-forward merge from a feature branch (or its integration parent).
 
 ### Branch Naming Convention
 
 **Format**: `{number}-{descriptive-kebab-case-name}`
 
-**Examples**:
-
-- `028-parallel-chunk-extraction`
-- `029-prompt-compression`
+**Examples**: `028-parallel-chunk-extraction`, `029-prompt-compression`, `121-phase-4a-mcp-client`.
 
 **Agent Responsibility**:
 
 1. Identify the next branch number (check `git branch -a`).
-2. Create descriptive name from GitHub issue title.
+2. Create descriptive name from GitHub issue title (or task description).
 3. Suggest branch creation: `git checkout -b {number}-{description}`.
+
+### Merge Policy — Fast-Forward Only, No PRs
+
+**Default**: When a feature branch is complete (tests pass, user has approved the final commit), the agent integrates it via **fast-forward merge** directly. **Do NOT open a Pull Request** unless the user explicitly asks for one.
+
+**Standard fast-forward sequence** (after the user says "merge it" / "ship it" / "continue"):
+
+```powershell
+# From the feature branch, with all commits pushed:
+git checkout <integration-target>          # usually main, sometimes a parent integration branch
+git pull --ff-only                         # ensure target is current
+git merge --ff-only <feature-branch>       # fails loudly if not fast-forwardable
+git push
+git checkout <feature-branch>              # return to the feature branch for cleanup or next step
+```
+
+**If `git merge --ff-only` fails** (target advanced independently):
+- DO NOT force-push or rebase published commits without asking.
+- Surface the divergence to the user and propose either (a) `git rebase <target>` on the feature branch then retry FF, or (b) a single merge commit with a clear message — let the user pick.
+
+**Branch cleanup**: After successful fast-forward merge, the feature branch can be deleted locally and on origin once the user confirms (`git branch -d <branch>; git push origin --delete <branch>`). Don't auto-delete.
+
+**When the user explicitly requests a PR** (e.g., "open a PR for this", "I want to review on GitHub"): use `mcp_github2_create_pull_request` against the right base. Otherwise, skip it.
 
 ### Commit Message Format
 
-Follow [Conventional Commits](https://www.conventionalcommits.org/):
-`type(scope): description`
+Follow [Conventional Commits](https://www.conventionalcommits.org/): `type(scope): description`
 
 - **Types**: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`
-- **Scope**: `extraction`, `inference`, `neo4j`, `prompts`, `agents`, `multimodal`, `ontology`
+- **Scope**: `extraction`, `inference`, `neo4j`, `prompts`, `agents`, `multimodal`, `ontology`, `skills`, `deps`
 
 ### Pre-Commit Checklist
 
@@ -313,57 +334,7 @@ Before proposing a commit, verify:
 2. **Schema consistency**: Do `VALID_ENTITY_TYPES` and `VALID_RELATIONSHIP_TYPES` in `schema.py` match what the prompts reference?
 3. **Test fixtures updated**: Do test signal patterns and assertions reflect the current vocabulary?
 4. **Version bumped**: If extraction prompt changed, is the version number in the prompt header updated?
-   - Run `python -m pytest tests` to run the standard test suite.
-   - Use markers if available (check `tests/pytest.ini` if present).
-5. **Prompt Signal Tests**:
-   - `python tools/test_query_prompt.py --workspace <name> --query-id M2` — Tests mentor persona signal detection
-   - Signal categories: `shipley_terms`, `mentoring_language`, `risk_flags`, `reasoning_chain`
-   - Note: Tests query against cached LLM responses. Re-process workspace under new prompts for fresh results.
-
-### Environment Setup
-
-- Monitor terminal prompt for `(.venv)` indicator.
-- Ensure `.env` is configured correctly for the test environment (e.g., `GRAPH_STORAGE`, `NEO4J_URI`).
-
----
-
-## Branch Management Strategy
-
-### **NEVER Work Directly on `main` Branch**
-
-**Rule**: ALL development happens on feature branches.
-
-### Branch Naming Convention
-
-**Format**: `{number}-{descriptive-kebab-case-name}`
-
-**Examples**:
-
-- `028-parallel-chunk-extraction`
-- `029-prompt-compression`
-
-**Agent Responsibility**:
-
-1. Identify the next branch number (check `git branch -a`).
-2. Create descriptive name from GitHub issue title.
-3. Suggest branch creation: `git checkout -b {number}-{description}`.
-
-### Commit Message Format
-
-Follow [Conventional Commits](https://www.conventionalcommits.org/):
-`type(scope): description`
-
-- **Types**: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`
-- **Scope**: `extraction`, `inference`, `neo4j`, `prompts`, `agents`, `multimodal`, `ontology`
-
-### Pre-Commit Checklist
-
-Before proposing a commit, verify:
-
-1. **Cross-system alignment**: If the change touches entity types, relationship types, or Shipley methodology, have all 3 prompt systems been audited? (See Cross-Cutting Change Checklist)
-2. **Schema consistency**: Do `VALID_ENTITY_TYPES` and `VALID_RELATIONSHIP_TYPES` in `schema.py` match what the prompts reference?
-3. **Test fixtures updated**: Do test signal patterns and assertions reflect the current vocabulary?
-4. **Version bumped**: If extraction prompt changed, is the version number in the prompt header updated?
+5. **Tests pass from `.venv`**: `.\.venv\Scripts\python.exe -m pytest <relevant tests>` succeeds.
 
 ---
 
