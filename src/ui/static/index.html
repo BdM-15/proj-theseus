@@ -2840,8 +2840,50 @@
                     </ul>
                   </div>
 
+                  <!-- Artifacts download panel (any run that wrote files) -->
+                  <template
+                    x-if="skills.run && (skills.run.artifacts || []).length"
+                  >
+                    <div class="skill-artifacts-panel">
+                      <div class="skill-artifacts-head">
+                        <i data-lucide="download" class="w-3 h-3"></i>
+                        <span>Artifacts</span>
+                        <span
+                          class="skill-transcript-count"
+                          x-text="'(' + skills.run.artifacts.length + ')'"
+                        ></span>
+                      </div>
+                      <ul class="skill-artifacts-list">
+                        <template
+                          x-for="f in skills.run.artifacts"
+                          :key="f.name"
+                        >
+                          <li>
+                            <a
+                              :href="'/api/ui/skills/' + encodeURIComponent(skills.current?.name) + '/runs/' + encodeURIComponent(skills.run.run_id) + '/artifacts/' + encodeURIComponent(f.name)"
+                              :download="f.name"
+                              class="skill-artifact-link"
+                            >
+                              <i
+                                :data-lucide="artifactIcon(f.mime, f.name)"
+                                class="w-3 h-3"
+                              ></i>
+                              <span class="font-mono" x-text="f.name"></span>
+                            </a>
+                            <span
+                              class="skill-transcript-size"
+                              x-text="formatBytes(parseInt(f.size, 10) || 0) + ' · ' + (f.mime || 'application/octet-stream')"
+                            ></span>
+                          </li>
+                        </template>
+                      </ul>
+                    </div>
+                  </template>
+
                   <!-- Transcript drawer (tools-mode runs only) -->
-                  <template x-if="skills.run && (skills.run.transcript || []).length">
+                  <template
+                    x-if="skills.run && (skills.run.transcript || []).length"
+                  >
                     <div class="skill-transcript">
                       <button
                         type="button"
@@ -2889,7 +2931,9 @@
                                   x-text="step.name"
                                 ></span>
                               </template>
-                              <template x-if="step.kind === 'assistant' && (step.tool_calls || []).length">
+                              <template
+                                x-if="step.kind === 'assistant' && (step.tool_calls || []).length"
+                              >
                                 <span
                                   class="skill-transcript-name"
                                   x-text="'→ ' + step.tool_calls.map(t => t.name).join(', ')"
@@ -2907,30 +2951,48 @@
                             >
                               <template x-if="step.kind === 'tool'">
                                 <div>
-                                  <div class="skill-transcript-label">arguments</div>
+                                  <div class="skill-transcript-label">
+                                    arguments
+                                  </div>
                                   <pre x-text="step.arguments || '{}'"></pre>
-                                  <div class="skill-transcript-label">result preview</div>
-                                  <pre x-text="step.result_preview || '(empty)'"></pre>
+                                  <div class="skill-transcript-label">
+                                    result preview
+                                  </div>
+                                  <pre
+                                    x-text="step.result_preview || '(empty)'"
+                                  ></pre>
                                 </div>
                               </template>
                               <template x-if="step.kind === 'assistant'">
                                 <div>
                                   <template x-if="step.content">
                                     <div>
-                                      <div class="skill-transcript-label">content</div>
+                                      <div class="skill-transcript-label">
+                                        content
+                                      </div>
                                       <pre x-text="step.content"></pre>
                                     </div>
                                   </template>
-                                  <template x-if="(step.tool_calls || []).length">
+                                  <template
+                                    x-if="(step.tool_calls || []).length"
+                                  >
                                     <div>
-                                      <div class="skill-transcript-label">tool_calls</div>
-                                      <pre x-text="JSON.stringify(step.tool_calls, null, 2)"></pre>
+                                      <div class="skill-transcript-label">
+                                        tool_calls
+                                      </div>
+                                      <pre
+                                        x-text="JSON.stringify(step.tool_calls, null, 2)"
+                                      ></pre>
                                     </div>
                                   </template>
                                   <template x-if="step.usage">
                                     <div>
-                                      <div class="skill-transcript-label">usage</div>
-                                      <pre x-text="JSON.stringify(step.usage, null, 2)"></pre>
+                                      <div class="skill-transcript-label">
+                                        usage
+                                      </div>
+                                      <pre
+                                        x-text="JSON.stringify(step.usage, null, 2)"
+                                      ></pre>
                                     </div>
                                   </template>
                                 </div>
@@ -2940,14 +3002,19 @@
                         </template>
                         <template x-if="(skills.run.tool_outputs || []).length">
                           <div class="skill-transcript-artifacts">
-                            <div class="skill-transcript-label">tool_outputs/</div>
+                            <div class="skill-transcript-label">
+                              tool_outputs/
+                            </div>
                             <ul>
                               <template
                                 x-for="f in skills.run.tool_outputs"
                                 :key="f.name"
                               >
                                 <li>
-                                  <span class="font-mono" x-text="f.name"></span>
+                                  <span
+                                    class="font-mono"
+                                    x-text="f.name"
+                                  ></span>
                                   <span
                                     class="skill-transcript-size"
                                     x-text="'(' + f.size + ' B)'"
@@ -5909,6 +5976,37 @@
               this.skills.runsLoading = false;
               this.$nextTick(() => lucide.createIcons());
             }
+          },
+          formatBytes(n) {
+            if (!n || n < 0) return "0 B";
+            const units = ["B", "KB", "MB", "GB"];
+            let i = 0;
+            let v = n;
+            while (v >= 1024 && i < units.length - 1) {
+              v /= 1024;
+              i++;
+            }
+            return (i === 0 ? v : v.toFixed(1)) + " " + units[i];
+          },
+          artifactIcon(mime, name) {
+            const m = (mime || "").toLowerCase();
+            const ext = (name || "").split(".").pop().toLowerCase();
+            if (
+              m.startsWith("image/") ||
+              ["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext)
+            )
+              return "image";
+            if (m.startsWith("video/") || ["mp4", "webm", "mov"].includes(ext))
+              return "film";
+            if (m.startsWith("audio/")) return "music";
+            if (ext === "pdf" || m === "application/pdf") return "file-text";
+            if (["pptx", "ppt"].includes(ext)) return "presentation";
+            if (["docx", "doc"].includes(ext)) return "file-text";
+            if (["xlsx", "xls", "csv"].includes(ext)) return "table";
+            if (["json", "yaml", "yml", "md", "txt"].includes(ext))
+              return "file-code";
+            if (["zip", "tar", "gz"].includes(ext)) return "archive";
+            return "file";
           },
           async loadSkillRun(name, runId) {
             if (!name || !runId) return;

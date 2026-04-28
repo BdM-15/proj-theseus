@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import Any, AsyncIterator, Awaitable, Callable, Optional, Union
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from lightrag.api.config import global_args
 from pydantic import BaseModel, Field
@@ -2523,5 +2523,30 @@ def register_ui(
         if not ok:
             raise HTTPException(404, f"Unknown or unsafe run id: {name}/{run_id}")
         return JSONResponse({"removed": run_id})
+
+    @app.get(
+        "/api/ui/skills/{name}/runs/{run_id}/artifacts/{filename}",
+        tags=["theseus-ui"],
+    )
+    async def download_skill_run_artifact_route(
+        name: str, run_id: str, filename: str
+    ) -> FileResponse:
+        """Stream a single artifact file produced during a skill run.
+
+        Used by the skill-run drawer to download binary outputs (PDF, PPTX,
+        MP4, GIF, DOCX, XLSX). Path-traversal-safe: ``filename`` cannot
+        contain separators or escape the artifacts/ folder.
+        """
+        mgr = get_skill_manager()
+        path = mgr.get_artifact_path(_workspace_dir(), name, run_id, filename)
+        if path is None:
+            raise HTTPException(404, f"Artifact not found: {name}/{run_id}/{filename}")
+        import mimetypes as _mt
+        mime, _ = _mt.guess_type(path.name)
+        return FileResponse(
+            path,
+            media_type=mime or "application/octet-stream",
+            filename=path.name,
+        )
 
     logger.info("✅ Project Theseus UI mounted at /ui (static: %s)", _STATIC_DIR)

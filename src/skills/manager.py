@@ -41,6 +41,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import mimetypes
 import os
 import re
 import shutil
@@ -1126,7 +1127,12 @@ class SkillManager:
         if artifacts_dir.is_dir():
             for p in sorted(artifacts_dir.iterdir()):
                 if p.is_file():
-                    artifacts.append({"name": p.name, "size": str(p.stat().st_size)})
+                    mime, _ = mimetypes.guess_type(p.name)
+                    artifacts.append({
+                        "name": p.name,
+                        "size": str(p.stat().st_size),
+                        "mime": mime or "application/octet-stream",
+                    })
         # Tools-mode runs persist a structured transcript (assistant turns +
         # tool calls + tool results) and may write tool_outputs/* sidecar files.
         # Surface both so the UI drawer can replay the run for grounding audit.
@@ -1171,6 +1177,38 @@ class SkillManager:
             return False
         shutil.rmtree(run_dir, ignore_errors=True)
         return not run_dir.exists()
+
+    def get_artifact_path(
+        self,
+        workspace_root: Path,
+        skill_name: str,
+        run_id: str,
+        filename: str,
+    ) -> Optional[Path]:
+        """Resolve an artifact filename inside a run's artifacts/ folder.
+
+        Defends against path traversal: rejects unsafe run IDs, rejects
+        filenames containing path separators or '..', and verifies the
+        resolved path is still under the artifacts directory. Returns None
+        if any check fails or the file does not exist.
+        """
+        if not self._is_safe_run_id(run_id):
+            return None
+        if not filename or "/" in filename or "\\" in filename or filename in (".", ".."):
+            return None
+        artifacts_dir = (
+            self._runs_root(workspace_root, skill_name) / run_id / "artifacts"
+        ).resolve()
+        if not artifacts_dir.is_dir():
+            return None
+        candidate = (artifacts_dir / filename).resolve()
+        try:
+            candidate.relative_to(artifacts_dir)
+        except ValueError:
+            return None
+        if not candidate.is_file():
+            return None
+        return candidate
 
     # ---- Ledger persistence -------------------------------------------
 
