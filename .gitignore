@@ -233,6 +233,9 @@ package-lock.json
 # Dep snapshots (Phase 3a backups)
 tools/_dep_snapshots/
 
+# Skill snapshots (skill-creator pre-edit backups)
+tools/_skill_snapshots/
+
 
 # Stray UI test response artifacts (loose at repo root)
 /response.json

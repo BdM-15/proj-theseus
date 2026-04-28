@@ -1,30 +1,47 @@
 {
   "skill": "competitive-intel",
-  "version": "0.0.2",
-  "notes": "Placeholder skill — evals verify the stub contract until real implementation lands.",
+  "version": "0.1.0",
+  "notes": "Phase 4d — real evals against the wired USAspending MCP. Run from a workspace whose KG has at least program/agency/NAICS context (e.g. afcap5_isr or afcap6_drfp). Live MCP eval requires THESEUS_LIVE_MCP=1.",
   "evals": [
     {
-      "id": "eval-001-incumbent-query",
-      "prompt": "Who is the incumbent on this contract?",
+      "id": "eval-001-incumbent-active-window",
+      "prompt": "Who is the incumbent on this contract and when does their period of performance end?",
       "expectations": [
-        {"kind": "response_contains", "value": "roadmap_placeholder"},
-        {"kind": "response_contains", "value": "competitive-intel is a roadmap placeholder"}
+        {"kind": "artifact_exists", "path": "competitive_intel.json"},
+        {"kind": "json_path_set", "path": "incumbent.name"},
+        {"kind": "json_path_in_set", "path": "incumbent.incumbent_status", "values": ["current", "prior", "unknown"]},
+        {"kind": "json_path_set", "path": "incumbent.flagship_award_id"},
+        {"kind": "transcript_tool_called", "tool": "mcp__usaspending__search_awards"}
       ]
     },
     {
-      "id": "eval-002-black-hat",
-      "prompt": "Give me a black-hat read on the top three likely competitors for this opportunity.",
+      "id": "eval-002-top-three-competitors",
+      "prompt": "Give me a black-hat read on the top three likely competitors for this opportunity. I need predicted themes and ghost language hooks I can hand to my proposal lead.",
       "expectations": [
-        {"kind": "response_contains", "value": "roadmap_placeholder"},
-        {"kind": "response_contains", "value": "next_steps"}
+        {"kind": "artifact_exists", "path": "competitive_intel.json"},
+        {"kind": "json_path_array_min_length", "path": "competitors", "min": 3},
+        {"kind": "json_path_array_min_length_each", "path": "competitors[*].predicted_themes", "min": 1},
+        {"kind": "json_path_array_min_length_each", "path": "competitors[*].ghost_language_hooks", "min": 1},
+        {"kind": "json_path_array_contains", "path": "competitors[*].claim_gaps", "value_substring": "CPARS"}
       ]
     },
     {
-      "id": "eval-003-pricing",
-      "prompt": "What is the typical award value for this NAICS at this magnitude?",
+      "id": "eval-003-pricing-benchmark",
+      "prompt": "What's the typical award value range for this NAICS at this magnitude over the last 5 years? Be honest if the sample is too small to give a real range.",
       "expectations": [
-        {"kind": "response_contains", "value": "roadmap_placeholder"},
-        {"kind": "response_contains", "value": "USAspending"}
+        {"kind": "artifact_exists", "path": "competitive_intel.json"},
+        {"kind": "json_path_in_set", "path": "pricing_benchmark.pricing_band", "values": ["valid", "insufficient sample"]},
+        {"kind": "json_path_set", "path": "pricing_benchmark.sample_size"},
+        {"kind": "transcript_tool_called", "tool": "mcp__usaspending__search_awards"}
+      ]
+    },
+    {
+      "id": "eval-004-missing-naics-fail-loud",
+      "prompt": "Run competitive intel on this opportunity.",
+      "workspace_hint": "use a workspace with NO regulatory_reference entities for NAICS/PSC",
+      "expectations": [
+        {"kind": "response_contains", "value": "GAP"},
+        {"kind": "transcript_no_invention", "rule": "no competitor name should appear that wasn't returned by mcp__usaspending__search_awards"}
       ]
     }
   ]
