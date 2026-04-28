@@ -110,40 +110,159 @@ no system ffmpeg install is needed for video work. Pandoc was added in
 
 ---
 
-## Phase 4 — External datasources (re-scoped 2026-04-28)
+## Phase 4 — MCP client + vendored capture skills (re-scoped 2026-04-28, B+C)
 
-### Original plan
+### Why this changed (again)
 
-Build `src/skills/datasources/` clients for SAM.gov, USAspending, FPDS,
-GSA eLibrary. Rate-limited + cached. Add `datasources:` SKILL.md field.
+After surveying [`1102tools/federal-contracting-mcps`](https://github.com/1102tools/federal-contracting-mcps)
+and [`1102tools/federal-contracting-skills`](https://github.com/1102tools/federal-contracting-skills),
+two facts forced a redesign:
 
-### What changed
+1. **The federal data tooling has consolidated into MCPs.** 1102tools
+   moved their five API skills (SAM.gov, USAspending, BLS OEWS, GSA
+   CALC+, GSA Per Diem) into MCP servers in April 2026 because skills
+   drifted across runs while MCPs stayed deterministic. Their MCPs went
+   through 3-6 audit rounds with ~350 bugs fixed against live APIs.
+   Re-implementing this in `src/skills/datasources/` (the original Phase
+   4 plan) means signing up for permanent maintenance debt against code
+   that isn't our domain. We should consume their MCPs, not port them.
+2. **Their orchestration skills are MIT-licensed and reusable from the
+   capture-team seat.** Skills written for the Contracting Officer
+   (SOW/PWS Builder, IGCE Builders, OT skills) have direct analogs on
+   the bidder side — same FAR citations, same cost-buildup math,
+   different persona / objective. Vendoring + repersonalizing them is
+   far cheaper than authoring from scratch.
 
-The tools-mode runtime (sub-phase 2.1) already has the right shape for
-this — datasources should be **runtime tools**, not a separate
-subsystem. Pattern matches `kg_query` / `kg_chunks`: each is a typed
-tool the LLM calls.
+### Architecture: skills + MCPs complement each other
 
-Also: huashu-design's `#0 事实验证先于假设` rule (the WebSearch-first
-discipline) is the right philosophical model for `competitive-intel`.
-Don't hallucinate award history — fetch and cite.
+| Layer     | Owns                                                             | Examples                                                                                                                  |
+| --------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| **MCP**   | Deterministic data access — HTTP, parsing, cache, retries        | `usaspending`, `sam_gov`, `fpds`, `bls_oews`, `gsa_calc`, `gsa_perdiem`, `federal_register`, `ecfr`, `regulations_gov`    |
+| **Skill** | Domain reasoning, decision trees, judgment, narrative, citations | `competitive-intel`, `price-to-win`, `rfp-reverse-engineer`, `subcontractor-sow-builder`, `proposal-generator` (existing) |
 
-### Re-scoped Phase 4
+Same opt-in pattern as Phase 3's `script_paths`: skills declare
+`metadata.mcps: [usaspending, sam_gov, ...]` in frontmatter; the MCP
+client subsystem only exposes declared tools to that skill's loop.
 
-| Item                                                                                                         | Status                                                                           |
-| ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
-| `src/skills/datasources/sam_gov.py` — SAM.gov Opportunities + Entity client (API key from `SAM_API_KEY` env) | ⏳ Not started                                                                   |
-| `src/skills/datasources/usaspending.py` — USAspending award search (no key required)                         | ⏳ Not started                                                                   |
-| `src/skills/datasources/fpds.py` — FPDS Atom feed parser (no key required)                                   | ⏳ Not started                                                                   |
-| `src/skills/datasources/cache.py` — Disk cache to `rag_storage/_platform/intel_cache/`, TTL per source       | ⏳ Not started                                                                   |
-| Runtime tools: `intel_search_opportunities`, `intel_award_history`, `intel_vendor_profile`                   | ⏳ Not started                                                                   |
-| Tools restricted to skills with `metadata.datasources: [sam_gov, usaspending, ...]` declared                 | ⏳ Not started                                                                   |
-| `competitive-intel` SKILL.md migrated from `legacy` placeholder → `tools` mode using the new tools           | ⏳ Not started                                                                   |
-| GSA eLibrary client                                                                                          | 🔵 Deferred — lower priority; schedules are mostly relevant for GSA-vehicle bids |
+### Three skill stances on vendored buyer-side logic
 
-**Net effect:** Phase 4 stays roughly the same scope as originally
-planned. The change is delivery model — datasources surface as runtime
-tools (consistent with KG access), not a parallel pre-fetch system.
+The 1102tools skills were written from the buyer's seat. We can use the
+same logic in three stances — each becomes a separate skill (one
+persona, one outcome, one set of evals, easier for the LLM to pick
+correctly from the description):
+
+| Stance      | Example                                                                                                 | Skill                       |
+| ----------- | ------------------------------------------------------------------------------------------------------- | --------------------------- |
+| **Reverse** | Take an RFP we received → reconstruct the CO's decision tree → reveal hot buttons + discriminator hooks | `rfp-reverse-engineer`      |
+| **Forward** | We write SOWs for OUR subcontractors / teaming partners — same tree, same FAR citations, opposite seat  | `subcontractor-sow-builder` |
+| **Inverse** | Same wrap-rate / burden / fee math the CO uses for IGCE → we use it to estimate price-to-win benchmark  | `price-to-win`              |
+
+`price-to-win` is **contract-type agnostic** (one skill, decision tree
+over RFP entities to pick FFP / LH&T&M / cost-reimbursement / hybrid
+buildup). The three IGCE Builder skills from upstream collapse into
+one Theseus skill with three internal cost-model templates under
+`references/cost_models/` and a top-level decision tree.
+
+### Re-scoped Phase 4 (sub-phases)
+
+| Sub-phase | Item                                                                                                                                                                                                                                                                                                                                                                                                                                            | Status         |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| **4a**    | MCP client subsystem in `src/skills/runtime.py` (or new `src/skills/mcp_client.py`): subprocess manager for `.mcpb` bundles + Node MCP servers, JSON-RPC stdio transport, tool-schema discovery at handshake, lifecycle (restart on crash, stderr → logs).                                                                                                                                                                                      | ⏳ Not started |
+| **4b**    | `metadata.mcps: [usaspending, sam_gov, ...]` allowlist field in SKILL.md frontmatter; runtime exposes only declared MCPs to a skill's loop. Mirrors `script_paths` pattern from Phase 3 — same security shape.                                                                                                                                                                                                                                  | ⏳ Not started |
+| **4c**    | Vendor first MCP (USAspending — no API key required → fastest end-to-end validation) into `tools/mcps/usaspending/`. `docs/PHASE_4C_MCP_TOOLCHAIN.md` covers install, verify, troubleshooting. Smoke test: `competitive-intel` placeholder calls `intel_award_history(naics=541512)` end-to-end through runtime.                                                                                                                                | ⏳ Not started |
+| **4d**    | UI: Settings → MCP Servers panel (install, enter API keys, view status, view stderr). Required because CLI-only key management is a non-starter for a server-mode product. Reuses the Phase 3c artifact-download endpoint pattern for status polling.                                                                                                                                                                                           | ⏳ Not started |
+| **4e**    | Vendor remaining MCPs from `1102tools/federal-contracting-mcps`: `sam_gov` (key-gated), `fpds`, `bls_oews`, `gsa_calc`, `gsa_perdiem`. `federal_register`, `ecfr`, `regulations_gov` deferred until first skill needs them. Each gets a UPSTREAM.md with attribution + re-vendor instructions.                                                                                                                                                  | ⏳ Not started |
+| **4f**    | Vendor `IGCE Builder` skills (FFP + LH/T&M + Cost-Reimbursement) from `1102tools/federal-contracting-skills`, **collapse into one `price-to-win` skill** under `.github/skills/price-to-win/`. Cost-model decision tree at top level; three IGCE buildup templates under `references/cost_models/`. UPSTREAM.md notes the buyer→bidder repersonalization. Drops upstream `ai-boundaries.md` linkage (capture-team intent, not CO compliance).   | ⏳ Not started |
+| **4g**    | Vendor `SOW/PWS Builder` from upstream → **two separate Theseus skills** sharing one `references/` folder: `rfp-reverse-engineer` (reverse stance — given an RFP we received, reconstruct the CO's decision tree) and `subcontractor-sow-builder` (forward stance — we write SOWs for our subcontractors). One persona per skill keeps eval / discovery clean.                                                                                  | ⏳ Not started |
+| **4h**    | Vendor `OT Project Description Builder` + `OT Cost Analysis` upstream skills as `ot-prototype-strategist` (single Theseus skill that handles both project description and cost reasoning since OT prototypes are typically scoped + priced together). Lower priority — only relevant to bidders pursuing 10 USC 4021/4022 prototype OTs.                                                                                                        | ⏳ Not started |
+| **4i**    | Migrate existing `competitive-intel` placeholder → tools-mode declaring `metadata.mcps: [usaspending, sam_gov, fpds]`. First skill that uses the full MCP chain end-to-end. Produces the first intel-brief artifact (which Phase 6 surfaces in Products library).                                                                                                                                                                               | ⏳ Not started |
+| **4j**    | **Skill taxonomy + frontmatter pass.** Adopt three-axis classification (`personas`, `shipley_phases`, `capability`) across all SKILL.md files. Authoritative vocabularies live in `docs/SKILL_TAXONOMY.md` (single source of truth, mirrors extraction-prompt persona list). Add 7th item to Cross-Cutting Change Checklist: "When personas change in extraction prompt, update SKILL_TAXONOMY.md and audit frontmatter." See sub-design below. | ⏳ Not started |
+
+### Sub-phase 4j: Three-axis skill taxonomy
+
+**Why three axes** (not one, not two, not free-form tags): Personas
+answer "who you are", Shipley phases answer "when in the lifecycle",
+capability answers "what action you need right now." Each axis is
+orthogonal and answers a different discovery question. Free-form tags
+drift; pure persona buckets force false-precision when one skill
+serves multiple personas (e.g., `price-to-win` is genuinely both Cost
+Estimator AND Capture Manager).
+
+**Frontmatter shape** (added to existing `metadata:` block — stays
+spec-portable, no new top-level YAML fields):
+
+```yaml
+metadata:
+  personas:
+    primary: cost_estimator # one of 8 canonical IDs
+    secondary: [capture_manager] # zero or more
+  shipley_phases: # zero or more (skill may span phases)
+    - strategy
+    - proposal_development
+  capability: estimate # one of ~7 closed-vocab verbs
+  category: domain # existing field unchanged
+```
+
+**Persona vocabulary (8 IDs, mirrors extraction prompt verbatim):**
+`capture_manager`, `proposal_manager`, `proposal_writer`,
+`cost_estimator`, `contracts_manager`, `technical_sme`,
+`legal_compliance`, `program_manager`. Plus implicit `none` for
+utility/meta skills (huashu-design, renderers, skill-creator).
+
+**Shipley phase vocabulary (6 phases):** `pursuit`, `capture`,
+`strategy`, `proposal_development`, `negotiation`, `post_award`. Skills
+may span multiple phases.
+
+**Capability vocabulary (7 verbs, closed):** `research` (gathers from
+external sources), `analyze` (examines KG, produces findings), `draft`
+(produces narrative for proposals), `audit` (validates against
+rules/regs), `estimate` (produces quantitative models), `render`
+(converts content to deliverable formats), `meta` (operates on other
+skills).
+
+**UI implications:**
+
+- Skills sidebar groups by `personas.primary`; secondary surfaces as a
+  "also relevant for…" badge.
+- Filter pills for `shipley_phases` and `capability` provide
+  orthogonal navigation (same skill catalog, different lenses).
+- Command-palette-style discovery: "[draft] for [proposal_manager] in
+  [proposal_development]" → exact skill match.
+
+**Backfill order:** Existing 7 skills (proposal-generator,
+compliance-auditor, competitive-intel, govcon-ontology, huashu-design,
+renderers, skill-creator) + the 5 new Phase 4 skills (price-to-win,
+rfp-reverse-engineer, subcontractor-sow-builder,
+ot-prototype-strategist, oci-sweeper) all land with full taxonomy in
+the same commit as 4j. No retrofit PRs.
+
+**Future skills explicitly scoped by this taxonomy:**
+
+- `oci-sweeper` (Legal/Compliance, capture phase, audit capability) —
+  scans workspace customer/incumbent/partner/subcontractor entities
+  against firm contract history for Organizational Conflict of
+  Interest per FAR Subpart 9.5. Companion to `compliance-auditor` with
+  narrower legal lens. Added to extraction prompt's Legal/Compliance
+  persona alongside this phase.
+
+### What we drop from the original Phase 4
+
+- `src/skills/datasources/{sam_gov,usaspending,fpds,cache}.py` — replaced by vendored MCPs
+- `intel_search_opportunities` / `intel_award_history` / `intel_vendor_profile` as in-process runtime tools — replaced by MCP-discovered tools (same names from the LLM's perspective; backed by subprocess MCP, not in-process function)
+
+### Net effect
+
+Phase 4 stops being "build six API clients" and becomes "add an
+MCP-client subsystem + vendor what the federal-contracting community
+already hardened." The runtime subsystem (4a-4b) is the only new
+infrastructure work; everything after is mechanical vendoring. Long-
+term cost goes down — every future MCP (custom internal, third-party,
+new federal data source) installs without runtime changes.
+
+**Sequencing within Phase 4:** 4a → 4b → 4c (proves the chain end-to-
+end with one MCP) → 4d (UI for keys) → 4e+4f+4g+4h (parallelizable
+vendoring; pick by capture-team priority) → 4i (proves capture intent
+end-to-end).
 
 ---
 
@@ -245,5 +364,74 @@ own capture team" in concrete terms.**
 3. ~~**Phase 3c drawer binary mimetype support**~~ ✅ Done 2026-04-28
 4. ~~**Phase 3d DOCX renderer**~~ ✅ Done 2026-04-28
 5. ~~**Phase 3e XLSX renderer**~~ ✅ Done 2026-04-28
-6. **Phase 4 SAM.gov + USAspending clients** (highest-leverage external data)
-7. **Phase 5 `invoke_skill`** (only valuable once 3 + 4 produce real outputs)
+6. **Phase 4a-4c MCP client subsystem + first vendored MCP** (USAspending end-to-end as proof)
+7. **Phase 4j taxonomy + frontmatter pass** (do this BEFORE 4d-4i so new skills land with full metadata, not a retrofit)
+8. **Phase 4d-4i UI + remaining MCP/skill vendoring** (parallelizable; pick by capture-team priority)
+9. **Phase 5 `invoke_skill`** (only valuable once 3 + 4 produce real outputs)
+10. **Phase 6 Products library + reasoning view** (can run in parallel with 4/5 — backend index + UI; reuses existing transcripts)
+
+---
+
+## Phase 6 — Products library + reasoning view (added 2026-04-28)
+
+### Why this phase exists
+
+Phase 3c gave skill artifacts a download surface inside the skill-run
+drawer — a developer view, scoped to one run at a time. Federal capture
+teams don't think in "skill runs"; they think in **deliverables**: "the
+Volume 1 draft", "the compliance matrix for AFCAP V", "the black-hat
+brief on the incumbent". They also distrust black-box AI output. Both
+gaps need a user-facing surface alongside the existing **RFP
+Intelligence** capture page.
+
+### Scope
+
+A new top-level UI surface — **Products** (or **Deliverables /
+Capture Library**, naming TBD) — that aggregates every artifact across
+every skill run in the active workspace, plus a deterministic
+"reasoning view" that explains how each artifact was produced from the
+data already captured in the per-run `transcript.json`.
+
+### Re-scoped Phase 6 (sub-phases)
+
+| Sub-phase | Item                                                                                                                                                       | Status         |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| **6a**    | Cross-run artifact index endpoint: `GET /api/ui/products?workspace=...` returns flat list `{skill, run_id, filename, mime, size, created_at, title?}`      | ⏳ Not started |
+| **6a**    | Aggregator walks `rag_storage/<workspace>/skills/<name>/runs/*/artifacts/*` (no new on-disk schema; pure index over Phase 3 layout)                        | ⏳ Not started |
+| **6a**    | New top-level "Products" entry in left sidebar of `src/ui/static/index.html`; reuses Phase 3c's `/artifacts/{filename}` download endpoint per row          | ⏳ Not started |
+| **6a**    | Filters: by skill, by format (DOCX / XLSX / PDF / PPTX / MP4 / GIF / MD / JSON), by RFP/program, by date                                                   | ⏳ Not started |
+| **6a**    | Inline preview pane per format: PDF.js (PDF), Mammoth.js (DOCX), SheetJS (XLSX), `<video>` (MP4), native `<img>` (GIF), syntax-highlighted (MD/JSON)       | ⏳ Not started |
+| **6a**    | Per-artifact actions: Download, Regenerate (re-invoke originating skill with same prompt), Archive, Pin, Open Originating Run (deep-link to drawer)        | ⏳ Not started |
+| **6a**    | Optional: KG back-links — each artifact's `proposal_draft.json` envelope (or equivalent) cites `chunk_id`s; click opens chunk inspector for that entity    | ⏳ Not started |
+| **6b**    | "Why this artifact?" view: deterministic transcript → narrative renderer (no extra LLM call). Walks `transcript.json` and renders each tool call as prose. | ⏳ Not started |
+| **6b**    | Tool-call → human-language mapping: `kg_entities(types=[…])` → "Pulled N entities of type X"; `kg_chunks(query=…)` → "Searched for ‘…' and read N chunks"  | ⏳ Not started |
+| **6b**    | Each narrative step links to the raw tool call + result in the transcript (collapsible JSON), so power users can audit                                     | ⏳ Not started |
+| **6b**    | Citation chain surfaces inline: every `chunk_id` referenced in the artifact resolves to the originating chunk's preview                                    | ⏳ Not started |
+
+### Why this is "simplistic" (per user requirement)
+
+6b adds **zero new inference**. The per-run `transcript.json` already
+records every tool call (`kg_entities`, `kg_chunks`, `kg_query`,
+`read_file`, `run_script`, `write_file`) with full args + results. The
+reasoning view is a deterministic renderer over that data — pure
+data-to-prose mapping, no LLM, no latency. If the transcript shows a
+chunk_id, the view shows a citation. If it shows a Cypher query, the
+view says "ran a graph trace for L↔M coverage". This is auditable and
+reproducible by definition.
+
+### Dependencies
+
+- ✅ Phase 2.1 tools-mode runtime (writes `transcript.json`)
+- ✅ Phase 3c artifact download endpoint (reused per row)
+- 🔵 Independent of Phase 4 (datasources) and Phase 5 (`invoke_skill`) —
+  but composes naturally with both: Phase 4 artifacts (intel briefs)
+  show up in the library automatically; Phase 5 nested transcripts
+  render as collapsible sub-trees in the reasoning view.
+
+### Net effect
+
+Closes the loop between "skills as tools" (developer surface) and
+"products as deliverables" (capture-team surface). The black-box
+problem is mitigated by surfacing the reasoning trail we already
+persist — no new LLM calls, no schema changes, no new on-disk artifact
+format.

@@ -2,7 +2,7 @@ GOVCON ONTOLOGY - LIGHTRAG NATIVE FORMAT (FULL INTELLIGENCE RESTORED)
 ======================================================================
 Model: xAI Grok-4-fast-reasoning (2M context window)
 Output: LightRAG tuple-delimited format (entity/relation lines)
-Version: 6.4 (Branch 080 - Extraction Prompt Holistic Pass)
+Version: 6.5 (Branch 120 - Phase 4j taxonomy: OCI sweeps added to Legal/Compliance persona)
 Source: Complete restoration from Branch 040 modular prompts
 Total Size: ~35K tokens (comprehensive domain intelligence)
 
@@ -20,7 +20,7 @@ USER PERSONAS YOU SUPPORT:
 - Cost Estimators: Workload drivers, labor hours, equipment counts, frequencies, BOE inputs
 - Contracts Managers: FAR/DFARS clauses, terms & conditions, regulatory compliance, CLINs
 - Technical SMEs: Performance standards, specifications, technical requirements, QA criteria
-- Legal/Compliance: Certifications, representations, regulatory obligations, IP requirements
+- Legal/Compliance: OCI sweeps, certifications, representations, regulatory obligations, IP requirements
 - Program Managers: CDRLs, deliverable schedules, reporting requirements, milestones
 
 EXTRACTION PHILOSOPHY:
