@@ -3939,6 +3939,216 @@
               </div>
             </details>
 
+            <!-- ===== MCP Servers (Phase 4e) ===== -->
+            <details class="acc accent-cyan" data-acc-key="mcps">
+              <summary>
+                <div class="flex items-center gap-3 min-w-0">
+                  <i
+                    data-lucide="chevron-right"
+                    class="acc-chevron w-4 h-4"
+                  ></i>
+                  <i
+                    data-lucide="plug"
+                    class="w-4 h-4 text-neon-cyan shrink-0"
+                  ></i>
+                  <div class="min-w-0">
+                    <div class="font-semibold">MCP Servers</div>
+                    <div
+                      class="text-[11px] font-mono text-slate-500 truncate"
+                      x-text="mcps.loaded ? `${mcps.items.length} vendored · ${mcps.items.filter(m => m.missing_env.length === 0).length} ready` : 'loading…'"
+                    ></div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2" @click.stop>
+                  <button
+                    class="btn btn-ghost text-xs"
+                    @click="loadMcps()"
+                    :disabled="mcps.loading"
+                    title="Re-scan tools/mcps/"
+                  >
+                    <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                    Refresh
+                  </button>
+                </div>
+              </summary>
+              <div class="acc-body">
+                <p class="text-xs text-slate-500 mb-4 max-w-2xl">
+                  Vendored Model Context Protocol servers under
+                  <code class="text-neon-cyan">tools/mcps/</code> are exposed to
+                  agent skills that opt in via
+                  <code class="text-neon-cyan">metadata.mcps:</code> in their
+                  SKILL.md frontmatter. No-key MCPs (USAspending, eCFR, GSA
+                  CALC+, GSA Per Diem, Federal Register) work out of the box;
+                  key-gated MCPs need the API keys set below. Saving keys
+                  rewrites <code class="text-neon-amber">.env</code> and
+                  triggers a graceful server restart.
+                </p>
+                <template x-if="!mcps.loaded">
+                  <div class="text-xs text-slate-500 font-mono">loading…</div>
+                </template>
+                <template x-if="mcps.loaded && mcps.items.length === 0">
+                  <div
+                    class="text-xs text-slate-500 font-mono bg-ink-900/40 border border-edge rounded-lg px-3 py-3"
+                  >
+                    No MCP manifests found under
+                    <code>tools/mcps/</code>. Vendor one through the standard
+                    Phase 4f pattern.
+                  </div>
+                </template>
+                <template x-if="mcps.loaded && mcps.items.length > 0">
+                  <div class="space-y-3">
+                    <template x-for="m in mcps.items" :key="m.name">
+                      <div
+                        class="bg-ink-900/60 border border-edge rounded-lg p-4 space-y-3"
+                      >
+                        <div
+                          class="flex items-start justify-between gap-3 flex-wrap"
+                        >
+                          <div class="min-w-0">
+                            <div class="flex items-center gap-2 mb-1">
+                              <code
+                                class="text-sm text-neon-cyan font-bold"
+                                x-text="m.name"
+                              ></code>
+                              <span
+                                class="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded border"
+                                :class="m.missing_env.length === 0 ? 'border-neon-lime/40 text-neon-lime' : 'border-neon-amber/40 text-neon-amber'"
+                                x-text="m.missing_env.length === 0 ? 'ready' : 'needs ' + m.missing_env.length + ' key(s)'"
+                              ></span>
+                            </div>
+                            <div
+                              class="text-[11px] text-slate-400 leading-relaxed max-w-3xl"
+                              x-text="m.description"
+                            ></div>
+                          </div>
+                          <button
+                            class="btn btn-ghost text-xs shrink-0"
+                            @click="testMcp(m.name)"
+                            :disabled="mcps.testing[m.name] || m.missing_env.length > 0"
+                            :title="m.missing_env.length > 0 ? 'Set required keys first' : 'Spawn subprocess + handshake + tools/list'"
+                          >
+                            <i data-lucide="activity" class="w-3.5 h-3.5"></i>
+                            <span
+                              x-text="mcps.testing[m.name] ? 'Testing…' : 'Test connection'"
+                            ></span>
+                          </button>
+                        </div>
+
+                        <template x-if="mcps.testResult[m.name]">
+                          <div
+                            class="text-[11px] font-mono px-3 py-2 rounded border"
+                            :class="mcps.testResult[m.name].ok ? 'border-neon-lime/40 bg-neon-lime/5 text-neon-lime' : 'border-neon-magenta/40 bg-neon-magenta/5 text-neon-magenta'"
+                          >
+                            <template x-if="mcps.testResult[m.name].ok">
+                              <div>
+                                ✓ handshake ok ·
+                                <span
+                                  x-text="mcps.testResult[m.name].tool_count"
+                                ></span>
+                                tools advertised:
+                                <span
+                                  class="text-slate-400"
+                                  x-text="mcps.testResult[m.name].sample_tools.join(', ')"
+                                ></span>
+                              </div>
+                            </template>
+                            <template x-if="!mcps.testResult[m.name].ok">
+                              <div
+                                x-text="'✗ ' + (mcps.testResult[m.name].error || 'unknown error')"
+                              ></div>
+                            </template>
+                          </div>
+                        </template>
+
+                        <template
+                          x-if="(m.env_required.length + m.env_optional.length) > 0"
+                        >
+                          <div class="space-y-2">
+                            <template
+                              x-for="env in [...m.env_required.map(e => ({...e, required: true})), ...m.env_optional.map(e => ({...e, required: false}))]"
+                              :key="env.name"
+                            >
+                              <div class="flex items-center gap-2">
+                                <label class="block flex-1 min-w-0">
+                                  <span
+                                    class="text-[10px] text-slate-400 font-mono uppercase tracking-wider flex items-center gap-2"
+                                  >
+                                    <code x-text="env.name"></code>
+                                    <span
+                                      class="text-[9px] px-1.5 py-0.5 rounded border"
+                                      :class="env.required ? 'border-neon-magenta/40 text-neon-magenta' : 'border-edge text-slate-500'"
+                                      x-text="env.required ? 'required' : 'optional'"
+                                    ></span>
+                                    <span
+                                      class="text-[9px] text-slate-600"
+                                      x-show="env.set"
+                                      x-text="'currently: ' + env.masked"
+                                    ></span>
+                                  </span>
+                                  <input
+                                    type="password"
+                                    :placeholder="env.set ? '(leave blank to keep current value)' : 'paste API key…'"
+                                    x-model="mcps.drafts[m.name + ':' + env.name]"
+                                    class="mt-1 w-full bg-ink-900/80 border border-edge rounded-lg px-3 py-2 text-sm font-mono focus:border-neon-cyan/60 outline-none"
+                                  />
+                                </label>
+                              </div>
+                            </template>
+                            <div class="flex justify-end">
+                              <button
+                                class="btn btn-primary text-xs"
+                                @click="saveMcpKeys(m.name)"
+                                :disabled="mcps.saving[m.name]"
+                              >
+                                <i data-lucide="save" class="w-3.5 h-3.5"></i>
+                                <span
+                                  x-text="mcps.saving[m.name] ? 'Saving + restarting…' : 'Save keys + restart'"
+                                ></span>
+                              </button>
+                            </div>
+                          </div>
+                        </template>
+
+                        <div
+                          class="text-[10px] font-mono text-slate-600 flex flex-wrap gap-x-4 gap-y-1 pt-2 border-t border-edge/40"
+                        >
+                          <span
+                            >command:
+                            <code
+                              class="text-slate-500"
+                              x-text="m.command.join(' ')"
+                            ></code
+                          ></span>
+                          <span
+                            >license:
+                            <code
+                              class="text-slate-500"
+                              x-text="m.license || '—'"
+                            ></code
+                          ></span>
+                          <span
+                            >vendored:
+                            <code
+                              class="text-slate-500"
+                              x-text="m.vendored_at || '—'"
+                            ></code
+                          ></span>
+                          <span x-show="m.vendored_from"
+                            ><a
+                              :href="m.vendored_from"
+                              target="_blank"
+                              class="text-neon-cyan hover:underline"
+                              >upstream ↗</a
+                            ></span
+                          >
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </template>
+              </div>
+            </details>
+
             <!-- ===== Models & Storage ===== -->
             <details class="acc accent-magenta" data-acc-key="models">
               <summary>
@@ -5139,6 +5349,17 @@
             defaults: {},
           },
 
+          // MCP Servers panel (Phase 4e) — vendored MCP inventory + key management
+          mcps: {
+            loaded: false,
+            loading: false,
+            items: [],
+            drafts: {}, // "<mcp>:<ENV_KEY>" → string
+            saving: {}, // mcpName → bool
+            testing: {}, // mcpName → bool
+            testResult: {}, // mcpName → { ok, tool_count, sample_tools, error }
+          },
+
           // Knowledge graph state
           cy: null,
           graph: {
@@ -5290,9 +5511,10 @@
                 if (this.active === "settings" && !this.querySettings.loaded)
                   this.loadQuerySettings();
                 this.loadSkillSettings();
+                if (this.active === "settings" && !this.mcps.loaded)
+                  this.loadMcps();
                 if (this.active === "settings" && !this.dangerZone.loaded)
                   this.loadWorkspaceInventory();
-                // Documents tab: poll status_counts + pipeline_status while
                 // visible so the status strip stays live without holding
                 // open a second SSE channel.
                 if (this.active === "documents") this.startDocStatsPoll();
@@ -7613,6 +7835,80 @@
               this.toast("Skill settings reset to defaults");
             } catch (e) {
               this.toast("Reset failed: " + e.message, "error");
+            }
+          },
+
+          // ----- MCP Servers panel (Phase 4e) -----
+          async loadMcps() {
+            this.mcps.loading = true;
+            try {
+              const data = await this.api("/api/ui/mcps");
+              this.mcps.items = data.mcps || [];
+              this.mcps.loaded = true;
+              this.$nextTick(() => lucide.createIcons());
+            } catch (e) {
+              this.toast("Failed loading MCPs: " + e.message, "error");
+            } finally {
+              this.mcps.loading = false;
+            }
+          },
+
+          async saveMcpKeys(name) {
+            // Collect drafts for this MCP, drop empty values (keep current).
+            const keys = {};
+            for (const k of Object.keys(this.mcps.drafts)) {
+              if (!k.startsWith(name + ":")) continue;
+              const v = (this.mcps.drafts[k] || "").trim();
+              if (v) keys[k.split(":", 2)[1]] = v;
+            }
+            if (Object.keys(keys).length === 0) {
+              this.toast("Nothing to save — all fields blank", "info");
+              return;
+            }
+            this.mcps.saving[name] = true;
+            try {
+              const data = await this.api(`/api/ui/mcps/${name}/keys`, {
+                method: "POST",
+                body: JSON.stringify({ keys, restart: true }),
+              });
+              if (data.status === "restarting") {
+                this.toast(`Saved ${data.written.length} key(s) — restarting…`);
+                this.restarting = true;
+                this.restartTarget = this.stats.workspace;
+                this.pollRestart();
+              } else {
+                this.toast(`Saved ${data.written.length} key(s)`);
+                this.loadMcps();
+              }
+              // Clear drafts for this MCP
+              for (const k of Object.keys(this.mcps.drafts)) {
+                if (k.startsWith(name + ":")) this.mcps.drafts[k] = "";
+              }
+            } catch (e) {
+              this.toast("Save failed: " + e.message, "error");
+            } finally {
+              this.mcps.saving[name] = false;
+            }
+          },
+
+          async testMcp(name) {
+            this.mcps.testing[name] = true;
+            this.mcps.testResult[name] = null;
+            try {
+              const data = await this.api(`/api/ui/mcps/${name}/test`, {
+                method: "POST",
+              });
+              this.mcps.testResult[name] = data;
+              if (data.ok) {
+                this.toast(`${name}: handshake ok (${data.tool_count} tools)`);
+              } else {
+                this.toast(`${name}: ${data.error || "failed"}`, "error");
+              }
+            } catch (e) {
+              this.mcps.testResult[name] = { ok: false, error: e.message };
+              this.toast("Test failed: " + e.message, "error");
+            } finally {
+              this.mcps.testing[name] = false;
             }
           },
 
