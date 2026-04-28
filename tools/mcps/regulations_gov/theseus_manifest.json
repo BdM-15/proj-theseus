@@ -1,0 +1,16 @@
+{
+  "name": "regulations_gov",
+  "description": "Regulations.gov MCP server (1102tools/federal-contracting-mcps). 8 read-only tools over the federal Regulations.gov API: rulemaking docket search + detail, document search + detail, public-comment search + detail, open comment-period tracking, and FAR case history lookup. Powers regulatory-change monitoring (FAR/DFARS amendments in flight), comment-period awareness for proposal posture, and historical FAR case research. Requires API_DATA_GOV_KEY (free at api.data.gov; rate-limited per key, shared across api.data.gov-fronted services).",
+  "command": [
+    "uvx",
+    "--from",
+    "regulationsgov-mcp==0.2.5",
+    "regulationsgov-mcp"
+  ],
+  "env_required": ["API_DATA_GOV_KEY"],
+  "env_optional": [],
+  "vendored_from": "https://github.com/1102tools/federal-contracting-mcps/tree/main/servers/regulations-gov-mcp",
+  "vendored_commit": "aef1961378b3e5c380270bec48ed47a4f7bed4fc",
+  "vendored_at": "2026-04-28",
+  "license": "MIT"
+}
