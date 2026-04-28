@@ -1,0 +1,62 @@
+{
+  "schema_version": "1.0",
+  "skill": "rfp-reverse-engineer",
+  "evals": [
+    {
+      "id": "rfp-rev-001",
+      "name": "Decode CO intent on AFCAP DRFP",
+      "prompt": "Workspace `afcap6_drfp`. Reverse-engineer this RFP — what scope decisions has the CO already made, what's still open, what hot buttons should we pursue?",
+      "expected_signals": [
+        "calls `kg_entities` for at least solicitation, requirement, deliverable, proposal_instruction, evaluation_factor, clause, performance_standard, document_section",
+        "emits `inferred_intake_answers` with values for sow_or_pws, contract_type, commercial_status — each with `signal`, `source_chunk_ids`, `confidence`",
+        "emits `decision_tree_reconstruction` with all 6 blocks (block_1_mission_service_model through block_6_quality_oversight)",
+        "for each scope decision: status is `locked` (visible), `implied` (inference rule fired), or `open` (clarification question generated)",
+        "emits at least 1 `hot_buttons[]` entry with `discriminator_opportunity` field",
+        "emits at least 1 `discriminator_hooks[]` entry citing an `evaluation_factor`",
+        "emits `cpff_form_signal`, `key_personnel_clause_check`, `qasp_cpars_check` populated even when status is `n/a` or `absent`",
+        "JSON envelope written to `{run_dir}/artifacts/rfp_reverse_engineering.json`",
+        "every inference cites `source_chunk_ids` or `kg_entities` — no uncited claims"
+      ],
+      "anti_signals": [
+        "any `hot_buttons` or `discriminator_hooks` entry without source citations",
+        "decision tree blocks omitted because the document is silent (should emit `status=open` instead)",
+        "fabricating a CPFF form when the document doesn't cite one (must mark `ambiguous`)",
+        "writing proposal prose instead of the JSON envelope"
+      ]
+    },
+    {
+      "id": "rfp-rev-002",
+      "name": "Detect CO Key Personnel clause trap",
+      "prompt": "Workspace `doj_mmwr_old_rfp`. Did the contracting officer cite the right Key Personnel substitution clause? What other compliance traps did they trip?",
+      "expected_signals": [
+        "checks for FAR 52.237-2 cited as Key Personnel substitution clause; if found, emits `key_personnel_clause_check.status = 'incorrect'` with explanation that 52.237-2 is 'Protection of Government Buildings, Equipment, and Vegetation' — wrong clause",
+        "recommends the agency-appropriate alternative (NFS 1852.237-72, HSAR 3052.237-72, HHSAR 352.237-75) or FAR 52.237-3 (Continuity of Services) as fallback",
+        "checks for bare `FAR 16.306` cite without (d)(1) or (d)(2); emits `cpff_form_signal.status = 'ambiguous'` if so",
+        "checks QASP Payment Consequence column for CPARS rating language; emits `qasp_cpars_check.status = 'non-compliant'` if so",
+        "emits a `clarification_questions[]` entry for each detected trap so the proposal team can file Q&A"
+      ],
+      "anti_signals": [
+        "skipping the trap detector when a clause IS present",
+        "recommending the same clause the CO already (incorrectly) cited",
+        "treating CO errors as signals of CO sophistication rather than as Q&A opportunities"
+      ]
+    },
+    {
+      "id": "rfp-rev-003",
+      "name": "Surface ghost language and missing-section signals",
+      "prompt": "Workspace `afcap5_swa_tas`. Find the ghost language in this PWS — what's vague, what's missing, where does the CO retain unilateral discretion?",
+      "expected_signals": [
+        "emits `ghost_language[]` entries for matches against `references/rfp_signal_patterns.md` Section D patterns: 'as appropriate', 'as required', 'where applicable', 'best practices' without standard, undefined acronyms, evaluation factors with no measurable threshold",
+        "each ghost_language entry has `phrase`, `section_origin`, `risk`, `source_chunk_ids`, `recommended_action`",
+        "emits `missing_sections[]` entries — for example, missing Section 13 Transition on a recompete (suspicious — likely amendment) or missing Section 14 Constraints & Assumptions (CO didn't document derived defaults; proposal should over-document own assumptions)",
+        "missing-section reasons cite the inference table from the catalog reference, not free-text guesses",
+        "`claim_gaps[]` populated when the document is silent on a structurally-implied requirement (e.g., FedRAMP IL5 implied but no DD 254 reference)"
+      ],
+      "anti_signals": [
+        "ghost_language entries without source_chunk_ids",
+        "treating every vague phrase as ghost language without checking the catalog",
+        "missing-section entries that say 'unclear why' instead of citing the inference rule"
+      ]
+    }
+  ]
+}
