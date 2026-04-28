@@ -1,0 +1,11 @@
+{
+  "name": "gsa_perdiem",
+  "description": "GSA Per Diem Rates MCP server (1102tools/federal-contracting-mcps). 6 read-only tools over the GSA Per Diem API: city/ZIP/state lookup, M&IE breakdown, travel cost estimation, multi-location comparison. Works without configuration via shared DEMO_KEY (rate-limited); set PERDIEM_API_KEY to a free api.data.gov key for 1,000 req/hr.",
+  "command": ["uvx", "--from", "gsa-perdiem-mcp==0.2.6", "gsa-perdiem-mcp"],
+  "env_required": [],
+  "env_optional": ["PERDIEM_API_KEY"],
+  "vendored_from": "https://github.com/1102tools/federal-contracting-mcps/tree/main/servers/gsa-perdiem-mcp",
+  "vendored_commit": "aef1961378b3e5c380270bec48ed47a4f7bed4fc",
+  "vendored_at": "2026-04-28",
+  "license": "MIT"
+}
