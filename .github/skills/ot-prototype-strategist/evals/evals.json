@@ -1,0 +1,60 @@
+{
+  "skill_name": "ot-prototype-strategist",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "We're an NDC startup pursuing a TRL 4-6 cyber prototype OT under 10 USC 4022. The solicitation is in the workspace (DIU consortium-brokered, San Diego, ~18 months, target $2.4M). Build the milestone proposal structure AND our bid cost stack so I can see what to propose at each gate and what it should cost us to deliver.",
+      "expected_output": "A JSON envelope at artifacts/ot_prototype_bid.json with workflow='respond_to_ot_solicitation', authority='10 USC 4022', performer_type='ndc', cost_share_path='4022(d)(1)(A)' with required=false, milestones[] (3-5 entries with milestone_id, phase, trl_in/trl_out, est_duration_months, deliverables[], payment_type, exit_criterion, should_cost_mid), labor[] benchmarked from BLS for the SOC codes (cybersecurity engineer 15-1212 minimum) at the San Diego MSA with explicit aging factor, calc_plus[] anchors with N reported, materials[] sized to prototype-type heuristic (software/hybrid 10-40%), travel[] for any test-event trips with GSA per diem, consortium_fee block (5% default for DIU), totals.{government_obligation_low/mid/high, performer_share}, and a bid_recommendation block with target_price, rationale, and at least 3 risk_flags. Methodology cites 10 USC 4022, 10 USC 4022(d)(1)(A), 10 USC 4003.",
+      "expectations": [
+        "The skill called kg_entities at least once requesting types including 'solicitation', 'requirement', 'deliverable', 'evaluation_factor', 'performance_standard', or 'place_of_performance'.",
+        "The skill called mcp__bls_oews__get_wage_data or mcp__bls_oews__igce_wage_benchmark for cybersecurity SOC 15-1212 (or 15-1252 software developer) at the San Diego metro.",
+        "The skill called mcp__gsa_calc__igce_benchmark or mcp__gsa_calc__price_reasonableness_check at least once.",
+        "The skill called mcp__gsa_perdiem__get_per_diem_by_zip or mcp__gsa_perdiem__estimate_travel_cost for the test-event travel line item (San Diego or test range).",
+        "The skill read references/ot_authority_taxonomy.md via read_file.",
+        "The skill read references/trl_milestone_patterns.md via read_file.",
+        "The skill read references/cost_models/ot_milestone_buildup.md via read_file.",
+        "The skill read references/relationship_query_patterns.md via read_file before calling kg_entities.",
+        "The skill called write_file with target path 'artifacts/ot_prototype_bid.json'.",
+        "The output authority field equals '10 USC 4022' (NOT '10 USC 4021' — this is a prototype, not research).",
+        "performer_type equals 'ndc' AND cost_share_path equals '4022(d)(1)(A)' AND cost_share_required equals false.",
+        "milestones array has at least 3 entries; every entry has a non-null exit_criterion (binary pass/fail); every payment_type is 'fixed' or 'cost-type' (not 'tbd').",
+        "Every labor entry has a buildup with non-null hourly rate AND the BLS series_id is reported.",
+        "consortium_fee.rate equals 0.05 (DIU default) and is added to government_obligation, not deducted from performer share.",
+        "bid_recommendation has a non-null target_price AND at least 3 risk_flags.",
+        "Methodology citations include both '10 USC 4022' AND '10 USC 4022(d)(1)(A)'."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "An AFRL research OT under 10 USC 4021 just dropped — TRL 2-4 autonomy algorithm work, university PI, Boston metro, 24 months, $1.8M. We're a traditional prime teaming with MIT. Build the project description framing AND the bid cost stack — but get the cost-share story right because the source doc shows confusing numbers.",
+      "expected_output": "A JSON envelope at artifacts/ot_research_bid.json with workflow='respond_to_ot_solicitation', authority='10 USC 4021', cost_share_required=false (4021 has NO statutory cost-share trigger), milestone structure mapped to research phases (typically 2-3 milestones across TRL 2-4), labor[] using academic burden scenarios (1.65/1.85/2.05 instead of 1.8/2.0/2.2) and grad_research_assistant entries at $55-75/hr institutional rate (NOT BLS-derived), postdoc entries at $80-110/hr, materials sized to research heuristic (low — 10-20%), and methodology that EXPLICITLY states '10 USC 4022(d) cost-sharing paths are statutorily inapplicable' to a 4021 research OT.",
+      "expectations": [
+        "The skill called kg_entities for solicitation/requirement/place_of_performance.",
+        "The skill called mcp__bls_oews__get_wage_data for the Boston metro for at least one labor category.",
+        "The skill read references/ot_authority_taxonomy.md AND references/cost_models/ot_milestone_buildup.md via read_file.",
+        "The skill called write_file with target path 'artifacts/ot_research_bid.json'.",
+        "The output authority field equals '10 USC 4021' (NOT '10 USC 4022').",
+        "cost_share_required equals false AND methodology_notes contains the phrase 'statutorily inapplicable' or '4021' adjacent to 'no cost-share'.",
+        "At least one labor entry uses an academic burden scenario (low/mid/high in the 1.65/1.85/2.05 band, not 1.8/2.0/2.2).",
+        "At least one labor entry has role='graduate_research_assistant' OR role='grad_ra' with hourly rate between 55 and 75 (institutional rate, NOT BLS), AND methodology_notes flags the institutional-rate basis (not BLS-derived).",
+        "Methodology citations include '10 USC 4021' but do NOT cite '10 USC 4022(d)' as a binding authority on this agreement."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Strategic question — we're a traditional prime (no NDC, no SB) with no teaming partner yet, looking at a 10 USC 4022 prototype OT. We can either bid solo (path C, 1/3 cost share required) or team with a small NDC sub. Run the cost-share scenario comparison so we know which path is cheaper out-of-pocket. Assume a $3.0M total project, traditional prime carries 80% of the work, NDC sub carries 20%.",
+      "expected_output": "A JSON envelope at artifacts/ot_strategy_compare.json with workflow='cost_share_path_compare', two scenarios labeled scenario_solo (path 4022(d)(1)(C), 1/3 cost share) and scenario_team (path 4022(d)(1)(A), NDC participation satisfies, no cost share if NDC participation is 'significant' = ≥33%), per-scenario government_obligation_mid and performer_out_of_pocket_mid, a participation_gate flag noting that 20% sub work-share is BELOW the typical 33% significant-participation threshold and that path A is at AO discretion, and a recommendation that increasing sub work-share to ≥33% OR adding additional NDC participation reduces our exposure by ~$1M at the standard 1/3 share. Methodology cites 10 USC 4022(d)(1)(A), 10 USC 4022(d)(1)(C), and 10 USC 3014 (NDC definition).",
+      "expectations": [
+        "The skill called kg_entities for solicitation/requirement/place_of_performance/incumbent if present.",
+        "The skill read references/ot_authority_taxonomy.md via read_file.",
+        "The skill called write_file with target path 'artifacts/ot_strategy_compare.json'.",
+        "The output workflow field equals 'cost_share_path_compare'.",
+        "The output has TWO labeled scenarios: scenario_solo (or path_c) AND scenario_team (or path_a).",
+        "scenario_solo.cost_share_path equals '4022(d)(1)(C)' AND scenario_solo.performer_share_pct equals approximately 0.333 (within 0.01 tolerance).",
+        "scenario_team.cost_share_path equals '4022(d)(1)(A)' AND scenario_team.performer_share_pct equals 0.0.",
+        "The output contains a participation_gate flag noting that 20% sub work-share is below the 33% significant-participation threshold OR that 4022(d)(1)(A) significant-participation is an AO judgment without a statutory percentage.",
+        "Methodology citations include '10 USC 4022(d)(1)(A)' AND '10 USC 4022(d)(1)(C)' AND '10 USC 3014'."
+      ]
+    }
+  ]
+}
