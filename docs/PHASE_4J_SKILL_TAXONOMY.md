@@ -1,6 +1,6 @@
 # Phase 4j — Three-Axis Skill Taxonomy + `oci-sweeper`
 
-**Status:** ✅ Done — `4fb8ba7`
+**Status:** ✅ Done — `586f650`
 **Branch:** `135-phase-4j-skill-taxonomy` → FF into `120-skills-spec-compliance`
 **Authoritative spec:** [docs/SKILL_TAXONOMY.md](SKILL_TAXONOMY.md)
 **Roadmap row:** [docs/skills_roadmap.md § 4j](skills_roadmap.md)
