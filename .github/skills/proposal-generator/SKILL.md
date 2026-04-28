@@ -5,8 +5,13 @@ license: MIT
 metadata:
   runtime: tools
   category: proposal
-  version: 0.3.0
+  version: 0.4.0
   status: active
+  # Phase 3b: opt-in cross-skill access to huashu-design's renderer scripts
+  # so the optional render step (12) can produce PPTX/PDF artifacts via
+  # run_script without per-skill wrapper shims.
+  script_paths:
+    - ../huashu-design/scripts
 ---
 
 # Proposal Generator — Shipley Methodology
@@ -174,7 +179,44 @@ For proposal_instruction ↔ evaluation_factor visualization choices, see `refer
 
 Save the final output to `artifacts/proposal_draft.json` via `write_file`, matching the Output Contract below. The final assistant message returned to the user should be a short cover note that summarizes counts (matrix rows, themes, FAB chains, warnings) and points at the artifact path.
 
-**Visual handoff (optional):** if the user asked for slides / PDF / a one-pager, name the relevant `assets/*.html` template(s) in your cover note and instruct the user to invoke the `huashu-design` skill with the JSON content as input. Do NOT attempt to render PPTX/PDF/MP4 directly — that is `huashu-design`'s job (its `scripts/html2pptx.js`, `scripts/render-video.js`, `scripts/export_deck_pdf.mjs` are the canonical renderers).
+**Visual handoff (optional):** if the user asked for slides / PDF / a one-pager, proceed to step 12 to render them yourself via `run_script`. Do NOT instruct the user to invoke another skill manually — the renderers are wired in.
+
+### 12. Render visual artifacts (optional, only when asked)
+
+If the user explicitly requested a slide deck, PDF brief, or one-pager, render it now. Otherwise skip this step.
+
+1. Use `read_file` to load the relevant `assets/*.html` template (`slide_master.html`, `one_pager.html`, `compliance_matrix.html`, `theme_card.html`).
+2. Populate placeholders with content from the JSON envelope you just wrote (one section / theme / row per HTML file as needed). Save each populated HTML via `write_file` under `slides/`, e.g. `slides/01_executive_summary.html`, `slides/02_compliance_matrix.html`. Both `slides/` and the eventual output PDF live inside `<run_dir>/artifacts/` automatically.
+3. Invoke huashu-design's PDF renderer via `run_script` with explicit args. The runtime substitutes `{artifacts}` with the absolute path to `<run_dir>/artifacts/`, so you don't need to know the run layout:
+
+   ```json
+   {
+     "path": "../huashu-design/scripts/export_deck_pdf.mjs",
+     "args": [
+       "--slides",
+       "{artifacts}/slides",
+       "--out",
+       "{artifacts}/deck.pdf",
+       "--width",
+       "1920",
+       "--height",
+       "1080"
+     ],
+     "timeout": 60
+   }
+   ```
+
+   The renderer will rasterize each `.html` file in `--slides` (sorted by filename) into a single vector PDF. Confirm `exit_code == 0` and that stderr does not contain errors.
+
+4. Add the produced filename(s) to the cover note's "Artifacts" section.
+
+**Renderer reference:**
+
+| Output | huashu script                                   | Required args                                        |
+| ------ | ----------------------------------------------- | ---------------------------------------------------- |
+| PDF    | `../huashu-design/scripts/export_deck_pdf.mjs`  | `--slides <dir> --out <file.pdf> [--width --height]` |
+| PPTX   | `../huashu-design/scripts/export_deck_pptx.mjs` | (see script header — load via `read_file` if needed) |
+| Video  | `../huashu-design/scripts/render-video.js`      | (see script header — requires bundled ffmpeg)        |
 
 ## Output Contract
 

@@ -19,7 +19,7 @@ items live in GitHub issues now.
 | **2.1** | Tool-calling runtime (imperative agent loop)       | ✅ Done                   | `b4b9e33`                                                                   |
 | **2.2** | Migrate `proposal-generator` to tools-mode         | ✅ Done                   | `7f4e75b`, `914a4eb`, `4cf5c42`, `1bfb99b`                                  |
 | **2.3** | Migrate remaining 4 skills + UI transcript drawer  | ✅ Done                   | `98980a7`, `2dc8e1a`, `55d694b`, `d3cf024`, `90610d7`, `fe716a4`, `5bba9be` |
-| **3**   | Artifact renderers (HTML → PPTX/PDF/MP4/DOCX/XLSX) | 🟡 3a done, 3b–3e pending | See §Phase 3 below                                                          |
+| **3**   | Artifact renderers (HTML → PPTX/PDF/MP4/DOCX/XLSX) | 🟡 3a+3b done, 3c–3e pending | See §Phase 3 below                                                          |
 | **4**   | External datasources (SAM.gov, USAspending, FPDS)  | ⏳ Not started            | `competitive-intel` is a stub                                               |
 | **5**   | Skills invoking other skills (sub-agents)          | ⏳ Not started            | needs `invoke_skill` tool                                                   |
 
@@ -93,7 +93,7 @@ existing scripts into a system tool the runtime exposes."**
 | Sub-phase | Item                                                                                                | Status      | Evidence                                                                           |
 | --------- | --------------------------------------------------------------------------------------------------- | ----------- | ---------------------------------------------------------------------------------- |
 | **3a**    | Toolchain install (Node + Playwright + Chromium via huashu `package.json`)                          | ✅ Done     | `docs/PHASE_3A_TOOLCHAIN.md`; smoke-tested `export_deck_pdf.mjs` → 23KB vector PDF |
-| **3b**    | `proposal-generator` SKILL.md references `huashu-design` scripts via absolute paths in `run_script` | ⏳ Not done |                                                                                    |
+| **3b**    | `proposal-generator` SKILL.md references `huashu-design` scripts via `run_script` (cross-skill `script_paths` + CLI `args` + `{artifacts}` placeholder) | ✅ Done     | E2E smoke test: 23.8KB vector PDF rendered through runtime; `metadata.script_paths` opt-in keeps spec-portable |
 | **3c**    | Drawer "Download artifacts" section recognizes binary mimetypes (.pptx/.pdf/.mp4/.gif)              | ⏳ Not done |                                                                                    |
 | **3d**    | DOCX renderer (Pandoc MD → DOCX) for proposal volumes — huashu doesn't ship this                    | ⏳ Not done |                                                                                    |
 | **3e**    | XLSX renderer (openpyxl) for compliance matrix — huashu doesn't ship this                           | ⏳ Not done |                                                                                    |
@@ -241,8 +241,8 @@ own capture team" in concrete terms.**
 ## Sequencing recommendation
 
 1. ~~**Phase 3a toolchain install**~~ ✅ Done 2026-04-28
-2. **Phase 3b wire `proposal-generator` → huashu via `run_script`** (small, proves the pattern)
-3. **Phase 3c drawer binary mimetype support** (UI side of 3b)
+2. ~~**Phase 3b wire `proposal-generator` → huashu via `run_script`**~~ ✅ Done 2026-04-28
+3. **Phase 3c drawer binary mimetype support** (UI side of 3b — surface .pdf/.pptx/.mp4 downloads in the skill-run drawer)
 4. **Phase 3d + 3e DOCX/XLSX renderers** (the two huashu doesn't cover)
 5. **Phase 4 SAM.gov + USAspending clients** (highest-leverage external data)
 6. **Phase 5 `invoke_skill`** (only valuable once 3 + 4 produce real outputs)

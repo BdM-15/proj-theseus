@@ -772,6 +772,36 @@ class SkillManager:
         # Honour an env-tunable turn cap so operators can throttle cost.
         max_turns = _env_int("SKILL_TOOLS_MAX_TURNS", 12)
 
+        # Phase 3b: opt-in cross-skill script roots. The skill declares
+        # ``metadata.script_paths`` as a list of directories (relative to its
+        # own folder) that ``run_script`` may execute from. Typical use is
+        # pointing at a sibling utility skill's scripts/ dir (e.g.,
+        # ``../huashu-design/scripts``) so PPTX/PDF renderers can be
+        # invoked without per-skill wrapper shims. We resolve, validate
+        # existence, and pass absolute paths to the tool runtime.
+        extra_script_roots: list[Path] = []
+        raw_paths = skill.frontmatter.metadata.get("script_paths") or []
+        if isinstance(raw_paths, str):
+            raw_paths = [raw_paths]
+        skill_dir_resolved = Path(skill.path).resolve()
+        for entry in raw_paths:
+            if not isinstance(entry, str) or not entry.strip():
+                warnings.append(
+                    f"script_paths: skipping non-string entry {entry!r}"
+                )
+                continue
+            candidate = (Path(skill.path) / entry).resolve()
+            if not candidate.is_dir():
+                warnings.append(
+                    f"script_paths: directory does not exist or is not a dir: {entry}"
+                )
+                continue
+            # Don't allow declaring your own skill_dir as an extra root (no-op);
+            # also reject ascending past the skills container root.
+            if candidate == skill_dir_resolved:
+                continue
+            extra_script_roots.append(candidate)
+
         ctx = ToolContext(
             skill_name=skill.name,
             skill_dir=Path(skill.path),
@@ -780,6 +810,7 @@ class SkillManager:
             workspace_name=workspace,
             slice_fn=slice_fn,
             retrieve_fn=retrieve_fn,
+            extra_script_roots=extra_script_roots,
         )
 
         loop_result = await run_tool_loop(

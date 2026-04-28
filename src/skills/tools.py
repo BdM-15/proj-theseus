@@ -78,6 +78,13 @@ class ToolContext:
     max_script_seconds: int = 60
     max_kg_entities_per_type: int = 50
     max_kg_chunks: int = 30
+    # Additional allowed roots for run_script, declared opt-in by the calling
+    # skill via ``metadata.script_paths`` in its SKILL.md frontmatter. Each
+    # entry is an absolute, resolved directory (typically a sibling skill's
+    # ``scripts/`` folder). Lets utility skills like huashu-design ship their
+    # renderer scripts once and have other skills invoke them without shim
+    # wrappers. See docs/skills_roadmap.md Phase 3b.
+    extra_script_roots: list[Path] = field(default_factory=list)
     # Filled by the runtime each call so artifacts/tool_outputs land in order.
     call_seq: list[int] = field(default_factory=lambda: [0])
 
@@ -179,22 +186,59 @@ async def tool_read_file(ctx: ToolContext, path: str) -> ToolResult:
 async def tool_run_script(
     ctx: ToolContext,
     path: str,
+    args: Optional[list[str]] = None,
     stdin: Optional[str] = None,
     timeout: Optional[int] = None,
 ) -> ToolResult:
-    """Execute a script under the skill's ``scripts/`` folder.
+    """Execute a script under the skill's ``scripts/`` folder OR any
+    opt-in extra root declared via ``metadata.script_paths`` in the calling
+    skill's frontmatter.
 
     Python scripts (``.py``) run with the active interpreter. Shell scripts
-    (``.sh``) require ``bash`` on PATH. The subprocess inherits no env vars
-    beyond what the parent process has, runs with cwd locked to the skill
-    folder, and is killed on timeout.
+    (``.sh``) require ``bash`` on PATH. Node scripts (``.mjs`` / ``.js``)
+    require ``node`` on PATH (Phase 3b: enables consuming huashu-design's
+    Playwright-based renderers without per-skill wrapper shims). The
+    subprocess inherits no env vars beyond what the parent process has,
+    runs with cwd locked to the script's owning directory, and is killed
+    on timeout.
     """
-    target = _safe_join(ctx.skill_dir, path)
-    rel = target.relative_to(ctx.skill_dir.resolve()).as_posix()
-    if not rel.startswith("scripts/"):
-        raise ToolError(f"run_script is restricted to scripts/ — got {rel!r}")
-    if not target.is_file():
-        raise ToolError(f"script not found: {rel}")
+    skill_root = ctx.skill_dir.resolve()
+    target_str = str(path).strip()
+    if not target_str:
+        raise ToolError("path must be a non-empty string")
+    if Path(target_str).is_absolute():
+        raise ToolError(f"path must be relative, got absolute: {path!r}")
+
+    candidate = (ctx.skill_dir / target_str).resolve()
+
+    # Allowed roots: the skill's own scripts/ folder + any opt-in extra root.
+    allowed_roots: list[Path] = [(skill_root / "scripts").resolve()]
+    allowed_roots.extend(r.resolve() for r in ctx.extra_script_roots)
+
+    matched_root: Optional[Path] = None
+    for root in allowed_roots:
+        try:
+            candidate.relative_to(root)
+        except ValueError:
+            continue
+        matched_root = root
+        break
+    if matched_root is None:
+        roots_display = ", ".join(str(r) for r in allowed_roots) or "(none)"
+        raise ToolError(
+            f"run_script path {path!r} is outside any allowed root. "
+            f"Allowed roots: {roots_display}. Declare cross-skill script "
+            "directories via `metadata.script_paths` in your SKILL.md."
+        )
+
+    if not candidate.is_file():
+        raise ToolError(f"script not found: {path}")
+    target = candidate
+    # Display label: prefer skill-relative path, else absolute (cross-skill).
+    try:
+        rel = target.relative_to(skill_root).as_posix()
+    except ValueError:
+        rel = str(target)
 
     suffix = target.suffix.lower()
     if suffix == ".py":
@@ -202,15 +246,56 @@ async def tool_run_script(
         cmd = [_sys.executable, str(target)]
     elif suffix == ".sh":
         cmd = ["bash", str(target)]
+    elif suffix in (".mjs", ".js"):
+        cmd = ["node", str(target)]
     else:
         raise ToolError(
-            f"unsupported script type {suffix!r}; only .py and .sh are allowed"
+            f"unsupported script type {suffix!r}; allowed: .py, .sh, .mjs, .js"
         )
+
+    # Append optional CLI args. We only accept simple strings to keep the
+    # subprocess invocation deterministic (no shell expansion). The model
+    # can encode paths / flags here, e.g. ['--slides', 'artifacts/slides',
+    # '--out', 'artifacts/deck.pdf'].
+    #
+    # Placeholder substitution: the following tokens in any arg are replaced
+    # with absolute paths so the model doesn't need to know the runtime
+    # layout. Useful when calling cross-skill renderers that require
+    # absolute --out paths.
+    #
+    #   {run_dir}    -> absolute path to <run_dir>
+    #   {artifacts}  -> absolute path to <run_dir>/artifacts
+    #   {skill_dir}  -> absolute path to the calling skill's directory
+    if args:
+        if not isinstance(args, list) or not all(isinstance(a, str) for a in args):
+            raise ToolError("args must be a list of strings")
+        if len(args) > 32:
+            raise ToolError("args list capped at 32 entries")
+        run_dir_abs = str(ctx.run_dir.resolve())
+        artifacts_abs = str((ctx.run_dir / "artifacts").resolve())
+        skill_dir_abs = str(skill_root)
+        substituted: list[str] = []
+        for a in args:
+            substituted.append(
+                a.replace("{run_dir}", run_dir_abs)
+                 .replace("{artifacts}", artifacts_abs)
+                 .replace("{skill_dir}", skill_dir_abs)
+            )
+        cmd.extend(substituted)
 
     effective_timeout = min(
         ctx.max_script_seconds,
         max(1, int(timeout)) if timeout is not None else ctx.max_script_seconds,
     )
+
+    # cwd: for own-skill scripts use the skill dir (legacy behavior); for
+    # cross-skill scripts use the script's owning skill dir so its relative
+    # imports / asset lookups (e.g. node_modules) resolve correctly.
+    if matched_root == (skill_root / "scripts").resolve():
+        cwd = str(ctx.skill_dir)
+    else:
+        # matched_root is .../<other_skill>/scripts — cwd = that skill's root
+        cwd = str(matched_root.parent)
 
     def _run() -> subprocess.CompletedProcess[str]:
         return subprocess.run(
@@ -219,7 +304,7 @@ async def tool_run_script(
             capture_output=True,
             text=True,
             timeout=effective_timeout,
-            cwd=str(ctx.skill_dir),
+            cwd=cwd,
             check=False,
         )
 
@@ -492,14 +577,39 @@ def build_tool_specs() -> list[ToolSpec]:
         ToolSpec(
             name="run_script",
             description=(
-                "Execute a Python (.py) or Bash (.sh) script under the skill's "
-                "scripts/ folder. Subprocess sandboxed: cwd locked to the "
-                "skill folder, time-limited. Returns stdout, stderr, exit code."
+                "Execute a script (.py, .sh, .mjs, .js) under the skill's "
+                "scripts/ folder OR any directory declared in this skill's "
+                "metadata.script_paths frontmatter (typically a sibling "
+                "utility skill like ../huashu-design/scripts for HTML\u2192PPTX/"
+                "PDF rendering). Subprocess sandboxed: cwd locked to the "
+                "owning skill, time-limited. Returns stdout, stderr, exit code."
             ),
             parameters={
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "scripts/<file> path."},
+                    "path": {
+                        "type": "string",
+                        "description": (
+                            "Path relative to this skill's directory. Either "
+                            "'scripts/<file>' for own scripts, or "
+                            "'../<other_skill>/scripts/<file>' for a "
+                            "cross-skill script declared in metadata.script_paths."
+                        ),
+                    },
+                    "args": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "Optional CLI arguments appended after the script path, "
+                            "e.g. ['--slides', '{artifacts}/slides', '--out', "
+                            "'{artifacts}/deck.pdf']. Each entry must be a string; "
+                            "capped at 32 entries. No shell expansion is performed. "
+                            "Placeholders {run_dir}, {artifacts}, {skill_dir} are "
+                            "substituted with absolute paths so you can reference "
+                            "the run's artifacts/ folder without knowing the layout."
+                        ),
+                        "maxItems": 32,
+                    },
                     "stdin": {
                         "type": "string",
                         "description": "Optional stdin to pipe to the script.",
