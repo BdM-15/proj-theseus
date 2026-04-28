@@ -2357,7 +2357,9 @@ details.acc .summary-actions {
   color: var(--text-400);
   cursor: pointer;
   border-radius: 9999px;
-  transition: color 140ms ease, background 140ms ease;
+  transition:
+    color 140ms ease,
+    background 140ms ease;
 }
 .filter-rail-search-clear:hover {
   color: var(--neon-magenta);

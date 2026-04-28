@@ -2601,7 +2601,10 @@
                       @click="toggleSkillPersona(p.id)"
                     >
                       <span x-text="p.label"></span>
-                      <span class="filter-pill-count" x-text="skillsCountForPersona(p.id)"></span>
+                      <span
+                        class="filter-pill-count"
+                        x-text="skillsCountForPersona(p.id)"
+                      ></span>
                     </button>
                   </template>
                 </div>
@@ -2616,7 +2619,10 @@
                       @click="toggleSkillPhase(p.id)"
                     >
                       <span x-text="p.label"></span>
-                      <span class="filter-pill-count" x-text="skillsCountForPhase(p.id)"></span>
+                      <span
+                        class="filter-pill-count"
+                        x-text="skillsCountForPhase(p.id)"
+                      ></span>
                     </button>
                   </template>
                 </div>
@@ -2634,7 +2640,10 @@
                       @click="toggleSkillCapability(c.id)"
                     >
                       <span x-text="c.label"></span>
-                      <span class="filter-pill-count" x-text="skillsCountForCapability(c.id)"></span>
+                      <span
+                        class="filter-pill-count"
+                        x-text="skillsCountForCapability(c.id)"
+                      ></span>
                     </button>
                   </template>
                 </div>
@@ -2642,7 +2651,10 @@
               <!-- Right-side meta cluster: search + live count + clear button -->
               <div class="filter-rail-meta">
                 <div class="filter-rail-search">
-                  <i data-lucide="search" class="w-3.5 h-3.5 filter-rail-search-icon"></i>
+                  <i
+                    data-lucide="search"
+                    class="w-3.5 h-3.5 filter-rail-search-icon"
+                  ></i>
                   <input
                     type="text"
                     class="filter-rail-search-input"
@@ -2667,7 +2679,10 @@
                     x-text="skillsFiltered().length"
                   ></span>
                   <span class="filter-rail-count-sep">of</span>
-                  <span class="filter-rail-count-total" x-text="skills.items.length"></span>
+                  <span
+                    class="filter-rail-count-total"
+                    x-text="skills.items.length"
+                  ></span>
                 </div>
                 <button
                   x-show="skills.activePersonas.length || skills.activePhases.length || skills.activeCapabilities.length || skills.searchQuery"
@@ -6286,12 +6301,24 @@
           // program_manager (requirements + technical execution contexts).
           skillPersonaFilterConfig() {
             return [
-              { id: "capture",     label: "Capture",   personas: ["capture_manager"] },
-              { id: "writer",      label: "Writer",    personas: ["proposal_writer"] },
-              { id: "operations",  label: "Operations", personas: ["technical_sme", "program_manager"] },
-              { id: "cost",        label: "Cost",      personas: ["cost_estimator"] },
-              { id: "contracts",   label: "Contracts", personas: ["contracts_manager"] },
-              { id: "legal",       label: "Legal",     personas: ["legal_compliance"] },
+              {
+                id: "capture",
+                label: "Capture",
+                personas: ["capture_manager"],
+              },
+              { id: "writer", label: "Writer", personas: ["proposal_writer"] },
+              {
+                id: "operations",
+                label: "Operations",
+                personas: ["technical_sme", "program_manager"],
+              },
+              { id: "cost", label: "Cost", personas: ["cost_estimator"] },
+              {
+                id: "contracts",
+                label: "Contracts",
+                personas: ["contracts_manager"],
+              },
+              { id: "legal", label: "Legal", personas: ["legal_compliance"] },
             ];
           },
           skillPhaseConfig() {
@@ -6360,7 +6387,9 @@
             const q = (this.skills.searchQuery || "").trim().toLowerCase();
             if (q) {
               const hay = (
-                (s.name || "") + " " + (s.description || "")
+                (s.name || "") +
+                " " +
+                (s.description || "")
               ).toLowerCase();
               const tokens = q.split(/\s+/);
               if (!tokens.every((t) => hay.includes(t))) return false;
@@ -6386,7 +6415,9 @@
           // are stable regardless of currently-active filters so toggling
           // a pill never makes another pill's number jump.
           skillsCountForPersona(id) {
-            const cfg = this.skillPersonaFilterConfig().find((p) => p.id === id);
+            const cfg = this.skillPersonaFilterConfig().find(
+              (p) => p.id === id,
+            );
             if (!cfg) return 0;
             const targets = new Set(cfg.personas);
             return (this.skills.items || []).filter((s) => {
