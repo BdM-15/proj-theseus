@@ -1,6 +1,6 @@
 # Skill Spec Compliance Audit
 
-**Branch:** `120-skills-spec-compliance` · **Date:** 2026-04-27 · **Sub-phase:** 2.2 (in progress — proposal-generator migrated)
+**Branch:** `120-skills-spec-compliance` · **Date:** 2026-04-27 · **Sub-phase:** 2.3 (✅ Done)
 
 **Sub-phase status:**
 
@@ -9,7 +9,7 @@
 | 2.0       | Vendor skill-creator + this audit doc + Copilot instructions    | ✅ Done (9134f0f) |
 | 2.1       | Tool-calling runtime (`src/skills/{tools,runtime,llm_chat}.py`) | ✅ Done (b4b9e33) |
 | 2.2       | Migrate `proposal-generator` end-to-end                         | ✅ Done           |
-| 2.3       | Migrate remaining 4 skills + UI transcript drawer               | ⏳ Pending        |
+| 2.3       | Migrate remaining 4 skills + UI transcript drawer               | ✅ Done (98980a7, 2dc8e1a, 55d694b, d3cf024, 90610d7, fe716a4) |
 
 This document audits every skill under `.github/skills/` against the open
 [Agent Skills specification](https://agentskills.io/specification) and
@@ -85,14 +85,14 @@ Copy this checklist:
 
 ## 2. Current-state inventory
 
-| Skill                      | Body lines | Subdirs present                                  | Frontmatter extras                            | Spec-conformant?           |
-| -------------------------- | ---------: | ------------------------------------------------ | --------------------------------------------- | -------------------------- |
-| `skill-creator` (vendored) |        ~30 | agents, assets, eval-viewer, references, scripts | none                                          | ✅ Yes                     |
-| `competitive-intel`        |         60 | references                                       | `category`, `version`, `status`               | ⚠️ Extras at top level     |
-| `compliance-auditor`       |        116 | references                                       | `category`, `version`                         | ⚠️ Extras at top level     |
-| `govcon-ontology`          |        166 | references                                       | `category`, `version`, `authoritative_source` | ⚠️ Extras at top level     |
+| Skill                      | Body lines | Subdirs present                                  | Frontmatter extras                            | Spec-conformant?                                                                                                                               |
+| -------------------------- | ---------: | ------------------------------------------------ | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `skill-creator` (vendored) |        ~30 | agents, assets, eval-viewer, references, scripts | none                                          | ✅ Yes                                                                                                                                         |
+| `competitive-intel`        |         60 | references                                       | `category`, `version`, `status`               | ⚠️ Extras at top level                                                                                                                         |
+| `compliance-auditor`       |        116 | references                                       | `category`, `version`                         | ⚠️ Extras at top level                                                                                                                         |
+| `govcon-ontology`          |        166 | references                                       | `category`, `version`, `authoritative_source` | ⚠️ Extras at top level                                                                                                                         |
 | `huashu-design-govcon`     |  (removed) | n/a                                              | n/a                                           | ⚠️ Removed in 2.3 — superseded by vendored `huashu-design` (engine) + `proposal-generator` (govcon content + HTML render templates). See §3.5. |
-| `proposal-generator`       |        200 | references, **assets**, evals                    | none (`metadata:` block)                      | ✅ Yes (2.2)               |
+| `proposal-generator`       |        200 | references, **assets**, evals                    | none (`metadata:` block)                      | ✅ Yes (2.2)                                                                                                                                   |
 
 **All bodies are under the 500-line limit.** ✅
 **All descriptions are third-person and reasonably "pushy."** ✅
@@ -259,12 +259,12 @@ These adaptations are notes, not code changes for 2.0 — they inform sub-phase
 
 ## 7. Sub-phase rollout plan (final)
 
-| Sub-phase | Scope                                                        | Skills touched                                                               | Commit          |
-| --------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- | --------------- |
-| **2.0**   | Vendor skill-creator + this audit doc                        | skill-creator only                                                           | This commit     |
-| **2.1**   | Tool-calling runtime in `src/skills/manager.py`              | None — runtime only                                                          | Separate commit |
-| **2.2**   | Migrate `proposal-generator` end-to-end (proves the pattern) | proposal-generator                                                           | Separate commit |
-| **2.3**   | Migrate remaining 4 skills + UI transcript drawer            | competitive-intel, compliance-auditor, govcon-ontology; **`huashu-design-govcon` removed** — superseded by vendored `huashu-design` + `proposal-generator` salvage (see §3.5) | Separate commit |
+| Sub-phase | Scope                                                        | Skills touched                                                                                                                                                                | Commit          |
+| --------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| **2.0**   | Vendor skill-creator + this audit doc                        | skill-creator only                                                                                                                                                            | This commit     |
+| **2.1**   | Tool-calling runtime in `src/skills/manager.py`              | None — runtime only                                                                                                                                                           | Separate commit |
+| **2.2**   | Migrate `proposal-generator` end-to-end (proves the pattern) | proposal-generator                                                                                                                                                            | Separate commit |
+| **2.3**   | Migrate remaining 4 skills + UI transcript drawer            | competitive-intel, compliance-auditor, govcon-ontology; **`huashu-design-govcon` removed** — superseded by vendored `huashu-design` + `proposal-generator` salvage (see §3.5) | ✅ 98980a7 (compliance-auditor), 2dc8e1a (competitive-intel), 55d694b (govcon-ontology), d3cf024 (vendor huashu-design), 90610d7 (remove overlay), fe716a4 (UI drawer) |
 
 Each sub-phase commit MUST be approved by the user before being created
 (per the MANDATORY rule in `.github/copilot-instructions.md`).
