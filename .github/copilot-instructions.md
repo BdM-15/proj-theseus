@@ -300,11 +300,17 @@ ALL development happens on feature branches. `main` is updated only via fast-for
 
 **Default**: When a feature branch is complete (tests pass, user has approved the final commit), the agent integrates it via **fast-forward merge** directly. **Do NOT open a Pull Request** unless the user explicitly asks for one.
 
+**⚠️ Identify the integration target BEFORE merging.** Most epics use a long-lived integration branch as their parent — sub-branches FF into the integration branch, NOT main. The integration branch only merges to main when the whole epic is done. Confirm the target with the user (or check `/memories/repo/branch-integration-policy.md`) if there is any doubt. Do NOT default to main.
+
+**Active integration branches:**
+
+- `120-skills-spec-compliance` — parent for the entire skills + MCP epic (Phases 2.x–6.x per `docs/skills_roadmap.md`). All `121-*`, `122-*`, etc. sub-branches FF into 120.
+
 **Standard fast-forward sequence** (after the user says "merge it" / "ship it" / "continue"):
 
 ```powershell
 # From the feature branch, with all commits pushed:
-git checkout <integration-target>          # usually main, sometimes a parent integration branch
+git checkout <integration-target>          # the epic's integration branch — NOT main by default
 git pull --ff-only                         # ensure target is current
 git merge --ff-only <feature-branch>       # fails loudly if not fast-forwardable
 git push
