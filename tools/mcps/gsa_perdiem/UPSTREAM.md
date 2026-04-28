@@ -23,21 +23,20 @@ The upstream API (api.gsa.gov, rate-limited via api.data.gov) supports two modes
 | Personal key         | `PERDIEM_API_KEY` env var            | 1,000 requests / hour, yours alone       |
 
 **The same api.data.gov key works for every api.data.gov-backed API** (GSA
-Per Diem, NASA, FEC, FCC, etc.). Theseus's `.env` reserves a single
-placeholder, `API_DATA_GOV_KEY`, for that shared value. To activate the
-1,000 req/hr tier here, **also set** `PERDIEM_API_KEY` to the same value
-(the upstream server reads `PERDIEM_API_KEY` specifically — it does not
-look at `API_DATA_GOV_KEY`):
+Per Diem, NASA, FEC, FCC, etc.). Theseus's `.env` keeps a single placeholder,
+`API_DATA_GOV_KEY`, for that shared value. The upstream server reads
+`PERDIEM_API_KEY` specifically, so `.env.example` ships a one-liner that
+auto-derives it via python-dotenv interpolation:
 
 ```bash
 # .env
-API_DATA_GOV_KEY=<your-key>      # Theseus-side reservation for api.data.gov
-PERDIEM_API_KEY=<same-key>       # what gsa-perdiem-mcp actually reads
+API_DATA_GOV_KEY=<your-key>            # the only value you ever set
+PERDIEM_API_KEY=${API_DATA_GOV_KEY}    # auto-derived; do not edit
 ```
 
 The manifest declares `env_required=[]` (so DEMO_KEY mode is allowed),
-plus `env_optional=["PERDIEM_API_KEY"]` so the runtime forwards it to the
-subprocess when present.
+plus `env_optional=["PERDIEM_API_KEY"]` so the runtime forwards the
+interpolated value to the subprocess.
 
 ## Why a manifest, not a source vendor
 

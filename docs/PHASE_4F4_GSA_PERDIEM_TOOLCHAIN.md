@@ -54,16 +54,18 @@ users globally**. A couple of skill invocations will exhaust it.
 To get the 1,000 req/hr tier:
 
 1. Sign up: <https://api.data.gov/signup/> (no approval, ~30 seconds).
-2. Set both env vars in `.env`:
+2. Set the **single** api.data.gov key in `.env`:
 
    ```bash
-   API_DATA_GOV_KEY=<your-key>      # Theseus-side reservation for api.data.gov
-   PERDIEM_API_KEY=<same-key>       # what gsa-perdiem-mcp actually reads
+   API_DATA_GOV_KEY=<your-key>            # the only value you ever set
+   PERDIEM_API_KEY=${API_DATA_GOV_KEY}    # auto-derived; do not edit
    ```
 
    The same key works for every api.data.gov-backed API (GSA Per Diem,
    NASA, FEC, FCC, etc.). The upstream server reads `PERDIEM_API_KEY`
-   specifically — it does not look at `API_DATA_GOV_KEY`.
+   specifically, so `.env.example` ships the auto-derive line — python-dotenv
+   expands `${API_DATA_GOV_KEY}` at load time so the subprocess receives the
+   correct value without you maintaining two copies.
 
 3. Restart the Theseus app so `.env` is reloaded.
 
