@@ -1096,6 +1096,24 @@ class SkillManager:
             for p in sorted(artifacts_dir.iterdir()):
                 if p.is_file():
                     artifacts.append({"name": p.name, "size": str(p.stat().st_size)})
+        # Tools-mode runs persist a structured transcript (assistant turns +
+        # tool calls + tool results) and may write tool_outputs/* sidecar files.
+        # Surface both so the UI drawer can replay the run for grounding audit.
+        transcript: list[dict[str, Any]] = []
+        transcript_path = run_dir / "transcript.json"
+        if transcript_path.exists():
+            try:
+                loaded = json.loads(transcript_path.read_text(encoding="utf-8"))
+                if isinstance(loaded, list):
+                    transcript = loaded
+            except (OSError, json.JSONDecodeError) as exc:
+                logger.warning("Unreadable transcript at %s: %s", transcript_path, exc)
+        tool_outputs: list[dict[str, str]] = []
+        tool_outputs_dir = run_dir / "tool_outputs"
+        if tool_outputs_dir.is_dir():
+            for p in sorted(tool_outputs_dir.iterdir()):
+                if p.is_file():
+                    tool_outputs.append({"name": p.name, "size": str(p.stat().st_size)})
         return {
             "run_id": run_id,
             "skill": skill_name,
@@ -1108,6 +1126,8 @@ class SkillManager:
             if prompt_path.exists()
             else "",
             "artifacts": artifacts,
+            "transcript": transcript,
+            "tool_outputs": tool_outputs,
         }
 
     def delete_run(

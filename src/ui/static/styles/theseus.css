@@ -34,6 +34,7 @@
   --ink-900-rgb: 10, 14, 26;
   --ink-850: #0f1422;
   --ink-800: #141a2b;
+  --ink-800-rgb: 20, 26, 43;
   --ink-700: #1c2338;
   --ink-600: #283151;
   --ink-card: #11172a;
@@ -47,6 +48,7 @@
   --text-100: #f1f5f9;
   --text-200: #e2e8f0;
   --text-300: #cbd5e1;
+  --text-300-rgb: 203, 213, 225;
   --text-400: #94a3b8;
   --text-500: #64748b;
   --text-600: #475569;
@@ -2039,4 +2041,148 @@ details.acc .summary-actions {
     transform: scale(1.12);
     opacity: 1;
   }
+}
+
+/* ========================================================================== *
+ * Skill Transcript Drawer (tools-mode runs)
+ * Replays the per-turn assistant ↔ tool exchange persisted in
+ * <run_dir>/transcript.json. Click a turn to expand its arguments + result.
+ * ========================================================================== */
+.skill-transcript {
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  background: rgba(var(--ink-900-rgb), 0.6);
+  overflow: hidden;
+}
+.skill-transcript-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 10px;
+  background: rgba(var(--ink-800-rgb), 0.7);
+  color: var(--text-300);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  border: none;
+  border-bottom: 1px solid var(--edge);
+  cursor: pointer;
+  text-align: left;
+}
+.skill-transcript-toggle:hover {
+  color: var(--neon-cyan);
+}
+.skill-transcript-count {
+  margin-left: auto;
+  color: rgba(var(--text-300-rgb), 0.55);
+  font-size: 10px;
+}
+.skill-transcript-body {
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+.skill-transcript-step {
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  background: rgba(var(--ink-800-rgb), 0.4);
+}
+.skill-transcript-step.is-tool {
+  border-left: 2px solid var(--neon-cyan);
+}
+.skill-transcript-step.is-assistant {
+  border-left: 2px solid rgba(var(--neon-cyan-rgb), 0.4);
+}
+.skill-transcript-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10px;
+  cursor: pointer;
+}
+.skill-transcript-head:hover {
+  background: rgba(var(--neon-cyan-rgb), 0.05);
+}
+.skill-transcript-kind {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--neon-cyan);
+  font-weight: 600;
+  min-width: 64px;
+}
+.skill-transcript-step.is-assistant .skill-transcript-kind {
+  color: rgba(var(--text-300-rgb), 0.7);
+}
+.skill-transcript-turn {
+  color: rgba(var(--text-300-rgb), 0.5);
+}
+.skill-transcript-name {
+  color: var(--text-300);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.skill-transcript-elapsed {
+  color: rgba(var(--text-300-rgb), 0.45);
+  font-size: 9px;
+}
+.skill-transcript-detail {
+  padding: 6px 10px 8px;
+  border-top: 1px solid var(--edge);
+  background: rgba(var(--ink-900-rgb), 0.5);
+}
+.skill-transcript-label {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(var(--text-300-rgb), 0.5);
+  margin: 4px 0 2px;
+}
+.skill-transcript-detail pre {
+  background: rgba(var(--ink-900-rgb), 0.8);
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10px;
+  color: var(--text-300);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 0;
+}
+.skill-transcript-artifacts {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 1px dashed var(--edge);
+  border-radius: 6px;
+  background: rgba(var(--ink-800-rgb), 0.3);
+}
+.skill-transcript-artifacts ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.skill-transcript-artifacts li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 10px;
+  color: var(--text-300);
+}
+.skill-transcript-size {
+  color: rgba(var(--text-300-rgb), 0.45);
+  font-size: 9px;
 }

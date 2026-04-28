@@ -2840,6 +2840,127 @@
                     </ul>
                   </div>
 
+                  <!-- Transcript drawer (tools-mode runs only) -->
+                  <template x-if="skills.run && (skills.run.transcript || []).length">
+                    <div class="skill-transcript">
+                      <button
+                        type="button"
+                        class="skill-transcript-toggle"
+                        @click="skills.transcriptOpen = !skills.transcriptOpen; $nextTick(() => lucide.createIcons())"
+                      >
+                        <i
+                          :data-lucide="skills.transcriptOpen ? 'chevron-down' : 'chevron-right'"
+                          class="w-3 h-3"
+                        ></i>
+                        <span>Transcript</span>
+                        <span
+                          class="skill-transcript-count"
+                          x-text="'(' + skills.run.transcript.length + ' steps · ' + (skills.run.tool_outputs || []).length + ' artifacts)'"
+                        ></span>
+                      </button>
+                      <div
+                        x-show="skills.transcriptOpen"
+                        x-cloak
+                        class="skill-transcript-body"
+                      >
+                        <template
+                          x-for="(step, idx) in skills.run.transcript"
+                          :key="idx"
+                        >
+                          <div
+                            class="skill-transcript-step"
+                            :class="step.kind === 'tool' ? 'is-tool' : 'is-assistant'"
+                          >
+                            <div
+                              class="skill-transcript-head"
+                              @click="skills.transcriptExpanded[idx] = !skills.transcriptExpanded[idx]"
+                            >
+                              <span
+                                class="skill-transcript-kind"
+                                x-text="step.kind"
+                              ></span>
+                              <span
+                                class="skill-transcript-turn"
+                                x-text="'turn ' + (step.turn ?? '?')"
+                              ></span>
+                              <template x-if="step.kind === 'tool'">
+                                <span
+                                  class="skill-transcript-name"
+                                  x-text="step.name"
+                                ></span>
+                              </template>
+                              <template x-if="step.kind === 'assistant' && (step.tool_calls || []).length">
+                                <span
+                                  class="skill-transcript-name"
+                                  x-text="'→ ' + step.tool_calls.map(t => t.name).join(', ')"
+                                ></span>
+                              </template>
+                              <span
+                                class="skill-transcript-elapsed"
+                                x-text="(step.elapsed_ms != null ? Math.round(step.elapsed_ms) + 'ms' : '')"
+                              ></span>
+                            </div>
+                            <div
+                              x-show="skills.transcriptExpanded[idx]"
+                              x-cloak
+                              class="skill-transcript-detail"
+                            >
+                              <template x-if="step.kind === 'tool'">
+                                <div>
+                                  <div class="skill-transcript-label">arguments</div>
+                                  <pre x-text="step.arguments || '{}'"></pre>
+                                  <div class="skill-transcript-label">result preview</div>
+                                  <pre x-text="step.result_preview || '(empty)'"></pre>
+                                </div>
+                              </template>
+                              <template x-if="step.kind === 'assistant'">
+                                <div>
+                                  <template x-if="step.content">
+                                    <div>
+                                      <div class="skill-transcript-label">content</div>
+                                      <pre x-text="step.content"></pre>
+                                    </div>
+                                  </template>
+                                  <template x-if="(step.tool_calls || []).length">
+                                    <div>
+                                      <div class="skill-transcript-label">tool_calls</div>
+                                      <pre x-text="JSON.stringify(step.tool_calls, null, 2)"></pre>
+                                    </div>
+                                  </template>
+                                  <template x-if="step.usage">
+                                    <div>
+                                      <div class="skill-transcript-label">usage</div>
+                                      <pre x-text="JSON.stringify(step.usage, null, 2)"></pre>
+                                    </div>
+                                  </template>
+                                </div>
+                              </template>
+                            </div>
+                          </div>
+                        </template>
+                        <template x-if="(skills.run.tool_outputs || []).length">
+                          <div class="skill-transcript-artifacts">
+                            <div class="skill-transcript-label">tool_outputs/</div>
+                            <ul>
+                              <template
+                                x-for="f in skills.run.tool_outputs"
+                                :key="f.name"
+                              >
+                                <li>
+                                  <span class="font-mono" x-text="f.name"></span>
+                                  <span
+                                    class="skill-transcript-size"
+                                    x-text="'(' + f.size + ' B)'"
+                                  ></span>
+                                </li>
+                              </template>
+                            </ul>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+
                   <div>
                     <h3 class="text-xs font-mono text-slate-400 mb-1">
                       SKILL.md
@@ -2868,10 +2989,33 @@
                     </div>
                   </template>
 
+                  <template x-if="(skills.current?.assets || []).length">
+                    <div>
+                      <h3 class="text-xs font-mono text-slate-400 mb-1">
+                        Assets
+                      </h3>
+                      <ul class="text-xs text-slate-300 space-y-1">
+                        <template
+                          x-for="a in skills.current.assets"
+                          :key="a.name"
+                        >
+                          <li class="font-mono">
+                            · <span x-text="a.name"></span>
+                          </li>
+                        </template>
+                      </ul>
+                    </div>
+                  </template>
+
                   <template x-if="(skills.current?.templates || []).length">
                     <div>
                       <h3 class="text-xs font-mono text-slate-400 mb-1">
                         Templates
+                        <span
+                          class="text-[10px] text-amber-400/70 font-normal"
+                          title="Open Skills spec renamed templates/ to assets/"
+                          >(deprecated)</span
+                        >
                       </h3>
                       <ul class="text-xs text-slate-300 space-y-1">
                         <template
@@ -4870,6 +5014,10 @@
             installing: false,
             runs: [],
             runsLoading: false,
+            // Active run detail (transcript drawer)
+            run: null,
+            transcriptOpen: false,
+            transcriptExpanded: {},
           },
           // Streaming UI helpers
           streamLiveContent: "",
@@ -5706,6 +5854,9 @@
             this.skills.invoking = true;
             this.skills.invokeResult = "";
             this.skills.invokeMeta = null;
+            this.skills.run = null;
+            this.skills.transcriptOpen = false;
+            this.skills.transcriptExpanded = {};
             try {
               const r = await this.api(
                 "/api/ui/skills/" +
@@ -5777,6 +5928,10 @@
                 run_id: r.run_id,
                 run_dir: r.run_dir,
               };
+              // Tools-mode: stash full run incl. transcript so the drawer renders.
+              this.skills.run = r;
+              this.skills.transcriptExpanded = {};
+              this.skills.transcriptOpen = (r.transcript || []).length > 0;
               this.$nextTick(() => lucide.createIcons());
             } catch (e) {
               this.toast("Failed to load run: " + (e?.message || e), "error");
