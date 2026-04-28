@@ -1,0 +1,65 @@
+{
+  "skill_name": "oci-sweeper",
+  "schema_version": "1.0",
+  "purpose": "Smoke-tests that oci-sweeper invokes the right KG queries, references the correct FAR Subpart 9.5 taxonomy, and produces a structured OCI sweep envelope with per-finding mitigation classes.",
+  "evals": [
+    {
+      "id": "oci-001-incumbent-impaired-objectivity",
+      "prompt": "Scan this workspace for OCI risk. The incumbent on the predecessor contract is one of our partners on this bid.",
+      "expected_signals": [
+        "FAR 9.505-3",
+        "impaired objectivity",
+        "incumbent",
+        "prior contract",
+        "mitigation",
+        "firewall"
+      ],
+      "anti_signals": ["no OCI risk found", "out of scope"],
+      "expectations": [
+        "calls kg_entities with types including 'company' or 'incumbent' or 'subcontractor'",
+        "calls kg_query for relationships involving partner / incumbent entities",
+        "envelope contains findings[] with at least one finding tagged class='impaired_objectivity'",
+        "each finding has a mitigation_recommendation referencing FAR 9.504 or 9.505",
+        "envelope contains coverage_summary with counts for unequal_access / impaired_objectivity / biased_ground_rules"
+      ]
+    },
+    {
+      "id": "oci-002-customer-side-personnel-conflict",
+      "prompt": "Sweep for OCI: one of the customer's KO support contractors is also a teaming partner we listed.",
+      "expected_signals": [
+        "FAR 9.505-1",
+        "biased ground rules",
+        "customer",
+        "support contractor",
+        "mitigation",
+        "non-disclosure"
+      ],
+      "anti_signals": ["no conflict", "skill not applicable"],
+      "expectations": [
+        "envelope flags biased_ground_rules class for customer-support / partner overlap",
+        "finding cites FAR 9.505-1 OR 9.505-2 in citation field",
+        "mitigation includes 'firewall' OR 'recusal' OR 'non-disclosure'",
+        "no fabricated FAR sections (only Subpart 9.5 references)"
+      ]
+    },
+    {
+      "id": "oci-003-unequal-access-data-from-prior-work",
+      "prompt": "Did our prior work on a related agency contract give us unequal access to non-public information that biases this bid?",
+      "expected_signals": [
+        "FAR 9.505-4",
+        "unequal access",
+        "non-public information",
+        "prior contract",
+        "mitigation"
+      ],
+      "anti_signals": ["no risk", "not enough data"],
+      "expectations": [
+        "envelope contains at least one finding with class='unequal_access'",
+        "finding references FAR 9.505-4 in citation field",
+        "mitigation_recommendation includes 'NDA' OR 'data segregation' OR 'firewall'",
+        "envelope has overall_risk_level field set to one of: low, medium, high",
+        "every finding has a chunk_id OR entity_name traceability field (no ungrounded claims)"
+      ]
+    }
+  ]
+}

@@ -3,9 +3,14 @@ name: subcontractor-sow-builder
 description: Drafts a federally-defensible SOW or PWS the prime issues to a subcontractor / teaming partner — same FAR 37.102(d) / 37.602 / 16.601(c)(2) / 16.306(d) discipline a contracting officer applies, opposite seat. USE WHEN the user asks to "write a SOW for our sub", "draft a PWS for [Partner]", "build the teaming-partner statement of work", "convert this SOO into a sub SOW", "we need a SOW the sub will sign", or any variant of authoring a downstream work statement. Walks the upstream 3-phase tree (acquisition intake → 6 scope blocks → 14-section assembly), pulls scope from the active Theseus KG (requirements, deliverables, work_scope_items, performance_standards), enforces FAR 37.102(d) "no FTEs in body", emits a chat-only staffing handoff for the prime's cost build, writes Markdown for `renderers` → .docx. DO NOT USE FOR prime proposal prose (`proposal-generator`), reverse-engineering an RFP (`rfp-reverse-engineer`), pricing the sub (`price-to-win`), or clause audit (`compliance-auditor`).
 license: MIT
 metadata:
+  # Phase 4j taxonomy — see docs/SKILL_TAXONOMY.md
+  personas_primary: contracts_manager
+  personas_secondary: [program_manager, capture_manager]
+  shipley_phases: [strategy, proposal_development, post_award]
+  capability: draft
   runtime: tools
   category: scope_authoring
-  version: 0.1.0
+  version: 0.2.0
   status: active
   # Phase 4h: pure decision-tree + KG-grounded skill — no MCPs needed.
   # The runtime exposes: read_file, run_script, write_file, kg_query,

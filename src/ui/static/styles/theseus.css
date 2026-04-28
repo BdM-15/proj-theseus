@@ -2233,3 +2233,365 @@ details.acc .summary-actions {
   color: var(--neon-cyan);
   border-bottom-color: var(--neon-cyan);
 }
+
+/* ============================================================
+   Phase 4j — Skill taxonomy UI (filter rail + 3-axis pills).
+   Closed-vocabulary helpers consumed by the Skills page in
+   index.html. NEVER use @apply (Tailwind Play CDN does not
+   process external CSS). All colors via :root tokens above.
+   ============================================================ */
+
+/* Filter rail container — gradient-edged glass panel matching
+   the chat composer / workspace header treatment. */
+.filter-rail {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.625rem;
+  background: linear-gradient(
+    180deg,
+    rgba(var(--ink-800-rgb), 0.7),
+    rgba(var(--ink-900-rgb), 0.85)
+  );
+  border: 1px solid var(--edge);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.02) inset,
+    0 0 24px -8px rgba(var(--neon-cyan-rgb), 0.12);
+  overflow: hidden;
+}
+.filter-rail-rows {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* Right-side meta cluster: live "Showing X of Y" + Clear button.
+   Vertically centered, separated from the rows by a faint divider. */
+.filter-rail-meta {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0.55rem;
+  padding-left: 1rem;
+  min-width: 13rem;
+}
+.filter-rail-meta::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 12%;
+  bottom: 12%;
+  width: 1px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgba(var(--neon-cyan-rgb), 0.25),
+    rgba(var(--neon-magenta-rgb), 0.25),
+    transparent
+  );
+}
+/* Compact search input — neon-glow on focus, with leading icon and an
+   inline clear button that only appears when there is a query. */
+.filter-rail-search {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+  min-width: 11rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 9999px;
+  background: rgba(var(--ink-900-rgb), 0.7);
+  border: 1px solid var(--edge);
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    background 140ms ease;
+}
+.filter-rail-search:hover {
+  border-color: rgba(var(--neon-cyan-rgb), 0.45);
+}
+.filter-rail-search:focus-within {
+  border-color: rgba(var(--neon-cyan-rgb), 0.85);
+  background: rgba(var(--ink-800-rgb), 0.9);
+  box-shadow:
+    0 0 12px rgba(var(--neon-cyan-rgb), 0.35),
+    0 0 0 1px rgba(var(--neon-cyan-rgb), 0.25);
+}
+.filter-rail-search-icon {
+  flex: 0 0 auto;
+  margin-right: 0.4rem;
+  color: var(--text-500, #6b7488);
+  transition: color 140ms ease;
+}
+.filter-rail-search:focus-within .filter-rail-search-icon {
+  color: var(--neon-cyan);
+}
+.filter-rail-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-200, #d6dbe7);
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: 0.02em;
+  padding: 0;
+}
+.filter-rail-search-input::placeholder {
+  color: var(--text-500, #6b7488);
+  font-style: italic;
+}
+.filter-rail-search-clear {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 0.35rem;
+  padding: 0.15rem;
+  border: none;
+  background: transparent;
+  color: var(--text-400);
+  cursor: pointer;
+  border-radius: 9999px;
+  transition: color 140ms ease, background 140ms ease;
+}
+.filter-rail-search-clear:hover {
+  color: var(--neon-magenta);
+  background: rgba(var(--neon-magenta-rgb), 0.12);
+}
+.filter-rail-count {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--text-400);
+  white-space: nowrap;
+}
+.filter-rail-count-label,
+.filter-rail-count-sep {
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  color: var(--text-500, #6b7488);
+}
+.filter-rail-count-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-200, #d6dbe7);
+  transition:
+    color 160ms ease,
+    text-shadow 160ms ease;
+}
+.filter-rail-count-value.is-filtered {
+  color: var(--neon-cyan);
+  text-shadow: 0 0 10px rgba(var(--neon-cyan-rgb), 0.6);
+}
+.filter-rail-count-total {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-300, #a4abbd);
+}
+.filter-rail::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      120% 60% at 0% 0%,
+      rgba(var(--neon-magenta-rgb), 0.08),
+      transparent 50%
+    ),
+    radial-gradient(
+      120% 60% at 100% 100%,
+      rgba(var(--neon-cyan-rgb), 0.08),
+      transparent 50%
+    );
+}
+.filter-rail::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(var(--neon-magenta-rgb), 0.5),
+    rgba(var(--neon-cyan-rgb), 0.5),
+    transparent
+  );
+  pointer-events: none;
+}
+.filter-rail-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.5rem;
+  padding: 0.35rem 0;
+}
+.filter-rail-row + .filter-rail-row {
+  border-top: 1px dashed rgba(var(--edge-rgb, 38, 49, 80), 0.4);
+}
+
+/* Axis label — small all-caps tag on the left, color-coded per axis. */
+.filter-axis-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 7rem;
+  padding: 0.15rem 0;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-weight: 700;
+  margin-right: 0.4rem;
+}
+.filter-axis-label [data-lucide],
+.filter-axis-label svg {
+  width: 14px;
+  height: 14px;
+}
+.filter-axis-label-magenta {
+  color: var(--neon-magenta);
+  text-shadow: 0 0 6px rgba(var(--neon-magenta-rgb), 0.5);
+}
+.filter-axis-label-cyan {
+  color: var(--neon-cyan);
+  text-shadow: 0 0 6px rgba(var(--neon-cyan-rgb), 0.5);
+}
+.filter-axis-label-amber {
+  color: var(--neon-amber);
+  text-shadow: 0 0 6px rgba(var(--neon-amber-rgb), 0.45);
+}
+
+/* Pill — base + hover + per-axis active variants. */
+.filter-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: 0.05em;
+  font-weight: 500;
+  background: rgba(var(--ink-900-rgb), 0.7);
+  border: 1px solid var(--edge);
+  color: var(--text-400);
+  cursor: pointer;
+  transition:
+    color 140ms ease,
+    border-color 140ms ease,
+    background 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+.filter-pill:hover {
+  color: var(--text-200, #d6dbe7);
+  border-color: rgba(var(--neon-cyan-rgb), 0.45);
+  background: rgba(var(--ink-800-rgb), 0.9);
+  transform: translateY(-1px);
+}
+.filter-pill:active {
+  transform: translateY(0);
+}
+/* Tiny count badge appended inside each pill (e.g. "Capture 2"). Reads
+   as a subscript so it never competes with the label. Inherits color
+   from the active variant via currentColor + opacity. */
+.filter-pill-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.1rem;
+  padding: 0 0.3rem;
+  margin-left: 0.1rem;
+  border-radius: 9999px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+  color: currentColor;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  opacity: 0.75;
+}
+.filter-pill:hover .filter-pill-count {
+  opacity: 1;
+}
+.filter-pill-active-cyan .filter-pill-count {
+  background: rgba(var(--neon-cyan-rgb), 0.18);
+  border-color: rgba(var(--neon-cyan-rgb), 0.4);
+  opacity: 1;
+}
+.filter-pill-active-magenta .filter-pill-count {
+  background: rgba(var(--neon-magenta-rgb), 0.18);
+  border-color: rgba(var(--neon-magenta-rgb), 0.4);
+  opacity: 1;
+}
+.filter-pill-active-amber .filter-pill-count {
+  background: rgba(var(--neon-amber-rgb), 0.18);
+  border-color: rgba(var(--neon-amber-rgb), 0.4);
+  opacity: 1;
+}
+.filter-pill-active-cyan {
+  color: var(--neon-cyan);
+  border-color: rgba(var(--neon-cyan-rgb), 0.85);
+  background: linear-gradient(
+    180deg,
+    rgba(var(--neon-cyan-rgb), 0.18),
+    rgba(var(--neon-cyan-rgb), 0.08)
+  );
+  box-shadow:
+    0 0 12px rgba(var(--neon-cyan-rgb), 0.45),
+    0 0 1px rgba(var(--neon-cyan-rgb), 0.8) inset,
+    0 0 0 1px rgba(var(--neon-cyan-rgb), 0.25);
+  text-shadow: 0 0 8px rgba(var(--neon-cyan-rgb), 0.55);
+}
+.filter-pill-active-magenta {
+  color: var(--neon-magenta);
+  border-color: rgba(var(--neon-magenta-rgb), 0.85);
+  background: linear-gradient(
+    180deg,
+    rgba(var(--neon-magenta-rgb), 0.18),
+    rgba(var(--neon-magenta-rgb), 0.08)
+  );
+  box-shadow:
+    0 0 12px rgba(var(--neon-magenta-rgb), 0.45),
+    0 0 1px rgba(var(--neon-magenta-rgb), 0.8) inset,
+    0 0 0 1px rgba(var(--neon-magenta-rgb), 0.25);
+  text-shadow: 0 0 8px rgba(var(--neon-magenta-rgb), 0.55);
+}
+.filter-pill-active-amber {
+  color: var(--neon-amber);
+  border-color: rgba(var(--neon-amber-rgb), 0.85);
+  background: linear-gradient(
+    180deg,
+    rgba(var(--neon-amber-rgb), 0.16),
+    rgba(var(--neon-amber-rgb), 0.06)
+  );
+  box-shadow:
+    0 0 12px rgba(var(--neon-amber-rgb), 0.4),
+    0 0 1px rgba(var(--neon-amber-rgb), 0.7) inset,
+    0 0 0 1px rgba(var(--neon-amber-rgb), 0.22);
+  text-shadow: 0 0 8px rgba(var(--neon-amber-rgb), 0.5);
+}
+.filter-pill-clear {
+  color: var(--text-400);
+  border-style: dashed;
+}
+.filter-pill-clear:hover {
+  color: var(--neon-magenta);
+  border-color: rgba(var(--neon-magenta-rgb), 0.6);
+  background: rgba(var(--neon-magenta-rgb), 0.06);
+}

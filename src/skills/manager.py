@@ -170,6 +170,33 @@ class Skill:
     def to_summary(self) -> dict[str, Any]:
         """Trimmed dict for /api/ui/skills list endpoint."""
         fm = self.frontmatter
+        meta = fm.metadata or {}
+        # Phase 4j taxonomy — see docs/SKILL_TAXONOMY.md.
+        # Closed vocabularies; UI groups by personas_primary and filters by
+        # shipley_phases / capability. Default values keep legacy skills
+        # discoverable as "Utility" until backfilled.
+        personas_primary_raw = meta.get("personas_primary")
+        personas_primary = (
+            str(personas_primary_raw).strip()
+            if personas_primary_raw not in (None, "", "None")
+            else "none"
+        )
+        personas_secondary_raw = meta.get("personas_secondary", []) or []
+        if isinstance(personas_secondary_raw, str):
+            personas_secondary = [personas_secondary_raw.strip()] if personas_secondary_raw.strip() else []
+        elif isinstance(personas_secondary_raw, list):
+            personas_secondary = [str(x).strip() for x in personas_secondary_raw if str(x).strip()]
+        else:
+            personas_secondary = []
+        shipley_phases_raw = meta.get("shipley_phases", []) or []
+        if isinstance(shipley_phases_raw, str):
+            shipley_phases = [shipley_phases_raw.strip()] if shipley_phases_raw.strip() else []
+        elif isinstance(shipley_phases_raw, list):
+            shipley_phases = [str(x).strip() for x in shipley_phases_raw if str(x).strip()]
+        else:
+            shipley_phases = []
+        capability_raw = meta.get("capability")
+        capability = str(capability_raw).strip() if capability_raw else ""
         return {
             "name": self.name,
             "description": fm.description,
@@ -188,6 +215,11 @@ class Skill:
             "source_url": self.source_url,
             "installed_at": self.installed_at,
             "last_invoked_at": self.last_invoked_at,
+            # Phase 4j taxonomy fields (closed vocabularies).
+            "personas_primary": personas_primary,
+            "personas_secondary": personas_secondary,
+            "shipley_phases": shipley_phases,
+            "capability": capability,
         }
 
 

@@ -3,8 +3,13 @@ name: competitive-intel
 description: Federal capture competitor and incumbent intelligence backed by live USAspending.gov data via the vendored `usaspending` MCP. USE WHEN the user asks "who's the incumbent on this contract?", "what was the last award value?", "give me a black-hat read on Bidder X", "who are the top three competitors for this NAICS?", "what's typical pricing for this work?", "pull award history for this agency / NAICS / PSC", or any variant of competitor research, recompete signals, or pricing benchmarks for a federal opportunity. The skill resolves the active workspace's program / agency / NAICS context, queries USAspending for award history, ranks incumbents and likely competitors by obligated dollars, pulls recipient profiles, and emits a structured black-hat brief with chunk + award citations. DO NOT USE FOR proposal drafting (use `proposal-generator`), clause / FAR compliance audit (use `compliance-auditor`), or generic web search about a company (no MCP tool covers that yet).
 license: MIT
 metadata:
+  # Phase 4j taxonomy — see docs/SKILL_TAXONOMY.md
+  personas_primary: capture_manager
+  personas_secondary: [cost_estimator, proposal_manager]
+  shipley_phases: [pursuit, capture, strategy]
+  capability: research
   category: intel
-  version: 0.1.0
+  version: 0.2.0
   status: active
   runtime: tools
   # Phase 4b: declare which vendored MCP servers this skill needs. The
@@ -81,11 +86,22 @@ Call `mcp__usaspending__search_awards` with a filters object scoped to the resol
 {
   "filters": {
     "naics_codes": ["<resolved naics>"],
-    "agencies": [{"type": "awarding", "tier": "toptier", "name": "<agency name>"}],
-    "time_period": [{"start_date": "<5y ago>", "end_date": "<today>"}],
+    "agencies": [
+      { "type": "awarding", "tier": "toptier", "name": "<agency name>" }
+    ],
+    "time_period": [{ "start_date": "<5y ago>", "end_date": "<today>" }],
     "award_type_codes": ["A", "B", "C", "D"]
   },
-  "fields": ["Award ID", "Recipient Name", "Award Amount", "Period of Performance Start Date", "Period of Performance Current End Date", "Awarding Agency", "Awarding Sub Agency", "Award Type"],
+  "fields": [
+    "Award ID",
+    "Recipient Name",
+    "Award Amount",
+    "Period of Performance Start Date",
+    "Period of Performance Current End Date",
+    "Awarding Agency",
+    "Awarding Sub Agency",
+    "Award Type"
+  ],
   "page": 1,
   "limit": 100,
   "sort": "Award Amount",
@@ -112,7 +128,7 @@ Call `mcp__usaspending__spending_by_category` with category `awarding_agency` (o
   "category": "naics",
   "filters": {
     "naics_codes": ["<resolved naics>"],
-    "time_period": [{"start_date": "<5y ago>", "end_date": "<today>"}]
+    "time_period": [{ "start_date": "<5y ago>", "end_date": "<today>" }]
   },
   "limit": 10
 }

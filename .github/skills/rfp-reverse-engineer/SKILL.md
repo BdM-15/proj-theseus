@@ -3,9 +3,14 @@ name: rfp-reverse-engineer
 description: Reverse-engineers a federal RFP we received — given the SOW/PWS and evaluation criteria already in the Theseus KG, reconstructs the CO's hidden decision tree (upstream `sow-pws-builder` 6 scope blocks + 3 intake answers), surfaces hot buttons, ghost language, discriminator hooks, missing-section signals, and CPFF-form / Section-5 / QASP / Key-Personnel traps. USE WHEN the user asks "what scope decisions did the CO already make?", "reverse engineer this RFP", "what hot buttons are hiding in this PWS?", "where are the discriminator hooks?", "did they pick CPFF completion or term form?", "anything suspiciously missing?", or any variant of decoding CO intent. Pulls `requirement`, `deliverable`, `proposal_instruction`, `evaluation_factor`, `clause`, `performance_standard` from the active workspace KG and emits a JSON envelope feeding `proposal-generator`. DO NOT USE FOR proposal prose (`proposal-generator`), pricing (`price-to-win`), clause audit (`compliance-auditor`), or sub SOW (`subcontractor-sow-builder`).
 license: MIT
 metadata:
+  # Phase 4j taxonomy — see docs/SKILL_TAXONOMY.md
+  personas_primary: capture_manager
+  personas_secondary: [proposal_manager]
+  shipley_phases: [capture, strategy]
+  capability: analyze
   runtime: tools
   category: capture_intelligence
-  version: 0.1.0
+  version: 0.2.0
   status: active
   # Phase 4h: pure KG + reasoning skill. No MCPs declared (closed-by-default).
 ---

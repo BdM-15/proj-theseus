@@ -63,8 +63,9 @@ This project has **three independent prompt systems** that MUST stay aligned. Ch
 5. **Inference prompts** (`prompts/relationship_inference/*.md`): Algorithm-specific prompts that reference entity/relationship types
 6. **Test fixtures** (`tools/test_query_prompt.py`, `tests/`): Signal detection patterns, expected entity types, relationship type assertions
 7. **VDB sync** (`src/inference/vdb_sync.py`): Normalization logic for relationship types
+8. **Skill taxonomy** (`docs/SKILL_TAXONOMY.md` + every `.github/skills/*/SKILL.md`): When the persona vocabulary in the extraction prompt's `USER PERSONAS YOU SUPPORT` block changes (add / remove / rename a persona), update `docs/SKILL_TAXONOMY.md` § "Persona Vocabulary" AND audit `metadata.personas_primary` / `metadata.personas_secondary` across every SKILL.md frontmatter. The persona ID set, the Shipley-phase set, and the capability-verb set are all closed vocabularies — `tests/skills/test_skill_taxonomy.py` will fail any drift.
 
-**Rule: No PR that changes entity types, relationship types, or Shipley methodology should be committed without confirming all 7 areas above are aligned.**
+**Rule: No PR that changes entity types, relationship types, Shipley methodology, or skill personas should be committed without confirming all 8 areas above are aligned.**
 
 ### Domain Vocabulary Reference
 

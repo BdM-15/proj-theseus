@@ -3,9 +3,14 @@ name: renderers
 description: Universal artifact renderers for Theseus skills. Converts structured content into deliverable file formats (DOCX, XLSX, PDF, PPTX, MP4, GIF) via opt-in `metadata.script_paths`. USE THIS SKILL'S SCRIPTS when another skill (proposal-generator, competitive-intel, compliance-auditor, executive-briefer, etc.) needs to produce a downloadable artifact in a standard office or presentation format. Pure utility — owns no domain logic, no LLM persona, no KG queries. Each renderer is a small CLI script invoked via the runtime's `run_script` tool. Currently ships `render_docx.py` (Markdown → Word via Pandoc) and `render_xlsx.py` (JSON envelope → styled Excel workbook via openpyxl); future scripts may re-export huashu-design's PPTX/PDF/Video renderers under one roof. DO NOT USE FOR drafting content (use the relevant domain skill — proposal-generator, competitive-intel, compliance-auditor, executive-briefer) or designing visuals (use huashu-design).
 license: MIT
 metadata:
+  # Phase 4j taxonomy — see docs/SKILL_TAXONOMY.md
+  personas_primary: none
+  personas_secondary: []
+  shipley_phases: []
+  capability: render
   runtime: tools
   category: utility
-  version: 0.2.0
+  version: 0.3.0
   status: active
   # Renderers is invoked indirectly: consumer skills declare
   # `script_paths: [../renderers/scripts]` in their own SKILL.md and call

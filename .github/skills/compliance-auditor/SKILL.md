@@ -3,9 +3,14 @@ name: compliance-auditor
 description: Federal acquisition compliance auditor for the active Theseus workspace, backed by live FAR/DFARS text via the vendored `ecfr` MCP. USE WHEN the user asks to audit FAR/DFARS clause coverage, validate that cited clauses actually exist in eCFR (catch fabricated or typo'd numbers), check whether a cited clause has been amended since the solicitation issued, validate regulatory references (NIST SP, DAFI, MIL-STD), check that every "shall" requirement has a deliverable, find missing compliance artifacts, audit proposal_instruction ↔ evaluation_factor coverage (UCF Section L↔M or non-UCF equivalent — FAR 16 task orders, FOPRs, BPA calls, OTAs), or "are we compliant with the proposal instructions?". Cross-references the workspace's clause / regulatory_reference / requirement / deliverable / compliance_artifact entities against live eCFR and flags gaps with severity. Format-agnostic. DO NOT USE FOR drafting compliant prose (use proposal-generator) or extracting clauses (Theseus pipeline does that automatically).
 license: MIT
 metadata:
+  # Phase 4j taxonomy — see docs/SKILL_TAXONOMY.md
+  personas_primary: legal_compliance
+  personas_secondary: [proposal_manager, contracts_manager]
+  shipley_phases: [proposal_development, negotiation]
+  capability: audit
   runtime: tools
   category: compliance
-  version: 0.4.0
+  version: 0.5.0
   status: active
   # Phase 4f.2: declare which vendored MCP servers this skill needs.
   # The runtime exposes only these MCPs to the agent loop, namespaced
@@ -132,7 +137,7 @@ Every `requirement` whose text contains a whole-word `shall` (case-insensitive) 
 
 Missing → critical finding. **Primary failure mode — emit one finding per missing shall, do not aggregate.**
 
-#### C4 — proposal_instruction ↔ evaluation_factor Bidirectional Coverage _(severity: high)_
+#### C4 — proposal*instruction ↔ evaluation_factor Bidirectional Coverage *(severity: high)\_
 
 For each `evaluation_factor`, ≥1 `proposal_instruction` must point to it via `GUIDES`. For each `proposal_instruction`, ≥1 `evaluation_factor` must point back via `EVALUATED_BY` (or the inverse). Asymmetric coverage = finding. Format-agnostic — never raise this finding merely because a literal "Section L" or "Section M" label is missing.
 

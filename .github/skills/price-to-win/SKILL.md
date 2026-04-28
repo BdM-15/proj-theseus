@@ -3,9 +3,14 @@ name: price-to-win
 description: Federal price-to-win (PTW) and competitor cost-stack estimator backed by live BLS OEWS wages, GSA CALC+ ceiling rates, and GSA Per Diem via the vendored `bls_oews`, `gsa_calc`, `gsa_perdiem` MCPs. USE WHEN the user asks "what's the price to win?", "build a competitor cost stack", "estimate the incumbent's bid", "back into a wrap rate", "what should we price this at?", or any variant of PTW, should-cost, target price, or cost-stack reverse-engineering for a federal opportunity. Picks a contract-type cost model (FFP wrap-rate, LH/T&M burden multiplier, or CR CPFF/CPAF/CPIF pools — or hybrid) via decision tree, pulls SOC+metro wages from BLS, anchors against CALC+, computes per diem, and emits a competitor cost stack with low/mid/high scenarios + FAR 15.404-4/16.x citations. DO NOT USE FOR proposal prose (use `proposal-generator`), FAR clause audit (use `compliance-auditor`), award-history research (use `competitive-intel`), or rendering workbooks (use `renderers`).
 license: MIT
 metadata:
+  # Phase 4j taxonomy — see docs/SKILL_TAXONOMY.md
+  personas_primary: cost_estimator
+  personas_secondary: [capture_manager]
+  shipley_phases: [capture, strategy, proposal_development]
+  capability: estimate
   runtime: tools
   category: pricing
-  version: 0.1.0
+  version: 0.2.0
   status: active
   # Phase 4g: declare which vendored MCP servers this skill needs.
   # The runtime exposes only these MCPs to the agent loop, namespaced
@@ -38,12 +43,12 @@ The three upstream IGCE Builder skills this is derived from are written for **co
 
 **Theseus inverts that gate.** This skill is for the **bidder / capture team**. Estimating competitor pricing IS the deliverable. There is no CO to defer to. The same FAR 15.404-4 / 16.x cost math applies — we just consume it from the opposite seat:
 
-| Concept | CO seat (upstream) | Bidder seat (this skill) |
-|---|---|---|
-| Output | IGCE for the contract file | PTW benchmark for capture strategy |
-| Wrap rate / burden | "Defensible to defend the estimate" | "Plausible for the competitor's vehicle / size" |
-| CALC+ percentile | "Position vs. ceiling pool" | "Where the competitor likely lands and where we have to undercut" |
-| Verdict | Refused — CO call | Required — capture call |
+| Concept            | CO seat (upstream)                  | Bidder seat (this skill)                                          |
+| ------------------ | ----------------------------------- | ----------------------------------------------------------------- |
+| Output             | IGCE for the contract file          | PTW benchmark for capture strategy                                |
+| Wrap rate / burden | "Defensible to defend the estimate" | "Plausible for the competitor's vehicle / size"                   |
+| CALC+ percentile   | "Position vs. ceiling pool"         | "Where the competitor likely lands and where we have to undercut" |
+| Verdict            | Refused — CO call                   | Required — capture call                                           |
 
 You MAY (and should) state evaluative judgments: "the incumbent likely prices at ~$X/hr fully burdened with a ~2.93x wrap, putting their base-year labor at $Y; to win on cost we should target 5–10% under, ~$Z." Use ranges, cite the math, name the assumptions.
 
@@ -157,34 +162,73 @@ JSON envelope (the renderer skill will turn this into .xlsx if needed):
 
 ```json
 {
-  "opportunity": {"solicitation_id": "...", "agency": "...", "naics": "...", "psc": "...", "pop": "..."},
+  "opportunity": {
+    "solicitation_id": "...",
+    "agency": "...",
+    "naics": "...",
+    "psc": "...",
+    "pop": "..."
+  },
   "cost_model": "FFP|LH|TM|CR-CPFF|CR-CPAF|CR-CPIF|hybrid",
   "model_rationale": "Trigger from decision tree...",
-  "incumbent": {"name": "...", "ueid": "...", "last_award_value": null},
+  "incumbent": { "name": "...", "ueid": "...", "last_award_value": null },
   "labor": [
     {
       "category": "Senior Software Developer",
       "soc": "15-1252",
       "tier": "senior",
       "metro": "Washington-Arlington-Alexandria, DC-VA-MD-WV",
-      "bls": {"series_id": "...", "vintage": "2024-05", "p50_annual": 152340, "p75_annual": 188900, "p90_annual": 215600},
-      "calc_plus": {"keyword": "Software Developer III", "n": 47, "p25": 178, "p50": 205, "p75": 234, "p90": 261},
-      "buildup": {"direct_hourly": 73.24, "fringe_pct": 0.32, "oh_pct": 0.80, "ga_pct": 0.12, "profit_pct": 0.10, "fbr_low": 178.50, "fbr_mid": 214.71, "fbr_high": 257.65},
+      "bls": {
+        "series_id": "...",
+        "vintage": "2024-05",
+        "p50_annual": 152340,
+        "p75_annual": 188900,
+        "p90_annual": 215600
+      },
+      "calc_plus": {
+        "keyword": "Software Developer III",
+        "n": 47,
+        "p25": 178,
+        "p50": 205,
+        "p75": 234,
+        "p90": 261
+      },
+      "buildup": {
+        "direct_hourly": 73.24,
+        "fringe_pct": 0.32,
+        "oh_pct": 0.8,
+        "ga_pct": 0.12,
+        "profit_pct": 0.1,
+        "fbr_low": 178.5,
+        "fbr_mid": 214.71,
+        "fbr_high": 257.65
+      },
       "headcount": 2,
       "annual_labor_mid": 807312
     }
   ],
-  "travel": [{"destination": "Huntsville, AL", "trips_per_year": 4, "travelers": 2, "annual_cost": 12480}],
+  "travel": [
+    {
+      "destination": "Huntsville, AL",
+      "trips_per_year": 4,
+      "travelers": 2,
+      "annual_cost": 12480
+    }
+  ],
   "materials": [],
-  "fee": {"type": "fixed", "rate": 0.10, "amount_mid": 92450},
+  "fee": { "type": "fixed", "rate": 0.1, "amount_mid": 92450 },
   "totals": {
-    "base_year": {"low": 1450000, "mid": 1820000, "high": 2240000},
-    "lifecycle": {"low": 7100000, "mid": 8950000, "high": 11020000}
+    "base_year": { "low": 1450000, "mid": 1820000, "high": 2240000 },
+    "lifecycle": { "low": 7100000, "mid": 8950000, "high": 11020000 }
   },
   "ptw_recommendation": {
     "target_price": 8500000,
     "rationale": "5% under the mid-scenario lifecycle to win on cost without triggering price-realism failure.",
-    "risk_flags": ["BLS vintage gap 18 months", "CALC+ N=12 for Senior Cyber Engineer (directional)", "Incumbent's actual wrap unknown — assumed Agency BPA cleared 3.17x"]
+    "risk_flags": [
+      "BLS vintage gap 18 months",
+      "CALC+ N=12 for Senior Cyber Engineer (directional)",
+      "Incumbent's actual wrap unknown — assumed Agency BPA cleared 3.17x"
+    ]
   },
   "citations": {
     "far": ["15.402", "15.404-4", "16.202"],
