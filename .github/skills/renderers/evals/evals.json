@@ -1,0 +1,38 @@
+{
+  "skill_name": "renderers",
+  "version": "0.1.0",
+  "description": "Smoke prompts for the universal artifact renderer library. Most production usage happens indirectly via consumer-skill script_paths; these evals exercise direct activation paths.",
+  "evals": [
+    {
+      "id": "render_docx_basic",
+      "prompt": "I have a Markdown file at artifacts/draft.md. Render it to a Word document at artifacts/draft.docx with the title 'Volume I — Technical Approach' and a table of contents.",
+      "expected_behavior": "Skill calls run_script on scripts/render_docx.py with --input, --output, --metadata title=..., --toc flags. Reports the output path back to the user. Exit code 0.",
+      "success_criteria": [
+        "Uses run_script tool, not write_file or shell",
+        "Passes --metadata 'title=Volume I — Technical Approach'",
+        "Passes --toc flag",
+        "Confirms exit_code == 0 and reports artifact path"
+      ]
+    },
+    {
+      "id": "render_docx_missing_pandoc",
+      "prompt": "Render artifacts/note.md as a DOCX. (Run on a system without Pandoc installed.)",
+      "expected_behavior": "Renderer script exits 127 with install hint on stderr. Skill surfaces the install instructions verbatim to the user instead of pretending success.",
+      "success_criteria": [
+        "Recognizes exit_code 127 as missing-toolchain, not a script bug",
+        "Quotes the multi-platform install hint from stderr",
+        "Does NOT retry or attempt a fallback renderer"
+      ]
+    },
+    {
+      "id": "scope_rejection_authoring",
+      "prompt": "Write me a Volume I technical approach for an Air Force RFP and produce it as a DOCX.",
+      "expected_behavior": "Skill declines the authoring portion (scope is rendering, not drafting) and recommends invoking proposal-generator first to produce the Markdown, then handing the result here for DOCX rendering.",
+      "success_criteria": [
+        "Does NOT attempt to draft proposal content",
+        "Names proposal-generator as the correct authoring skill",
+        "Offers to render the resulting Markdown once proposal-generator produces it"
+      ]
+    }
+  ]
+}

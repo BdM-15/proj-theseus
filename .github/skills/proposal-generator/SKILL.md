@@ -5,13 +5,16 @@ license: MIT
 metadata:
   runtime: tools
   category: proposal
-  version: 0.4.0
+  version: 0.5.0
   status: active
   # Phase 3b: opt-in cross-skill access to huashu-design's renderer scripts
   # so the optional render step (12) can produce PPTX/PDF artifacts via
   # run_script without per-skill wrapper shims.
+  # Phase 3d: the `renderers` utility skill owns format-conversion scripts
+  # (DOCX now, XLSX next). All consumer skills opt in the same way.
   script_paths:
     - ../huashu-design/scripts
+    - ../renderers/scripts
 ---
 
 # Proposal Generator — Shipley Methodology
@@ -212,11 +215,42 @@ If the user explicitly requested a slide deck, PDF brief, or one-pager, render i
 
 **Renderer reference:**
 
-| Output | huashu script                                   | Required args                                        |
-| ------ | ----------------------------------------------- | ---------------------------------------------------- |
-| PDF    | `../huashu-design/scripts/export_deck_pdf.mjs`  | `--slides <dir> --out <file.pdf> [--width --height]` |
-| PPTX   | `../huashu-design/scripts/export_deck_pptx.mjs` | (see script header — load via `read_file` if needed) |
-| Video  | `../huashu-design/scripts/render-video.js`      | (see script header — requires bundled ffmpeg)        |
+| Output | Script                                          | Required args                                                                      | Toolchain       |
+| ------ | ----------------------------------------------- | ---------------------------------------------------------------------------------- | --------------- |
+| PDF    | `../huashu-design/scripts/export_deck_pdf.mjs`  | `--slides <dir> --out <file.pdf> [--width --height]`                               | Node + Chromium |
+| PPTX   | `../huashu-design/scripts/export_deck_pptx.mjs` | (see script header — load via `read_file` if needed)                               | Node + Chromium |
+| Video  | `../huashu-design/scripts/render-video.js`      | (see script header — requires bundled ffmpeg)                                      | Node + ffmpeg   |
+| DOCX   | `../renderers/scripts/render_docx.py`           | `--input <md> --output <docx> [--reference <docx>] [--toc] [--metadata KEY=VALUE]` | Pandoc on PATH  |
+
+Renderers live in dedicated utility skills (`huashu-design` for visual artifacts, `renderers` for office formats) and are opted in via this skill's `metadata.script_paths`. Future consumer skills follow the same pattern — no per-skill renderer code.
+
+### 12b. Render a Word (.docx) volume (optional)
+
+Federal proposals are typically submitted as DOCX, often on an agency- or company-mandated Word template. To render the proposal narrative as a Word document:
+
+1. Use `write_file` to save the proposal narrative as Markdown under `artifacts/`, e.g. `artifacts/volume_1.md`. The Markdown can include headings, tables, lists, blockquotes, and footnotes — Pandoc translates them into proper Word styles.
+2. (Optional) If the user supplied a corporate / agency Word template, save it under `artifacts/reference.docx` first (or reference an existing one in `assets/`). Pandoc maps every Markdown heading and block style onto the matching style in this template.
+3. Invoke the DOCX renderer (lives in the `renderers` utility skill) via `run_script`:
+
+   ```json
+   {
+     "path": "../renderers/scripts/render_docx.py",
+     "args": [
+       "--input",
+       "{artifacts}/volume_1.md",
+       "--output",
+       "{artifacts}/volume_1.docx",
+       "--metadata",
+       "title=Volume I — Technical Approach",
+       "--toc"
+     ],
+     "timeout": 60
+   }
+   ```
+
+   Add `"--reference", "{artifacts}/reference.docx"` if a template was supplied. Confirm `exit_code == 0`. If `exit_code == 127`, Pandoc is not installed — surface the install hint from stderr to the user (see `docs/PHASE_3D_TOOLCHAIN.md`).
+
+4. Add the produced filename to the cover note's "Artifacts" section.
 
 ## Output Contract
 

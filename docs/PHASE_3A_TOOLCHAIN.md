@@ -14,7 +14,7 @@ runtime's `run_script` tool. **Phase 3a installs JS deps only — Python env is 
 | Node deps | `.github/skills/huashu-design/node_modules/` | `playwright`, `pdf-lib`, `pptxgenjs`, `sharp`                         | ✅ Yes — needed for any render                 |
 | Chromium  | Playwright browser cache (user AppData)      | Headless Chromium (~150MB) installed by `playwright install chromium` | ✅ Yes — every renderer drives a page          |
 | ffmpeg    | Bundled by Playwright                        | Auto-downloaded as part of `playwright install`                       | ✅ Already present (no system install)         |
-| Pandoc    | (deferred to Phase 3d)                       | Needed only for future DOCX renderer                                  | ❌ Not installed                               |
+| Pandoc    | System PATH (installed in Phase 3d)          | Required for DOCX volume renderer — see `docs/PHASE_3D_TOOLCHAIN.md`  | Phase 3d                                       |
 | openpyxl  | Already in Python env (3.1.5)                | Needed for Phase 3e XLSX renderer                                     | ❌ Not installed by Phase 3a (already present) |
 
 ### Why Node + Chromium and not Python Playwright?
