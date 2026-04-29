@@ -10,7 +10,7 @@ metadata:
   capability: estimate
   runtime: tools
   category: pricing
-  version: 0.2.0
+  version: 0.3.0
   status: active
   # Phase 4g: declare which vendored MCP servers this skill needs.
   # The runtime exposes only these MCPs to the agent loop, namespaced
@@ -243,9 +243,13 @@ JSON envelope (the renderer skill will turn this into .xlsx if needed):
 }
 ```
 
-### 9. Present the cost stack
+### 9. Write the JSON envelope (MANDATORY — do this BEFORE the narrative summary)
 
-Narrative summary (capture-team-readable, 8–12 short sections) covering:
+**You MUST call `write_file` to save the envelope from step 8 to `artifacts/price_to_win.json` before producing your final assistant message.** The JSON envelope IS the deliverable — the narrative summary in step 10 is just a cover note. A run that ends without the artifact is a failed run.
+
+### 10. Present the cost stack
+
+After `write_file` succeeds, produce a narrative summary (capture-team-readable, 8–12 short sections) covering:
 
 1. Recommended target price and the rationale (why this number wins).
 2. Cost model chosen and why.
@@ -256,7 +260,7 @@ Narrative summary (capture-team-readable, 8–12 short sections) covering:
 7. What we DON'T know about the competitor (subcontractor mix, actual wrap, OCI exposure).
 8. FAR citations supporting the cost methodology.
 
-If the user asked for an artifact, hand the JSON envelope to the `renderers` skill (`render_xlsx.py`) for a competitor-cost-stack workbook.
+If the user asked for a workbook, hand the JSON envelope to the `renderers` skill (`render_xlsx.py`) for a competitor-cost-stack .xlsx.
 
 ## What This Skill Does NOT Cover
 

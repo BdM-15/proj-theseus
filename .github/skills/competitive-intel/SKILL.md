@@ -9,9 +9,16 @@ metadata:
   shipley_phases: [pursuit, capture, strategy]
   capability: research
   category: intel
-  version: 0.2.0
+  version: 0.3.0
   status: active
   runtime: tools
+  # This skill walks 10 numbered steps with 6+ MCP calls and 3+ KG calls
+  # per run. The default 12-turn budget (SKILL_TOOLS_MAX_TURNS) is too
+  # tight — runs hit the cap before reaching the final write_file step.
+  # The runtime treats this as a floor and uses the larger of env vs
+  # skill value. See issue #120 for the future decomposition epic that
+  # will let us drop this back to the default once sub-skills exist.
+  max_turns: 20
   # Phase 4b: declare which vendored MCP servers this skill needs. The
   # runtime exposes only these MCPs to the agent loop, namespaced as
   # `mcp__usaspending__<tool>`. Skills that omit `metadata.mcps` get zero
@@ -161,9 +168,13 @@ Before writing the envelope: re-read your draft and confirm:
 
 If any check fails, iterate — do not ship.
 
-### 10. Write the JSON envelope
+### 10. Write the JSON envelope (MANDATORY — do this BEFORE any final summary)
 
-Save to `artifacts/competitive_intel.json` via `write_file`, matching the Output Contract below. Final assistant message: a short cover note summarizing counts (incumbent identified yes/no, # competitors profiled, sample size for pricing, # warnings) and pointing at the artifact.
+**You MUST call `write_file` to save the envelope to `artifacts/competitive_intel.json` before producing your final assistant message.** This is the skill's primary deliverable — a run that ends without this artifact is a failed run, regardless of how good the prose summary looks.
+
+If you are running low on turns and have not yet written the artifact, **stop gathering data and write what you have now**, with `warnings[]` honestly noting what is incomplete. A partial envelope with `claim_gap` entries is more useful than no envelope.
+
+Match the Output Contract below. After `write_file` succeeds, the final assistant message is a short cover note summarizing counts (incumbent identified yes/no, # competitors profiled, sample size for pricing, # warnings) and pointing at the artifact path. Do not write more prose before the artifact is on disk.
 
 ## Output Contract
 

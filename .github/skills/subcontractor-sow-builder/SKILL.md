@@ -10,7 +10,7 @@ metadata:
   capability: draft
   runtime: tools
   category: scope_authoring
-  version: 0.2.0
+  version: 0.3.0
   status: active
   # Phase 4h: pure decision-tree + KG-grounded skill — no MCPs needed.
   # The runtime exposes: read_file, run_script, write_file, kg_query,
@@ -54,6 +54,14 @@ The upstream `sow-pws-builder` skill is written for **federal contracting office
 - **NO FTE counts, SOC codes, hours-per-year, or labor categories in the document body.** FAR 37.102(d) — staffing lives in the chat-only handoff at the end, NEVER in the SOW/PWS or any appendix.
 - **Cite FAR.** 37.102(d) (results not hours), 37.602 (PBA preferred), 46.401 (QA), 16.601(c)(2) (T&M ceiling hours), 16.306(d)(1)/(d)(2) (CPFF completion vs term form), 16.301-3 (CR accounting prereq), 7.105 (acquisition plan).
 - **Two outputs, never combined.** (1) the SOW/PWS Markdown artifact for `renderers` to convert to .docx; (2) the chat-only staffing handoff for `price-to-win`. Never embed staffing in the document.
+
+## STOP CONDITION — read before every final message
+
+This skill's deliverable is a Markdown file at `{run_dir}/artifacts/sub_sow_pws.md`, written via `write_file`. **A run is successful if and only if `write_file` was called.** Producing a long Phase 1 Decision Summary in chat without writing the artifact is a FAILED run, even if the prose is excellent.
+
+Before you send your final assistant message in this run, check: **did I call `write_file`?** If no, do not finalize. Either call `write_file` now (with the best draft you have, flagging incomplete sections in Section 1.4 Assumptions), or — only in interactive mode with zero framing answers from the user — explicitly ask the user a clarifying question (which keeps the loop open).
+
+Never end a run with `finish_reason=stop` and an empty `artifacts/` directory.
 
 ## Workflow Checklist
 
@@ -110,9 +118,13 @@ Load `references/decision_tree_blocks.md`. Walk Blocks 1–6 in a single batched
 
 ### 4. Decision-summary gate
 
-Present a Phase 1 Decision Summary in chat: the 3 framing answers, all derived defaults with one-line rationale, the planned Section 3 structure (task areas for SOW, performance objectives for PWS).
+**First, check what the user already gave you.** Score the prompt against the 3 framing questions in step 2 (SOW vs PWS, contract type, commercial vs non-commercial):
 
-**STOP and wait for the user to reply "proceed" (or correct any item) before generating the document.** Do not self-approve. The user is entitled to catch a wrong default before a large document gets locked in.
+- **All 3 answered in the prompt → SKIP THE GATE.** Emit a one-line confirmation in chat (`Confirmed: <doc-type> | <contract-type> | <commercial flag>. Proceeding to artifact.`) and go directly to step 5. Do NOT print a long Phase 1 Decision Summary — that wastes turns and produces no deliverable.
+- **1–2 answered → SKIP THE GATE in autonomous mode** (no follow-up signal in the originating prompt — automated test harness, batch invocation, orchestrator chain). Use sensible defaults for the missing answer(s), document them in Section 1.4 ("Assumptions") of the artifact, and go to step 5. In interactive mode, ask the missing question(s) only.
+- **0 answered AND interactive → use the gate.** Present the Phase 1 Decision Summary (3 framing answers as defaults + derived block-level decisions) and STOP, waiting for the user to reply "proceed". Do not self-approve.
+
+**Universal rule across all branches: your final assistant message in this run MUST come AFTER `write_file` succeeds in step 5, not before.** A long Phase 1 Decision Summary in chat with no artifact written is a failed run. The artifact is the deliverable; everything in chat is just a cover note.
 
 ### 5. Generate the SOW/PWS Markdown
 

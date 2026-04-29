@@ -844,7 +844,18 @@ class SkillManager:
         (run_dir / "tool_outputs").mkdir(exist_ok=True)
 
         # Honour an env-tunable turn cap so operators can throttle cost.
-        max_turns = _env_int("SKILL_TOOLS_MAX_TURNS", 12)
+        # A skill MAY also declare ``metadata.max_turns`` to claim a larger
+        # budget for itself when its workflow legitimately needs it (e.g.,
+        # ``competitive-intel`` walks 10 numbered steps with multiple MCP
+        # calls each). The skill's value wins when it is a positive int and
+        # exceeds the env baseline; otherwise the env value is used. This
+        # keeps the global throttle as a floor, not a ceiling, so operators
+        # can still raise it across the board without editing every skill.
+        env_max_turns = _env_int("SKILL_TOOLS_MAX_TURNS", 12)
+        max_turns = env_max_turns
+        skill_max_turns_raw = skill.frontmatter.metadata.get("max_turns")
+        if isinstance(skill_max_turns_raw, int) and skill_max_turns_raw > max_turns:
+            max_turns = skill_max_turns_raw
 
         # Phase 3b: opt-in cross-skill script roots. The skill declares
         # ``metadata.script_paths`` as a list of directories (relative to its
