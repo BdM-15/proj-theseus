@@ -54,7 +54,7 @@ main (protected — never edited directly)
 | ID | Branch | Wave | Owner intent | Status | FF'd into 142 | Notes |
 |----|--------|------|--------------|--------|---------------|-------|
 | 142 | `142-skills-e2e-hardening` | epic | integration parent | 🟡 active | — | Created 2026-04-29 |
-| 143 | `143-renderers-scope-fix` | 1a | Trim renderers description; delegate non-DOCX/XLSX to huashu-design | ⏳ not started | ❌ | Trivial fix — `skill-creator` workflow NOT required |
+| 143 | `143-renderers-scope-fix` | 1a | Trim renderers description; delegate non-DOCX/XLSX to huashu-design | ✅ done | ⏳ pending | Went through skill-creator workflow (snapshot → evals → draft → smoke). 6 evals incl. 2 new delegation prompts. Desc 1017/1024 chars. v0.4.0 |
 | 144 | `144-huashu-frontmatter-english` | 1b | Translate `description` to English; preserve Chinese under `metadata.description_zh`; refresh evals | ⏳ not started | ❌ | Material change — **MUST go through skill-creator workflow** |
 | 145 | `145-skills-e2e-test-harness` | 2 | `tests/skills/e2e/` runner + seeded fixture workspace | ⏳ not started | ❌ | Blocks 146 + 147 |
 | 146 | `146-skill-creator-reverify-pass` | 3a | Re-author 9 in-house skills via skill-creator workflow | ⏳ not started | ❌ | Depends on 145 |
@@ -105,7 +105,7 @@ main (protected — never edited directly)
 - [ ] Verify `tests/skills/test_skill_taxonomy.py` still passes.
 - [ ] Verify `description ≤ 1024 chars`.
 
-**Skill-creator gate**: Exempt — this is a description trim + section addition, no behavioral change. Affirm in commit message.
+**Skill-creator gate**: REQUIRED. Description trim is trigger-accuracy optimization per [.github/copilot-instructions.md](.github/copilot-instructions.md) MANDATE. Affirm in commit message that `skill-creator/SKILL.md` was loaded and its workflow followed.
 
 **Exit criteria**: Tests green, diff < 60 lines, user approves the commit message.
 

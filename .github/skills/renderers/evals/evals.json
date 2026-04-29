@@ -1,7 +1,7 @@
 {
   "skill_name": "renderers",
-  "version": "0.2.0",
-  "description": "Smoke prompts for the universal artifact renderer library. Most production usage happens indirectly via consumer-skill script_paths; these evals exercise direct activation paths.",
+  "version": "0.3.0",
+  "description": "Smoke prompts for the office-document renderer library (DOCX + XLSX). Most production usage happens indirectly via consumer-skill script_paths; these evals exercise direct activation paths and the delegation boundary against huashu-design (PDF/PPTX/MP4/GIF are explicitly out of scope).",
   "evals": [
     {
       "id": "render_docx_basic",
@@ -43,6 +43,27 @@
         "Passes --title argument",
         "Confirms exit_code == 0 and reports artifact path",
         "Mentions that compliance_matrix / themes / fab_chains became separate sheets"
+      ]
+    },
+    {
+      "id": "delegate_pdf_to_huashu_design",
+      "prompt": "Render the slide deck at artifacts/exec_brief.html as a PDF. Save it to artifacts/exec_brief.pdf.",
+      "expected_behavior": "Skill recognizes PDF is out of scope for renderers (DOCX + XLSX only) and routes the user to huashu-design, which owns export_deck_pdf.mjs. Does NOT attempt run_script against a non-existent renderers/scripts/render_pdf.py.",
+      "success_criteria": [
+        "Names huashu-design as the correct skill for PDF / PPTX / MP4 / GIF",
+        "Mentions huashu-design/scripts/export_deck_pdf.mjs (or that the consumer skill needs ../huashu-design/scripts in its script_paths)",
+        "Does NOT call run_script on a renderers/scripts/render_pdf.* path",
+        "Does NOT silently fabricate a PDF renderer script in this skill"
+      ]
+    },
+    {
+      "id": "delegate_pptx_to_huashu_design",
+      "prompt": "I need a PowerPoint deck of the workspace's executive brief. Produce a .pptx file via the renderers skill.",
+      "expected_behavior": "Skill declines PPTX (out of scope after the 143 scope-fix) and points the user at huashu-design's export_deck_pptx.mjs. Explains that PPTX is a visual / presentation format owned by the design skill, not the office-document renderer.",
+      "success_criteria": [
+        "Declines PPTX explicitly with a one-line reason (visual / presentation format)",
+        "Names huashu-design and export_deck_pptx.mjs",
+        "Does NOT attempt to dispatch to a renderers PPTX script"
       ]
     }
   ]

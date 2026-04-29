@@ -1,6 +1,6 @@
 ---
 name: renderers
-description: Universal artifact renderers for Theseus skills. Converts structured content into deliverable file formats (DOCX, XLSX, PDF, PPTX, MP4, GIF) via opt-in `metadata.script_paths`. USE THIS SKILL'S SCRIPTS when another skill (proposal-generator, competitive-intel, compliance-auditor, executive-briefer, etc.) needs to produce a downloadable artifact in a standard office or presentation format. Pure utility — owns no domain logic, no LLM persona, no KG queries. Each renderer is a small CLI script invoked via the runtime's `run_script` tool. Currently ships `render_docx.py` (Markdown → Word via Pandoc) and `render_xlsx.py` (JSON envelope → styled Excel workbook via openpyxl); future scripts may re-export huashu-design's PPTX/PDF/Video renderers under one roof. DO NOT USE FOR drafting content (use the relevant domain skill — proposal-generator, competitive-intel, compliance-auditor, executive-briefer) or designing visuals (use huashu-design).
+description: Office-document renderers for Theseus skills — turns Markdown into Word (DOCX) and JSON envelopes into styled Excel (XLSX) deliverables via opt-in `metadata.script_paths`. USE THIS SKILL'S SCRIPTS when another skill (proposal-generator, competitive-intel, compliance-auditor, oci-sweeper, price-to-win, ot-prototype-strategist, subcontractor-sow-builder, rfp-reverse-engineer, executive-briefer, etc.) needs a downloadable .docx or .xlsx file. Pure utility — owns no domain logic, no LLM persona, no KG queries. Each renderer is a small CLI script invoked via the runtime's `run_script` tool. Ships `render_docx.py` (Markdown → Word via Pandoc) and `render_xlsx.py` (JSON envelope → styled Excel workbook via openpyxl). DO NOT USE FOR drafting content (use the relevant domain skill) or for visual / presentation / motion formats — PDF, PPTX, MP4, and GIF are out of scope here and MUST be routed to `huashu-design` directly (the consumer skill declares `../huashu-design/scripts` in its own `metadata.script_paths`).
 license: MIT
 metadata:
   # Phase 4j taxonomy — see docs/SKILL_TAXONOMY.md
@@ -10,7 +10,7 @@ metadata:
   capability: render
   runtime: tools
   category: utility
-  version: 0.3.0
+  version: 0.4.0
   status: active
   # Renderers is invoked indirectly: consumer skills declare
   # `script_paths: [../renderers/scripts]` in their own SKILL.md and call
@@ -44,13 +44,22 @@ Directly (rare — for testing or one-off conversions): activate the skill yours
 - ❌ Designing slides / animations / visual mockups — use `huashu-design`.
 - ❌ Querying the knowledge graph or drafting analysis — that's the consumer skill's job; renderers receives structured text/data and emits a file.
 
-## Available Renderers
+## Available Renderers (this skill)
 
-| Format                 | Script                                           | Purpose                                                                             | Toolchain                                                            |
-| ---------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| DOCX                   | [scripts/render_docx.py](scripts/render_docx.py) | Markdown → Word document with optional `--reference` template inheritance           | Pandoc on PATH (see `docs/archive/phase_3-4/PHASE_3D_TOOLCHAIN.md`)                    |
-| XLSX                   | [scripts/render_xlsx.py](scripts/render_xlsx.py) | JSON envelope → styled multi-sheet Excel workbook (auto status fill, frozen header) | openpyxl (Python, already in venv; see `docs/archive/phase_3-4/PHASE_3E_TOOLCHAIN.md`) |
-| PDF / PPTX / MP4 / GIF | Use `huashu-design/scripts/*` directly           | HTML deck / animation rendering                                                     | Node + Playwright + Chromium (see `docs/archive/phase_3-4/PHASE_3A_TOOLCHAIN.md`)      |
+| Format | Script                                           | Purpose                                                                             | Toolchain                                                                              |
+| ------ | ------------------------------------------------ | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| DOCX   | [scripts/render_docx.py](scripts/render_docx.py) | Markdown → Word document with optional `--reference` template inheritance           | Pandoc on PATH (see `docs/archive/phase_3-4/PHASE_3D_TOOLCHAIN.md`)  |
+| XLSX   | [scripts/render_xlsx.py](scripts/render_xlsx.py) | JSON envelope → styled multi-sheet Excel workbook (auto status fill, frozen header) | openpyxl (Python, already in venv; see `docs/archive/phase_3-4/PHASE_3E_TOOLCHAIN.md`) |
+
+## Delegation — formats this skill does NOT own
+
+PDF, PPTX, MP4, and GIF are visual / presentation / motion formats; they are designed by `huashu-design` (HTML deck / animation rendering via Node + Playwright + Chromium). They are **not** re-exported here, and there is no plan to re-export them. If a consumer skill needs one of those formats:
+
+1. Add `../huashu-design/scripts` to that skill's `metadata.script_paths`.
+2. Invoke `huashu-design`'s renderer script directly (e.g. `export_deck_pdf.mjs`, `export_deck_pptx.mjs`, `render-video.js`).
+3. Do NOT route through `renderers` for these formats — there is nothing here to dispatch to and you will get a missing-script error.
+
+If the user asks `renderers` (this skill) directly for one of those formats, decline and name `huashu-design` as the correct skill. See `docs/archive/phase_3-4/PHASE_3A_TOOLCHAIN.md` for the Node / Playwright toolchain `huashu-design` uses.
 
 ## Invocation Pattern (from a consumer skill)
 
