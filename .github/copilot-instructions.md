@@ -341,7 +341,7 @@ ALL development happens on feature branches. `main` is updated only via fast-for
 
 **Active integration branches:**
 
-- `120-skills-spec-compliance` — parent for the entire skills + MCP epic (Phases 2.x–6.x per `docs/skills_roadmap.md`). All `121-*`, `122-*`, etc. sub-branches FF into 120.
+- _None._ The skills + MCP epic (Phases 2.x–6.x) merged to `main` as `v1.2.0`. New feature branches now branch from `main` directly. If a future multi-branch epic starts, list its integration branch here.
 
 **Standard fast-forward sequence** (after the user says "merge it" / "ship it" / "continue"):
 

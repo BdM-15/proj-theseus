@@ -48,9 +48,9 @@ Directly (rare — for testing or one-off conversions): activate the skill yours
 
 | Format                 | Script                                           | Purpose                                                                             | Toolchain                                                            |
 | ---------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| DOCX                   | [scripts/render_docx.py](scripts/render_docx.py) | Markdown → Word document with optional `--reference` template inheritance           | Pandoc on PATH (see `docs/PHASE_3D_TOOLCHAIN.md`)                    |
-| XLSX                   | [scripts/render_xlsx.py](scripts/render_xlsx.py) | JSON envelope → styled multi-sheet Excel workbook (auto status fill, frozen header) | openpyxl (Python, already in venv; see `docs/PHASE_3E_TOOLCHAIN.md`) |
-| PDF / PPTX / MP4 / GIF | Use `huashu-design/scripts/*` directly           | HTML deck / animation rendering                                                     | Node + Playwright + Chromium (see `docs/PHASE_3A_TOOLCHAIN.md`)      |
+| DOCX                   | [scripts/render_docx.py](scripts/render_docx.py) | Markdown → Word document with optional `--reference` template inheritance           | Pandoc on PATH (see `docs/archive/phase_3-4/PHASE_3D_TOOLCHAIN.md`)                    |
+| XLSX                   | [scripts/render_xlsx.py](scripts/render_xlsx.py) | JSON envelope → styled multi-sheet Excel workbook (auto status fill, frozen header) | openpyxl (Python, already in venv; see `docs/archive/phase_3-4/PHASE_3E_TOOLCHAIN.md`) |
+| PDF / PPTX / MP4 / GIF | Use `huashu-design/scripts/*` directly           | HTML deck / animation rendering                                                     | Node + Playwright + Chromium (see `docs/archive/phase_3-4/PHASE_3A_TOOLCHAIN.md`)      |
 
 ## Invocation Pattern (from a consumer skill)
 
@@ -94,7 +94,7 @@ Every script in `scripts/` MUST:
 
 ## See Also
 
-- [docs/PHASE_3D_TOOLCHAIN.md](../../../docs/PHASE_3D_TOOLCHAIN.md) — Pandoc install + DOCX renderer contract
-- [docs/PHASE_3E_TOOLCHAIN.md](../../../docs/PHASE_3E_TOOLCHAIN.md) — openpyxl + XLSX renderer contract
+- [docs/archive/phase_3-4/PHASE_3D_TOOLCHAIN.md](../../../docs/archive/phase_3-4/PHASE_3D_TOOLCHAIN.md) — Pandoc install + DOCX renderer contract
+- [docs/archive/phase_3-4/PHASE_3E_TOOLCHAIN.md](../../../docs/archive/phase_3-4/PHASE_3E_TOOLCHAIN.md) — openpyxl + XLSX renderer contract
 - [docs/PHASE_3A_TOOLCHAIN.md](../../../docs/PHASE_3A_TOOLCHAIN.md) — Node / Playwright / Chromium for huashu-design renderers
 - [docs/skills_roadmap.md](../../../docs/skills_roadmap.md) — Phase 3 sub-phase tracking

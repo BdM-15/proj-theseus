@@ -54,7 +54,7 @@ Theseus splits the upstream skill into two Theseus skills (`subcontractor-sow-bu
 - `subcontractor-sow-builder/references/`: section structure spec, decision-tree blocks, FAR citations for authoring, language rules.
 - `rfp-reverse-engineer/references/`: reverse-engineering catalog (3 intake + 6 blocks BACKWARDS), discriminator hooks, RFP signal patterns (ghost language, missing sections), FAR citations for trap detection.
 
-**Future TODO:** If references drift becomes a maintenance burden, introduce `extra_read_roots` in `src/skills/manager.py` and `src/skills/tools.py` mirroring the existing `script_paths` pattern (~30 lines). Tracked in `docs/PHASE_4H_SOW_SKILLS.md`.
+**Future TODO:** If references drift becomes a maintenance burden, introduce `extra_read_roots` in `src/skills/manager.py` and `src/skills/tools.py` mirroring the existing `script_paths` pattern (~30 lines). Tracked in `docs/archive/phase_3-4/PHASE_4H_SOW_SKILLS.md`.
 
 ## Re-Vendor Procedure
 
@@ -67,4 +67,4 @@ Theseus splits the upstream skill into two Theseus skills (`subcontractor-sow-bu
 
 ## License Notice
 
-Upstream is MIT-licensed. The original LICENSE text is preserved in the upstream repository. Modifications made by Theseus are documented in this file and in `docs/PHASE_4H_SOW_SKILLS.md`.
+Upstream is MIT-licensed. The original LICENSE text is preserved in the upstream repository. Modifications made by Theseus are documented in this file and in `docs/archive/phase_3-4/PHASE_4H_SOW_SKILLS.md`.

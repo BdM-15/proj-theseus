@@ -254,7 +254,7 @@ Federal proposals are typically submitted as DOCX, often on an agency- or compan
    }
    ```
 
-   Add `"--reference", "{artifacts}/reference.docx"` if a template was supplied. Confirm `exit_code == 0`. If `exit_code == 127`, Pandoc is not installed — surface the install hint from stderr to the user (see `docs/PHASE_3D_TOOLCHAIN.md`).
+   Add `"--reference", "{artifacts}/reference.docx"` if a template was supplied. Confirm `exit_code == 0`. If `exit_code == 127`, Pandoc is not installed — surface the install hint from stderr to the user (see `docs/archive/phase_3-4/PHASE_3D_TOOLCHAIN.md`).
 
 4. Add the produced filename to the cover note's "Artifacts" section.
 
@@ -280,7 +280,7 @@ Federal contracting officers expect the compliance matrix as a sortable, filtera
    }
    ```
 
-   Confirm `exit_code == 0`. The workbook will have a frozen header, autofilter, and conditional row fills (green=OK, yellow=PARTIAL, red=GAP) on any sheet that contains a `status` column. If `exit_code == 127`, openpyxl is missing from the venv — surface the install hint from stderr (see `docs/PHASE_3E_TOOLCHAIN.md`).
+   Confirm `exit_code == 0`. The workbook will have a frozen header, autofilter, and conditional row fills (green=OK, yellow=PARTIAL, red=GAP) on any sheet that contains a `status` column. If `exit_code == 127`, openpyxl is missing from the venv — surface the install hint from stderr (see `docs/archive/phase_3-4/PHASE_3E_TOOLCHAIN.md`).
 
 3. Add the produced filename to the cover note's "Artifacts" section.
 
