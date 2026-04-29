@@ -2705,6 +2705,177 @@ details.acc .summary-actions {
   background: rgba(var(--neon-cyan-rgb), 0.05);
 }
 
+/* === Phase 6a-2 — Pinned anchors (Theseus mythos) ===
+   Anchor icon doubles as a Ship-of-Theseus nod and a literal "pin to
+   top" affordance. Active state uses cyan glow + filled background; the
+   row gets a subtle left border so pinned items read as a curated band. */
+.studio-anchor.studio-anchor-active {
+  color: var(--neon-cyan);
+  border-color: rgba(var(--neon-cyan-rgb), 0.85);
+  background: rgba(var(--neon-cyan-rgb), 0.12);
+  box-shadow: 0 0 8px rgba(var(--neon-cyan-rgb), 0.35);
+}
+.studio-anchor.studio-anchor-active:hover {
+  background: rgba(var(--neon-cyan-rgb), 0.18);
+}
+.studio-row-pinned {
+  background: rgba(var(--neon-cyan-rgb), 0.03);
+  box-shadow: inset 2px 0 0 0 rgba(var(--neon-cyan-rgb), 0.55);
+}
+.studio-row-pinned:hover {
+  background: rgba(var(--neon-cyan-rgb), 0.06);
+}
+
+/* Filename → preview button (replaces the static <td> text label). */
+.studio-filename-btn {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  font-size: inherit;
+  transition: color 120ms ease;
+}
+.studio-filename-btn:hover {
+  color: #fff;
+  text-decoration: underline;
+  text-decoration-color: rgba(var(--neon-cyan-rgb), 0.6);
+  text-underline-offset: 3px;
+}
+
+/* === Phase 6a-2 — Inline preview drawer === */
+.studio-preview-pre {
+  display: block;
+  width: 100%;
+  max-height: 75vh;
+  overflow: auto;
+  padding: 12px 14px;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-300);
+  background: rgba(var(--ink-800-rgb), 0.7);
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* DOCX (Mammoth output): Word renders to bare semantic HTML — give it
+   readable typography on the dark canvas. */
+.studio-preview-docx {
+  max-height: 75vh;
+  overflow: auto;
+  padding: 24px 28px;
+  background: #0f1218;
+  color: #e2e8f0;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.studio-preview-docx h1,
+.studio-preview-docx h2,
+.studio-preview-docx h3,
+.studio-preview-docx h4 {
+  color: #fff;
+  font-weight: 600;
+  margin: 1.2em 0 0.5em;
+}
+.studio-preview-docx h1 { font-size: 1.6em; }
+.studio-preview-docx h2 { font-size: 1.35em; }
+.studio-preview-docx h3 { font-size: 1.15em; }
+.studio-preview-docx p { margin: 0.6em 0; }
+.studio-preview-docx ul,
+.studio-preview-docx ol { padding-left: 1.5em; margin: 0.6em 0; }
+.studio-preview-docx table {
+  border-collapse: collapse;
+  margin: 0.8em 0;
+  width: 100%;
+}
+.studio-preview-docx th,
+.studio-preview-docx td {
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+.studio-preview-docx th {
+  background: rgba(var(--neon-cyan-rgb), 0.08);
+  color: var(--neon-cyan);
+  font-weight: 600;
+}
+.studio-preview-docx a {
+  color: var(--neon-cyan);
+  text-decoration: underline;
+}
+
+/* XLSX (SheetJS): emits raw <table> with no classes. Style it to match
+   the dark canvas. */
+.studio-preview-xlsx {
+  max-height: 75vh;
+  overflow: auto;
+  background: rgba(var(--ink-800-rgb), 0.7);
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+}
+.studio-preview-xlsx table {
+  border-collapse: collapse;
+  width: 100%;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  font-size: 12px;
+  color: var(--text-300);
+}
+.studio-preview-xlsx th,
+.studio-preview-xlsx td {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  padding: 5px 8px;
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+.studio-preview-xlsx tr:first-child td,
+.studio-preview-xlsx th {
+  background: rgba(var(--neon-cyan-rgb), 0.08);
+  color: var(--neon-cyan);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.studio-preview-xlsx tr:nth-child(even) td {
+  background: rgba(var(--ink-900-rgb), 0.4);
+}
+
+/* Sheet tabs (XLSX multi-sheet) */
+.studio-sheet-tab {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  color: var(--text-300);
+  background: rgba(var(--ink-800-rgb), 0.6);
+  border: 1px solid var(--edge);
+  border-radius: 4px 4px 0 0;
+  border-bottom-color: transparent;
+  cursor: pointer;
+  transition:
+    color 120ms ease,
+    border-color 120ms ease,
+    background-color 120ms ease;
+}
+.studio-sheet-tab:hover {
+  color: var(--neon-cyan);
+}
+.studio-sheet-tab-active {
+  color: var(--neon-cyan);
+  background: rgba(var(--neon-cyan-rgb), 0.1);
+  border-color: rgba(var(--neon-cyan-rgb), 0.55);
+  border-bottom-color: rgba(var(--neon-cyan-rgb), 0.55);
+}
+
 /* === Phase 6b — Reasoning view ("Why this artifact?") === */
 .reasoning-chip {
   display: inline-flex;
