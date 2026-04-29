@@ -1,0 +1,11 @@
+{
+  "name": "federal_register",
+  "description": "Federal Register MCP server (1102tools/federal-contracting-mcps). 8 read-only tools over the public Federal Register API: search proposed/final rules, notices, executive orders, comment periods, and FAR/DFARS case rulemaking history since 1994. No authentication required. Companion to ecfr (what the rule says now) - federal_register tracks what is changing.",
+  "command": ["uvx", "--from", "federal-register-mcp==0.2.7", "federal-register-mcp"],
+  "env_required": [],
+  "env_optional": [],
+  "vendored_from": "https://github.com/1102tools/federal-contracting-mcps/tree/main/servers/federal-register-mcp",
+  "vendored_commit": "aef1961378b3e5c380270bec48ed47a4f7bed4fc",
+  "vendored_at": "2026-04-28",
+  "license": "MIT"
+}

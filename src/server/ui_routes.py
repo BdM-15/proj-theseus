@@ -304,6 +304,26 @@ class SkillInstallPayload(BaseModel):
     name: Optional[str] = Field(None, description="Override target skill slug")
 
 
+class McpKeyUpdate(BaseModel):
+    """Body for POST /api/ui/mcps/{name}/keys.
+
+    Only env vars declared in the MCP's manifest (env_required +
+    env_optional) are writable through this endpoint — it cannot be used
+    as a generic .env writer. Empty string clears the variable's value
+    while keeping the line in .env so users see it was intentionally
+    blanked.
+    """
+
+    keys: dict[str, str] = Field(
+        default_factory=dict,
+        description="env-var name → value pairs (must be declared by the MCP)",
+    )
+    restart: bool = Field(
+        default=True,
+        description="Schedule a graceful self-restart so subprocess env updates",
+    )
+
+
 def _default_max_entities_per_type() -> int:
     """Active value (per-workspace override → env → 40)."""
     return int(_read_skill_settings()["max_entities_per_type"])
@@ -2515,6 +2535,82 @@ def register_ui(
             raise HTTPException(404, f"Unknown run: {name}/{run_id}")
         return JSONResponse(run)
 
+    @app.get(
+        "/api/ui/skills/{name}/runs/{run_id}/reasoning",
+        tags=["theseus-ui"],
+    )
+    async def get_skill_run_reasoning_route(name: str, run_id: str) -> JSONResponse:
+        """Phase 6b — Deterministic "Why this artifact?" view.
+
+        Walks the persisted ``transcript.json`` for one skill run and renders
+        a numbered reasoning timeline (assistant turns + tool calls + tool
+        results paired by ``call_id``). Pure transcript renderer — **no LLM
+        calls, no inference**. The transcript is the source of truth.
+        """
+        from src.skills.reasoning import build_reasoning_view
+
+        mgr = get_skill_manager()
+        run = mgr.get_run(_workspace_dir(), name, run_id)
+        if run is None:
+            raise HTTPException(404, f"Unknown run: {name}/{run_id}")
+        transcript = run.get("transcript") or []
+        view = await asyncio.to_thread(build_reasoning_view, transcript)
+        return JSONResponse(
+            {
+                "workspace": get_settings().workspace,
+                "skill": name,
+                "run_id": run_id,
+                "title": (run.get("metadata") or {}).get("title"),
+                "created_at": (run.get("metadata") or {}).get("created_at"),
+                "artifacts": run.get("artifacts") or [],
+                **view,
+            }
+        )
+
+    @app.get("/api/ui/chunks/{chunk_id}", tags=["theseus-ui"])
+    async def get_chunk_route(chunk_id: str) -> JSONResponse:
+        """Phase 6b.2 — Resolve a single text chunk for inline preview.
+
+        Powers the citation chips in the reasoning drawer (and any other
+        UI surface that surfaces ``chunk-<hex>`` ids). Reads the workspace's
+        ``kv_store_text_chunks.json`` directly. Pure read-only lookup.
+        """
+        # Defensive id shape: must look like a real chunk key (chunk-<hex>)
+        # to keep this endpoint from doubling as an arbitrary file probe.
+        if not chunk_id or len(chunk_id) > 128 or "/" in chunk_id or "\\" in chunk_id:
+            raise HTTPException(400, "Invalid chunk id")
+
+        ws = _workspace_dir()
+        tc_path = ws / "kv_store_text_chunks.json"
+        if not tc_path.exists():
+            raise HTTPException(404, "No text-chunk store in this workspace")
+
+        def _load_chunk() -> Optional[dict]:
+            try:
+                store = json.loads(tc_path.read_text(encoding="utf-8"))
+            except Exception as exc:
+                logger.warning("Failed reading text-chunk store: %s", exc)
+                return None
+            return store.get(chunk_id)
+
+        chunk = await asyncio.to_thread(_load_chunk)
+        if not chunk:
+            raise HTTPException(404, f"Unknown chunk: {chunk_id}")
+
+        content = chunk.get("content") or chunk.get("text") or ""
+        return JSONResponse(
+            {
+                "workspace": get_settings().workspace,
+                "chunk_id": chunk_id,
+                "file_path": chunk.get("file_path") or chunk.get("full_doc_id"),
+                "full_doc_id": chunk.get("full_doc_id"),
+                "chunk_order_index": chunk.get("chunk_order_index"),
+                "tokens": chunk.get("tokens"),
+                "length": len(content),
+                "content": content,
+            }
+        )
+
     @app.delete("/api/ui/skills/{name}/runs/{run_id}", tags=["theseus-ui"])
     async def delete_skill_run_route(name: str, run_id: str) -> JSONResponse:
         """Delete a persisted skill run from disk."""
@@ -2548,5 +2644,175 @@ def register_ui(
             media_type=mime or "application/octet-stream",
             filename=path.name,
         )
+
+    @app.get("/api/ui/studio", tags=["theseus-ui"])
+    async def list_studio_deliverables_route(limit: int = 500) -> JSONResponse:
+        """List every artifact across every skill run in the active workspace.
+
+        Powers the Studio sidebar entry (Phase 6a). Pure index over the
+        Phase 3 on-disk layout — no new schema. Each row carries enough to
+        render a table row and deep-link back to the originating run via
+        ``/api/ui/skills/{name}/runs/{run_id}/artifacts/{filename}``.
+        """
+        mgr = get_skill_manager()
+        deliverables = await asyncio.to_thread(
+            mgr.list_deliverables, _workspace_dir(), limit
+        )
+        return JSONResponse(
+            {
+                "workspace": get_settings().workspace,
+                "count": len(deliverables),
+                "deliverables": deliverables,
+            }
+        )
+
+    # ------------------------------------------------------------------
+    # Phase 4e — MCP Servers Settings panel
+    # ------------------------------------------------------------------
+    # Surfaces the vendored MCP inventory under tools/mcps/ to the
+    # Settings UI: what is installed, which env vars each one wants,
+    # whether those env vars are currently set, and a "Test connection"
+    # path that does a real handshake + tools/list against the upstream
+    # subprocess. Saving keys persists to .env (atomic, same pattern as
+    # the workspace switch flow) and triggers a graceful self-restart so
+    # the new env reaches every subsystem.
+
+    _SAFE_MCP_NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+    _SAFE_ENV_KEY = re.compile(r"^[A-Z][A-Z0-9_]{0,63}$")
+
+    def _mcps_root() -> Path:
+        return Path.cwd() / "tools" / "mcps"
+
+    def _mask_secret(value: str) -> str:
+        """Show first 4 + last 2, never the middle. Empty stays empty."""
+        if not value:
+            return ""
+        if len(value) <= 8:
+            return value[0] + "***"
+        return f"{value[:4]}***{value[-2:]}"
+
+    def _env_status(name: str) -> dict[str, Any]:
+        v = os.environ.get(name, "")
+        return {"name": name, "set": bool(v), "masked": _mask_secret(v)}
+
+    @app.get("/api/ui/mcps", tags=["theseus-ui"])
+    async def list_mcps_route() -> JSONResponse:
+        """List vendored MCP servers + their env-var status.
+
+        Drives the Settings → MCP Servers panel. No subprocess is spawned;
+        this is metadata-only.
+        """
+        from src.skills.mcp_client import discover_manifests
+
+        manifests = discover_manifests(_mcps_root())
+        items: list[dict[str, Any]] = []
+        for name in sorted(manifests):
+            m = manifests[name]
+            items.append({
+                "name": m.name,
+                "description": m.description,
+                "command": m.command,
+                "env_required": [_env_status(k) for k in m.env_required],
+                "env_optional": [_env_status(k) for k in m.env_optional],
+                "missing_env": m.missing_env(),
+                "vendored_from": m.vendored_from,
+                "vendored_commit": m.vendored_commit,
+                "vendored_at": m.vendored_at,
+                "license": m.license,
+            })
+        return JSONResponse({"mcps": items})
+
+    @app.post("/api/ui/mcps/{name}/keys", tags=["theseus-ui"])
+    async def update_mcp_keys_route(name: str, payload: McpKeyUpdate) -> JSONResponse:
+        """Persist env vars for one MCP into .env, then schedule restart.
+
+        Restricts the writable key set to the manifest's env_required +
+        env_optional list — this endpoint cannot be used as a generic
+        .env writer.
+        """
+        from src.skills.mcp_client import discover_manifests
+
+        if not _SAFE_MCP_NAME.match(name):
+            raise HTTPException(400, "Invalid MCP name")
+        manifests = discover_manifests(_mcps_root())
+        if name not in manifests:
+            raise HTTPException(404, f"Unknown MCP: {name}")
+        m = manifests[name]
+        allowed = set(m.env_required) | set(m.env_optional)
+        if not allowed:
+            raise HTTPException(400, f"MCP {name!r} declares no env vars")
+        bad = [k for k in payload.keys if k not in allowed]
+        if bad:
+            raise HTTPException(
+                400,
+                f"Keys not declared by MCP {name!r}: {bad}. "
+                f"Allowed: {sorted(allowed)}",
+            )
+        invalid = [k for k in payload.keys if not _SAFE_ENV_KEY.match(k)]
+        if invalid:
+            raise HTTPException(400, f"Malformed env-var names: {invalid}")
+        written: list[str] = []
+        for key, val in payload.keys.items():
+            try:
+                _set_env_var(key, val)
+                written.append(key)
+            except Exception as exc:
+                raise HTTPException(
+                    500, f"Failed updating .env for {key}: {exc}"
+                ) from exc
+        if payload.restart and written:
+            asyncio.get_event_loop().call_later(0.75, _self_restart)
+            logger.warning(
+                "🔄 MCP %s keys updated (%s) - restarting…", name, written
+            )
+            return JSONResponse({
+                "status": "restarting",
+                "written": written,
+                "mcp": name,
+                "message": "Keys saved. Server is restarting; UI will reconnect.",
+            })
+        return JSONResponse({
+            "status": "saved",
+            "written": written,
+            "mcp": name,
+        })
+
+    @app.post("/api/ui/mcps/{name}/test", tags=["theseus-ui"])
+    async def test_mcp_route(name: str) -> JSONResponse:
+        """Spawn the MCP, complete handshake, return advertised tool inventory.
+
+        Uses the same MCPSession the live runtime uses, so a green test
+        here proves real production health. Subprocess is reaped before
+        the response returns. Returns ``ok: false`` (HTTP 200) on any
+        MCP-side failure so the UI can render the error string instead
+        of a generic 500.
+        """
+        from src.skills.mcp_client import MCPError, MCPSession, discover_manifests
+
+        if not _SAFE_MCP_NAME.match(name):
+            raise HTTPException(400, "Invalid MCP name")
+        manifests = discover_manifests(_mcps_root())
+        if name not in manifests:
+            raise HTTPException(404, f"Unknown MCP: {name}")
+        session = MCPSession(manifests[name])
+        try:
+            try:
+                await session.start()
+            except MCPError as exc:
+                return JSONResponse(
+                    {"ok": False, "mcp": name, "error": str(exc)}
+                )
+            tools = list(session._tools)  # filled by start()
+            return JSONResponse({
+                "ok": True,
+                "mcp": name,
+                "tool_count": len(tools),
+                "sample_tools": [t.name for t in tools[:8]],
+            })
+        finally:
+            try:
+                await session.shutdown()
+            except Exception:  # noqa: BLE001 — best-effort reap
+                logger.debug("MCP %s test shutdown raised", name, exc_info=True)
 
     logger.info("✅ Project Theseus UI mounted at /ui (static: %s)", _STATIC_DIR)

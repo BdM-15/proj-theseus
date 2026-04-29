@@ -77,6 +77,20 @@ DEFAULT_SKILL_MAX_PAYLOAD_CHARS = _env_int("SKILL_MAX_PAYLOAD_CHARS", 200_000)
 logger = logging.getLogger(__name__)
 
 
+# Mimetypes the stdlib ``mimetypes`` module misses on Windows / fresh installs.
+# Used by ``SkillManager.list_deliverables`` to label rows for the Studio UI.
+_STUDIO_EXTRA_MIME: dict[str, str] = {
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "md": "text/markdown",
+    "json": "application/json",
+    "gif": "image/gif",
+    "mp4": "video/mp4",
+    "pdf": "application/pdf",
+}
+
+
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
@@ -170,6 +184,33 @@ class Skill:
     def to_summary(self) -> dict[str, Any]:
         """Trimmed dict for /api/ui/skills list endpoint."""
         fm = self.frontmatter
+        meta = fm.metadata or {}
+        # Phase 4j taxonomy — see docs/SKILL_TAXONOMY.md.
+        # Closed vocabularies; UI groups by personas_primary and filters by
+        # shipley_phases / capability. Default values keep legacy skills
+        # discoverable as "Utility" until backfilled.
+        personas_primary_raw = meta.get("personas_primary")
+        personas_primary = (
+            str(personas_primary_raw).strip()
+            if personas_primary_raw not in (None, "", "None")
+            else "none"
+        )
+        personas_secondary_raw = meta.get("personas_secondary", []) or []
+        if isinstance(personas_secondary_raw, str):
+            personas_secondary = [personas_secondary_raw.strip()] if personas_secondary_raw.strip() else []
+        elif isinstance(personas_secondary_raw, list):
+            personas_secondary = [str(x).strip() for x in personas_secondary_raw if str(x).strip()]
+        else:
+            personas_secondary = []
+        shipley_phases_raw = meta.get("shipley_phases", []) or []
+        if isinstance(shipley_phases_raw, str):
+            shipley_phases = [shipley_phases_raw.strip()] if shipley_phases_raw.strip() else []
+        elif isinstance(shipley_phases_raw, list):
+            shipley_phases = [str(x).strip() for x in shipley_phases_raw if str(x).strip()]
+        else:
+            shipley_phases = []
+        capability_raw = meta.get("capability")
+        capability = str(capability_raw).strip() if capability_raw else ""
         return {
             "name": self.name,
             "description": fm.description,
@@ -188,6 +229,11 @@ class Skill:
             "source_url": self.source_url,
             "installed_at": self.installed_at,
             "last_invoked_at": self.last_invoked_at,
+            # Phase 4j taxonomy fields (closed vocabularies).
+            "personas_primary": personas_primary,
+            "personas_secondary": personas_secondary,
+            "shipley_phases": shipley_phases,
+            "capability": capability,
         }
 
 
@@ -1247,6 +1293,98 @@ class SkillManager:
             return False
         shutil.rmtree(run_dir, ignore_errors=True)
         return not run_dir.exists()
+
+    def list_deliverables(
+        self, workspace_root: Path, limit: int = 500
+    ) -> list[dict[str, Any]]:
+        """Flatten every artifact across every skill run into one feed.
+
+        Walks ``<workspace_root>/skill_runs/<skill>/<run_id>/artifacts/*`` and
+        emits one row per file. Pure index over the Phase 3 layout — no new
+        on-disk schema. Powers the Studio sidebar entry (Phase 6a).
+
+        Each row carries enough to render a table row + deep-link back to the
+        originating run drawer:
+
+            {
+                "skill":      <skill name>,
+                "run_id":     <YYYYMMDD_HHMMSS_slug>,
+                "filename":   <basename>,
+                "mime":       <mimetype or None>,
+                "size":       <bytes>,
+                "created_at": <ISO timestamp from run envelope, or file mtime>,
+                "title":      <run envelope title, or None>,
+                "ext":        <lowercase extension without dot, or "">,
+            }
+
+        Sorted newest-first by ``created_at``. Capped at ``limit`` rows.
+        """
+        import mimetypes as _mt
+        from datetime import datetime as _dt, timezone as _tz
+
+        base = workspace_root / "skill_runs"
+        if not base.is_dir():
+            return []
+
+        rows: list[dict[str, Any]] = []
+        for skill_root in base.iterdir():
+            if not skill_root.is_dir():
+                continue
+            skill_name = skill_root.name
+            for run_dir in skill_root.iterdir():
+                if not run_dir.is_dir() or not self._is_safe_run_id(run_dir.name):
+                    continue
+                run_id = run_dir.name
+                artifacts_dir = run_dir / "artifacts"
+                if not artifacts_dir.is_dir():
+                    continue
+
+                # Pull created_at + title from the run envelope (cheap parse).
+                envelope_path = run_dir / "run.md"
+                meta: dict[str, Any] = {}
+                if envelope_path.exists():
+                    try:
+                        meta = _parse_run_envelope(
+                            envelope_path.read_text(encoding="utf-8")
+                        )
+                    except Exception:  # noqa: BLE001
+                        meta = {}
+                created_at = meta.get("created_at") or ""
+                title = meta.get("title")  # optional; envelope may not carry one
+
+                for artifact in sorted(artifacts_dir.iterdir()):
+                    if not artifact.is_file():
+                        continue
+                    try:
+                        stat = artifact.stat()
+                    except OSError:
+                        continue
+                    mime, _ = _mt.guess_type(artifact.name)
+                    ext = artifact.suffix.lstrip(".").lower()
+                    # Prefer our explicit map over stdlib guesses — on Windows
+                    # the registry mislabels .md / .docx / .xlsx etc.
+                    if ext in _STUDIO_EXTRA_MIME:
+                        mime = _STUDIO_EXTRA_MIME[ext]
+                    elif mime is None:
+                        mime = "application/octet-stream"
+                    rows.append(
+                        {
+                            "skill": skill_name,
+                            "run_id": run_id,
+                            "filename": artifact.name,
+                            "mime": mime,
+                            "size": stat.st_size,
+                            "created_at": created_at
+                            or _dt.fromtimestamp(
+                                stat.st_mtime, tz=_tz.utc
+                            ).isoformat(),
+                            "title": title,
+                            "ext": ext,
+                        }
+                    )
+
+        rows.sort(key=lambda r: r.get("created_at", ""), reverse=True)
+        return rows[:limit]
 
     def get_artifact_path(
         self,

@@ -1,11 +1,16 @@
 ---
 name: proposal-generator
-description: Shipley-methodology federal proposal outline and section drafter. USE WHEN the user asks to draft a proposal volume, build an outline from the proposal_instruction ↔ evaluation_factor traceability (UCF Section L/M or equivalent for non-UCF — FAR 16 task orders, FOPRs, BPA calls, OTAs, agency-specific formats), generate a compliance matrix, write win themes, draft an executive summary, propose FAB (Feature → Advantage → Benefit) chains, identify discriminators, or "respond to this RFP". Pulls requirements, evaluation factors, instructions, customer priorities, and pain points from the active Theseus workspace KG and produces an evidence-cited draft. Also ships govcon HTML render templates (compliance_matrix, one_pager, slide_master, theme_card) under assets/ — hand the rendered content off to the `huashu-design` skill for PPTX / PDF / animation export. Format-agnostic: never assumes UCF section labels are present. DO NOT USE FOR clause compliance auditing only (use compliance-auditor) or extracting new entities (use govcon-ontology + the Theseus pipeline).
+description: "Shipley-methodology federal proposal outline and section drafter. USE WHEN the user asks to draft a proposal volume, build an outline from the proposal_instruction ↔ evaluation_factor traceability (UCF Section L/M or equivalent for non-UCF — FAR 16 task orders, FOPRs, BPA calls, OTAs, agency-specific formats), generate a compliance matrix, write win themes, draft an executive summary, propose FAB (Feature → Advantage → Benefit) chains, identify discriminators, or 'respond to this RFP'. Pulls requirements, evaluation factors, instructions, customer priorities, and pain points from the active Theseus workspace KG and produces an evidence-cited draft. Also ships govcon HTML render templates (compliance_matrix, one_pager, slide_master, theme_card) under assets/ — hand the rendered content off to the `huashu-design` skill for PPTX / PDF / animation export. Format-agnostic — never assumes UCF section labels are present. DO NOT USE FOR clause compliance auditing only (use compliance-auditor) or extracting new entities (use govcon-ontology + the Theseus pipeline)."
 license: MIT
 metadata:
+  # Phase 4j taxonomy — see docs/SKILL_TAXONOMY.md
+  personas_primary: proposal_writer
+  personas_secondary: [proposal_manager, capture_manager]
+  shipley_phases: [proposal_development]
+  capability: draft
   runtime: tools
   category: proposal
-  version: 0.6.0
+  version: 0.7.0
   status: active
   # Phase 3b: opt-in cross-skill access to huashu-design's renderer scripts
   # so the optional render step (12) can produce PPTX/PDF artifacts via
@@ -249,7 +254,7 @@ Federal proposals are typically submitted as DOCX, often on an agency- or compan
    }
    ```
 
-   Add `"--reference", "{artifacts}/reference.docx"` if a template was supplied. Confirm `exit_code == 0`. If `exit_code == 127`, Pandoc is not installed — surface the install hint from stderr to the user (see `docs/PHASE_3D_TOOLCHAIN.md`).
+   Add `"--reference", "{artifacts}/reference.docx"` if a template was supplied. Confirm `exit_code == 0`. If `exit_code == 127`, Pandoc is not installed — surface the install hint from stderr to the user (see `docs/archive/phase_3-4/PHASE_3D_TOOLCHAIN.md`).
 
 4. Add the produced filename to the cover note's "Artifacts" section.
 
@@ -275,7 +280,7 @@ Federal contracting officers expect the compliance matrix as a sortable, filtera
    }
    ```
 
-   Confirm `exit_code == 0`. The workbook will have a frozen header, autofilter, and conditional row fills (green=OK, yellow=PARTIAL, red=GAP) on any sheet that contains a `status` column. If `exit_code == 127`, openpyxl is missing from the venv — surface the install hint from stderr (see `docs/PHASE_3E_TOOLCHAIN.md`).
+   Confirm `exit_code == 0`. The workbook will have a frozen header, autofilter, and conditional row fills (green=OK, yellow=PARTIAL, red=GAP) on any sheet that contains a `status` column. If `exit_code == 127`, openpyxl is missing from the venv — surface the install hint from stderr (see `docs/archive/phase_3-4/PHASE_3E_TOOLCHAIN.md`).
 
 3. Add the produced filename to the cover note's "Artifacts" section.
 

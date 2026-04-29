@@ -914,7 +914,14 @@ details.acc .summary-actions {
   max-height: 28rem;
   overflow-y: auto;
 }
-.source-row {
+/* Source card — collapsible row that expands inline to show the full
+   chunk content (cleaned narrative + Raw toggle). The same fetch +
+   formatSource() pipeline that powers the reasoning-drawer chunk modal
+   feeds this view, so chat sources and citation chips render identically. */
+.source-card {
+  display: block;
+  width: 100%;
+  text-align: left;
   padding: 0.55rem 0.7rem;
   border: 1px solid rgba(148, 163, 184, 0.15);
   border-radius: 0.5rem;
@@ -925,15 +932,126 @@ details.acc .summary-actions {
     box-shadow 0.6s ease,
     border-color 0.2s ease;
 }
-.source-row:hover {
-  border-color: rgba(var(--neon-cyan-rgb), 0.35);
+.source-card:hover:not(.source-card-disabled) {
+  border-color: rgba(var(--neon-cyan-rgb), 0.45);
+  background: rgba(15, 23, 42, 0.7);
 }
-.source-row-head {
+.source-card-expanded {
+  border-color: rgba(var(--neon-cyan-rgb), 0.5);
+  background: rgba(15, 23, 42, 0.75);
+  box-shadow: 0 0 0 1px rgba(var(--neon-cyan-rgb), 0.12);
+}
+.source-card-disabled .source-card-head {
+  cursor: default;
+}
+.source-card-head {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   flex-wrap: wrap;
-  margin-bottom: 0.3rem;
+  cursor: pointer;
+}
+.source-card-head:focus-visible {
+  outline: 2px solid rgba(var(--neon-cyan-rgb), 0.6);
+  outline-offset: 2px;
+  border-radius: 0.3rem;
+}
+.source-card-chev {
+  color: rgba(148, 163, 184, 0.6);
+  font-size: 0.85rem;
+  line-height: 1;
+  margin-left: 0.25rem;
+  transition:
+    color 0.15s ease,
+    transform 0.18s ease;
+  display: inline-block;
+}
+.source-card-chev-open {
+  color: rgba(var(--neon-cyan-rgb), 0.95);
+  transform: rotate(180deg);
+}
+.source-card:hover:not(.source-card-disabled) .source-card-chev {
+  color: rgba(var(--neon-cyan-rgb), 0.85);
+}
+.source-card-sub {
+  margin-top: 0.3rem;
+}
+.source-card-caption {
+  display: block;
+  color: rgba(226, 232, 240, 0.85);
+  font-size: 0.7rem;
+  font-style: italic;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.source-card-expand .source-card-caption {
+  white-space: normal;
+  overflow: visible;
+  margin-bottom: 0.4rem;
+}
+.source-card-tablechip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.3rem;
+  background: rgba(255, 205, 94, 0.07);
+  border: 1px dashed rgba(255, 205, 94, 0.35);
+  color: rgba(255, 205, 94, 0.95);
+  font-size: 0.65rem;
+  font-family:
+    "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, monospace;
+}
+.source-card-expand .source-card-tablechip {
+  margin-bottom: 0.5rem;
+}
+.source-card-excerpt {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: rgba(203, 213, 225, 0.78);
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+/* Inline expanded panel — uses .modal-canvas to mirror the Studio
+   chunk-preview modal styling (header bar + chip row + body). */
+.source-card-expand {
+  margin-top: 0.6rem;
+  border-radius: 0.65rem;
+  overflow: hidden;
+}
+/* "View full chunk" action in the source card head row — opens the
+   shared Studio chunk-preview modal so chat citations and reasoning
+   chips both render the same scrollable modal. */
+.source-card-view-btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.62rem;
+  font-family:
+    "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(148, 163, 184, 0.85);
+  background: transparent;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 0.3rem;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+.source-card-view-btn:hover {
+  color: rgba(var(--neon-cyan-rgb), 0.95);
+  border-color: rgba(var(--neon-cyan-rgb), 0.55);
+  background: rgba(var(--neon-cyan-rgb), 0.06);
 }
 .source-num {
   color: var(--neon-cyan);
@@ -953,33 +1071,8 @@ details.acc .summary-actions {
   margin-left: auto;
   color: rgba(148, 163, 184, 0.7);
   font-size: 0.6rem;
-}
-.source-preview {
-  color: rgba(203, 213, 225, 0.85);
-  font-size: 0.72rem;
-  line-height: 1.45;
-  white-space: pre-wrap;
-  word-break: break-word;
-  max-height: 8rem;
-  overflow: hidden;
-  position: relative;
   font-family:
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    Roboto,
-    sans-serif;
-}
-.source-preview::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 1.5rem;
-  background: linear-gradient(to bottom, transparent, rgba(15, 23, 42, 0.85));
-  pointer-events: none;
+    "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, monospace;
 }
 /* Content-type badge in source row head */
 .source-kind-badge {
@@ -1016,69 +1109,6 @@ details.acc .summary-actions {
   color: rgba(148, 163, 184, 0.85);
   border-color: rgba(148, 163, 184, 0.3);
   background: rgba(148, 163, 184, 0.06);
-}
-/* Caption (italic, just under header) */
-.source-caption {
-  color: rgba(226, 232, 240, 0.92);
-  font-size: 0.72rem;
-  font-style: italic;
-  margin-bottom: 0.35rem;
-  line-height: 1.4;
-}
-/* Table summary card */
-.source-tablecard {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.35rem 0.6rem;
-  border-radius: 0.4rem;
-  background: rgba(255, 205, 94, 0.07);
-  border: 1px dashed rgba(255, 205, 94, 0.35);
-  color: rgba(255, 205, 94, 0.95);
-  font-size: 0.7rem;
-  font-family:
-    "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, monospace;
-  margin-bottom: 0.35rem;
-}
-/* Raw expander */
-.source-raw-wrap {
-  margin-top: 0.4rem;
-}
-.source-raw-toggle {
-  font-size: 0.6rem;
-  font-family:
-    "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, monospace;
-  color: rgba(148, 163, 184, 0.8);
-  background: transparent;
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  padding: 0.15rem 0.5rem;
-  border-radius: 0.3rem;
-  cursor: pointer;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  transition:
-    color 0.15s ease,
-    border-color 0.15s ease;
-}
-.source-raw-toggle:hover {
-  color: rgba(var(--neon-cyan-rgb), 0.95);
-  border-color: rgba(var(--neon-cyan-rgb), 0.5);
-}
-.source-raw {
-  margin-top: 0.4rem;
-  padding: 0.55rem 0.7rem;
-  background: rgba(2, 6, 23, 0.85);
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  border-radius: 0.4rem;
-  color: rgba(203, 213, 225, 0.78);
-  font-size: 0.62rem;
-  font-family:
-    "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, monospace;
-  line-height: 1.4;
-  max-height: 14rem;
-  overflow: auto;
-  white-space: pre-wrap;
-  word-break: break-word;
 }
 
 /* Chat ambient backdrop: animated aurora + grid */
@@ -2232,4 +2262,800 @@ details.acc .summary-actions {
 .skill-artifact-link:hover {
   color: var(--neon-cyan);
   border-bottom-color: var(--neon-cyan);
+}
+
+/* ============================================================
+   Phase 4j — Skill taxonomy UI (filter rail + 3-axis pills).
+   Closed-vocabulary helpers consumed by the Skills page in
+   index.html. NEVER use @apply (Tailwind Play CDN does not
+   process external CSS). All colors via :root tokens above.
+   ============================================================ */
+
+/* Filter rail container — gradient-edged glass panel matching
+   the chat composer / workspace header treatment. */
+.filter-rail {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.625rem;
+  background: linear-gradient(
+    180deg,
+    rgba(var(--ink-800-rgb), 0.7),
+    rgba(var(--ink-900-rgb), 0.85)
+  );
+  border: 1px solid var(--edge);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.02) inset,
+    0 0 24px -8px rgba(var(--neon-cyan-rgb), 0.12);
+  overflow: hidden;
+}
+.filter-rail-rows {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* Right-side meta cluster: live "Showing X of Y" + Clear button.
+   Vertically centered, separated from the rows by a faint divider. */
+.filter-rail-meta {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0.55rem;
+  padding-left: 1rem;
+  min-width: 13rem;
+}
+.filter-rail-meta::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 12%;
+  bottom: 12%;
+  width: 1px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgba(var(--neon-cyan-rgb), 0.25),
+    rgba(var(--neon-magenta-rgb), 0.25),
+    transparent
+  );
+}
+/* Compact search input — neon-glow on focus, with leading icon and an
+   inline clear button that only appears when there is a query. */
+.filter-rail-search {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+  min-width: 11rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 9999px;
+  background: rgba(var(--ink-900-rgb), 0.7);
+  border: 1px solid var(--edge);
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    background 140ms ease;
+}
+.filter-rail-search:hover {
+  border-color: rgba(var(--neon-cyan-rgb), 0.45);
+}
+.filter-rail-search:focus-within {
+  border-color: rgba(var(--neon-cyan-rgb), 0.85);
+  background: rgba(var(--ink-800-rgb), 0.9);
+  box-shadow:
+    0 0 12px rgba(var(--neon-cyan-rgb), 0.35),
+    0 0 0 1px rgba(var(--neon-cyan-rgb), 0.25);
+}
+.filter-rail-search-icon {
+  flex: 0 0 auto;
+  margin-right: 0.4rem;
+  color: var(--text-500, #6b7488);
+  transition: color 140ms ease;
+}
+.filter-rail-search:focus-within .filter-rail-search-icon {
+  color: var(--neon-cyan);
+}
+.filter-rail-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-200, #d6dbe7);
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: 0.02em;
+  padding: 0;
+}
+.filter-rail-search-input::placeholder {
+  color: var(--text-500, #6b7488);
+  font-style: italic;
+}
+.filter-rail-search-clear {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 0.35rem;
+  padding: 0.15rem;
+  border: none;
+  background: transparent;
+  color: var(--text-400);
+  cursor: pointer;
+  border-radius: 9999px;
+  transition:
+    color 140ms ease,
+    background 140ms ease;
+}
+.filter-rail-search-clear:hover {
+  color: var(--neon-magenta);
+  background: rgba(var(--neon-magenta-rgb), 0.12);
+}
+.filter-rail-count {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--text-400);
+  white-space: nowrap;
+}
+.filter-rail-count-label,
+.filter-rail-count-sep {
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  color: var(--text-500, #6b7488);
+}
+.filter-rail-count-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-200, #d6dbe7);
+  transition:
+    color 160ms ease,
+    text-shadow 160ms ease;
+}
+.filter-rail-count-value.is-filtered {
+  color: var(--neon-cyan);
+  text-shadow: 0 0 10px rgba(var(--neon-cyan-rgb), 0.6);
+}
+.filter-rail-count-total {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-300, #a4abbd);
+}
+.filter-rail::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      120% 60% at 0% 0%,
+      rgba(var(--neon-magenta-rgb), 0.08),
+      transparent 50%
+    ),
+    radial-gradient(
+      120% 60% at 100% 100%,
+      rgba(var(--neon-cyan-rgb), 0.08),
+      transparent 50%
+    );
+}
+.filter-rail::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(var(--neon-magenta-rgb), 0.5),
+    rgba(var(--neon-cyan-rgb), 0.5),
+    transparent
+  );
+  pointer-events: none;
+}
+.filter-rail-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.5rem;
+  padding: 0.35rem 0;
+}
+.filter-rail-row + .filter-rail-row {
+  border-top: 1px dashed rgba(var(--edge-rgb, 38, 49, 80), 0.4);
+}
+
+/* Axis label — small all-caps tag on the left, color-coded per axis. */
+.filter-axis-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 7rem;
+  padding: 0.15rem 0;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-weight: 700;
+  margin-right: 0.4rem;
+}
+.filter-axis-label [data-lucide],
+.filter-axis-label svg {
+  width: 14px;
+  height: 14px;
+}
+.filter-axis-label-magenta {
+  color: var(--neon-magenta);
+  text-shadow: 0 0 6px rgba(var(--neon-magenta-rgb), 0.5);
+}
+.filter-axis-label-cyan {
+  color: var(--neon-cyan);
+  text-shadow: 0 0 6px rgba(var(--neon-cyan-rgb), 0.5);
+}
+.filter-axis-label-amber {
+  color: var(--neon-amber);
+  text-shadow: 0 0 6px rgba(var(--neon-amber-rgb), 0.45);
+}
+
+/* Pill — base + hover + per-axis active variants. */
+.filter-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: 0.05em;
+  font-weight: 500;
+  background: rgba(var(--ink-900-rgb), 0.7);
+  border: 1px solid var(--edge);
+  color: var(--text-400);
+  cursor: pointer;
+  transition:
+    color 140ms ease,
+    border-color 140ms ease,
+    background 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+.filter-pill:hover {
+  color: var(--text-200, #d6dbe7);
+  border-color: rgba(var(--neon-cyan-rgb), 0.45);
+  background: rgba(var(--ink-800-rgb), 0.9);
+  transform: translateY(-1px);
+}
+.filter-pill:active {
+  transform: translateY(0);
+}
+/* Tiny count badge appended inside each pill (e.g. "Capture 2"). Reads
+   as a subscript so it never competes with the label. Inherits color
+   from the active variant via currentColor + opacity. */
+.filter-pill-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.1rem;
+  padding: 0 0.3rem;
+  margin-left: 0.1rem;
+  border-radius: 9999px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+  color: currentColor;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  opacity: 0.75;
+}
+.filter-pill:hover .filter-pill-count {
+  opacity: 1;
+}
+.filter-pill-active-cyan .filter-pill-count {
+  background: rgba(var(--neon-cyan-rgb), 0.18);
+  border-color: rgba(var(--neon-cyan-rgb), 0.4);
+  opacity: 1;
+}
+.filter-pill-active-magenta .filter-pill-count {
+  background: rgba(var(--neon-magenta-rgb), 0.18);
+  border-color: rgba(var(--neon-magenta-rgb), 0.4);
+  opacity: 1;
+}
+.filter-pill-active-amber .filter-pill-count {
+  background: rgba(var(--neon-amber-rgb), 0.18);
+  border-color: rgba(var(--neon-amber-rgb), 0.4);
+  opacity: 1;
+}
+.filter-pill-active-cyan {
+  color: var(--neon-cyan);
+  border-color: rgba(var(--neon-cyan-rgb), 0.85);
+  background: linear-gradient(
+    180deg,
+    rgba(var(--neon-cyan-rgb), 0.18),
+    rgba(var(--neon-cyan-rgb), 0.08)
+  );
+  box-shadow:
+    0 0 12px rgba(var(--neon-cyan-rgb), 0.45),
+    0 0 1px rgba(var(--neon-cyan-rgb), 0.8) inset,
+    0 0 0 1px rgba(var(--neon-cyan-rgb), 0.25);
+  text-shadow: 0 0 8px rgba(var(--neon-cyan-rgb), 0.55);
+}
+.filter-pill-active-magenta {
+  color: var(--neon-magenta);
+  border-color: rgba(var(--neon-magenta-rgb), 0.85);
+  background: linear-gradient(
+    180deg,
+    rgba(var(--neon-magenta-rgb), 0.18),
+    rgba(var(--neon-magenta-rgb), 0.08)
+  );
+  box-shadow:
+    0 0 12px rgba(var(--neon-magenta-rgb), 0.45),
+    0 0 1px rgba(var(--neon-magenta-rgb), 0.8) inset,
+    0 0 0 1px rgba(var(--neon-magenta-rgb), 0.25);
+  text-shadow: 0 0 8px rgba(var(--neon-magenta-rgb), 0.55);
+}
+.filter-pill-active-amber {
+  color: var(--neon-amber);
+  border-color: rgba(var(--neon-amber-rgb), 0.85);
+  background: linear-gradient(
+    180deg,
+    rgba(var(--neon-amber-rgb), 0.16),
+    rgba(var(--neon-amber-rgb), 0.06)
+  );
+  box-shadow:
+    0 0 12px rgba(var(--neon-amber-rgb), 0.4),
+    0 0 1px rgba(var(--neon-amber-rgb), 0.7) inset,
+    0 0 0 1px rgba(var(--neon-amber-rgb), 0.22);
+  text-shadow: 0 0 8px rgba(var(--neon-amber-rgb), 0.5);
+}
+.filter-pill-clear {
+  color: var(--text-400);
+  border-style: dashed;
+}
+.filter-pill-clear:hover {
+  color: var(--neon-magenta);
+  border-color: rgba(var(--neon-magenta-rgb), 0.6);
+  background: rgba(var(--neon-magenta-rgb), 0.06);
+}
+
+/* ============================================================
+   Phase 6a — Studio (cross-skill deliverables index).
+   Table view for every artifact every skill has produced for
+   the active workspace. NEVER use @apply (Tailwind Play CDN
+   does not process external CSS). All colors via :root tokens.
+   ============================================================ */
+
+.studio-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.studio-table thead th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-500, #94a3b8);
+  padding: 10px 14px;
+  background: rgba(var(--ink-800-rgb), 0.7);
+  border-bottom: 1px solid var(--edge);
+}
+.studio-table tbody td {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(var(--edge-rgb, 38, 49, 80), 0.4);
+  vertical-align: middle;
+}
+.studio-row {
+  transition: background-color 120ms ease;
+}
+.studio-row:hover {
+  background: rgba(var(--neon-cyan-rgb), 0.04);
+}
+.studio-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  color: var(--neon-magenta);
+  background: rgba(var(--neon-magenta-rgb), 0.08);
+  border: 1px solid rgba(var(--neon-magenta-rgb), 0.3);
+  border-radius: 999px;
+}
+.studio-format {
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--neon-cyan);
+  background: rgba(var(--neon-cyan-rgb), 0.08);
+  border: 1px solid rgba(var(--neon-cyan-rgb), 0.3);
+  border-radius: 4px;
+}
+.studio-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-left: 4px;
+  color: var(--text-300);
+  background: transparent;
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  cursor: pointer;
+  transition:
+    color 120ms ease,
+    border-color 120ms ease,
+    background-color 120ms ease;
+}
+.studio-action:hover {
+  color: var(--neon-cyan);
+  border-color: rgba(var(--neon-cyan-rgb), 0.6);
+  background: rgba(var(--neon-cyan-rgb), 0.05);
+}
+
+/* === Phase 6a-2 — Pinned anchors (Theseus mythos) ===
+   Anchor icon doubles as a Ship-of-Theseus nod and a literal "pin to
+   top" affordance. Active state uses cyan glow + filled background; the
+   row gets a subtle left border so pinned items read as a curated band. */
+.studio-anchor.studio-anchor-active {
+  color: var(--neon-cyan);
+  border-color: rgba(var(--neon-cyan-rgb), 0.85);
+  background: rgba(var(--neon-cyan-rgb), 0.12);
+  box-shadow: 0 0 8px rgba(var(--neon-cyan-rgb), 0.35);
+}
+.studio-anchor.studio-anchor-active:hover {
+  background: rgba(var(--neon-cyan-rgb), 0.18);
+}
+.studio-row-pinned {
+  background: rgba(var(--neon-cyan-rgb), 0.03);
+  box-shadow: inset 2px 0 0 0 rgba(var(--neon-cyan-rgb), 0.55);
+}
+.studio-row-pinned:hover {
+  background: rgba(var(--neon-cyan-rgb), 0.06);
+}
+
+/* Filename → preview button (replaces the static <td> text label). */
+.studio-filename-btn {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  font-size: inherit;
+  transition: color 120ms ease;
+}
+.studio-filename-btn:hover {
+  color: #fff;
+  text-decoration: underline;
+  text-decoration-color: rgba(var(--neon-cyan-rgb), 0.6);
+  text-underline-offset: 3px;
+}
+
+/* === Phase 6a-2 — Inline preview drawer === */
+.studio-preview-pre {
+  display: block;
+  width: 100%;
+  max-height: 75vh;
+  overflow: auto;
+  padding: 12px 14px;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-300);
+  background: rgba(var(--ink-800-rgb), 0.7);
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* DOCX (Mammoth output): Word renders to bare semantic HTML — give it
+   readable typography on the dark canvas. */
+.studio-preview-docx {
+  max-height: 75vh;
+  overflow: auto;
+  padding: 24px 28px;
+  background: #0f1218;
+  color: #e2e8f0;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.studio-preview-docx h1,
+.studio-preview-docx h2,
+.studio-preview-docx h3,
+.studio-preview-docx h4 {
+  color: #fff;
+  font-weight: 600;
+  margin: 1.2em 0 0.5em;
+}
+.studio-preview-docx h1 { font-size: 1.6em; }
+.studio-preview-docx h2 { font-size: 1.35em; }
+.studio-preview-docx h3 { font-size: 1.15em; }
+.studio-preview-docx p { margin: 0.6em 0; }
+.studio-preview-docx ul,
+.studio-preview-docx ol { padding-left: 1.5em; margin: 0.6em 0; }
+.studio-preview-docx table {
+  border-collapse: collapse;
+  margin: 0.8em 0;
+  width: 100%;
+}
+.studio-preview-docx th,
+.studio-preview-docx td {
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+.studio-preview-docx th {
+  background: rgba(var(--neon-cyan-rgb), 0.08);
+  color: var(--neon-cyan);
+  font-weight: 600;
+}
+.studio-preview-docx a {
+  color: var(--neon-cyan);
+  text-decoration: underline;
+}
+
+/* XLSX (SheetJS): emits raw <table> with no classes. Style it to match
+   the dark canvas. */
+.studio-preview-xlsx {
+  max-height: 75vh;
+  overflow: auto;
+  background: rgba(var(--ink-800-rgb), 0.7);
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+}
+.studio-preview-xlsx table {
+  border-collapse: collapse;
+  width: 100%;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  font-size: 12px;
+  color: var(--text-300);
+}
+.studio-preview-xlsx th,
+.studio-preview-xlsx td {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  padding: 5px 8px;
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+.studio-preview-xlsx tr:first-child td,
+.studio-preview-xlsx th {
+  background: rgba(var(--neon-cyan-rgb), 0.08);
+  color: var(--neon-cyan);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.studio-preview-xlsx tr:nth-child(even) td {
+  background: rgba(var(--ink-900-rgb), 0.4);
+}
+
+/* Sheet tabs (XLSX multi-sheet) */
+.studio-sheet-tab {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  color: var(--text-300);
+  background: rgba(var(--ink-800-rgb), 0.6);
+  border: 1px solid var(--edge);
+  border-radius: 4px 4px 0 0;
+  border-bottom-color: transparent;
+  cursor: pointer;
+  transition:
+    color 120ms ease,
+    border-color 120ms ease,
+    background-color 120ms ease;
+}
+.studio-sheet-tab:hover {
+  color: var(--neon-cyan);
+}
+.studio-sheet-tab-active {
+  color: var(--neon-cyan);
+  background: rgba(var(--neon-cyan-rgb), 0.1);
+  border-color: rgba(var(--neon-cyan-rgb), 0.55);
+  border-bottom-color: rgba(var(--neon-cyan-rgb), 0.55);
+}
+
+/* === Phase 6b — Reasoning view ("Why this artifact?") === */
+.reasoning-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  color: var(--text-300);
+  background: rgba(var(--ink-800-rgb), 0.6);
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+}
+.reasoning-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.reasoning-step {
+  position: relative;
+  padding: 10px 12px;
+  background: rgba(var(--ink-800-rgb), 0.5);
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  transition: border-color 120ms ease;
+}
+.reasoning-step:hover {
+  border-color: rgba(var(--neon-cyan-rgb), 0.4);
+}
+.reasoning-step[data-kind="tool_action"] {
+  border-left: 3px solid rgba(var(--neon-cyan-rgb), 0.6);
+}
+.reasoning-step[data-kind="assistant_text"] {
+  border-left: 3px solid rgba(var(--neon-magenta-rgb), 0.4);
+}
+.reasoning-step[data-kind="system"] {
+  border-left: 3px solid var(--edge-strong);
+  opacity: 0.85;
+}
+.reasoning-step[data-kind="user"] {
+  border-left: 3px solid rgba(var(--text-300-rgb, 148, 163, 184), 0.5);
+}
+.reasoning-step-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.reasoning-step-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  color: var(--neon-cyan);
+  background: rgba(var(--neon-cyan-rgb), 0.08);
+  border: 1px solid rgba(var(--neon-cyan-rgb), 0.3);
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.reasoning-step-icon {
+  flex-shrink: 0;
+  margin-top: 4px;
+  color: var(--text-300);
+}
+.reasoning-step-summary {
+  font-size: 13px;
+  color: var(--text-100, #e2e8f0);
+  line-height: 1.4;
+  word-break: break-word;
+}
+.reasoning-step-preview {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-500, #94a3b8);
+  font-style: italic;
+  line-height: 1.4;
+  word-break: break-word;
+}
+.reasoning-step-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.reasoning-tool-pill {
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  color: var(--neon-cyan);
+  background: rgba(var(--neon-cyan-rgb), 0.08);
+  border: 1px solid rgba(var(--neon-cyan-rgb), 0.3);
+  border-radius: 3px;
+}
+.reasoning-elapsed {
+  font-size: 10px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  color: var(--text-500, #94a3b8);
+}
+.reasoning-step-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  color: var(--text-500, #94a3b8);
+  background: transparent;
+  border: 1px solid var(--edge);
+  border-radius: 3px;
+  cursor: pointer;
+  transition:
+    color 120ms ease,
+    border-color 120ms ease;
+}
+.reasoning-step-toggle:hover {
+  color: var(--neon-cyan);
+  border-color: rgba(var(--neon-cyan-rgb), 0.5);
+}
+.reasoning-citations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+  padding-left: 32px;
+}
+.reasoning-citation-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  color: var(--neon-magenta);
+  background: rgba(var(--neon-magenta-rgb), 0.06);
+  border: 1px solid rgba(var(--neon-magenta-rgb), 0.3);
+  border-radius: 3px;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+.reasoning-citation-chip:hover {
+  background: rgba(var(--neon-magenta-rgb), 0.15);
+  border-color: rgba(var(--neon-magenta-rgb), 0.6);
+}
+.reasoning-step-detail {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--edge);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.reasoning-detail-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-500, #94a3b8);
+  margin-bottom: 4px;
+}
+.reasoning-detail-pre {
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  color: var(--text-300);
+  background: rgba(var(--ink-950-rgb, 9, 14, 28), 0.6);
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 320px;
+  overflow-y: auto;
+  line-height: 1.4;
 }

@@ -1,0 +1,66 @@
+{
+  "schema_version": "1.0",
+  "skill": "subcontractor-sow-builder",
+  "evals": [
+    {
+      "id": "sub-sow-001",
+      "name": "Tier-2 cyber engineering PWS for teaming partner",
+      "prompt": "We're prime on a DoD task order and need a PWS for our Tier-2 cyber engineering subcontractor. Workspace `afcap6_drfp` has the requirements. Sub will provide threat hunting and detection engineering. Contract type with sub will be CPFF term form (R&D-flavored work, level of effort). Draft the PWS.",
+      "expected_signals": [
+        "calls `kg_entities` for at least requirement, deliverable, work_scope_item, performance_standard",
+        "asks the 3 intake questions (SOW vs PWS, contract type, commercial vs non-commercial) up front in a single batched message",
+        "Section 1.1 explicitly cites FAR 16.306(d)(2) (CPFF term form) — never bare `FAR 16.306`",
+        "Section 5 is OMITTED (CPFF, not T&M/LH); subsequent sections renumber sequentially",
+        "Section 9 references DD Form 254 since classified-adjacent work is implied",
+        "Section 10 Key Personnel substitution clause is NOT FAR 52.237-2; agency-appropriate clause or FAR 52.237-3 fallback",
+        "Section 12 QASP Payment Consequence column lists invoice deductions / cure notices / re-performance — NEVER CPARS rating language",
+        "NO FTE counts, SOC codes, hours-per-year, or staffing tables anywhere in the document body or appendices",
+        "After the artifact write, BOTH chat-only handoffs are emitted (Staffing Handoff for `price-to-win`, CLIN Handoff for prime's subagreement Section B)",
+        "Markdown artifact saved to `{run_dir}/artifacts/sub_sow_pws.md` via `write_file`"
+      ],
+      "anti_signals": [
+        "Section 5 included for a CPFF contract",
+        "Bare `FAR 16.306` citation without (d)(1) or (d)(2)",
+        "FTE counts or labor categories appearing in the document body",
+        "QASP Payment Consequence column containing 'Satisfactory', 'Exceptional', 'Marginal', 'Unsatisfactory', or any CPARS rating",
+        "FAR 52.237-2 cited for Key Personnel substitution",
+        "Staffing handoff written to a file or embedded as an appendix"
+      ]
+    },
+    {
+      "id": "sub-sow-002",
+      "name": "Commercial FFP services SOW for sub under prime BPA",
+      "prompt": "We hold a GSA MAS BPA. Need to issue an FFP commercial-services SOW to our help-desk subcontractor for a 1-year base + 4 option years. Workspace `mcpp_drfp` has the prime requirements. Draft the SOW.",
+      "expected_signals": [
+        "intake answers: SOW (not PWS), FFP, commercial → Section 14 flags FAR Part 12 applicability and FAR 12.207 (FFP commercial)",
+        "Section 5 OMITTED (FFP); subsequent sections renumbered",
+        "language uses prescriptive SOW verbs ('the contractor shall perform', 'the contractor shall provide') — NOT outcome-oriented PWS verbs",
+        "Section 9 cites FAR 52.204-21 (Basic Safeguarding) since CUI is plausibly in scope",
+        "CLIN Handoff Table emitted in chat with separate travel and ODC CLINs if travel/ODCs in scope"
+      ],
+      "anti_signals": [
+        "PWS-style outcome verbs in Section 3 of an SOW",
+        "Section 5 included for FFP",
+        "Travel or ODCs blended into a single performance CLIN"
+      ]
+    },
+    {
+      "id": "sub-sow-003",
+      "name": "T&M sub SOW with mandatory Section 5 ceiling-hours table",
+      "prompt": "We're prime on a follow-on; sub agreement with our incumbent partner will be T&M for surge engineering support. Draft the sub SOW. Performance is at Huntsville, AL. Base + 2 option years.",
+      "expected_signals": [
+        "intake answers: SOW or PWS user-chosen; T&M; commercial-status user-chosen",
+        "Section 5 Labor Category Ceiling Hours table PRESENT, citing FAR 16.601(c)(2)",
+        "Section 5 columns: `Labor Category | Base Year Ceiling Hours | OY1 | OY2 | Total Ceiling` — NO SOC codes, NO FTE counts, NO derivation basis",
+        "skill recognizes Section 5 is a pricing risk-sharing mechanism, NOT a staffing prescription",
+        "Staffing Handoff Table (chat-only) is still emitted separately — never confused with the Section 5 table"
+      ],
+      "anti_signals": [
+        "Section 5 table containing SOC codes or FTE counts",
+        "Section 5 omitted from a T&M contract",
+        "Bare `FAR 16.601` citation without `(c)(2)`",
+        "Section 5 table merged with the chat-only Staffing Handoff"
+      ]
+    }
+  ]
+}

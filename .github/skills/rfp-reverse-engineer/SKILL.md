@@ -1,0 +1,232 @@
+---
+name: rfp-reverse-engineer
+description: Reverse-engineers a federal RFP we received — given the SOW/PWS and evaluation criteria already in the Theseus KG, reconstructs the CO's hidden decision tree (upstream `sow-pws-builder` 6 scope blocks + 3 intake answers), surfaces hot buttons, ghost language, discriminator hooks, missing-section signals, and CPFF-form / Section-5 / QASP / Key-Personnel traps. USE WHEN the user asks "what scope decisions did the CO already make?", "reverse engineer this RFP", "what hot buttons are hiding in this PWS?", "where are the discriminator hooks?", "did they pick CPFF completion or term form?", "anything suspiciously missing?", or any variant of decoding CO intent. Pulls `requirement`, `deliverable`, `proposal_instruction`, `evaluation_factor`, `clause`, `performance_standard` from the active workspace KG and emits a JSON envelope feeding `proposal-generator`. DO NOT USE FOR proposal prose (`proposal-generator`), pricing (`price-to-win`), clause audit (`compliance-auditor`), or sub SOW (`subcontractor-sow-builder`).
+license: MIT
+metadata:
+  # Phase 4j taxonomy — see docs/SKILL_TAXONOMY.md
+  personas_primary: capture_manager
+  personas_secondary: [proposal_manager]
+  shipley_phases: [capture, strategy]
+  capability: analyze
+  runtime: tools
+  category: capture_intelligence
+  version: 0.2.0
+  status: active
+  # Phase 4h: pure KG + reasoning skill. No MCPs declared (closed-by-default).
+---
+
+# RFP Reverse-Engineer
+
+You are a senior capture-side intelligence analyst working multi-turn against the active Theseus workspace knowledge graph. Given an RFP, SOW, PWS, or task-order solicitation **we received**, reconstruct the **contracting officer's hidden decision tree** — the same 3 acquisition-strategy intake answers and 6 scope decision blocks the upstream `sow-pws-builder` skill walks a CO through, but inferred BACKWARDS from the document the CO actually published.
+
+## When to Use
+
+- "What scope decisions did the CO already make on this RFP?"
+- "Reverse engineer the SOW — what was their thinking?"
+- "Where are the hot buttons hiding in this PWS?"
+- "What discriminator hooks does the evaluation criteria open up?"
+- "Did the CO pick CPFF completion or term form?"
+- "Is anything suspiciously missing from this solicitation?"
+- "What ghost language is hiding in Section M?"
+
+## The Stance Inversion (READ THIS FIRST)
+
+The upstream `sow-pws-builder` skill walks a **federal contracting officer** FORWARD through 3 intake questions and 6 decision blocks until a 14-section SOW/PWS falls out. The output is the document.
+
+**This skill runs the same machine BACKWARDS from the bidder's seat.** The document is the input. The reconstructed decision tree is the output. Every section of the SOW/PWS the CO published encodes a scope decision they already made — and often a scope decision they DIDN'T make and are quietly leaving open. The `subcontractor-sow-builder` companion skill is the forward inverse (prime writes SOW for sub).
+
+| Concept                                | Upstream (CO writing)                                                | This skill (bidder reading)                                                                                                                                                     |
+| -------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Direction                              | Decisions → document                                                 | Document → inferred decisions                                                                                                                                                   |
+| Output                                 | 14-section .docx                                                     | JSON envelope: `inferred_intake`, `decision_tree`, `hot_buttons`, `discriminator_hooks`, `ghost_language`, `missing_sections`, `cpff_form_signal`, `key_personnel_clause_check` |
+| Section 14 (Constraints & Assumptions) | Where the CO documents derived defaults for the CO's own audit trail | Where the CO is most likely to leak intent — read it first                                                                                                                      |
+| QASP Payment Consequence column        | Pre-committed by CO                                                  | Tells us where the CO has highest performance anxiety → discriminator opportunity                                                                                               |
+| Missing Section 5                      | CO chose FFP or CR (no T&M ceiling)                                  | Confirms cost-risk allocation                                                                                                                                                   |
+| FAR 52.237-2 cited for Key Personnel   | CO error (clause is "Protection of Buildings")                       | Capture flag — CO contracts shop is sloppy → likely amendments coming                                                                                                           |
+
+## Operating Discipline
+
+- **No invention.** Every inferred decision cites the source chunk(s) or entity(ies) in the KG. If the document is silent, mark the decision as `inferred=false, status=open` and surface it as a clarification question for the proposal team.
+- **Workspace-first.** All reasoning anchors on entities and chunks already in the active Theseus KG. Use `kg_entities` and `kg_chunks`.
+- **Format-agnostic input.** UCF Section L/M, FAR 16 task order, FOPR, BPA call, OTA, agency-specific format — they all map to the same 14-section spec when reverse-flowed. If sections are reordered or merged, normalize silently.
+- **Cite signals, not guesses.** Every entry in `hot_buttons`, `discriminator_hooks`, `ghost_language` must cite the chunk_id or entity_id that triggered the inference + the matching pattern from `references/rfp_signal_patterns.md`.
+
+## Workflow Checklist
+
+Execute in order. Record each inference + source citation in the run transcript.
+
+### 1. Pull workspace context
+
+Call `kg_entities`:
+
+```json
+{
+  "types": [
+    "solicitation",
+    "document_section",
+    "requirement",
+    "deliverable",
+    "proposal_instruction",
+    "evaluation_factor",
+    "subfactor",
+    "clause",
+    "performance_standard",
+    "transition_activity",
+    "government_furnished_item",
+    "labor_category",
+    "contract_line_item",
+    "period_of_performance",
+    "place_of_performance",
+    "regulatory_reference",
+    "amendment"
+  ],
+  "limit": 400
+}
+```
+
+Then `kg_chunks` for any explicit references the user mentions ("the SOO paragraph about FedRAMP", "Section M.4 evaluation language").
+
+### 2. Infer the 3 acquisition-strategy intake answers
+
+Load `references/reverse_engineering_catalog.md` Section A. For each:
+
+| Intake Question               | Backwards-inference signal                                                                                                                                               |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| SOW or PWS?                   | Section 3 phrasing — task-oriented "shall perform" → SOW; outcome-oriented "shall achieve / maintain" → PWS                                                              |
+| Contract type?                | Presence of Section 5 ceiling-hours table → T&M/LH; CPFF form citation in Section 1.1 → CR; absence of either + FFP language → FFP; CLIN structure (if visible) confirms |
+| Commercial or non-commercial? | FAR 52.212-4 cite or "commercial item" language → Part 12; full Section I/L buildout → Part 15                                                                           |
+
+Record as `inferred_intake_answers` with `signal` (the pattern matched), `source_chunk_ids[]`, `confidence` ("high" / "medium" / "low" / "open").
+
+### 3. Reverse-walk the 6 scope decision blocks
+
+For each Block 1–6, load the corresponding row of `references/reverse_engineering_catalog.md` Section B. For each decision in the block, check:
+
+- **Decision visible** → record what the CO chose + source chunk.
+- **Decision implied** → record the inference rule that fired + source chunk.
+- **Decision absent (open)** → record as a `clarification_question` for the proposal team to surface in Q&A.
+
+Output structure: `decision_tree_reconstruction.block_1` through `block_6`, each containing the upstream questions with `co_choice`, `derivation_signal`, `source_chunk_ids[]`, `status` ("locked" / "implied" / "open").
+
+### 4. Surface hot buttons
+
+Load `references/reverse_engineering_catalog.md` Section C (Hot-Button Decoder). For each pattern that fires in the KG, emit a `hot_buttons[]` entry:
+
+```json
+{
+  "id": "HB-001",
+  "label": "24/7 coverage stated without surge multiplier",
+  "implication": "CO knows this is staffing-heavy; unit cost discipline will drive evaluation.",
+  "section_origin": "PWS Section 3.4",
+  "source_chunk_ids": ["chunk_47"],
+  "discriminator_opportunity": "Propose tiered-coverage model with surge automation that flexes from 24/7 down to follow-the-sun for low-volume periods."
+}
+```
+
+### 5. Surface discriminator hooks
+
+Load `references/discriminator_hooks.md`. For each evaluation factor / subfactor in the KG, check for hook patterns ("most highly rated", "preferred but not required", "where past performance demonstrates"). Emit `discriminator_hooks[]`:
+
+```json
+{
+  "id": "DH-001",
+  "evaluation_factor": "Technical Approach",
+  "hook_phrase": "exceptional past performance in classified cloud migrations",
+  "hook_type": "ghost_preference",
+  "source_chunk_ids": ["chunk_112"],
+  "proposal_play": "Lead the Technical Approach narrative with the [past_performance_reference] for the DoD IL5 migration; tie it to Win Theme #2."
+}
+```
+
+### 6. Detect ghost language
+
+Load `references/rfp_signal_patterns.md` Section D (Ghost Language Catalog). Match patterns like "shall consider", "as appropriate", "where applicable", "may include but is not limited to", undefined acronyms, evaluation factors with no measurable threshold, "best practices" without a cited standard. Emit `ghost_language[]`:
+
+```json
+{
+  "id": "GL-001",
+  "phrase": "as appropriate",
+  "section_origin": "SOW Section 3.7",
+  "risk": "Requirement is non-measurable; CO retains unilateral discretion.",
+  "source_chunk_ids": ["chunk_88"],
+  "recommended_action": "Submit Q&A asking the CO to define the trigger; if unanswered, document the assumed interpretation in the proposal."
+}
+```
+
+### 7. Detect missing-section signals
+
+Walk the 14-section reference list. For each section the document lacks, emit a `missing_sections[]` entry with the inferred reason:
+
+| Section absent                                                          | Likely meaning                                                                                                   |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Section 5 (Labor Category Ceiling Hours)                                | Contract is FFP or CR (not T&M / LH).                                                                            |
+| Section 9 Security Requirements (when classified work implied)          | CO has not yet issued DD Form 254 — capture should ask Q&A.                                                      |
+| Section 13 Transition (incumbent recompete with no transition language) | Suspicious — likely amendment incoming OR CO accepts incumbent advantage.                                        |
+| Section 14 Constraints & Assumptions                                    | CO did not document derived defaults — proposal should over-document its own assumptions to lock interpretation. |
+
+### 8. Run targeted compliance traps
+
+Load `references/far_citations.md` Section E (Trap Detector). Check the `clause` entities for known traps:
+
+- **FAR 52.237-2 cited for Key Personnel substitution** → `key_personnel_clause_check.status = "incorrect"` (clause is "Protection of Buildings"). Flag as a CO error → likely amendment.
+- **CPFF cited without (d)(1) or (d)(2)** → `cpff_form_signal.status = "ambiguous"` (CO has not committed completion vs term form) → mandatory Q&A question.
+- **QASP Payment Consequence column = CPARS rating language** → `qasp_cpars_check.status = "non-compliant"` (CPARS is FAR 42.15 post-performance, not QASP-bindable) → CO error → propose corrected QASP language as a soft amendment in Q&A.
+
+### 9. Assemble the JSON envelope
+
+```json
+{
+  "opportunity_context": {"solicitation_id": "...", "agency": "...", "naics": "...", "psc": "..."},
+  "inferred_intake_answers": {
+    "sow_or_pws": {"value": "PWS", "signal": "Section 3 outcome-oriented verbs", "source_chunk_ids": ["..."], "confidence": "high"},
+    "contract_type": {"value": "FFP", "signal": "No Section 5; FAR 16.202 cited", "source_chunk_ids": ["..."], "confidence": "high"},
+    "commercial_status": {"value": "non-commercial", "signal": "Full Section I/L buildout, FAR Part 15", "source_chunk_ids": ["..."], "confidence": "medium"}
+  },
+  "decision_tree_reconstruction": {
+    "block_1_mission_service_model": [...],
+    "block_2_technical_scope": [...],
+    "block_3_scale_volume": [...],
+    "block_4_organizational_scope": [...],
+    "block_5_contract_structure": [...],
+    "block_6_quality_oversight": [...]
+  },
+  "hot_buttons": [...],
+  "discriminator_hooks": [...],
+  "ghost_language": [...],
+  "missing_sections": [...],
+  "cpff_form_signal": {"status": "completion|term|ambiguous|n/a", "source_chunk_ids": [...]},
+  "key_personnel_clause_check": {"status": "correct|incorrect|absent", "clause_cited": "...", "recommended_clause": "..."},
+  "qasp_cpars_check": {"status": "compliant|non-compliant|absent", "source_chunk_ids": [...]},
+  "clarification_questions": [...],
+  "citations": {
+    "kg_entities": [...],
+    "kg_chunks": [...],
+    "far": ["37.102(d)", "37.602", "16.306(d)", "..."]
+  },
+  "claim_gaps": [
+    "Section 9 absent but FedRAMP IL5 implied — CO has not issued DD 254."
+  ]
+}
+```
+
+Write to `{run_dir}/artifacts/rfp_reverse_engineering.json` via `write_file`.
+
+### 10. Present a capture-team narrative
+
+8–12 short sections covering: inferred contract type and why it matters for our cost stack; top 3 hot buttons with discriminator plays; top 3 ghost-language risks needing Q&A; CO errors detected (52.237-2 trap, CPFF form ambiguity, CPARS-QASP confusion); top 5 clarification questions to file in the next Q&A round; what the proposal team should hand to `proposal-generator` next.
+
+## What This Skill Does NOT Cover
+
+- **Drafting proposal prose / win themes / FAB chains** → use `proposal-generator` (it consumes this skill's JSON envelope).
+- **Pricing / cost stack** → use `price-to-win`.
+- **FAR clause compliance audit** (existence checks, amendments since solicitation issued) → use `compliance-auditor` (eCFR MCP).
+- **Black-hat competitor research** → use `competitive-intel` (USAspending MCP).
+- **Writing the prime↔sub SOW** → use `subcontractor-sow-builder`.
+- **Inventing facts the document does not support.** Every inference must cite a chunk or entity. Open decisions become Q&A questions, not fabrications.
+
+## References
+
+- [references/reverse_engineering_catalog.md](references/reverse_engineering_catalog.md) — Section A (3 intake-question backwards-inference table), Section B (6 scope-block reverse-walk patterns), Section C (Hot-Button Decoder).
+- [references/discriminator_hooks.md](references/discriminator_hooks.md) — Discriminator-hook pattern catalog: ghost preferences, "most highly rated" cues, past-performance unlock phrases, FAB-chain trigger language.
+- [references/rfp_signal_patterns.md](references/rfp_signal_patterns.md) — Section D (Ghost Language Catalog), missing-section signal table, contract-type detection patterns, security-tier escalation cues.
+- [references/far_citations.md](references/far_citations.md) — FAR sections this skill cites; Section E Trap Detector (52.237-2, CPFF form ambiguity, QASP↔CPARS mistake, FAR 16.601(c)(2) ceiling-hour omission).

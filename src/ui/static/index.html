@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en" class="dark">
   <head>
     <meta charset="utf-8" />
@@ -1805,12 +1805,24 @@
                                 :key="si"
                               >
                                 <div
-                                  class="source-row"
+                                  class="source-card"
+                                  :class="{ 'source-card-disabled': !s.chunk_id }"
                                   :id="`source-${i}-${s.reference_id}`"
                                   :data-source-ref="s.reference_id"
-                                  x-data="{ raw: false, fmt: formatSource(s) }"
+                                  x-data="{ fmt: formatSource(s), loading: false, error: null }"
+                                  x-init="
+                                    if (s.chunk_id && (s.truncated || fmt.kind === 'table' || fmt.kind === 'image' || fmt.kind === 'equation')) {
+                                      loading = true;
+                                      fetchChunk(s.chunk_id).then(function(f){
+                                        if (f && f.content) {
+                                          fmt = formatSource({ ...s, preview: f.content, truncated: false });
+                                        }
+                                      }).catch(function(e){ error = e && e.message ? e.message : String(e); })
+                                        .finally(function(){ loading = false; });
+                                    }
+                                  "
                                 >
-                                  <div class="source-row-head">
+                                  <div class="source-card-head">
                                     <span
                                       class="source-num"
                                       x-text="`[${s.reference_id}]`"
@@ -1828,46 +1840,39 @@
                                     <span
                                       class="source-meta"
                                       x-show="s.char_count"
-                                      x-text="s.truncated ? `${s.char_count} chars (preview)` : `${s.char_count} chars`"
+                                      x-text="`${s.char_count} chars`"
                                     ></span>
-                                  </div>
-                                  <!-- Caption (table/image only, when present) -->
-                                  <div
-                                    class="source-caption"
-                                    x-show="fmt.caption"
-                                    x-text="fmt.caption"
-                                  ></div>
-                                  <!-- Table summary card -->
-                                  <div
-                                    class="source-tablecard"
-                                    x-show="fmt.kind === 'table' && fmt.tableSummary"
-                                  >
-                                    <i
-                                      data-lucide="table-2"
-                                      class="w-3.5 h-3.5"
-                                    ></i>
-                                    <span x-text="fmt.tableSummary"></span>
-                                  </div>
-                                  <!-- Body (text chunks, image alt-text, equation source) -->
-                                  <div
-                                    class="source-preview"
-                                    x-show="fmt.body && fmt.kind !== 'table'"
-                                    x-text="fmt.body"
-                                  ></div>
-                                  <!-- Raw expander (always available) -->
-                                  <div class="source-raw-wrap">
                                     <button
                                       type="button"
-                                      class="source-raw-toggle"
-                                      @click="raw = !raw"
-                                      x-text="raw ? 'Hide raw' : 'Show raw'"
-                                    ></button>
-                                    <pre
-                                      class="source-raw"
-                                      x-show="raw"
-                                      x-transition.opacity
-                                      x-text="s.preview"
-                                    ></pre>
+                                      class="source-card-view-btn"
+                                      x-show="s.chunk_id"
+                                      @click.stop="openChunkPreview(s.chunk_id)"
+                                      :title="`View full chunk in modal — ${s.chunk_id}`"
+                                    >
+                                      <span>View full chunk</span>
+                                      <span aria-hidden="true">&#x2197;</span>
+                                    </button>
+                                  </div>
+                                  <!-- Subtitle: caption + table chip + narrative excerpt -->
+                                  <div
+                                    class="source-card-sub"
+                                    x-show="fmt.caption || fmt.body || (fmt.kind === 'table' && fmt.tableSummary)"
+                                  >
+                                    <span
+                                      class="source-card-caption"
+                                      x-show="fmt.caption"
+                                      x-text="fmt.caption"
+                                    ></span>
+                                    <span
+                                      class="source-card-tablechip"
+                                      x-show="fmt.kind === 'table' && fmt.tableSummary"
+                                      x-text="fmt.tableSummary"
+                                    ></span>
+                                    <span
+                                      class="source-card-excerpt"
+                                      x-show="fmt.body"
+                                      x-text="fmt.body"
+                                    ></span>
                                   </div>
                                 </div>
                               </template>
@@ -2584,17 +2589,130 @@
               <code class="font-mono">.github/skills/</code> exists.
             </div>
 
+            <!-- Phase 4j: taxonomy filter rail (Persona / Phase / Capability) -->
+            <div x-show="skills.items.length > 0" class="filter-rail mb-5">
+              <div class="filter-rail-rows">
+                <div class="filter-rail-row">
+                  <span class="filter-axis-label filter-axis-label-magenta">
+                    <i data-lucide="users" class="w-3 h-3"></i>Persona
+                  </span>
+                  <template
+                    x-for="p in skillPersonaFilterConfig()"
+                    :key="'pe-' + p.id"
+                  >
+                    <button
+                      class="filter-pill"
+                      :class="skills.activePersonas.includes(p.id) ? 'filter-pill-active-magenta' : ''"
+                      @click="toggleSkillPersona(p.id)"
+                    >
+                      <span x-text="p.label"></span>
+                      <span
+                        class="filter-pill-count"
+                        x-text="skillsCountForPersona(p.id)"
+                      ></span>
+                    </button>
+                  </template>
+                </div>
+                <div class="filter-rail-row">
+                  <span class="filter-axis-label filter-axis-label-cyan">
+                    <i data-lucide="git-branch" class="w-3 h-3"></i>Phase
+                  </span>
+                  <template x-for="p in skillPhaseConfig()" :key="'ph-' + p.id">
+                    <button
+                      class="filter-pill"
+                      :class="skills.activePhases.includes(p.id) ? 'filter-pill-active-cyan' : ''"
+                      @click="toggleSkillPhase(p.id)"
+                    >
+                      <span x-text="p.label"></span>
+                      <span
+                        class="filter-pill-count"
+                        x-text="skillsCountForPhase(p.id)"
+                      ></span>
+                    </button>
+                  </template>
+                </div>
+                <div class="filter-rail-row">
+                  <span class="filter-axis-label filter-axis-label-amber">
+                    <i data-lucide="zap" class="w-3 h-3"></i>Capability
+                  </span>
+                  <template
+                    x-for="c in skillCapabilityConfig()"
+                    :key="'cap-' + c.id"
+                  >
+                    <button
+                      class="filter-pill"
+                      :class="skills.activeCapabilities.includes(c.id) ? 'filter-pill-active-amber' : ''"
+                      @click="toggleSkillCapability(c.id)"
+                    >
+                      <span x-text="c.label"></span>
+                      <span
+                        class="filter-pill-count"
+                        x-text="skillsCountForCapability(c.id)"
+                      ></span>
+                    </button>
+                  </template>
+                </div>
+              </div>
+              <!-- Right-side meta cluster: search + live count + clear button -->
+              <div class="filter-rail-meta">
+                <div class="filter-rail-search">
+                  <i
+                    data-lucide="search"
+                    class="w-3.5 h-3.5 filter-rail-search-icon"
+                  ></i>
+                  <input
+                    type="text"
+                    class="filter-rail-search-input"
+                    placeholder="Search skills…"
+                    x-model="skills.searchQuery"
+                    @input.debounce.150ms="$nextTick(() => lucide.createIcons())"
+                  />
+                  <button
+                    x-show="skills.searchQuery"
+                    class="filter-rail-search-clear"
+                    @click="skills.searchQuery = ''; $nextTick(() => lucide.createIcons())"
+                    title="Clear search"
+                  >
+                    <i data-lucide="x" class="w-3 h-3"></i>
+                  </button>
+                </div>
+                <div class="filter-rail-count">
+                  <span class="filter-rail-count-label">Showing</span>
+                  <span
+                    class="filter-rail-count-value"
+                    :class="skillsFiltered().length < skills.items.length ? 'is-filtered' : ''"
+                    x-text="skillsFiltered().length"
+                  ></span>
+                  <span class="filter-rail-count-sep">of</span>
+                  <span
+                    class="filter-rail-count-total"
+                    x-text="skills.items.length"
+                  ></span>
+                </div>
+                <button
+                  x-show="skills.activePersonas.length || skills.activePhases.length || skills.activeCapabilities.length || skills.searchQuery"
+                  class="filter-pill filter-pill-clear"
+                  @click="clearSkillFilters()"
+                >
+                  <i data-lucide="x" class="w-3 h-3"></i>Clear
+                </button>
+              </div>
+            </div>
+
+            <!-- Phase 4j: flat grid; meta skills pinned first -->
             <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              <template x-for="s in skills.items" :key="s.name">
+              <template x-for="s in skillsFiltered()" :key="s.name">
                 <div
-                  class="card card-accent p-4 flex flex-col gap-3 cursor-pointer card-hover border-neon-magenta/30"
+                  class="card card-accent p-4 flex flex-col gap-3 cursor-pointer card-hover"
+                  :class="isMetaSkill(s) ? 'border-neon-cyan/40 ring-1 ring-neon-cyan/20' : 'border-neon-magenta/30'"
                   @click="openSkill(s.name)"
                 >
                   <div class="flex items-start justify-between gap-2">
                     <div class="flex items-center gap-2 min-w-0">
                       <i
-                        data-lucide="wand-2"
-                        class="w-4 h-4 text-neon-magenta flex-shrink-0"
+                        :data-lucide="isMetaSkill(s) ? 'sparkles' : 'wand-2'"
+                        class="w-4 h-4 flex-shrink-0"
+                        :class="isMetaSkill(s) ? 'text-neon-cyan' : 'text-neon-magenta'"
                       ></i>
                       <h3
                         class="text-sm font-semibold text-slate-100 leading-snug truncate"
@@ -2602,14 +2720,40 @@
                       ></h3>
                     </div>
                     <span
-                      class="pill bg-ink-800 text-slate-400 border border-edge whitespace-nowrap text-[10px]"
-                      x-text="s.category || 'other'"
+                      x-show="s.capability"
+                      class="pill whitespace-nowrap text-[10px]"
+                      :class="isMetaSkill(s) ? 'bg-ink-800 text-neon-cyan border border-neon-cyan/40' : 'bg-ink-800 text-neon-magenta border border-neon-magenta/40'"
+                      x-text="s.capability"
                     ></span>
                   </div>
+                  <div
+                    class="text-[10px] font-mono uppercase tracking-wider text-slate-500"
+                    x-text="personaLabel(s.personas_primary)"
+                  ></div>
                   <p
                     class="text-xs text-slate-400 leading-snug line-clamp-3"
                     x-text="s.description"
                   ></p>
+                  <div
+                    x-show="s.personas_secondary && s.personas_secondary.length"
+                    class="text-[10px] text-slate-500"
+                  >
+                    <span class="text-slate-600">also for:</span>
+                    <template
+                      x-for="(p, idx) in s.personas_secondary"
+                      :key="'sec-' + s.name + '-' + p"
+                    >
+                      <span>
+                        <span
+                          class="text-slate-400"
+                          x-text="personaLabel(p)"
+                        ></span
+                        ><span x-show="idx < s.personas_secondary.length - 1"
+                          >,
+                        </span>
+                      </span>
+                    </template>
+                  </div>
                   <div
                     class="flex items-center gap-2 text-[10px] font-mono text-slate-500 mt-auto"
                   >
@@ -2626,11 +2770,24 @@
                       x-text="s.status"
                     ></span>
                     <span class="ml-auto" x-show="s.has_references">refs</span>
-                    <span x-show="s.has_templates">tpl</span>
+                    <span x-show="s.has_assets || s.has_templates">assets</span>
                     <span x-show="s.has_scripts">scripts</span>
                   </div>
                 </div>
               </template>
+            </div>
+
+            <div
+              x-show="skills.items.length > 0 && skillsFiltered().length === 0"
+              class="card p-6 text-center text-sm text-slate-500"
+            >
+              No skills match the current filters.
+              <button
+                class="text-neon-cyan ml-2 underline"
+                @click="clearSkillFilters()"
+              >
+                Clear filters
+              </button>
             </div>
 
             <!-- Skill detail drawer -->
@@ -2874,6 +3031,17 @@
                               class="skill-transcript-size"
                               x-text="formatBytes(parseInt(f.size, 10) || 0) + ' · ' + (f.mime || 'application/octet-stream')"
                             ></span>
+                            <button
+                              type="button"
+                              class="studio-action"
+                              title="Why this artifact? (reasoning view)"
+                              @click="openReasoning({ skill: skills.current?.name, run_id: skills.run.run_id, filename: f.name, title: skills.run.title || '', created_at: skills.run.created_at || '' })"
+                            >
+                              <i
+                                data-lucide="brain-circuit"
+                                class="w-3 h-3"
+                              ></i>
+                            </button>
                           </li>
                         </template>
                       </ul>
@@ -3161,6 +3329,227 @@
                   </button>
                 </div>
               </div>
+            </div>
+          </section>
+
+          <!-- ============== STUDIO (Phase 6a) ============== -->
+          <!--
+            Cross-skill deliverables index. Walks /api/ui/studio (server
+            walks rag_storage/<workspace>/skill_runs/<skill>/<run_id>/
+            artifacts/* and flattens). Each row is one rendered artifact:
+            DOCX, XLSX, PDF, MD, JSON, MP4, GIF, etc. Filters by skill +
+            format + free-text search; "Open Run" deep-links into the
+            existing skill-run drawer in Agent Skills.
+            Phase 6b will add an inline preview pane + reasoning view.
+          -->
+          <section x-show="active === 'studio'" x-cloak>
+            <div class="flex items-end justify-between mb-5 flex-wrap gap-3">
+              <div>
+                <h1 class="text-2xl font-bold tracking-tight">
+                  <span class="h1-gradient">Studio</span>
+                </h1>
+                <p class="text-sm text-slate-500 mt-1">
+                  Every deliverable every skill has produced for the active
+                  workspace. Sourced from
+                  <code class="font-mono text-neon-cyan"
+                    >rag_storage/&lt;workspace&gt;/skill_runs/</code
+                  >
+                  — pure index, no new on-disk schema.
+                </p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button
+                  class="pill bg-ink-800 border border-edge text-slate-300 hover:text-neon-cyan hover:border-neon-cyan/50 px-3 py-1.5 text-xs"
+                  @click="loadStudio()"
+                  :disabled="studio.loading"
+                >
+                  <i
+                    data-lucide="refresh-cw"
+                    class="w-3.5 h-3.5 inline mr-1"
+                  ></i>
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            <div
+              x-show="studio.error"
+              class="card border border-red-500/40 bg-red-500/5 p-3 mb-4 text-sm text-red-300"
+              x-text="studio.error"
+            ></div>
+
+            <!-- Filters -->
+            <div class="card p-4 mb-4 flex flex-wrap items-center gap-3">
+              <div class="flex items-center gap-2">
+                <label class="text-xs uppercase text-slate-500">Skill</label>
+                <select
+                  class="bg-ink-800 border border-edge text-slate-200 text-sm rounded px-2 py-1.5"
+                  x-model="studio.filterSkill"
+                >
+                  <option value="">All</option>
+                  <template x-for="s in studioSkillOptions()" :key="s">
+                    <option :value="s" x-text="s"></option>
+                  </template>
+                </select>
+              </div>
+              <div class="flex items-center gap-2">
+                <label class="text-xs uppercase text-slate-500">Format</label>
+                <select
+                  class="bg-ink-800 border border-edge text-slate-200 text-sm rounded px-2 py-1.5"
+                  x-model="studio.filterFormat"
+                >
+                  <option value="">All</option>
+                  <template x-for="f in studioFormatOptions()" :key="f">
+                    <option :value="f" x-text="f.toUpperCase()"></option>
+                  </template>
+                </select>
+              </div>
+              <div class="flex items-center gap-2 flex-1 min-w-[200px]">
+                <label class="text-xs uppercase text-slate-500">Search</label>
+                <input
+                  type="text"
+                  class="bg-ink-800 border border-edge text-slate-200 text-sm rounded px-2 py-1.5 flex-1"
+                  placeholder="filename or title…"
+                  x-model="studio.search"
+                />
+              </div>
+              <span
+                class="text-xs text-slate-500 ml-auto"
+                x-text="studioFiltered().length + ' / ' + studio.deliverables.length + ' deliverables'"
+              ></span>
+            </div>
+
+            <!-- Loading + empty states -->
+            <div
+              x-show="studio.loading"
+              class="card p-10 text-center text-sm text-slate-500"
+            >
+              <i
+                data-lucide="loader-2"
+                class="w-5 h-5 mx-auto mb-2 animate-spin text-neon-cyan"
+              ></i>
+              Loading deliverables…
+            </div>
+            <div
+              x-show="!studio.loading && studio.loaded && !studio.deliverables.length"
+              class="card p-10 text-center text-sm text-slate-500"
+            >
+              <i
+                data-lucide="folder-open"
+                class="w-8 h-8 mx-auto mb-3 text-slate-600"
+              ></i>
+              No deliverables yet for this workspace.<br />
+              Run an agent skill that writes artifacts and they will appear
+              here.
+            </div>
+            <div
+              x-show="!studio.loading && studioFiltered().length === 0 && studio.deliverables.length"
+              class="card p-6 text-center text-sm text-slate-500"
+            >
+              No deliverables match the current filters.
+            </div>
+
+            <!-- Deliverables table -->
+            <div
+              x-show="!studio.loading && studioFiltered().length"
+              class="card overflow-hidden"
+            >
+              <table class="studio-table w-full text-sm">
+                <thead>
+                  <tr>
+                    <th>File</th>
+                    <th>Skill</th>
+                    <th>Format</th>
+                    <th class="text-right">Size</th>
+                    <th>Created</th>
+                    <th class="text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template
+                    x-for="d in studioFiltered()"
+                    :key="d.skill + '/' + d.run_id + '/' + d.filename"
+                  >
+                    <tr class="studio-row" :class="isStudioPinned(d) ? 'studio-row-pinned' : ''">
+                      <td>
+                        <button
+                          type="button"
+                          class="studio-filename-btn font-mono text-neon-cyan"
+                          @click="openStudioPreview(d)"
+                          :title="`Preview ${d.filename}`"
+                          x-text="d.filename"
+                        ></button>
+                      </td>
+                      <td>
+                        <span class="studio-pill" x-text="d.skill"></span>
+                      </td>
+                      <td>
+                        <span
+                          class="studio-format"
+                          x-text="(d.ext || '').toUpperCase()"
+                        ></span>
+                      </td>
+                      <td
+                        class="text-right text-slate-400"
+                        x-text="formatBytes(d.size)"
+                      ></td>
+                      <td
+                        class="text-slate-400"
+                        x-text="(d.created_at || '').slice(0, 19).replace('T', ' ')"
+                      ></td>
+                      <td class="text-right">
+                        <button
+                          type="button"
+                          class="studio-action studio-anchor"
+                          :class="isStudioPinned(d) ? 'studio-anchor-active' : ''"
+                          :title="isStudioPinned(d) ? 'Unpin (release anchor)' : 'Pin to top (drop anchor)'"
+                          @click="toggleStudioPin(d)"
+                        >
+                          <i data-lucide="anchor" class="w-3.5 h-3.5"></i>
+                        </button>
+                        <button
+                          type="button"
+                          class="studio-action"
+                          title="Preview inline"
+                          @click="openStudioPreview(d)"
+                        >
+                          <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+                        </button>
+                        <a
+                          :href="studioDownloadHref(d)"
+                          :download="d.filename"
+                          class="studio-action"
+                          title="Download"
+                        >
+                          <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                        </a>
+                        <button
+                          type="button"
+                          class="studio-action"
+                          title="Why this artifact? (reasoning view)"
+                          @click="openReasoning(d)"
+                        >
+                          <i
+                            data-lucide="brain-circuit"
+                            class="w-3.5 h-3.5"
+                          ></i>
+                        </button>
+                        <button
+                          type="button"
+                          class="studio-action"
+                          title="Open originating run"
+                          @click="studioOpenRun(d)"
+                        >
+                          <i
+                            data-lucide="external-link"
+                            class="w-3.5 h-3.5"
+                          ></i>
+                        </button>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
             </div>
           </section>
 
@@ -3939,6 +4328,216 @@
               </div>
             </details>
 
+            <!-- ===== MCP Servers (Phase 4e) ===== -->
+            <details class="acc accent-cyan" data-acc-key="mcps">
+              <summary>
+                <div class="flex items-center gap-3 min-w-0">
+                  <i
+                    data-lucide="chevron-right"
+                    class="acc-chevron w-4 h-4"
+                  ></i>
+                  <i
+                    data-lucide="plug"
+                    class="w-4 h-4 text-neon-cyan shrink-0"
+                  ></i>
+                  <div class="min-w-0">
+                    <div class="font-semibold">MCP Servers</div>
+                    <div
+                      class="text-[11px] font-mono text-slate-500 truncate"
+                      x-text="mcps.loaded ? `${mcps.items.length} vendored · ${mcps.items.filter(m => m.missing_env.length === 0).length} ready` : 'loading…'"
+                    ></div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2" @click.stop>
+                  <button
+                    class="btn btn-ghost text-xs"
+                    @click="loadMcps()"
+                    :disabled="mcps.loading"
+                    title="Re-scan tools/mcps/"
+                  >
+                    <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                    Refresh
+                  </button>
+                </div>
+              </summary>
+              <div class="acc-body">
+                <p class="text-xs text-slate-500 mb-4 max-w-2xl">
+                  Vendored Model Context Protocol servers under
+                  <code class="text-neon-cyan">tools/mcps/</code> are exposed to
+                  agent skills that opt in via
+                  <code class="text-neon-cyan">metadata.mcps:</code> in their
+                  SKILL.md frontmatter. No-key MCPs (USAspending, eCFR, GSA
+                  CALC+, GSA Per Diem, Federal Register) work out of the box;
+                  key-gated MCPs need the API keys set below. Saving keys
+                  rewrites <code class="text-neon-amber">.env</code> and
+                  triggers a graceful server restart.
+                </p>
+                <template x-if="!mcps.loaded">
+                  <div class="text-xs text-slate-500 font-mono">loading…</div>
+                </template>
+                <template x-if="mcps.loaded && mcps.items.length === 0">
+                  <div
+                    class="text-xs text-slate-500 font-mono bg-ink-900/40 border border-edge rounded-lg px-3 py-3"
+                  >
+                    No MCP manifests found under
+                    <code>tools/mcps/</code>. Vendor one through the standard
+                    Phase 4f pattern.
+                  </div>
+                </template>
+                <template x-if="mcps.loaded && mcps.items.length > 0">
+                  <div class="space-y-3">
+                    <template x-for="m in mcps.items" :key="m.name">
+                      <div
+                        class="bg-ink-900/60 border border-edge rounded-lg p-4 space-y-3"
+                      >
+                        <div
+                          class="flex items-start justify-between gap-3 flex-wrap"
+                        >
+                          <div class="min-w-0">
+                            <div class="flex items-center gap-2 mb-1">
+                              <code
+                                class="text-sm text-neon-cyan font-bold"
+                                x-text="m.name"
+                              ></code>
+                              <span
+                                class="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded border"
+                                :class="m.missing_env.length === 0 ? 'border-neon-lime/40 text-neon-lime' : 'border-neon-amber/40 text-neon-amber'"
+                                x-text="m.missing_env.length === 0 ? 'ready' : 'needs ' + m.missing_env.length + ' key(s)'"
+                              ></span>
+                            </div>
+                            <div
+                              class="text-[11px] text-slate-400 leading-relaxed max-w-3xl"
+                              x-text="m.description"
+                            ></div>
+                          </div>
+                          <button
+                            class="btn btn-ghost text-xs shrink-0"
+                            @click="testMcp(m.name)"
+                            :disabled="mcps.testing[m.name] || m.missing_env.length > 0"
+                            :title="m.missing_env.length > 0 ? 'Set required keys first' : 'Spawn subprocess + handshake + tools/list'"
+                          >
+                            <i data-lucide="activity" class="w-3.5 h-3.5"></i>
+                            <span
+                              x-text="mcps.testing[m.name] ? 'Testing…' : 'Test connection'"
+                            ></span>
+                          </button>
+                        </div>
+
+                        <template x-if="mcps.testResult[m.name]">
+                          <div
+                            class="text-[11px] font-mono px-3 py-2 rounded border"
+                            :class="mcps.testResult[m.name].ok ? 'border-neon-lime/40 bg-neon-lime/5 text-neon-lime' : 'border-neon-magenta/40 bg-neon-magenta/5 text-neon-magenta'"
+                          >
+                            <template x-if="mcps.testResult[m.name].ok">
+                              <div>
+                                ✓ handshake ok ·
+                                <span
+                                  x-text="mcps.testResult[m.name].tool_count"
+                                ></span>
+                                tools advertised:
+                                <span
+                                  class="text-slate-400"
+                                  x-text="mcps.testResult[m.name].sample_tools.join(', ')"
+                                ></span>
+                              </div>
+                            </template>
+                            <template x-if="!mcps.testResult[m.name].ok">
+                              <div
+                                x-text="'✗ ' + (mcps.testResult[m.name].error || 'unknown error')"
+                              ></div>
+                            </template>
+                          </div>
+                        </template>
+
+                        <template
+                          x-if="(m.env_required.length + m.env_optional.length) > 0"
+                        >
+                          <div class="space-y-2">
+                            <template
+                              x-for="env in [...m.env_required.map(e => ({...e, required: true})), ...m.env_optional.map(e => ({...e, required: false}))]"
+                              :key="env.name"
+                            >
+                              <div class="flex items-center gap-2">
+                                <label class="block flex-1 min-w-0">
+                                  <span
+                                    class="text-[10px] text-slate-400 font-mono uppercase tracking-wider flex items-center gap-2"
+                                  >
+                                    <code x-text="env.name"></code>
+                                    <span
+                                      class="text-[9px] px-1.5 py-0.5 rounded border"
+                                      :class="env.required ? 'border-neon-magenta/40 text-neon-magenta' : 'border-edge text-slate-500'"
+                                      x-text="env.required ? 'required' : 'optional'"
+                                    ></span>
+                                    <span
+                                      class="text-[9px] text-slate-600"
+                                      x-show="env.set"
+                                      x-text="'currently: ' + env.masked"
+                                    ></span>
+                                  </span>
+                                  <input
+                                    type="password"
+                                    :placeholder="env.set ? '(leave blank to keep current value)' : 'paste API key…'"
+                                    x-model="mcps.drafts[m.name + ':' + env.name]"
+                                    class="mt-1 w-full bg-ink-900/80 border border-edge rounded-lg px-3 py-2 text-sm font-mono focus:border-neon-cyan/60 outline-none"
+                                  />
+                                </label>
+                              </div>
+                            </template>
+                            <div class="flex justify-end">
+                              <button
+                                class="btn btn-primary text-xs"
+                                @click="saveMcpKeys(m.name)"
+                                :disabled="mcps.saving[m.name]"
+                              >
+                                <i data-lucide="save" class="w-3.5 h-3.5"></i>
+                                <span
+                                  x-text="mcps.saving[m.name] ? 'Saving + restarting…' : 'Save keys + restart'"
+                                ></span>
+                              </button>
+                            </div>
+                          </div>
+                        </template>
+
+                        <div
+                          class="text-[10px] font-mono text-slate-600 flex flex-wrap gap-x-4 gap-y-1 pt-2 border-t border-edge/40"
+                        >
+                          <span
+                            >command:
+                            <code
+                              class="text-slate-500"
+                              x-text="m.command.join(' ')"
+                            ></code
+                          ></span>
+                          <span
+                            >license:
+                            <code
+                              class="text-slate-500"
+                              x-text="m.license || '—'"
+                            ></code
+                          ></span>
+                          <span
+                            >vendored:
+                            <code
+                              class="text-slate-500"
+                              x-text="m.vendored_at || '—'"
+                            ></code
+                          ></span>
+                          <span x-show="m.vendored_from"
+                            ><a
+                              :href="m.vendored_from"
+                              target="_blank"
+                              class="text-neon-cyan hover:underline"
+                              >upstream ↗</a
+                            ></span
+                          >
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </template>
+              </div>
+            </details>
+
             <!-- ===== Models & Storage ===== -->
             <details class="acc accent-magenta" data-acc-key="models">
               <summary>
@@ -4242,6 +4841,578 @@
           >
             No matches.
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================== PHASE 6b — REASONING DRAWER ("Why this artifact?") ========================== -->
+    <div
+      x-show="reasoning.open"
+      x-cloak
+      x-transition.opacity
+      class="fixed inset-0 z-[85] bg-black/70 flex items-stretch justify-end"
+      @click.self="closeReasoning()"
+    >
+      <div
+        class="w-full max-w-3xl h-full bg-ink-900 border-l border-edge-strong overflow-y-auto pt-16"
+        @click.stop
+      >
+        <div
+          class="bg-ink-900 border-b border-edge p-4 flex items-start justify-between gap-3 sticky top-0 z-10"
+        >
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 text-xs text-slate-400">
+              <i data-lucide="brain-circuit" class="w-3.5 h-3.5"></i>
+              <span>Why this artifact?</span>
+            </div>
+            <h2
+              class="text-lg font-semibold text-slate-100 break-words mt-1"
+              x-text="reasoning.title || (reasoning.skill + ' \u00b7 ' + reasoning.run_id)"
+            ></h2>
+            <p
+              class="text-xs text-slate-400 mt-1"
+              x-text="reasoning.skill + (reasoning.created_at ? '  \u00b7  ' + reasoning.created_at.slice(0, 19).replace('T', ' ') : '')"
+            ></p>
+          </div>
+          <button
+            @click="closeReasoning()"
+            class="shrink-0 text-slate-400 hover:text-neon-magenta mt-0.5"
+          >
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <div class="p-4">
+          <div
+            x-show="reasoning.loading"
+            class="text-sm text-slate-400 flex items-center gap-2"
+          >
+            <i data-lucide="loader" class="w-4 h-4 animate-spin"></i>
+            <span>Reading transcript\u2026</span>
+          </div>
+
+          <div
+            x-show="!reasoning.loading && reasoning.error"
+            class="text-sm text-neon-magenta border border-neon-magenta/40 rounded p-3"
+            x-text="reasoning.error"
+          ></div>
+
+          <div
+            x-show="!reasoning.loading && !reasoning.error && reasoning.steps.length === 0"
+            class="text-sm text-slate-500"
+          >
+            No transcript was persisted for this run (likely a pre-tools-mode
+            skill). Nothing to render.
+          </div>
+
+          <div
+            x-show="!reasoning.loading && !reasoning.error && reasoning.summary"
+            class="flex flex-wrap gap-2 mb-4 text-xs"
+          >
+            <span class="reasoning-chip">
+              <i data-lucide="layers" class="w-3 h-3"></i>
+              <span x-text="`${reasoning.summary?.turns} turns`"></span>
+            </span>
+            <span class="reasoning-chip">
+              <i data-lucide="wrench" class="w-3 h-3"></i>
+              <span
+                x-text="`${reasoning.summary?.tool_calls} tool calls`"
+              ></span>
+            </span>
+            <span class="reasoning-chip">
+              <i data-lucide="list" class="w-3 h-3"></i>
+              <span x-text="`${reasoning.summary?.messages} steps`"></span>
+            </span>
+            <span
+              class="reasoning-chip"
+              x-show="reasoning.summary?.total_elapsed_ms"
+            >
+              <i data-lucide="timer" class="w-3 h-3"></i>
+              <span
+                x-text="`${(reasoning.summary?.total_elapsed_ms / 1000).toFixed(1)}s reasoning`"
+              ></span>
+            </span>
+          </div>
+
+          <ol
+            x-show="!reasoning.loading && !reasoning.error && reasoning.steps.length"
+            class="reasoning-timeline"
+          >
+            <template x-for="step in reasoning.steps" :key="step.index">
+              <li class="reasoning-step" :data-kind="step.kind">
+                <div class="reasoning-step-header">
+                  <span class="reasoning-step-index" x-text="step.index"></span>
+                  <i
+                    :data-lucide="reasoningStepIcon(step.kind)"
+                    class="w-3.5 h-3.5 reasoning-step-icon"
+                  ></i>
+                  <div class="flex-1 min-w-0">
+                    <div
+                      class="reasoning-step-summary"
+                      x-text="step.summary"
+                    ></div>
+                    <div
+                      x-show="step.preview"
+                      class="reasoning-step-preview"
+                      x-text="step.preview"
+                    ></div>
+                  </div>
+                  <div class="reasoning-step-meta">
+                    <span
+                      x-show="step.tool"
+                      class="reasoning-tool-pill"
+                      x-text="step.tool"
+                    ></span>
+                    <span
+                      x-show="step.elapsed_ms"
+                      class="reasoning-elapsed"
+                      x-text="`${(step.elapsed_ms).toFixed(0)} ms`"
+                    ></span>
+                    <button
+                      type="button"
+                      class="reasoning-step-toggle"
+                      @click="toggleReasoningStep(step.index)"
+                      :title="reasoning.expanded[step.index] ? 'Collapse' : 'Expand'"
+                    >
+                      <i
+                        :data-lucide="reasoning.expanded[step.index] ? 'chevron-up' : 'chevron-down'"
+                        class="w-3.5 h-3.5"
+                      ></i>
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  x-show="step.links?.chunk_ids?.length"
+                  class="reasoning-citations"
+                >
+                  <template
+                    x-for="cid in (step.links?.chunk_ids || [])"
+                    :key="cid"
+                  >
+                    <button
+                      type="button"
+                      class="reasoning-citation-chip"
+                      :title="`Preview ${cid} (right-click to copy)`"
+                      @click="openChunkPreview(cid)"
+                      @contextmenu.prevent="copyToClipboard(cid)"
+                    >
+                      <i data-lucide="link" class="w-3 h-3"></i>
+                      <span x-text="cid"></span>
+                    </button>
+                  </template>
+                </div>
+
+                <div
+                  x-show="reasoning.expanded[step.index]"
+                  x-cloak
+                  class="reasoning-step-detail"
+                >
+                  <template x-if="step.args && Object.keys(step.args).length">
+                    <div>
+                      <div class="reasoning-detail-label">Arguments</div>
+                      <pre
+                        class="reasoning-detail-pre"
+                        x-text="reasoningPrettyJson(step.args)"
+                      ></pre>
+                    </div>
+                  </template>
+                  <template x-if="step.result_preview">
+                    <div>
+                      <div class="reasoning-detail-label">
+                        Result preview
+                        <span
+                          x-show="step.result_truncated"
+                          class="text-neon-magenta"
+                        >
+                          (truncated)
+                        </span>
+                      </div>
+                      <pre
+                        class="reasoning-detail-pre"
+                        x-text="step.result_preview"
+                      ></pre>
+                    </div>
+                  </template>
+                  <template x-if="step.raw?.content">
+                    <div>
+                      <div class="reasoning-detail-label">Content</div>
+                      <pre
+                        class="reasoning-detail-pre"
+                        x-text="step.raw.content"
+                      ></pre>
+                    </div>
+                  </template>
+                </div>
+              </li>
+            </template>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================== PHASE 6b.2 — CHUNK PREVIEW MODAL ========================== -->
+    <div
+      x-show="chunkPreview.open"
+      x-cloak
+      x-transition.opacity
+      class="fixed inset-0 z-[90] bg-black/75 flex items-start justify-center pt-20"
+      @click.self="closeChunkPreview()"
+      @keydown.escape.window="if (chunkPreview.open) closeChunkPreview()"
+    >
+      <div
+        class="w-full max-w-3xl modal-canvas rounded-2xl overflow-hidden flex flex-col max-h-[80vh]"
+        @click.stop
+      >
+        <div
+          class="px-5 py-4 glass-section-bar flex items-start justify-between gap-4"
+        >
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 text-xs text-slate-400">
+              <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+              <span>Source chunk</span>
+            </div>
+            <h3
+              class="font-semibold text-slate-100 break-all mt-1"
+              x-text="chunkPreview.chunk_id"
+            ></h3>
+            <p
+              class="text-xs text-slate-400 mt-1 break-all"
+              x-show="chunkPreview.file_path"
+              x-text="chunkPreview.file_path"
+            ></p>
+          </div>
+          <button
+            @click="closeChunkPreview()"
+            class="shrink-0 text-slate-400 hover:text-neon-magenta mt-0.5"
+          >
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <div
+          x-show="!chunkPreview.loading && !chunkPreview.error"
+          class="flex flex-wrap gap-2 px-5 pt-3 text-xs"
+        >
+          <span
+            class="reasoning-chip"
+            x-show="chunkPreview.chunk_order_index !== null && chunkPreview.chunk_order_index !== undefined"
+          >
+            <i data-lucide="hash" class="w-3 h-3"></i>
+            <span x-text="`order ${chunkPreview.chunk_order_index}`"></span>
+          </span>
+          <span class="reasoning-chip" x-show="chunkPreview.tokens">
+            <i data-lucide="sigma" class="w-3 h-3"></i>
+            <span x-text="`${chunkPreview.tokens} tokens`"></span>
+          </span>
+          <span class="reasoning-chip">
+            <i data-lucide="ruler" class="w-3 h-3"></i>
+            <span x-text="`${chunkPreview.length} chars`"></span>
+          </span>
+          <button
+            type="button"
+            class="reasoning-chip hover:text-neon-cyan"
+            @click="copyToClipboard(chunkPreview.chunk_id)"
+            title="Copy chunk id"
+          >
+            <i data-lucide="copy" class="w-3 h-3"></i>
+            <span>Copy id</span>
+          </button>
+          <button
+            type="button"
+            class="reasoning-chip hover:text-neon-cyan"
+            @click="copyToClipboard(chunkPreview.content)"
+            title="Copy chunk content"
+            x-show="chunkPreview.content"
+          >
+            <i data-lucide="clipboard" class="w-3 h-3"></i>
+            <span>Copy content</span>
+          </button>
+          <button
+            type="button"
+            class="reasoning-chip hover:text-neon-cyan"
+            @click="chunkPreview.showRaw = !chunkPreview.showRaw"
+            title="Toggle raw vs cleaned narrative"
+            x-show="chunkPreview.content"
+          >
+            <i data-lucide="eye" class="w-3 h-3"></i>
+            <span x-text="chunkPreview.showRaw ? 'Cleaned' : 'Raw'"></span>
+          </button>
+        </div>
+
+        <div class="p-5 overflow-y-auto flex-1 min-h-0">
+          <div
+            x-show="chunkPreview.loading"
+            class="text-sm text-slate-400 flex items-center gap-2"
+          >
+            <i data-lucide="loader" class="w-4 h-4 animate-spin"></i>
+            <span>Resolving chunk\u2026</span>
+          </div>
+          <div
+            x-show="!chunkPreview.loading && chunkPreview.error"
+            class="text-sm text-neon-magenta border border-neon-magenta/40 rounded p-3"
+            x-text="chunkPreview.error"
+          ></div>
+
+          <!-- Cleaned narrative view (default) -->
+          <template
+            x-if="!chunkPreview.loading && !chunkPreview.error && chunkPreview.content && !chunkPreview.showRaw"
+          >
+            <div class="space-y-3">
+              <div class="flex flex-wrap items-center gap-2 text-xs">
+                <span
+                  class="reasoning-chip"
+                  :class="{
+                    'text-neon-cyan': chunkPreview.view.kind === 'text',
+                    'text-amber-300': chunkPreview.view.kind === 'table',
+                    'text-fuchsia-300': chunkPreview.view.kind === 'image',
+                    'text-emerald-300': chunkPreview.view.kind === 'equation',
+                  }"
+                >
+                  <i
+                    :data-lucide="
+                      chunkPreview.view.kind === 'table'
+                        ? 'table'
+                        : chunkPreview.view.kind === 'image'
+                        ? 'image'
+                        : chunkPreview.view.kind === 'equation'
+                        ? 'sigma'
+                        : 'file-text'
+                    "
+                    class="w-3 h-3"
+                  ></i>
+                  <span x-text="chunkPreview.view.badge"></span>
+                </span>
+                <span
+                  x-show="chunkPreview.view.caption"
+                  class="text-xs text-slate-300 italic break-words"
+                  x-text="`\u201c${chunkPreview.view.caption}\u201d`"
+                ></span>
+              </div>
+
+              <div
+                x-show="chunkPreview.view.kind === 'table' && chunkPreview.view.tableSummary"
+                class="text-xs text-slate-400"
+                x-text="`Table: ${chunkPreview.view.tableSummary} \u2014 cells in \u2018Raw\u2019.`"
+              ></div>
+
+              <pre
+                x-show="chunkPreview.view.body"
+                class="reasoning-detail-pre text-sm whitespace-pre-wrap"
+                x-text="chunkPreview.view.body"
+              ></pre>
+
+              <div
+                x-show="!chunkPreview.view.body && chunkPreview.view.kind !== 'table'"
+                class="text-sm text-slate-500"
+              >
+                (No narrative content for this chunk \u2014 switch to
+                \u2018Raw\u2019 to view the source.)
+              </div>
+            </div>
+          </template>
+
+          <!-- Raw view (toggle) -->
+          <pre
+            x-show="!chunkPreview.loading && !chunkPreview.error && chunkPreview.content && chunkPreview.showRaw"
+            class="reasoning-detail-pre text-sm whitespace-pre-wrap"
+            x-text="chunkPreview.content"
+          ></pre>
+
+          <div
+            x-show="!chunkPreview.loading && !chunkPreview.error && !chunkPreview.content"
+            class="text-sm text-slate-500"
+          >
+            (Empty chunk content.)
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================== PHASE 6a-2 — STUDIO PREVIEW DRAWER ========================== -->
+    <!--
+      Right-side slide-in inline preview for any Studio deliverable.
+      Loads bytes from the same /api/ui/skills/.../artifacts/{filename}
+      endpoint used for downloads, then renders client-side per format:
+        - PDF       → <iframe src="…">
+        - MP4/WEBM  → <video controls>
+        - PNG/JPG/… → <img>
+        - MD/JSON/CSV/TXT → <pre> (text)
+        - DOCX      → Mammoth.js → HTML
+        - XLSX      → SheetJS → HTML table per sheet (tabbed)
+      Mammoth and SheetJS load lazily from CDN only on first DOCX/XLSX open.
+      For JSON envelopes we also surface chunk-id back-links that open the
+      shared chunkPreview modal from Phase 6b.2.
+    -->
+    <div
+      x-show="studioPreview.open"
+      x-cloak
+      x-transition.opacity
+      class="fixed inset-0 z-[85] bg-black/70 flex items-stretch justify-end"
+      @click.self="closeStudioPreview()"
+    >
+      <div
+        class="w-full max-w-4xl h-full bg-ink-900 border-l border-edge-strong overflow-y-auto pt-16"
+        @click.stop
+      >
+        <div
+          class="bg-ink-900 border-b border-edge p-4 flex items-start justify-between gap-3 sticky top-0 z-10"
+        >
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 text-xs text-slate-400">
+              <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+              <span>Inline preview</span>
+              <span
+                class="font-mono text-[10px] text-slate-500 uppercase"
+                x-text="studioPreview.kind"
+              ></span>
+            </div>
+            <h2
+              class="text-lg font-semibold text-neon-cyan break-words mt-1 font-mono"
+              x-text="studioPreview.deliverable && studioPreview.deliverable.filename"
+            ></h2>
+            <p
+              class="text-xs text-slate-400 mt-1"
+              x-show="studioPreview.deliverable"
+            >
+              <span x-text="studioPreview.deliverable && studioPreview.deliverable.skill"></span>
+              <span class="text-slate-600"> · </span>
+              <span x-text="studioPreview.deliverable && (studioPreview.deliverable.created_at || '').slice(0, 19).replace('T', ' ')"></span>
+            </p>
+          </div>
+          <div class="flex items-center gap-2 shrink-0 mt-0.5">
+            <a
+              :href="studioPreview.href"
+              :download="studioPreview.deliverable && studioPreview.deliverable.filename"
+              class="text-slate-400 hover:text-neon-cyan"
+              title="Download"
+            >
+              <i data-lucide="download" class="w-5 h-5"></i>
+            </a>
+            <button
+              @click="closeStudioPreview()"
+              class="text-slate-400 hover:text-neon-magenta"
+              title="Close"
+            >
+              <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="p-4 space-y-4">
+          <!-- Loading -->
+          <div
+            x-show="studioPreview.loading"
+            class="text-sm text-slate-400 flex items-center gap-2"
+          >
+            <i data-lucide="loader" class="w-4 h-4 animate-spin"></i>
+            <span>Loading preview&hellip;</span>
+          </div>
+
+          <!-- Error -->
+          <div
+            x-show="!studioPreview.loading && studioPreview.error"
+            class="text-sm text-neon-magenta border border-neon-magenta/40 rounded p-3"
+            x-text="studioPreview.error"
+          ></div>
+
+          <!-- PDF -->
+          <template x-if="!studioPreview.loading && !studioPreview.error && studioPreview.kind === 'pdf'">
+            <iframe
+              :src="studioPreview.href"
+              class="w-full h-[75vh] bg-white rounded border border-edge"
+              title="PDF preview"
+            ></iframe>
+          </template>
+
+          <!-- Video -->
+          <template x-if="!studioPreview.loading && !studioPreview.error && studioPreview.kind === 'video'">
+            <video
+              :src="studioPreview.href"
+              controls
+              class="w-full max-h-[75vh] rounded border border-edge bg-black"
+            ></video>
+          </template>
+
+          <!-- Image / GIF -->
+          <template x-if="!studioPreview.loading && !studioPreview.error && studioPreview.kind === 'image'">
+            <div class="flex items-center justify-center bg-ink-800 rounded border border-edge p-4">
+              <img
+                :src="studioPreview.href"
+                :alt="studioPreview.deliverable && studioPreview.deliverable.filename"
+                class="max-w-full max-h-[75vh]"
+              />
+            </div>
+          </template>
+
+          <!-- Text-like (MD / TXT / CSV) -->
+          <template x-if="!studioPreview.loading && !studioPreview.error && (studioPreview.kind === 'md' || studioPreview.kind === 'text' || studioPreview.kind === 'csv')">
+            <pre
+              class="studio-preview-pre"
+              x-text="studioPreview.text"
+            ></pre>
+          </template>
+
+          <!-- JSON (text + chunk-id back-links) -->
+          <template x-if="!studioPreview.loading && !studioPreview.error && studioPreview.kind === 'json'">
+            <div class="space-y-3">
+              <div
+                class="flex items-center gap-2 flex-wrap"
+                x-show="studioPreview.jsonChunks.length"
+              >
+                <span class="text-[10px] uppercase tracking-wider text-slate-500">
+                  KG back-links
+                </span>
+                <template x-for="cid in studioPreview.jsonChunks" :key="cid">
+                  <button
+                    type="button"
+                    class="reasoning-chip hover:text-neon-cyan"
+                    @click="openChunkPreview(cid)"
+                    :title="`Open chunk ${cid}`"
+                  >
+                    <i data-lucide="link-2" class="w-3 h-3"></i>
+                    <span class="font-mono" x-text="cid"></span>
+                  </button>
+                </template>
+              </div>
+              <pre class="studio-preview-pre" x-text="studioPreview.text"></pre>
+            </div>
+          </template>
+
+          <!-- DOCX (Mammoth) -->
+          <template x-if="!studioPreview.loading && !studioPreview.error && studioPreview.kind === 'docx'">
+            <div class="studio-preview-docx" x-html="studioPreview.docxHtml"></div>
+          </template>
+
+          <!-- XLSX (SheetJS, with sheet tabs) -->
+          <template x-if="!studioPreview.loading && !studioPreview.error && studioPreview.kind === 'xlsx'">
+            <div class="space-y-3">
+              <div class="flex items-center gap-1 flex-wrap" x-show="studioPreview.sheets.length > 1">
+                <template x-for="(sh, idx) in studioPreview.sheets" :key="sh.name + idx">
+                  <button
+                    type="button"
+                    class="studio-sheet-tab"
+                    :class="studioPreview.sheetIdx === idx ? 'studio-sheet-tab-active' : ''"
+                    @click="studioSetSheet(idx)"
+                    x-text="sh.name"
+                  ></button>
+                </template>
+              </div>
+              <div
+                class="studio-preview-xlsx"
+                x-html="studioPreview.sheets[studioPreview.sheetIdx] && studioPreview.sheets[studioPreview.sheetIdx].html"
+              ></div>
+            </div>
+          </template>
+
+          <!-- Unsupported -->
+          <template x-if="!studioPreview.loading && !studioPreview.error && studioPreview.kind === 'unsupported'">
+            <div class="text-sm text-slate-400 border border-edge rounded p-4 text-center">
+              <i data-lucide="file-question" class="w-6 h-6 mx-auto mb-2 text-slate-500"></i>
+              <p>No inline preview available for this format.</p>
+              <p class="text-xs text-slate-500 mt-1">Use the download button above.</p>
+            </div>
+          </template>
         </div>
       </div>
     </div>
@@ -4964,6 +6135,12 @@
                   icon: "shield-check",
                   accent: "amber",
                 },
+                {
+                  id: "studio",
+                  label: "Studio",
+                  icon: "folder-open",
+                  accent: "lime",
+                },
               ],
             },
             {
@@ -5085,6 +6262,97 @@
             run: null,
             transcriptOpen: false,
             transcriptExpanded: {},
+            // Phase 4j taxonomy filters (closed vocabularies — see docs/SKILL_TAXONOMY.md)
+            activePersonas: [],
+            activePhases: [],
+            activeCapabilities: [],
+            searchQuery: "",
+          },
+          // Phase 6a — Studio: cross-skill deliverables index. Walks
+          // /api/ui/studio (server walks rag_storage/<ws>/skill_runs/*/...)
+          // and lists every artifact every skill has ever written for the
+          // active workspace. No new on-disk schema; pure index.
+          studio: {
+            deliverables: [],
+            loading: false,
+            error: null,
+            loaded: false,
+            filterSkill: "",
+            filterFormat: "",
+            search: "",
+            // Phase 6a-2 — Pinned anchors (Theseus mythos: anchor the
+            // current bid set so it surfaces at the top regardless of
+            // recency). Persisted to localStorage by deliverable key.
+            pinned: {}, // { "<skill>/<run_id>/<filename>": true }
+          },
+          // Phase 6a-2 — Inline preview pane (right slide-in drawer).
+          // Streams the artifact bytes from the existing
+          // /api/ui/skills/{name}/runs/{run_id}/artifacts/{filename}
+          // endpoint and renders client-side: PDF iframe, video, image,
+          // text/MD/JSON/CSV pre, DOCX via Mammoth.js, XLSX via SheetJS.
+          studioPreview: {
+            open: false,
+            loading: false,
+            error: null,
+            deliverable: null, // the row {skill, run_id, filename, ext, ...}
+            kind: "", // "pdf" | "video" | "image" | "text" | "md" | "json" | "csv" | "docx" | "xlsx" | "unsupported"
+            href: "", // download URL (used by iframe / video / img / mammoth fetch)
+            // Text-format payload (md / json / csv / txt)
+            text: "",
+            // DOCX → Mammoth HTML
+            docxHtml: "",
+            // XLSX → SheetJS sheet list + active sheet HTML
+            sheets: [], // [{ name, html }]
+            sheetIdx: 0,
+            // JSON KG back-links — chunk_ids found in the envelope
+            jsonChunks: [],
+          },
+          // Phase 6b — Reasoning view ("Why this artifact?"). Renders the
+          // deterministic transcript timeline returned by
+          // /api/ui/skills/{name}/runs/{run_id}/reasoning. Pure renderer; no
+          // LLM call. Each step is expandable to its raw tool args + result.
+          reasoning: {
+            open: false,
+            loading: false,
+            error: null,
+            skill: "",
+            run_id: "",
+            title: "",
+            created_at: "",
+            steps: [],
+            summary: null,
+            artifacts: [],
+            expanded: {}, // {[stepIndex]: bool}
+          },
+          // Phase 6b.2 — Inline chunk preview. Citation chips in the
+          // reasoning drawer (and any other surface that shows chunk-<hex>
+          // ids) open this modal, which resolves the chunk via
+          // /api/ui/chunks/{chunk_id} and renders its source content.
+          chunkPreview: {
+            open: false,
+            loading: false,
+            error: null,
+            chunk_id: "",
+            file_path: null,
+            full_doc_id: null,
+            chunk_order_index: null,
+            tokens: null,
+            length: 0,
+            content: "",
+            // Cleaned multimodal display (mirrors chat references):
+            // - kind: 'text' | 'table' | 'image' | 'equation' | 'unknown'
+            // - badge: short label for the badge pill
+            // - caption: extracted Caption: line, when present
+            // - body: cleaned narrative (Image Path / Caption stripped)
+            // - tableSummary: "N rows x M cols" when kind === 'table'
+            view: {
+              kind: "text",
+              badge: "TEXT",
+              caption: "",
+              body: "",
+              tableSummary: "",
+            },
+            showRaw: false,
           },
           // Streaming UI helpers
           streamLiveContent: "",
@@ -5137,6 +6405,17 @@
             saving: false,
             values: {},
             defaults: {},
+          },
+
+          // MCP Servers panel (Phase 4e) — vendored MCP inventory + key management
+          mcps: {
+            loaded: false,
+            loading: false,
+            items: [],
+            drafts: {}, // "<mcp>:<ENV_KEY>" → string
+            saving: {}, // mcpName → bool
+            testing: {}, // mcpName → bool
+            testResult: {}, // mcpName → { ok, tool_count, sample_tools, error }
           },
 
           // Knowledge graph state
@@ -5193,6 +6472,7 @@
               graph: "Knowledge Graph",
               chat: "Capture Chat",
               intel: "RFP Intelligence",
+              studio: "Studio",
               settings: "Settings",
             };
             return m[this.active] || "";
@@ -5211,6 +6491,7 @@
               chat: "shipley mentor · RAG over the workspace",
               intel:
                 "instructions ↔ evaluation · traceability · coverage · gaps",
+              studio: "capture products · every artifact every skill produced",
               settings: "workspace · storage · models",
             };
             return m[this.active] || "";
@@ -5290,9 +6571,10 @@
                 if (this.active === "settings" && !this.querySettings.loaded)
                   this.loadQuerySettings();
                 this.loadSkillSettings();
+                if (this.active === "settings" && !this.mcps.loaded)
+                  this.loadMcps();
                 if (this.active === "settings" && !this.dangerZone.loaded)
                   this.loadWorkspaceInventory();
-                // Documents tab: poll status_counts + pipeline_status while
                 // visible so the status strip stays live without holding
                 // open a second SSE channel.
                 if (this.active === "documents") this.startDocStatsPoll();
@@ -5306,6 +6588,9 @@
                 // Skills page: lazy-load on first visit, refresh on demand.
                 if (this.active === "skills" && !this.skills.loaded)
                   this.loadSkills();
+                // Studio page: lazy-load on first visit; refresh button forces.
+                if (this.active === "studio" && !this.studio.loaded)
+                  this.loadStudio();
               }),
             );
             this.$watch("documents", () =>
@@ -5355,6 +6640,24 @@
             this.$watch("restarting", () =>
               this.$nextTick(() => lucide.createIcons()),
             );
+            this.$watch("reasoning.open", () =>
+              this.$nextTick(() => lucide.createIcons()),
+            );
+            this.$watch("reasoning.expanded", () =>
+              this.$nextTick(() => lucide.createIcons()),
+            );
+            this.$watch("chunkPreview.open", () =>
+              this.$nextTick(() => lucide.createIcons()),
+            );
+            this.$watch("studioPreview.open", () =>
+              this.$nextTick(() => lucide.createIcons()),
+            );
+            this.$watch("studioPreview.sheetIdx", () =>
+              this.$nextTick(() => lucide.createIcons()),
+            );
+
+            // Phase 6a-2 — restore pinned anchors from localStorage
+            this._loadStudioPinned();
 
             await this.refreshAll();
             lucide.createIcons();
@@ -5898,6 +7201,576 @@
               this.skills.loading = false;
               this.$nextTick(() => lucide.createIcons());
             }
+          },
+
+          // ----- Studio (Phase 6a — cross-skill deliverables index) -----
+          async loadStudio() {
+            this.studio.loading = true;
+            this.studio.error = null;
+            try {
+              const r = await this.api("/api/ui/studio");
+              this.studio.deliverables = r.deliverables || [];
+              this.studio.loaded = true;
+            } catch (e) {
+              this.studio.error =
+                "Failed to load deliverables: " + (e?.message || e);
+              this.studio.deliverables = [];
+            } finally {
+              this.studio.loading = false;
+              this.$nextTick(() => lucide.createIcons());
+            }
+          },
+          studioSkillOptions() {
+            const set = new Set(
+              (this.studio.deliverables || []).map((d) => d.skill),
+            );
+            return Array.from(set).sort();
+          },
+          studioFormatOptions() {
+            const set = new Set(
+              (this.studio.deliverables || []).map((d) => d.ext || ""),
+            );
+            return Array.from(set).filter(Boolean).sort();
+          },
+          studioFiltered() {
+            const q = (this.studio.search || "").toLowerCase().trim();
+            const filtered = (this.studio.deliverables || []).filter((d) => {
+              if (
+                this.studio.filterSkill &&
+                d.skill !== this.studio.filterSkill
+              )
+                return false;
+              if (
+                this.studio.filterFormat &&
+                (d.ext || "") !== this.studio.filterFormat
+              )
+                return false;
+              if (
+                q &&
+                !(d.filename || "").toLowerCase().includes(q) &&
+                !(d.title || "").toLowerCase().includes(q)
+              )
+                return false;
+              return true;
+            });
+            // Pinned anchors (Phase 6a-2) sort to the top, preserving the
+            // existing order within each group (server already returns
+            // newest-first).
+            const pinKey = (d) => this.studioKey(d);
+            const pinned = this.studio.pinned || {};
+            return filtered
+              .map((d, i) => ({ d, i, p: pinned[pinKey(d)] ? 1 : 0 }))
+              .sort((a, b) => b.p - a.p || a.i - b.i)
+              .map((x) => x.d);
+          },
+          studioDownloadHref(d) {
+            return (
+              "/api/ui/skills/" +
+              encodeURIComponent(d.skill) +
+              "/runs/" +
+              encodeURIComponent(d.run_id) +
+              "/artifacts/" +
+              encodeURIComponent(d.filename)
+            );
+          },
+          studioOpenRun(d) {
+            // Deep-link the existing skill-run drawer: switch to Skills
+            // tab, open the originating skill detail, then load this run.
+            this.active = "skills";
+            this.$nextTick(async () => {
+              try {
+                if (!this.skills.loaded) await this.loadSkills();
+                await this.openSkill(d.skill);
+                this.loadSkillRun(d.skill, d.run_id);
+              } catch (e) {
+                this.toast("Could not open run: " + (e?.message || e), "error");
+              }
+            });
+          },
+          // ===== Phase 6a-2 — Pinned anchors (Theseus mythos) =====
+          studioKey(d) {
+            return (d.skill || "") + "/" + (d.run_id || "") + "/" + (d.filename || "");
+          },
+          isStudioPinned(d) {
+            return !!(this.studio.pinned || {})[this.studioKey(d)];
+          },
+          toggleStudioPin(d) {
+            const k = this.studioKey(d);
+            const next = { ...(this.studio.pinned || {}) };
+            if (next[k]) delete next[k];
+            else next[k] = true;
+            this.studio.pinned = next;
+            try {
+              localStorage.setItem(
+                "theseus.studio.pinned",
+                JSON.stringify(next),
+              );
+            } catch (_) {
+              /* localStorage unavailable */
+            }
+          },
+          _loadStudioPinned() {
+            try {
+              const raw = localStorage.getItem("theseus.studio.pinned");
+              if (raw) this.studio.pinned = JSON.parse(raw) || {};
+            } catch (_) {
+              this.studio.pinned = {};
+            }
+          },
+          // ===== Phase 6a-2 — Inline preview pane =====
+          // Lazy-loads CDN scripts (Mammoth.js, SheetJS) only when the
+          // user opens a DOCX or XLSX preview. Cached after first load.
+          _ensureScript(url) {
+            if (!this._scriptCache) this._scriptCache = {};
+            if (this._scriptCache[url]) return this._scriptCache[url];
+            this._scriptCache[url] = new Promise((resolve, reject) => {
+              const s = document.createElement("script");
+              s.src = url;
+              s.async = true;
+              s.onload = () => resolve();
+              s.onerror = () =>
+                reject(new Error("Failed to load script: " + url));
+              document.head.appendChild(s);
+            });
+            return this._scriptCache[url];
+          },
+          _studioFormatFor(d) {
+            const ext = (d.ext || "").toLowerCase().replace(/^\./, "");
+            if (ext === "pdf") return "pdf";
+            if (ext === "mp4" || ext === "webm" || ext === "mov")
+              return "video";
+            if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext))
+              return "image";
+            if (ext === "md" || ext === "markdown") return "md";
+            if (ext === "json") return "json";
+            if (ext === "csv") return "csv";
+            if (ext === "txt" || ext === "log" || ext === "yaml" || ext === "yml")
+              return "text";
+            if (ext === "docx") return "docx";
+            if (ext === "xlsx" || ext === "xls") return "xlsx";
+            return "unsupported";
+          },
+          async openStudioPreview(d) {
+            this.studioPreview.open = true;
+            this.studioPreview.loading = true;
+            this.studioPreview.error = null;
+            this.studioPreview.deliverable = d;
+            this.studioPreview.kind = this._studioFormatFor(d);
+            this.studioPreview.href = this.studioDownloadHref(d);
+            this.studioPreview.text = "";
+            this.studioPreview.docxHtml = "";
+            this.studioPreview.sheets = [];
+            this.studioPreview.sheetIdx = 0;
+            this.studioPreview.jsonChunks = [];
+            try {
+              const k = this.studioPreview.kind;
+              if (k === "pdf" || k === "video" || k === "image") {
+                // Native browser handlers — nothing to fetch in JS.
+                this.studioPreview.loading = false;
+              } else if (k === "md" || k === "json" || k === "csv" || k === "text") {
+                const r = await fetch(this.studioPreview.href);
+                if (!r.ok) throw new Error("HTTP " + r.status);
+                this.studioPreview.text = await r.text();
+                if (k === "json") {
+                  this.studioPreview.jsonChunks = this._extractJsonChunkIds(
+                    this.studioPreview.text,
+                  );
+                }
+                this.studioPreview.loading = false;
+              } else if (k === "docx") {
+                await this._ensureScript(
+                  "https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js",
+                );
+                const r = await fetch(this.studioPreview.href);
+                if (!r.ok) throw new Error("HTTP " + r.status);
+                const buf = await r.arrayBuffer();
+                const out = await window.mammoth.convertToHtml({
+                  arrayBuffer: buf,
+                });
+                this.studioPreview.docxHtml = out && out.value ? out.value : "";
+                this.studioPreview.loading = false;
+              } else if (k === "xlsx") {
+                await this._ensureScript(
+                  "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
+                );
+                const r = await fetch(this.studioPreview.href);
+                if (!r.ok) throw new Error("HTTP " + r.status);
+                const buf = await r.arrayBuffer();
+                const wb = window.XLSX.read(buf, { type: "array" });
+                this.studioPreview.sheets = (wb.SheetNames || []).map(
+                  (name) => ({
+                    name,
+                    html: window.XLSX.utils.sheet_to_html(wb.Sheets[name], {
+                      header: "",
+                      footer: "",
+                    }),
+                  }),
+                );
+                this.studioPreview.sheetIdx = 0;
+                this.studioPreview.loading = false;
+              } else {
+                this.studioPreview.loading = false;
+              }
+            } catch (e) {
+              this.studioPreview.error = e?.message || String(e);
+              this.studioPreview.loading = false;
+            }
+            this.$nextTick(() => {
+              if (window.lucide) lucide.createIcons();
+            });
+          },
+          closeStudioPreview() {
+            this.studioPreview.open = false;
+          },
+          studioSetSheet(idx) {
+            this.studioPreview.sheetIdx = idx;
+          },
+          // Walk a JSON envelope for chunk_<hex> ids (string or in arrays);
+          // returns deduplicated, ordered list. Used so JSON envelopes
+          // produced by skills (PTW cost stack, OCI findings, etc.) get
+          // back-linked to their originating chunks via the existing
+          // openChunkPreview() modal from Phase 6b.2.
+          _extractJsonChunkIds(text) {
+            if (!text) return [];
+            const re = /chunk-[0-9a-f]{8,}/gi;
+            const seen = new Set();
+            const out = [];
+            let m;
+            while ((m = re.exec(text)) !== null) {
+              const id = m[0];
+              if (!seen.has(id)) {
+                seen.add(id);
+                out.push(id);
+              }
+              if (out.length >= 200) break; // safety cap
+            }
+            return out;
+          },
+          // ===== Phase 6b — Reasoning view =====
+          async openReasoning(d) {
+            this.reasoning.open = true;
+            this.reasoning.loading = true;
+            this.reasoning.error = null;
+            this.reasoning.skill = d.skill;
+            this.reasoning.run_id = d.run_id;
+            this.reasoning.title = d.title || "";
+            this.reasoning.created_at = d.created_at || "";
+            this.reasoning.steps = [];
+            this.reasoning.summary = null;
+            this.reasoning.artifacts = [];
+            this.reasoning.expanded = {};
+            try {
+              const r = await fetch(
+                "/api/ui/skills/" +
+                  encodeURIComponent(d.skill) +
+                  "/runs/" +
+                  encodeURIComponent(d.run_id) +
+                  "/reasoning",
+              );
+              if (!r.ok) throw new Error("HTTP " + r.status);
+              const j = await r.json();
+              this.reasoning.steps = j.steps || [];
+              this.reasoning.summary = j.summary || null;
+              this.reasoning.artifacts = j.artifacts || [];
+              this.reasoning.title = j.title || this.reasoning.title;
+              this.reasoning.created_at =
+                j.created_at || this.reasoning.created_at;
+            } catch (e) {
+              this.reasoning.error = e?.message || String(e);
+            } finally {
+              this.reasoning.loading = false;
+              this.$nextTick(() => {
+                if (window.lucide) lucide.createIcons();
+              });
+            }
+          },
+          closeReasoning() {
+            this.reasoning.open = false;
+          },
+          toggleReasoningStep(idx) {
+            this.reasoning.expanded[idx] = !this.reasoning.expanded[idx];
+          },
+          reasoningStepIcon(kind) {
+            return (
+              {
+                system: "settings",
+                user: "user",
+                assistant_text: "message-circle",
+                tool_action: "wrench",
+              }[kind] || "circle"
+            );
+          },
+          reasoningPrettyJson(value) {
+            try {
+              return JSON.stringify(value, null, 2);
+            } catch {
+              return String(value);
+            }
+          },
+          copyToClipboard(text) {
+            try {
+              navigator.clipboard.writeText(text);
+              this.toast("Copied: " + text, "success");
+            } catch (e) {
+              this.toast("Copy failed", "error");
+            }
+          },
+          // ===== Phase 6b.2 — Inline chunk preview =====
+          // Workspace-scoped cache so the same chunk fetched from multiple
+          // surfaces (chat sources card, reasoning drawer modal) only hits
+          // the API once. Reset whenever the active workspace changes.
+          _chunkCache: Object.create(null),
+          async fetchChunk(chunkId) {
+            if (!chunkId) throw new Error("missing chunk id");
+            const hit = this._chunkCache[chunkId];
+            if (hit) return hit;
+            const r = await fetch(
+              "/api/ui/chunks/" + encodeURIComponent(chunkId),
+            );
+            if (!r.ok) {
+              if (r.status === 404) {
+                throw new Error("Chunk not found in this workspace");
+              }
+              throw new Error("HTTP " + r.status);
+            }
+            const j = await r.json();
+            const record = {
+              chunk_id: chunkId,
+              file_path: j.file_path,
+              full_doc_id: j.full_doc_id,
+              chunk_order_index: j.chunk_order_index,
+              tokens: j.tokens,
+              length: j.length || 0,
+              content: j.content || "",
+              view: this.formatSource({ preview: j.content || "" }),
+            };
+            this._chunkCache[chunkId] = record;
+            return record;
+          },
+          async openChunkPreview(chunkId) {
+            if (!chunkId) return;
+            this.chunkPreview.open = true;
+            this.chunkPreview.loading = true;
+            this.chunkPreview.error = null;
+            this.chunkPreview.chunk_id = chunkId;
+            this.chunkPreview.file_path = null;
+            this.chunkPreview.full_doc_id = null;
+            this.chunkPreview.chunk_order_index = null;
+            this.chunkPreview.tokens = null;
+            this.chunkPreview.length = 0;
+            this.chunkPreview.content = "";
+            try {
+              const rec = await this.fetchChunk(chunkId);
+              this.chunkPreview.file_path = rec.file_path;
+              this.chunkPreview.full_doc_id = rec.full_doc_id;
+              this.chunkPreview.chunk_order_index = rec.chunk_order_index;
+              this.chunkPreview.tokens = rec.tokens;
+              this.chunkPreview.length = rec.length;
+              this.chunkPreview.content = rec.content;
+              this.chunkPreview.view = rec.view;
+              this.chunkPreview.showRaw = false;
+            } catch (e) {
+              this.chunkPreview.error = e?.message || String(e);
+            } finally {
+              this.chunkPreview.loading = false;
+              this.$nextTick(() => {
+                if (window.lucide) lucide.createIcons();
+              });
+            }
+          },
+          closeChunkPreview() {
+            this.chunkPreview.open = false;
+          },
+          // Phase 4j taxonomy helpers (closed vocabularies — see docs/SKILL_TAXONOMY.md)
+          // Persona display config (label + ordering); "none" maps to "Utility & Meta".
+          skillPersonaConfig() {
+            return [
+              { id: "capture_manager", label: "Capture Managers" },
+              { id: "proposal_manager", label: "Proposal Managers" },
+              { id: "proposal_writer", label: "Proposal Writers" },
+              { id: "cost_estimator", label: "Cost Estimators" },
+              { id: "contracts_manager", label: "Contracts Managers" },
+              { id: "technical_sme", label: "Technical SMEs" },
+              { id: "legal_compliance", label: "Legal / Compliance" },
+              { id: "program_manager", label: "Program Managers" },
+              { id: "none", label: "Utility & Meta" },
+            ];
+          },
+          // Compact filter pills for the persona axis. Each pill has its
+          // own filter `id` plus a `personas` array of underlying taxonomy
+          // IDs it matches (one pill can fold multiple personas). SME and
+          // Meta are intentionally absent: meta skills are pinned at top
+          // regardless of filters, and SME folds into Operations alongside
+          // program_manager (requirements + technical execution contexts).
+          skillPersonaFilterConfig() {
+            return [
+              {
+                id: "capture",
+                label: "Capture",
+                personas: ["capture_manager"],
+              },
+              { id: "writer", label: "Writer", personas: ["proposal_writer"] },
+              {
+                id: "operations",
+                label: "Operations",
+                personas: ["technical_sme", "program_manager"],
+              },
+              { id: "cost", label: "Cost", personas: ["cost_estimator"] },
+              {
+                id: "contracts",
+                label: "Contracts",
+                personas: ["contracts_manager"],
+              },
+              { id: "legal", label: "Legal", personas: ["legal_compliance"] },
+            ];
+          },
+          skillPhaseConfig() {
+            return [
+              { id: "pursuit", label: "Pursuit" },
+              { id: "capture", label: "Capture" },
+              { id: "strategy", label: "Strategy" },
+              { id: "proposal_development", label: "Proposal Dev" },
+              { id: "negotiation", label: "Negotiation" },
+              { id: "post_award", label: "Post-Award" },
+            ];
+          },
+          skillCapabilityConfig() {
+            return [
+              { id: "research", label: "Research" },
+              { id: "analyze", label: "Analyze" },
+              { id: "draft", label: "Draft" },
+              { id: "audit", label: "Audit" },
+              { id: "estimate", label: "Estimate" },
+              { id: "render", label: "Render" },
+              { id: "meta", label: "Meta" },
+            ];
+          },
+          // Meta/utility skills are pinned to the top regardless of filters
+          // so the toolbox feels stable. A skill counts as meta when its
+          // primary persona is "none" OR its capability is "meta" — that
+          // matches user intuition (skill-creator, huashu-design,
+          // govcon-ontology, renderers all sit above the domain skills).
+          isMetaSkill(s) {
+            return (
+              (s.personas_primary || "none") === "none" ||
+              s.capability === "meta"
+            );
+          },
+          // Returns true when the skill matches the active persona + phase
+          // + capability filters. Empty filter set on an axis = "all skills
+          // pass that axis". Across axes the filters AND together.
+          skillMatchesFilters(s) {
+            const pe = this.skills.activePersonas;
+            const ph = this.skills.activePhases;
+            const cp = this.skills.activeCapabilities;
+            if (pe.length) {
+              // Expand each active filter id into its underlying persona IDs
+              // (one pill, e.g. "operations", can match multiple personas).
+              const cfg = this.skillPersonaFilterConfig();
+              const expanded = new Set();
+              for (const id of pe) {
+                const entry = cfg.find((p) => p.id === id);
+                if (entry) entry.personas.forEach((x) => expanded.add(x));
+              }
+              const primary = s.personas_primary || "none";
+              const sec = s.personas_secondary || [];
+              if (!expanded.has(primary) && !sec.some((x) => expanded.has(x)))
+                return false;
+            }
+            if (ph.length) {
+              const phases = s.shipley_phases || [];
+              if (!phases.some((p) => ph.includes(p))) return false;
+            }
+            if (cp.length) {
+              if (!cp.includes(s.capability)) return false;
+            }
+            // Free-text search across name + description (case-insensitive,
+            // whitespace-trimmed). Matches if every whitespace-separated
+            // token appears somewhere in the haystack.
+            const q = (this.skills.searchQuery || "").trim().toLowerCase();
+            if (q) {
+              const hay = (
+                (s.name || "") +
+                " " +
+                (s.description || "")
+              ).toLowerCase();
+              const tokens = q.split(/\s+/);
+              if (!tokens.every((t) => hay.includes(t))) return false;
+            }
+            return true;
+          },
+          // Flat, filtered, sorted skill list. Meta skills first (pinned),
+          // then domain skills, both alphabetical within their group.
+          skillsFiltered() {
+            const items = (this.skills.items || []).filter((s) =>
+              this.skillMatchesFilters(s),
+            );
+            return items.slice().sort((a, b) => {
+              const am = this.isMetaSkill(a) ? 0 : 1;
+              const bm = this.isMetaSkill(b) ? 0 : 1;
+              if (am !== bm) return am - bm;
+              return a.name.localeCompare(b.name);
+            });
+          },
+          // Per-pill counts. Each returns the total number of skills (out
+          // of the full catalog) that would match if ONLY that pill were
+          // active — gives users a sense of each filter's scope. Counts
+          // are stable regardless of currently-active filters so toggling
+          // a pill never makes another pill's number jump.
+          skillsCountForPersona(id) {
+            const cfg = this.skillPersonaFilterConfig().find(
+              (p) => p.id === id,
+            );
+            if (!cfg) return 0;
+            const targets = new Set(cfg.personas);
+            return (this.skills.items || []).filter((s) => {
+              const primary = s.personas_primary || "none";
+              const sec = s.personas_secondary || [];
+              return targets.has(primary) || sec.some((x) => targets.has(x));
+            }).length;
+          },
+          skillsCountForPhase(id) {
+            return (this.skills.items || []).filter((s) =>
+              (s.shipley_phases || []).includes(id),
+            ).length;
+          },
+          skillsCountForCapability(id) {
+            return (this.skills.items || []).filter((s) => s.capability === id)
+              .length;
+          },
+          toggleSkillPersona(id) {
+            const arr = this.skills.activePersonas;
+            const i = arr.indexOf(id);
+            if (i >= 0) arr.splice(i, 1);
+            else arr.push(id);
+            this.$nextTick(() => lucide.createIcons());
+          },
+          toggleSkillPhase(id) {
+            const arr = this.skills.activePhases;
+            const i = arr.indexOf(id);
+            if (i >= 0) arr.splice(i, 1);
+            else arr.push(id);
+            this.$nextTick(() => lucide.createIcons());
+          },
+          toggleSkillCapability(id) {
+            const arr = this.skills.activeCapabilities;
+            const i = arr.indexOf(id);
+            if (i >= 0) arr.splice(i, 1);
+            else arr.push(id);
+            this.$nextTick(() => lucide.createIcons());
+          },
+          clearSkillFilters() {
+            this.skills.activePersonas = [];
+            this.skills.activePhases = [];
+            this.skills.activeCapabilities = [];
+            this.skills.searchQuery = "";
+            this.$nextTick(() => lucide.createIcons());
+          },
+          // Pretty label for a personas_primary or personas_secondary id
+          // (singular form, falls back to id itself for unknown values).
+          personaLabel(id) {
+            const cfg = this.skillPersonaConfig().find((p) => p.id === id);
+            return cfg ? cfg.label.replace(/s$/, "") : id;
           },
           async openSkill(name) {
             this.skills.invokeResult = "";
@@ -6869,14 +8742,65 @@
               const cellCount = firstTr
                 ? (firstTr[0].match(/<t[dh][\s>]/gi) || []).length
                 : 0;
-              const rowsLabel = trMatches.length
-                ? `${trMatches.length}${s.truncated ? "+" : ""} rows`
+              // Markdown-table fallback (MinerU often emits | a | b | rows
+              // instead of <table>). Count pipe-rows to give the user *some*
+              // idea of size.
+              let mdRows = 0;
+              let mdCols = 0;
+              if (!trMatches.length) {
+                const mdLines = structHtml
+                  .split(/\n/)
+                  .filter((ln) => /^\s*\|.*\|\s*$/.test(ln));
+                // Drop the markdown separator row (|---|---|).
+                const dataLines = mdLines.filter(
+                  (ln) => !/^\s*\|[\s:|-]+\|\s*$/.test(ln),
+                );
+                mdRows = dataLines.length;
+                if (dataLines.length) {
+                  mdCols = (dataLines[0].match(/\|/g) || []).length - 1;
+                }
+              }
+              const totalRows = trMatches.length || mdRows;
+              const totalCols = cellCount || mdCols;
+              const rowsLabel = totalRows
+                ? `${totalRows}${s.truncated ? "+" : ""} rows`
                 : "rows unknown";
-              const colsLabel = cellCount ? ` Ã— ${cellCount} cols` : "";
+              const colsLabel = totalCols ? ` \u00d7 ${totalCols} cols` : "";
               out.tableSummary = `${rowsLabel}${colsLabel}${
                 s.truncated ? " (preview clipped)" : ""
               }`;
-              out.body = "";
+
+              // Prefer the VLM "Analysis:" paragraph as the body — that's
+              // the human-readable summary the user actually wants. Fall
+              // back to Footnotes, then to a cleaned dump of the whole
+              // chunk minus the Image Path line and the Structure blob.
+              const analysisMatch = raw.match(
+                /(?:^|\n)\s*Analysis\s*:\s*([\s\S]+?)(?=\n\s*(?:Footnotes|Image Path|Caption|Structure)\s*:|$)/i,
+              );
+              const footnotesMatch = raw.match(
+                /(?:^|\n)\s*Footnotes\s*:\s*([\s\S]+?)(?=\n\s*(?:Analysis|Image Path|Caption|Structure)\s*:|$)/i,
+              );
+              if (analysisMatch && analysisMatch[1].trim()) {
+                out.body = analysisMatch[1].trim();
+              } else if (footnotesMatch && footnotesMatch[1].trim()) {
+                out.body = footnotesMatch[1].trim();
+              } else {
+                out.body = raw
+                  .replace(/(?:^|\n)\s*Image Path\s*:\s*[^\n]+/i, "")
+                  .replace(
+                    /(?:^|\n)\s*Structure\s*:\s*<table[\s\S]*?<\/table>\s*/i,
+                    "\n",
+                  )
+                  .replace(/(?:^|\n)\s*Structure\s*:\s*<table[\s\S]*$/i, "")
+                  // Markdown-table fallback strip: drop the Structure: line
+                  // and every following pipe-table row.
+                  .replace(
+                    /(?:^|\n)\s*Structure\s*:[^\n]*(?:\n\s*\|[^\n]*)+/i,
+                    "\n",
+                  )
+                  .replace(/\n{3,}/g, "\n\n")
+                  .trim();
+              }
               return out;
             }
 
@@ -7613,6 +9537,80 @@
               this.toast("Skill settings reset to defaults");
             } catch (e) {
               this.toast("Reset failed: " + e.message, "error");
+            }
+          },
+
+          // ----- MCP Servers panel (Phase 4e) -----
+          async loadMcps() {
+            this.mcps.loading = true;
+            try {
+              const data = await this.api("/api/ui/mcps");
+              this.mcps.items = data.mcps || [];
+              this.mcps.loaded = true;
+              this.$nextTick(() => lucide.createIcons());
+            } catch (e) {
+              this.toast("Failed loading MCPs: " + e.message, "error");
+            } finally {
+              this.mcps.loading = false;
+            }
+          },
+
+          async saveMcpKeys(name) {
+            // Collect drafts for this MCP, drop empty values (keep current).
+            const keys = {};
+            for (const k of Object.keys(this.mcps.drafts)) {
+              if (!k.startsWith(name + ":")) continue;
+              const v = (this.mcps.drafts[k] || "").trim();
+              if (v) keys[k.split(":", 2)[1]] = v;
+            }
+            if (Object.keys(keys).length === 0) {
+              this.toast("Nothing to save — all fields blank", "info");
+              return;
+            }
+            this.mcps.saving[name] = true;
+            try {
+              const data = await this.api(`/api/ui/mcps/${name}/keys`, {
+                method: "POST",
+                body: JSON.stringify({ keys, restart: true }),
+              });
+              if (data.status === "restarting") {
+                this.toast(`Saved ${data.written.length} key(s) — restarting…`);
+                this.restarting = true;
+                this.restartTarget = this.stats.workspace;
+                this.pollRestart();
+              } else {
+                this.toast(`Saved ${data.written.length} key(s)`);
+                this.loadMcps();
+              }
+              // Clear drafts for this MCP
+              for (const k of Object.keys(this.mcps.drafts)) {
+                if (k.startsWith(name + ":")) this.mcps.drafts[k] = "";
+              }
+            } catch (e) {
+              this.toast("Save failed: " + e.message, "error");
+            } finally {
+              this.mcps.saving[name] = false;
+            }
+          },
+
+          async testMcp(name) {
+            this.mcps.testing[name] = true;
+            this.mcps.testResult[name] = null;
+            try {
+              const data = await this.api(`/api/ui/mcps/${name}/test`, {
+                method: "POST",
+              });
+              this.mcps.testResult[name] = data;
+              if (data.ok) {
+                this.toast(`${name}: handshake ok (${data.tool_count} tools)`);
+              } else {
+                this.toast(`${name}: ${data.error || "failed"}`, "error");
+              }
+            } catch (e) {
+              this.mcps.testResult[name] = { ok: false, error: e.message };
+              this.toast("Test failed: " + e.message, "error");
+            } finally {
+              this.mcps.testing[name] = false;
             }
           },
 

@@ -1,0 +1,54 @@
+{
+  "skill_name": "price-to-win",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Build me a price-to-win for an FFP services contract: NAICS 541512, 5 senior software developers in the DC metro, 1-year base + 4 option years, GSA MAS commercial pricing. The incumbent's last award was $9.2M.",
+      "expected_output": "A JSON envelope at artifacts/ptw_ffp.json with cost_model='FFP', a wrap-rate buildup using the GSA MAS commercial vehicle preset (~2.47x implied multiplier), three scenarios (low/mid/high) per LCAT, BLS-aged annual wages with explicit aging factor, CALC+ percentile anchors with N reported, lifecycle totals (base + 4 option years) low/mid/high, and a ptw_recommendation block with a target_price 5–10% under the mid-scenario lifecycle plus rationale and at least three risk_flags. Methodology cites FAR 15.404-4 and 16.202.",
+      "expectations": [
+        "The skill called kg_entities at least once requesting types including 'solicitation', 'naics_code', 'incumbent', 'labor_category', or 'place_of_performance'.",
+        "The skill called mcp__bls_oews__get_wage_data or mcp__bls_oews__igce_wage_benchmark for the Software Developer SOC (15-1252) at the DC metro.",
+        "The skill called mcp__gsa_calc__igce_benchmark or mcp__gsa_calc__price_reasonableness_check at least once.",
+        "The skill read references/cost_models/ffp_buildup.md via read_file.",
+        "The skill called write_file with target path 'artifacts/ptw_ffp.json'.",
+        "The output cost_model field equals 'FFP' and model_rationale cites FAR 16.202 or FFP/firm-fixed-price language.",
+        "The wrap-rate implied multiplier in the mid scenario falls within the GSA MAS commercial sanity band (2.3x–2.7x).",
+        "Every labor entry has a buildup with non-null fbr_low, fbr_mid, fbr_high, and the BLS series_id is reported.",
+        "The ptw_recommendation block has a non-null target_price and at least 3 risk_flags.",
+        "Methodology citations include 'FAR 15.404-4' and 'FAR 16.202'."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Estimate the price-to-win for an LH task order under FAR 16.601: 3 senior cyber analysts cleared TS/SCI in the DC metro, 2080 hours per FTE per year, 3-year period of performance, 4 trips per year to Huntsville AL for 2 travelers. Agency BPA cleared environment.",
+      "expected_output": "A JSON envelope at artifacts/ptw_lh.json with cost_model='LH', BLS-anchored direct hourly per LCAT, three burden multiplier scenarios (1.8 / 2.0 / 2.2), travel block computed from GSA per diem (Huntsville), no burden applied to travel, lifecycle totals across 3 years, and a ptw_recommendation block. Methodology cites FAR 16.601 and FAR 31.205-46.",
+      "expectations": [
+        "The skill called mcp__bls_oews__get_wage_data for SOC code 15-1212 (Information Security Analyst) or equivalent senior cyber SOC at the DC metro.",
+        "The skill called mcp__gsa_calc__igce_benchmark with a senior cyber labor keyword.",
+        "The skill called mcp__gsa_perdiem__estimate_travel_cost for Huntsville, AL.",
+        "The skill read references/cost_models/lh_tm_buildup.md via read_file.",
+        "The skill called write_file with target path 'artifacts/ptw_lh.json'.",
+        "The output cost_model field equals 'LH' (not 'FFP').",
+        "Every labor entry has loaded_hourly_low, loaded_hourly_mid, loaded_hourly_high derived from burden multipliers 1.8 / 2.0 / 2.2 respectively.",
+        "The travel block reports a non-zero annual_cost and burden_applied is false.",
+        "Methodology citations include 'FAR 16.601'."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Build a price-to-win for a CPAF cost-reimbursement R&D BAA award: 2 principal investigators + 4 research engineers in the Boston metro, 3-year base, no option years. Assume the agency uses an 85% historical earned-fee mean on a 10% award pool with a 3% base fee. The competitor is a DCAA-approved mid-tier prime.",
+      "expected_output": "A JSON envelope at artifacts/ptw_cr.json with cost_model='CR-CPAF', cost pools (fringe / overhead / G&A) with three scenarios, fee_structure block declaring CPAF subtype with base_fee_pct=0.03, award_pool_pct=0.10, earned_pct_assumption=0.85, fee computed on Fee-Bearing Cost only (NOT on ODCs or sub pass-throughs), lifecycle totals, and a ptw_recommendation block. Methodology cites FAR 16.405-2 and 10 USC 3322(a) statutory fee cap.",
+      "expectations": [
+        "The skill called mcp__bls_oews__get_wage_data for the Boston metro for at least one of the labor categories.",
+        "The skill called mcp__gsa_calc__igce_benchmark for at least one labor category.",
+        "The skill read references/cost_models/cost_reimbursement_buildup.md via read_file.",
+        "The skill called write_file with target path 'artifacts/ptw_cr.json'.",
+        "The output cost_model field starts with 'CR-' (e.g., 'CR-CPAF').",
+        "The fee_structure.subtype equals 'CPAF' and earned_pct_assumption equals 0.85.",
+        "fee_bearing_cost_mid is reported AND non_fee_cost_mid is reported as separate fields (proves fee is NOT computed on the grand total).",
+        "fee_mid is approximately equal to fee_bearing_cost_mid * (base_fee_pct + award_pool_pct * earned_pct_assumption) within 1% tolerance.",
+        "Methodology citations include 'FAR 16.405-2' AND '10 USC 3322(a)'."
+      ]
+    }
+  ]
+}

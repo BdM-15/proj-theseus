@@ -10,7 +10,7 @@ identical to the in-process tools (``read_file``, ``kg_query``, etc.) —
 they all flow through the same transcript, the same dispatch loop, and
 the same error envelopes.
 
-Design constraints (see ``docs/PHASE_4A_MCP_CLIENT_DESIGN.md``):
+Design constraints (see ``docs/archive/phase_3-4/PHASE_4A_MCP_CLIENT_DESIGN.md``):
 
 * **Transport:** stdio with **newline-delimited JSON** (per the official
   MCP spec — one JSON-RPC message per line, no embedded newlines).

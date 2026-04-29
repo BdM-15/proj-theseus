@@ -1,0 +1,11 @@
+{
+  "name": "sam_gov",
+  "description": "SAM.gov MCP server (1102tools/federal-contracting-mcps). 19 read-only tools over the SAM.gov public API: entity registration lookups (UEI/CAGE), exclusions (debarment) checks, contract opportunity search + descriptions, FPDS-NG contract awards (search, lookup by PIID, deleted awards), PSC code lookups, vendor responsibility checks, federal organization hierarchy, and acquisition + assistance subaward search. Note: upstream consolidates FPDS data into this server (no standalone FPDS MCP). Requires SAM_GOV_API_KEY (free at sam.gov; rate-limited per key).",
+  "command": ["uvx", "--from", "sam-gov-mcp==0.4.1", "sam-gov-mcp"],
+  "env_required": ["SAM_GOV_API_KEY"],
+  "env_optional": [],
+  "vendored_from": "https://github.com/1102tools/federal-contracting-mcps/tree/main/servers/sam-gov-mcp",
+  "vendored_commit": "aef1961378b3e5c380270bec48ed47a4f7bed4fc",
+  "vendored_at": "2026-04-28",
+  "license": "MIT"
+}

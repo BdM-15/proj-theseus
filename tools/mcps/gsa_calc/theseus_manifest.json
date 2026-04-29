@@ -1,0 +1,11 @@
+{
+  "name": "gsa_calc",
+  "description": "GSA CALC+ MCP server (1102tools/federal-contracting-mcps). 8 read-only tools over the GSA CALC+ Labor Ceiling Rates API: keyword/exact search, autocomplete, filtered browse, IGCE benchmarking, price reasonableness, vendor rate cards, SIN distribution analysis. No API key required (1,000 requests/hour rate limit).",
+  "command": ["uvx", "--from", "gsa-calc-mcp==0.2.7", "gsa-calc-mcp"],
+  "env_required": [],
+  "env_optional": [],
+  "vendored_from": "https://github.com/1102tools/federal-contracting-mcps/tree/main/servers/gsa-calc-mcp",
+  "vendored_commit": "aef1961378b3e5c380270bec48ed47a4f7bed4fc",
+  "vendored_at": "2026-04-28",
+  "license": "MIT"
+}

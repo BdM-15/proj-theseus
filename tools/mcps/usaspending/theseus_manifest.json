@@ -1,0 +1,11 @@
+{
+  "name": "usaspending",
+  "description": "USASpending.gov MCP server (1102tools/federal-contracting-mcps). 55 read-only tools over the federal award, contract, IDV, subaward, recipient, agency, and federal-account API. No API key required.",
+  "command": ["uvx", "--from", "usaspending-gov-mcp==0.3.2", "usaspending-mcp"],
+  "env_required": [],
+  "env_optional": [],
+  "vendored_from": "https://github.com/1102tools/federal-contracting-mcps/tree/main/servers/usaspending-gov-mcp",
+  "vendored_commit": "aef1961378b3e5c380270bec48ed47a4f7bed4fc",
+  "vendored_at": "2025-11-25",
+  "license": "MIT"
+}

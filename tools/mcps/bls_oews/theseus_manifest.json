@@ -1,0 +1,11 @@
+{
+  "name": "bls_oews",
+  "description": "BLS Occupational Employment and Wage Statistics MCP server (1102tools/federal-contracting-mcps). 7 read-only tools over the Bureau of Labor Statistics OEWS public API: occupational wage data lookups by SOC code + metro area, metro/occupation comparisons, IGCE wage benchmarks for cost estimates and price-to-win analysis, latest-year detection, and SOC/metro reference helpers. Powers Independent Government Cost Estimate (IGCE) construction and labor-rate benchmarking. Requires BLS_API_KEY (free at bls.gov/developers; rate-limited per key).",
+  "command": ["uvx", "--from", "bls-oews-mcp==0.2.7", "bls-oews-mcp"],
+  "env_required": ["BLS_API_KEY"],
+  "env_optional": [],
+  "vendored_from": "https://github.com/1102tools/federal-contracting-mcps/tree/main/servers/bls-oews-mcp",
+  "vendored_commit": "aef1961378b3e5c380270bec48ed47a4f7bed4fc",
+  "vendored_at": "2026-04-28",
+  "license": "MIT"
+}

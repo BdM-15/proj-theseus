@@ -1,26 +1,41 @@
-# Black-Hat One-Pager Template (skeleton)
+# Black-Hat One-Pager — canonical structure (Phase 4d)
+
+Use this template once per competitor (incumbent + top 3 likely). Every
+non-trivial claim cites either an `award_id` (USAspending
+`generated_internal_id`) or a `chunk_id` (Theseus KG). Anything you cannot
+cite goes in `claim_gaps`, NOT in the body.
 
 ```
-COMPETITOR: <name>   ROLE: <incumbent | top-3 likely | wildcard>
+COMPETITOR: <recipient name>
+ROLE: incumbent | likely-1 | likely-2 | likely-3
+RECIPIENT_HASH: <from get_recipient_profile>
+PARENT_RECIPIENT: <parent name or "self">
+BUSINESS_TYPES: <e.g. "Large Business, For-Profit Organization">
 
-LIKELY THEMES (predicted):
-  1. <verb-led theme they will use>
+LAST 3 WINS IN THIS NAICS / AGENCY:
+  1. <agency> · $<amount> · <pop_end> · [award:<id>]
   2. ...
   3. ...
 
-DISCRIMINATORS THEY WILL CLAIM:
-  - <claim>  →  Our counter: <ghost language we plant>
+PREDICTED THEMES (anchored to award history):
+  1. <verb-led theme> — evidence: [award:<id>], [award:<id>]
+  2. <verb-led theme> — evidence: [award:<id>]
+  3. ...
 
-VULNERABILITIES (public evidence):
-  - <CPARS / news / protest decision> → ghost angle for our proposal
+CLAIM GAPS (what we cannot verify with USAspending alone):
+  - CPARS performance ratings — no MCP source yet
+  - Protest history — no MCP source yet
+  - Recent news / leadership changes — no MCP source yet
+  - Teaming intent on this specific opportunity — qualitative, requires capture-team intel
 
-PRICING POSTURE (estimated):
-  - Strategy: <buy-in | premium | matched>
-  - Likely $ range: <low–high>
+GHOST LANGUAGE HOOKS (for proposal-generator):
+  - <hook 1 — short, evaluator-friendly phrase>
+  - <hook 2>
 
-SUGGESTED HAND-OFF TO proposal-generator:
-  - Add ghost language: <bullet list>
-  - Reinforce themes: <bullet list>
+NOTES FOR USER (manual research):
+  - <thing the user should look up before red team>
 ```
 
-This is a skeleton — flesh out when the SAM.gov / USAspending integration lands.
+Fill ONLY the fields you have evidence for. Drop the line entirely if
+empty rather than emit a "TBD" — `proposal-generator` consumes this and
+treats placeholder strings as content.

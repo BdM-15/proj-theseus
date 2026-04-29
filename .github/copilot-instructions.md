@@ -63,8 +63,9 @@ This project has **three independent prompt systems** that MUST stay aligned. Ch
 5. **Inference prompts** (`prompts/relationship_inference/*.md`): Algorithm-specific prompts that reference entity/relationship types
 6. **Test fixtures** (`tools/test_query_prompt.py`, `tests/`): Signal detection patterns, expected entity types, relationship type assertions
 7. **VDB sync** (`src/inference/vdb_sync.py`): Normalization logic for relationship types
+8. **Skill taxonomy** (`docs/SKILL_TAXONOMY.md` + every `.github/skills/*/SKILL.md`): When the persona vocabulary in the extraction prompt's `USER PERSONAS YOU SUPPORT` block changes (add / remove / rename a persona), update `docs/SKILL_TAXONOMY.md` § "Persona Vocabulary" AND audit `metadata.personas_primary` / `metadata.personas_secondary` across every SKILL.md frontmatter. The persona ID set, the Shipley-phase set, and the capability-verb set are all closed vocabularies — `tests/skills/test_skill_taxonomy.py` will fail any drift.
 
-**Rule: No PR that changes entity types, relationship types, or Shipley methodology should be committed without confirming all 7 areas above are aligned.**
+**Rule: No PR that changes entity types, relationship types, Shipley methodology, or skill personas should be committed without confirming all 8 areas above are aligned.**
 
 ### Domain Vocabulary Reference
 
@@ -151,6 +152,41 @@ Theseus implements the open [Agent Skills specification](https://agentskills.io/
 
 **Foundational meta-skill:** [.github/skills/skill-creator/](../.github/skills/skill-creator/) — vendored from `anthropics/skills` (Apache-2.0). Use it to author/refine/evaluate every other skill. See its [UPSTREAM.md](../.github/skills/skill-creator/UPSTREAM.md) for re-vendor instructions and the Claude.ai-specific runtime adaptation (Theseus is single-process; upstream assumes Claude Code parallel subagents).
 
+### 🔒 MANDATE — `skill-creator` is required for every skill change
+
+**There is no path to creating, rewriting, promoting, or materially improving a skill that bypasses `skill-creator`.** This is non-negotiable, applies to the agent and any subagent, and supersedes any "I'll just edit the file directly" instinct.
+
+**You MUST load `skill-creator` (read its `SKILL.md`) and follow its workflow when:**
+
+- Creating a new skill from scratch (any folder under `.github/skills/<new-name>/`)
+- Promoting a placeholder/stub skill to a real implementation (e.g., wiring an MCP, adding tools-mode runtime)
+- Rewriting a skill's frontmatter, body, references, assets, or evals
+- Optimizing a skill's `description` for trigger accuracy
+- Adding/removing `metadata.mcps`, `metadata.script_paths`, or `metadata.runtime`
+- Running benchmarks/evals against a skill or comparing against a baseline
+
+**Permitted without invoking `skill-creator` (small, surgical, no behavioral change):**
+
+- Typo / mojibake / formatting-only fixes inside an existing SKILL.md or reference file
+- Bumping `metadata.version` to match an already-completed change
+- Renaming an internal artifact path that doesn't change the skill's contract
+- Adding a contract test under `tests/skills/` (those live outside `.github/skills/`)
+
+**The `skill-creator` workflow you MUST follow** (anchored in [Anthropic's authoring best-practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices)):
+
+1. **Snapshot first.** Copy the existing skill (if any) to `tools/_skill_snapshots/<skill-name>-pre-<phase>/` (gitignored) so you can diff and roll back.
+2. **Build evals BEFORE prose.** Write/refresh `evals/evals.json` with ≥3 realistic prompts that capture the gaps you intend to close. Evals are the source of truth — not your intuition.
+3. **Establish the baseline.** Note how the current skill (or no skill) performs against those prompts.
+4. **Draft minimally.** Write only enough SKILL.md to close the gap. Honor the spec: 6-field frontmatter, body <500 lines, workflow-as-numbered-checklist, references one level deep, `assets/` not `templates/`, gerund naming, third-person "pushy" description with both WHAT + WHEN, no time-sensitive language, consistent terminology, no Windows backslashes in paths inside the skill.
+5. **Match degrees of freedom to fragility.** High-freedom prose for judgment-heavy steps; low-freedom "run exactly this script" for fragile ones. Avoid offering multiple options where one default + escape hatch will do.
+6. **Iterate observe→refine→test.** Run the evals (or at minimum a live smoke-test invocation through `SkillManager.invoke(...)`), watch what the model actually does, bring observations back, refine. Do not declare "done" without at least one real run.
+7. **Honor progressive disclosure.** Push large reference material into `references/*.md` so it loads on demand, not into the SKILL.md body.
+8. **Cite Anthropic best-practices** in your commit/PR description when you make a non-trivial authoring decision (e.g., "moved tool reference table to `references/data_sources.md` per progressive-disclosure pattern").
+
+**Enforcement at commit time:** Before proposing any commit that touches `.github/skills/<skill>/SKILL.md`, `evals/evals.json`, `references/`, or `assets/`, you must affirm in the commit message body (or the chat turn proposing it) that `skill-creator` was loaded and its workflow was followed. If it wasn't, stop, load `skill-creator`, redo the work, then commit.
+
+**Rule:** No PR that creates or materially changes a skill should be committed without (a) `skill-creator` having been loaded for that turn, (b) an updated `evals/evals.json`, and (c) at least one observed run (smoke test or full eval pass).
+
 ### Spec rules (the only ones that matter)
 
 1. **Frontmatter — six allowed fields only:** `name` (required, max 64 chars, lowercase + hyphens, no `anthropic`/`claude`), `description` (required, max 1024 chars, third-person, "pushy" with both **what** + **when**), `license`, `compatibility`, `metadata` (escape hatch for custom keys), `allowed-tools` (experimental). **Anything else at the top level is non-conformant — move it under `metadata:`.**
@@ -178,16 +214,17 @@ Every tool call is captured in `<run_dir>/transcript.json` for grounding audit. 
 
 When modifying a skill or the runtime, you MUST:
 
-1. **Frontmatter audit:** Verify only the 6 spec fields at top level. Move `version`, `category`, `status`, `authoritative_source`, `upstream`, etc. under `metadata:`.
-2. **Directory naming:** If the skill has a `templates/` folder, it must be renamed to `assets/` (and `Skill.has_templates` references in `manager.py` updated to `has_assets`).
-3. **Body length:** Stay under 500 lines. Move long content into `references/*.md`.
-4. **Workflow as checklist:** Body must contain an explicit numbered checklist invoking the tools above. No implicit "use the briefing book" assumptions.
-5. **`evals/evals.json` present:** Every skill needs at least 3 test prompts using the schema in `.github/skills/skill-creator/references/schemas.md`.
-6. **UTF-8 only:** Save SKILL.md as UTF-8 (no BOM round-trip through Windows-1252). PowerShell: `Out-File -Encoding utf8`. Watch for mojibake (`â€"`, `â†'`, `â†"`) in existing files.
-7. **Spec portability:** The same SKILL.md must run unmodified in Claude Code, Cursor, Copilot. Theseus-specific behavior goes under `metadata:` — never as new top-level YAML keys.
-8. **Audit doc updated:** If you discover a new gap or close one, update `docs/SKILL_SPEC_COMPLIANCE.md` in the same commit.
+1. **`skill-creator` loaded:** For any non-trivial skill change (see MANDATE above), affirm `skill-creator/SKILL.md` was read this turn and its workflow followed. Trivial fixes (typos, mojibake, version bumps) are exempt.
+2. **Frontmatter audit:** Verify only the 6 spec fields at top level. Move `version`, `category`, `status`, `authoritative_source`, `upstream`, etc. under `metadata:`.
+3. **Directory naming:** If the skill has a `templates/` folder, it must be renamed to `assets/` (and `Skill.has_templates` references in `manager.py` updated to `has_assets`).
+4. **Body length:** Stay under 500 lines. Move long content into `references/*.md`.
+5. **Workflow as checklist:** Body must contain an explicit numbered checklist invoking the tools above. No implicit "use the briefing book" assumptions.
+6. **`evals/evals.json` present:** Every skill needs at least 3 test prompts using the schema in `.github/skills/skill-creator/references/schemas.md`.
+7. **UTF-8 only:** Save SKILL.md as UTF-8 (no BOM round-trip through Windows-1252). PowerShell: `Out-File -Encoding utf8`. Watch for mojibake (`â€"`, `â†'`, `â†"`) in existing files.
+8. **Spec portability:** The same SKILL.md must run unmodified in Claude Code, Cursor, Copilot. Theseus-specific behavior goes under `metadata:` — never as new top-level YAML keys.
+9. **Audit doc updated:** If you discover a new gap or close one, update `docs/SKILL_SPEC_COMPLIANCE.md` in the same commit.
 
-**Rule:** No PR that touches `.github/skills/` or `src/skills/` should be committed without confirming all 8 areas above.
+**Rule:** No PR that touches `.github/skills/` or `src/skills/` should be committed without confirming all 9 areas above.
 
 ### Sub-phase migration state (current)
 
@@ -300,11 +337,17 @@ ALL development happens on feature branches. `main` is updated only via fast-for
 
 **Default**: When a feature branch is complete (tests pass, user has approved the final commit), the agent integrates it via **fast-forward merge** directly. **Do NOT open a Pull Request** unless the user explicitly asks for one.
 
+**⚠️ Identify the integration target BEFORE merging.** Most epics use a long-lived integration branch as their parent — sub-branches FF into the integration branch, NOT main. The integration branch only merges to main when the whole epic is done. Confirm the target with the user (or check `/memories/repo/branch-integration-policy.md`) if there is any doubt. Do NOT default to main.
+
+**Active integration branches:**
+
+- _None._ The skills + MCP epic (Phases 2.x–6.x) merged to `main` as `v1.2.0`. New feature branches now branch from `main` directly. If a future multi-branch epic starts, list its integration branch here.
+
 **Standard fast-forward sequence** (after the user says "merge it" / "ship it" / "continue"):
 
 ```powershell
 # From the feature branch, with all commits pushed:
-git checkout <integration-target>          # usually main, sometimes a parent integration branch
+git checkout <integration-target>          # the epic's integration branch — NOT main by default
 git pull --ff-only                         # ensure target is current
 git merge --ff-only <feature-branch>       # fails loudly if not fast-forwardable
 git push
@@ -312,6 +355,7 @@ git checkout <feature-branch>              # return to the feature branch for cl
 ```
 
 **If `git merge --ff-only` fails** (target advanced independently):
+
 - DO NOT force-push or rebase published commits without asking.
 - Surface the divergence to the user and propose either (a) `git rebase <target>` on the feature branch then retry FF, or (b) a single merge commit with a clear message — let the user pick.
 
