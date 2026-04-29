@@ -131,12 +131,49 @@ def test_chunk_ids_are_extracted_from_result_preview() -> None:
             "kind": "tool",
             "call_id": "c1",
             "name": "kg_chunks",
-            "result_preview": 'hits: chunk-abc123def, chunk-deadbeef99, chunk-abc123def (dupe)',
+            "result_preview": 'hits: chunk-1b8a790d0500c50bb2b2b57ff70c810a, chunk-b562c978f436c55018b296b14f7de509, chunk-1b8a790d0500c50bb2b2b57ff70c810a (dupe)',
         },
     ]
     view = build_reasoning_view(transcript)
     step = next(s for s in view["steps"] if s["kind"] == "tool_action")
-    assert step["links"]["chunk_ids"] == ["chunk-abc123def", "chunk-deadbeef99"]
+    assert step["links"]["chunk_ids"] == [
+        "chunk-1b8a790d0500c50bb2b2b57ff70c810a",
+        "chunk-b562c978f436c55018b296b14f7de509",
+    ]
+
+
+def test_chunk_ids_prefer_stored_field_over_regex() -> None:
+    """New runs persist a ``chunk_ids`` list on the tool entry (full ids
+    captured before the 500-char preview slice). The renderer must prefer
+    that list so ids that fall past the truncation are still surfaced."""
+    transcript = [
+        {
+            "kind": "assistant",
+            "turn": 1,
+            "content": "",
+            "tool_calls": [
+                {"id": "c1", "name": "kg_chunks", "arguments": json.dumps({"query": "cyber"})},
+            ],
+        },
+        {
+            "kind": "tool",
+            "call_id": "c1",
+            "name": "kg_chunks",
+            # Preview only contains a truncated id (would be a half-match).
+            "result_preview": "hits: chunk-1b8a790d0500c50bb2",
+            # But the runtime extracted these from the full payload.
+            "chunk_ids": [
+                "chunk-1b8a790d0500c50bb2b2b57ff70c810a",
+                "chunk-b562c978f436c55018b296b14f7de509",
+            ],
+        },
+    ]
+    view = build_reasoning_view(transcript)
+    step = next(s for s in view["steps"] if s["kind"] == "tool_action")
+    assert step["links"]["chunk_ids"] == [
+        "chunk-1b8a790d0500c50bb2b2b57ff70c810a",
+        "chunk-b562c978f436c55018b296b14f7de509",
+    ]
 
 
 def test_unpaired_tool_entry_still_surfaces() -> None:

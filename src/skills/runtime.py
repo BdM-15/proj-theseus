@@ -291,6 +291,23 @@ async def run_tool_loop(
             tool_t0 = _now_ms()
             payload_str, extra = await _dispatch_tool_call(call, specs_by_name, ctx)
             tool_elapsed = _now_ms() - tool_t0
+            # Extract chunk-<32hex> ids from the FULL payload before we
+            # truncate the preview, so the reasoning drawer can deep-link to
+            # the originating chunk even when the id sits past the 500-char
+            # cutoff. Required-32-hex shape rejects mid-string truncations.
+            _full_chunk_ids: list[str] = []
+            try:
+                import re as _re
+                seen: set[str] = set()
+                for m in _re.finditer(r"\bchunk-[a-f0-9]{32}\b", payload_str):
+                    cid = m.group(0)
+                    if cid not in seen:
+                        seen.add(cid)
+                        _full_chunk_ids.append(cid)
+                        if len(_full_chunk_ids) >= 25:
+                            break
+            except Exception:
+                pass
             _append(
                 transcript,
                 {
@@ -301,6 +318,7 @@ async def run_tool_loop(
                     "arguments": call.arguments_json,
                     "elapsed_ms": tool_elapsed,
                     "result_preview": payload_str[:500],
+                    "chunk_ids": _full_chunk_ids,
                     "extra": extra,
                 },
             )

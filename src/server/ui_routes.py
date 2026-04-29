@@ -2567,6 +2567,50 @@ def register_ui(
             }
         )
 
+    @app.get("/api/ui/chunks/{chunk_id}", tags=["theseus-ui"])
+    async def get_chunk_route(chunk_id: str) -> JSONResponse:
+        """Phase 6b.2 — Resolve a single text chunk for inline preview.
+
+        Powers the citation chips in the reasoning drawer (and any other
+        UI surface that surfaces ``chunk-<hex>`` ids). Reads the workspace's
+        ``kv_store_text_chunks.json`` directly. Pure read-only lookup.
+        """
+        # Defensive id shape: must look like a real chunk key (chunk-<hex>)
+        # to keep this endpoint from doubling as an arbitrary file probe.
+        if not chunk_id or len(chunk_id) > 128 or "/" in chunk_id or "\\" in chunk_id:
+            raise HTTPException(400, "Invalid chunk id")
+
+        ws = _workspace_dir()
+        tc_path = ws / "kv_store_text_chunks.json"
+        if not tc_path.exists():
+            raise HTTPException(404, "No text-chunk store in this workspace")
+
+        def _load_chunk() -> Optional[dict]:
+            try:
+                store = json.loads(tc_path.read_text(encoding="utf-8"))
+            except Exception as exc:
+                logger.warning("Failed reading text-chunk store: %s", exc)
+                return None
+            return store.get(chunk_id)
+
+        chunk = await asyncio.to_thread(_load_chunk)
+        if not chunk:
+            raise HTTPException(404, f"Unknown chunk: {chunk_id}")
+
+        content = chunk.get("content") or chunk.get("text") or ""
+        return JSONResponse(
+            {
+                "workspace": get_settings().workspace,
+                "chunk_id": chunk_id,
+                "file_path": chunk.get("file_path") or chunk.get("full_doc_id"),
+                "full_doc_id": chunk.get("full_doc_id"),
+                "chunk_order_index": chunk.get("chunk_order_index"),
+                "tokens": chunk.get("tokens"),
+                "length": len(content),
+                "content": content,
+            }
+        )
+
     @app.delete("/api/ui/skills/{name}/runs/{run_id}", tags=["theseus-ui"])
     async def delete_skill_run_route(name: str, run_id: str) -> JSONResponse:
         """Delete a persisted skill run from disk."""

@@ -21,8 +21,13 @@ from typing import Any
 _RESULT_SLICE = 1200
 
 # Pattern for chunk ids surfaced by kg_chunks / kg_query results. LightRAG
-# uses ``chunk-<hex>`` ids; tolerate both that and the bare hex form.
-_CHUNK_ID_RX = re.compile(r"\b(chunk-[A-Za-z0-9]{6,})\b")
+# Chunk ids are 32-hex MD5 hashes prefixed with ``chunk-``. We require the
+# full 32-hex shape so a mid-string truncation in ``result_preview`` (which
+# is sliced at 500 chars in the runtime) does not surface a half-id that
+# would 404 against ``GET /api/ui/chunks/{chunk_id}``. New runs also store
+# the full id list directly on the transcript entry as ``chunk_ids``; the
+# regex is the fallback for older runs persisted before that change.
+_CHUNK_ID_RX = re.compile(r"\bchunk-[a-f0-9]{32}\b")
 
 
 def _safe_load_args(arguments: Any) -> dict[str, Any]:
@@ -97,12 +102,12 @@ def _summarize_tool_call(name: str, args: dict[str, Any], result_preview: str) -
 
 
 def _extract_chunk_ids(blob: str) -> list[str]:
-    """Pull any ``chunk-<hex>`` ids out of a result preview / arg blob."""
+    """Pull any ``chunk-<32hex>`` ids out of a result preview / arg blob."""
     if not blob:
         return []
     seen: list[str] = []
     for m in _CHUNK_ID_RX.finditer(blob):
-        cid = m.group(1)
+        cid = m.group(0)
         if cid not in seen:
             seen.append(cid)
         if len(seen) >= 25:
@@ -214,8 +219,15 @@ def build_reasoning_view(transcript: list[dict[str, Any]]) -> dict[str, Any]:
 
                 # Collect chunk ids referenced by the args or result, so the
                 # UI can render them as deep-link chips (Phase 6b.2 wires the
-                # actual chunk preview modal).
-                chunk_ids = _extract_chunk_ids(json.dumps(args)) + _extract_chunk_ids(result_preview)
+                # actual chunk preview modal). Prefer the runtime-captured
+                # ``chunk_ids`` field on the tool entry (extracted from the
+                # FULL payload before the 500-char preview slice); fall back
+                # to regex on args + preview for older transcripts.
+                stored = (result_entry or {}).get("chunk_ids") or []
+                if isinstance(stored, list) and stored:
+                    chunk_ids = [str(c) for c in stored if isinstance(c, str)]
+                else:
+                    chunk_ids = _extract_chunk_ids(json.dumps(args)) + _extract_chunk_ids(result_preview)
                 # Dedupe preserving order.
                 deduped: list[str] = []
                 for c in chunk_ids:
@@ -246,6 +258,11 @@ def build_reasoning_view(transcript: list[dict[str, Any]]) -> dict[str, Any]:
             name = str(entry.get("name") or "unknown")
             result_preview = str(entry.get("result_preview") or "")
             args = _safe_load_args(entry.get("arguments"))
+            stored = entry.get("chunk_ids") or []
+            if isinstance(stored, list) and stored:
+                cids = [str(c) for c in stored if isinstance(c, str)]
+            else:
+                cids = _extract_chunk_ids(result_preview)
             steps.append({
                 "index": len(steps) + 1,
                 "kind": "tool_action",
@@ -257,7 +274,7 @@ def build_reasoning_view(transcript: list[dict[str, Any]]) -> dict[str, Any]:
                 "result_preview": _truncate(result_preview, _RESULT_SLICE),
                 "result_truncated": bool((entry.get("extra") or {}).get("truncated")),
                 "elapsed_ms": float(entry.get("elapsed_ms") or 0),
-                "links": {"chunk_ids": _extract_chunk_ids(result_preview)},
+                "links": {"chunk_ids": cids},
             })
 
     summary = {

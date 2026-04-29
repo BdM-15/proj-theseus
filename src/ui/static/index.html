@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en" class="dark">
   <head>
     <meta charset="utf-8" />
@@ -1805,12 +1805,24 @@
                                 :key="si"
                               >
                                 <div
-                                  class="source-row"
+                                  class="source-card"
+                                  :class="{ 'source-card-disabled': !s.chunk_id }"
                                   :id="`source-${i}-${s.reference_id}`"
                                   :data-source-ref="s.reference_id"
-                                  x-data="{ raw: false, fmt: formatSource(s) }"
+                                  x-data="{ fmt: formatSource(s), loading: false, error: null }"
+                                  x-init="
+                                    if (s.chunk_id && (s.truncated || fmt.kind === 'table' || fmt.kind === 'image' || fmt.kind === 'equation')) {
+                                      loading = true;
+                                      fetchChunk(s.chunk_id).then(function(f){
+                                        if (f && f.content) {
+                                          fmt = formatSource({ ...s, preview: f.content, truncated: false });
+                                        }
+                                      }).catch(function(e){ error = e && e.message ? e.message : String(e); })
+                                        .finally(function(){ loading = false; });
+                                    }
+                                  "
                                 >
-                                  <div class="source-row-head">
+                                  <div class="source-card-head">
                                     <span
                                       class="source-num"
                                       x-text="`[${s.reference_id}]`"
@@ -1828,46 +1840,39 @@
                                     <span
                                       class="source-meta"
                                       x-show="s.char_count"
-                                      x-text="s.truncated ? `${s.char_count} chars (preview)` : `${s.char_count} chars`"
+                                      x-text="`${s.char_count} chars`"
                                     ></span>
-                                  </div>
-                                  <!-- Caption (table/image only, when present) -->
-                                  <div
-                                    class="source-caption"
-                                    x-show="fmt.caption"
-                                    x-text="fmt.caption"
-                                  ></div>
-                                  <!-- Table summary card -->
-                                  <div
-                                    class="source-tablecard"
-                                    x-show="fmt.kind === 'table' && fmt.tableSummary"
-                                  >
-                                    <i
-                                      data-lucide="table-2"
-                                      class="w-3.5 h-3.5"
-                                    ></i>
-                                    <span x-text="fmt.tableSummary"></span>
-                                  </div>
-                                  <!-- Body (text chunks, image alt-text, equation source) -->
-                                  <div
-                                    class="source-preview"
-                                    x-show="fmt.body && fmt.kind !== 'table'"
-                                    x-text="fmt.body"
-                                  ></div>
-                                  <!-- Raw expander (always available) -->
-                                  <div class="source-raw-wrap">
                                     <button
                                       type="button"
-                                      class="source-raw-toggle"
-                                      @click="raw = !raw"
-                                      x-text="raw ? 'Hide raw' : 'Show raw'"
-                                    ></button>
-                                    <pre
-                                      class="source-raw"
-                                      x-show="raw"
-                                      x-transition.opacity
-                                      x-text="s.preview"
-                                    ></pre>
+                                      class="source-card-view-btn"
+                                      x-show="s.chunk_id"
+                                      @click.stop="openChunkPreview(s.chunk_id)"
+                                      :title="`View full chunk in modal — ${s.chunk_id}`"
+                                    >
+                                      <span>View full chunk</span>
+                                      <span aria-hidden="true">&#x2197;</span>
+                                    </button>
+                                  </div>
+                                  <!-- Subtitle: caption + table chip + narrative excerpt -->
+                                  <div
+                                    class="source-card-sub"
+                                    x-show="fmt.caption || fmt.body || (fmt.kind === 'table' && fmt.tableSummary)"
+                                  >
+                                    <span
+                                      class="source-card-caption"
+                                      x-show="fmt.caption"
+                                      x-text="fmt.caption"
+                                    ></span>
+                                    <span
+                                      class="source-card-tablechip"
+                                      x-show="fmt.kind === 'table' && fmt.tableSummary"
+                                      x-text="fmt.tableSummary"
+                                    ></span>
+                                    <span
+                                      class="source-card-excerpt"
+                                      x-show="fmt.body"
+                                      x-text="fmt.body"
+                                    ></span>
                                   </div>
                                 </div>
                               </template>
@@ -4966,8 +4971,9 @@
                     <button
                       type="button"
                       class="reasoning-citation-chip"
-                      :title="`Copy chunk id: ${cid}`"
-                      @click="copyToClipboard(cid)"
+                      :title="`Preview ${cid} (right-click to copy)`"
+                      @click="openChunkPreview(cid)"
+                      @contextmenu.prevent="copyToClipboard(cid)"
                     >
                       <i data-lucide="link" class="w-3 h-3"></i>
                       <span x-text="cid"></span>
@@ -4980,9 +4986,7 @@
                   x-cloak
                   class="reasoning-step-detail"
                 >
-                  <template
-                    x-if="step.args && Object.keys(step.args).length"
-                  >
+                  <template x-if="step.args && Object.keys(step.args).length">
                     <div>
                       <div class="reasoning-detail-label">Arguments</div>
                       <pre
@@ -5021,6 +5025,184 @@
               </li>
             </template>
           </ol>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================== PHASE 6b.2 — CHUNK PREVIEW MODAL ========================== -->
+    <div
+      x-show="chunkPreview.open"
+      x-cloak
+      x-transition.opacity
+      class="fixed inset-0 z-[90] bg-black/75 flex items-start justify-center pt-20"
+      @click.self="closeChunkPreview()"
+      @keydown.escape.window="if (chunkPreview.open) closeChunkPreview()"
+    >
+      <div
+        class="w-full max-w-3xl modal-canvas rounded-2xl overflow-hidden flex flex-col max-h-[80vh]"
+        @click.stop
+      >
+        <div
+          class="px-5 py-4 glass-section-bar flex items-start justify-between gap-4"
+        >
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 text-xs text-slate-400">
+              <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+              <span>Source chunk</span>
+            </div>
+            <h3
+              class="font-semibold text-slate-100 break-all mt-1"
+              x-text="chunkPreview.chunk_id"
+            ></h3>
+            <p
+              class="text-xs text-slate-400 mt-1 break-all"
+              x-show="chunkPreview.file_path"
+              x-text="chunkPreview.file_path"
+            ></p>
+          </div>
+          <button
+            @click="closeChunkPreview()"
+            class="shrink-0 text-slate-400 hover:text-neon-magenta mt-0.5"
+          >
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <div
+          x-show="!chunkPreview.loading && !chunkPreview.error"
+          class="flex flex-wrap gap-2 px-5 pt-3 text-xs"
+        >
+          <span
+            class="reasoning-chip"
+            x-show="chunkPreview.chunk_order_index !== null && chunkPreview.chunk_order_index !== undefined"
+          >
+            <i data-lucide="hash" class="w-3 h-3"></i>
+            <span x-text="`order ${chunkPreview.chunk_order_index}`"></span>
+          </span>
+          <span class="reasoning-chip" x-show="chunkPreview.tokens">
+            <i data-lucide="sigma" class="w-3 h-3"></i>
+            <span x-text="`${chunkPreview.tokens} tokens`"></span>
+          </span>
+          <span class="reasoning-chip">
+            <i data-lucide="ruler" class="w-3 h-3"></i>
+            <span x-text="`${chunkPreview.length} chars`"></span>
+          </span>
+          <button
+            type="button"
+            class="reasoning-chip hover:text-neon-cyan"
+            @click="copyToClipboard(chunkPreview.chunk_id)"
+            title="Copy chunk id"
+          >
+            <i data-lucide="copy" class="w-3 h-3"></i>
+            <span>Copy id</span>
+          </button>
+          <button
+            type="button"
+            class="reasoning-chip hover:text-neon-cyan"
+            @click="copyToClipboard(chunkPreview.content)"
+            title="Copy chunk content"
+            x-show="chunkPreview.content"
+          >
+            <i data-lucide="clipboard" class="w-3 h-3"></i>
+            <span>Copy content</span>
+          </button>
+          <button
+            type="button"
+            class="reasoning-chip hover:text-neon-cyan"
+            @click="chunkPreview.showRaw = !chunkPreview.showRaw"
+            title="Toggle raw vs cleaned narrative"
+            x-show="chunkPreview.content"
+          >
+            <i data-lucide="eye" class="w-3 h-3"></i>
+            <span x-text="chunkPreview.showRaw ? 'Cleaned' : 'Raw'"></span>
+          </button>
+        </div>
+
+        <div class="p-5 overflow-y-auto flex-1 min-h-0">
+          <div
+            x-show="chunkPreview.loading"
+            class="text-sm text-slate-400 flex items-center gap-2"
+          >
+            <i data-lucide="loader" class="w-4 h-4 animate-spin"></i>
+            <span>Resolving chunk\u2026</span>
+          </div>
+          <div
+            x-show="!chunkPreview.loading && chunkPreview.error"
+            class="text-sm text-neon-magenta border border-neon-magenta/40 rounded p-3"
+            x-text="chunkPreview.error"
+          ></div>
+
+          <!-- Cleaned narrative view (default) -->
+          <template
+            x-if="!chunkPreview.loading && !chunkPreview.error && chunkPreview.content && !chunkPreview.showRaw"
+          >
+            <div class="space-y-3">
+              <div class="flex flex-wrap items-center gap-2 text-xs">
+                <span
+                  class="reasoning-chip"
+                  :class="{
+                    'text-neon-cyan': chunkPreview.view.kind === 'text',
+                    'text-amber-300': chunkPreview.view.kind === 'table',
+                    'text-fuchsia-300': chunkPreview.view.kind === 'image',
+                    'text-emerald-300': chunkPreview.view.kind === 'equation',
+                  }"
+                >
+                  <i
+                    :data-lucide="
+                      chunkPreview.view.kind === 'table'
+                        ? 'table'
+                        : chunkPreview.view.kind === 'image'
+                        ? 'image'
+                        : chunkPreview.view.kind === 'equation'
+                        ? 'sigma'
+                        : 'file-text'
+                    "
+                    class="w-3 h-3"
+                  ></i>
+                  <span x-text="chunkPreview.view.badge"></span>
+                </span>
+                <span
+                  x-show="chunkPreview.view.caption"
+                  class="text-xs text-slate-300 italic break-words"
+                  x-text="`\u201c${chunkPreview.view.caption}\u201d`"
+                ></span>
+              </div>
+
+              <div
+                x-show="chunkPreview.view.kind === 'table' && chunkPreview.view.tableSummary"
+                class="text-xs text-slate-400"
+                x-text="`Table: ${chunkPreview.view.tableSummary} \u2014 cells in \u2018Raw\u2019.`"
+              ></div>
+
+              <pre
+                x-show="chunkPreview.view.body"
+                class="reasoning-detail-pre text-sm whitespace-pre-wrap"
+                x-text="chunkPreview.view.body"
+              ></pre>
+
+              <div
+                x-show="!chunkPreview.view.body && chunkPreview.view.kind !== 'table'"
+                class="text-sm text-slate-500"
+              >
+                (No narrative content for this chunk \u2014 switch to
+                \u2018Raw\u2019 to view the source.)
+              </div>
+            </div>
+          </template>
+
+          <!-- Raw view (toggle) -->
+          <pre
+            x-show="!chunkPreview.loading && !chunkPreview.error && chunkPreview.content && chunkPreview.showRaw"
+            class="reasoning-detail-pre text-sm whitespace-pre-wrap"
+            x-text="chunkPreview.content"
+          ></pre>
+
+          <div
+            x-show="!chunkPreview.loading && !chunkPreview.error && !chunkPreview.content"
+            class="text-sm text-slate-500"
+          >
+            (Empty chunk content.)
+          </div>
         </div>
       </div>
     </div>
@@ -5906,6 +6088,36 @@
             artifacts: [],
             expanded: {}, // {[stepIndex]: bool}
           },
+          // Phase 6b.2 — Inline chunk preview. Citation chips in the
+          // reasoning drawer (and any other surface that shows chunk-<hex>
+          // ids) open this modal, which resolves the chunk via
+          // /api/ui/chunks/{chunk_id} and renders its source content.
+          chunkPreview: {
+            open: false,
+            loading: false,
+            error: null,
+            chunk_id: "",
+            file_path: null,
+            full_doc_id: null,
+            chunk_order_index: null,
+            tokens: null,
+            length: 0,
+            content: "",
+            // Cleaned multimodal display (mirrors chat references):
+            // - kind: 'text' | 'table' | 'image' | 'equation' | 'unknown'
+            // - badge: short label for the badge pill
+            // - caption: extracted Caption: line, when present
+            // - body: cleaned narrative (Image Path / Caption stripped)
+            // - tableSummary: "N rows x M cols" when kind === 'table'
+            view: {
+              kind: "text",
+              badge: "TEXT",
+              caption: "",
+              body: "",
+              tableSummary: "",
+            },
+            showRaw: false,
+          },
           // Streaming UI helpers
           streamLiveContent: "",
           thinkStartedAt: null,
@@ -6196,6 +6408,9 @@
               this.$nextTick(() => lucide.createIcons()),
             );
             this.$watch("reasoning.expanded", () =>
+              this.$nextTick(() => lucide.createIcons()),
+            );
+            this.$watch("chunkPreview.open", () =>
               this.$nextTick(() => lucide.createIcons()),
             );
 
@@ -6886,6 +7101,72 @@
             } catch (e) {
               this.toast("Copy failed", "error");
             }
+          },
+          // ===== Phase 6b.2 — Inline chunk preview =====
+          // Workspace-scoped cache so the same chunk fetched from multiple
+          // surfaces (chat sources card, reasoning drawer modal) only hits
+          // the API once. Reset whenever the active workspace changes.
+          _chunkCache: Object.create(null),
+          async fetchChunk(chunkId) {
+            if (!chunkId) throw new Error("missing chunk id");
+            const hit = this._chunkCache[chunkId];
+            if (hit) return hit;
+            const r = await fetch(
+              "/api/ui/chunks/" + encodeURIComponent(chunkId),
+            );
+            if (!r.ok) {
+              if (r.status === 404) {
+                throw new Error("Chunk not found in this workspace");
+              }
+              throw new Error("HTTP " + r.status);
+            }
+            const j = await r.json();
+            const record = {
+              chunk_id: chunkId,
+              file_path: j.file_path,
+              full_doc_id: j.full_doc_id,
+              chunk_order_index: j.chunk_order_index,
+              tokens: j.tokens,
+              length: j.length || 0,
+              content: j.content || "",
+              view: this.formatSource({ preview: j.content || "" }),
+            };
+            this._chunkCache[chunkId] = record;
+            return record;
+          },
+          async openChunkPreview(chunkId) {
+            if (!chunkId) return;
+            this.chunkPreview.open = true;
+            this.chunkPreview.loading = true;
+            this.chunkPreview.error = null;
+            this.chunkPreview.chunk_id = chunkId;
+            this.chunkPreview.file_path = null;
+            this.chunkPreview.full_doc_id = null;
+            this.chunkPreview.chunk_order_index = null;
+            this.chunkPreview.tokens = null;
+            this.chunkPreview.length = 0;
+            this.chunkPreview.content = "";
+            try {
+              const rec = await this.fetchChunk(chunkId);
+              this.chunkPreview.file_path = rec.file_path;
+              this.chunkPreview.full_doc_id = rec.full_doc_id;
+              this.chunkPreview.chunk_order_index = rec.chunk_order_index;
+              this.chunkPreview.tokens = rec.tokens;
+              this.chunkPreview.length = rec.length;
+              this.chunkPreview.content = rec.content;
+              this.chunkPreview.view = rec.view;
+              this.chunkPreview.showRaw = false;
+            } catch (e) {
+              this.chunkPreview.error = e?.message || String(e);
+            } finally {
+              this.chunkPreview.loading = false;
+              this.$nextTick(() => {
+                if (window.lucide) lucide.createIcons();
+              });
+            }
+          },
+          closeChunkPreview() {
+            this.chunkPreview.open = false;
           },
           // Phase 4j taxonomy helpers (closed vocabularies — see docs/SKILL_TAXONOMY.md)
           // Persona display config (label + ordering); "none" maps to "Utility & Meta".
@@ -8048,14 +8329,65 @@
               const cellCount = firstTr
                 ? (firstTr[0].match(/<t[dh][\s>]/gi) || []).length
                 : 0;
-              const rowsLabel = trMatches.length
-                ? `${trMatches.length}${s.truncated ? "+" : ""} rows`
+              // Markdown-table fallback (MinerU often emits | a | b | rows
+              // instead of <table>). Count pipe-rows to give the user *some*
+              // idea of size.
+              let mdRows = 0;
+              let mdCols = 0;
+              if (!trMatches.length) {
+                const mdLines = structHtml
+                  .split(/\n/)
+                  .filter((ln) => /^\s*\|.*\|\s*$/.test(ln));
+                // Drop the markdown separator row (|---|---|).
+                const dataLines = mdLines.filter(
+                  (ln) => !/^\s*\|[\s:|-]+\|\s*$/.test(ln),
+                );
+                mdRows = dataLines.length;
+                if (dataLines.length) {
+                  mdCols = (dataLines[0].match(/\|/g) || []).length - 1;
+                }
+              }
+              const totalRows = trMatches.length || mdRows;
+              const totalCols = cellCount || mdCols;
+              const rowsLabel = totalRows
+                ? `${totalRows}${s.truncated ? "+" : ""} rows`
                 : "rows unknown";
-              const colsLabel = cellCount ? ` Ã— ${cellCount} cols` : "";
+              const colsLabel = totalCols ? ` \u00d7 ${totalCols} cols` : "";
               out.tableSummary = `${rowsLabel}${colsLabel}${
                 s.truncated ? " (preview clipped)" : ""
               }`;
-              out.body = "";
+
+              // Prefer the VLM "Analysis:" paragraph as the body — that's
+              // the human-readable summary the user actually wants. Fall
+              // back to Footnotes, then to a cleaned dump of the whole
+              // chunk minus the Image Path line and the Structure blob.
+              const analysisMatch = raw.match(
+                /(?:^|\n)\s*Analysis\s*:\s*([\s\S]+?)(?=\n\s*(?:Footnotes|Image Path|Caption|Structure)\s*:|$)/i,
+              );
+              const footnotesMatch = raw.match(
+                /(?:^|\n)\s*Footnotes\s*:\s*([\s\S]+?)(?=\n\s*(?:Analysis|Image Path|Caption|Structure)\s*:|$)/i,
+              );
+              if (analysisMatch && analysisMatch[1].trim()) {
+                out.body = analysisMatch[1].trim();
+              } else if (footnotesMatch && footnotesMatch[1].trim()) {
+                out.body = footnotesMatch[1].trim();
+              } else {
+                out.body = raw
+                  .replace(/(?:^|\n)\s*Image Path\s*:\s*[^\n]+/i, "")
+                  .replace(
+                    /(?:^|\n)\s*Structure\s*:\s*<table[\s\S]*?<\/table>\s*/i,
+                    "\n",
+                  )
+                  .replace(/(?:^|\n)\s*Structure\s*:\s*<table[\s\S]*$/i, "")
+                  // Markdown-table fallback strip: drop the Structure: line
+                  // and every following pipe-table row.
+                  .replace(
+                    /(?:^|\n)\s*Structure\s*:[^\n]*(?:\n\s*\|[^\n]*)+/i,
+                    "\n",
+                  )
+                  .replace(/\n{3,}/g, "\n\n")
+                  .trim();
+              }
               return out;
             }
 
