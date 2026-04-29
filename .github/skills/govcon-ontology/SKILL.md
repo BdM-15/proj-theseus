@@ -1,6 +1,6 @@
 ---
 name: govcon-ontology
-description: Authoritative, agent-readable specification of Project Theseus's 33-entity / 35-relationship federal-contracting ontology. USE WHEN extracting entities or relationships from any federal solicitation text — RFP, SOW, PWS, proposal instructions (UCF Section L or equivalent), evaluation criteria (UCF Section M or equivalent), attachments (UCF Section J or equivalent), FAR 16 task orders, FOPRs, BPA calls, OTAs, agency-specific formats; validating extraction output; extending the ontology with a new entity type or relationship; debugging "why didn't it tag this as a CLIN?"; or when any agent (Copilot, sub-agent, Theseus runtime) needs to produce or consume Theseus-graph-compatible structured output. The ontology is intentionally format-agnostic — entity types map to purpose, not UCF position. DO NOT USE FOR generic NER, non-federal contracting (state/local/commercial), or open-domain knowledge graphs. Acts as living documentation and a guardrail so agents extend the ontology consistently without spelunking source code.
+description: Authoritative, agent-readable specification of Project Theseus's 33-entity / 35-relationship federal-contracting ontology. USE WHEN extracting entities or relationships from any federal solicitation text — RFP, SOW, PWS, proposal instructions / evaluation criteria / attachments (UCF Section L/M/J or equivalent), FAR 16 task orders, FOPRs, BPA calls, OTAs, agency-specific formats; validating extraction output; extending the ontology with a new entity type or relationship; debugging "why didn't it tag this as a CLIN?"; or when any agent (Copilot, sub-agent, Theseus runtime) needs to produce or consume Theseus-graph-compatible structured output. The ontology is intentionally format-agnostic — entity types map to purpose, not UCF position. DO NOT USE FOR generic NER, non-federal contracting (state/local/commercial), or open-domain knowledge graphs. Acts as living documentation and a guardrail so agents extend the ontology consistently.
 license: MIT
 metadata:
   # Phase 4j taxonomy — see docs/SKILL_TAXONOMY.md
@@ -9,7 +9,7 @@ metadata:
   shipley_phases: []
   capability: meta
   category: ontology
-  version: 1.3.0
+  version: 1.3.1
   status: active
   runtime: legacy
   authoritative_source: src/ontology/schema.py
