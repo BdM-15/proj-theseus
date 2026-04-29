@@ -28,7 +28,7 @@ def _base_url() -> str:
 
 
 def _expected_workspace() -> str:
-    return os.getenv("THESEUS_E2E_WORKSPACE", "doj_mmwr_old_rfp")
+    return os.getenv("THESEUS_E2E_WORKSPACE", "afcap5_adab_iss")
 
 
 # Hard skip the whole package when not enabled or no server is reachable.
@@ -47,6 +47,29 @@ def pytest_collection_modifyitems(config, items):
     except Exception as exc:  # noqa: BLE001
         skip_marker = pytest.mark.skip(
             reason=f"Theseus server not reachable at {_base_url()}: {exc}"
+        )
+        for item in items:
+            if "tests/skills/e2e" in str(item.fspath).replace("\\", "/"):
+                item.add_marker(skip_marker)
+        return
+
+    # Active-workspace gate: tests are written against a known fixture
+    # workspace. If the server is on something else, refuse to run rather
+    # than emit nonsense graded against the wrong KG.
+    expected = _expected_workspace()
+    try:
+        ws_resp = httpx.get(f"{_base_url()}/api/ui/workspaces", timeout=5.0)
+        ws_resp.raise_for_status()
+        active = (ws_resp.json() or {}).get("active", "")
+    except Exception as exc:  # noqa: BLE001
+        active = f"<probe failed: {exc}>"
+    if active != expected:
+        skip_marker = pytest.mark.skip(
+            reason=(
+                f"Active workspace is {active!r}; e2e harness expects "
+                f"{expected!r}. Switch via the Studio UI (or set "
+                f"THESEUS_E2E_WORKSPACE) and re-run."
+            )
         )
         for item in items:
             if "tests/skills/e2e" in str(item.fspath).replace("\\", "/"):

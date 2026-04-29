@@ -47,8 +47,8 @@ Directly (rare — for testing or one-off conversions): activate the skill yours
 ## Available Renderers (this skill)
 
 | Format | Script                                           | Purpose                                                                             | Toolchain                                                                              |
-| ------ | ------------------------------------------------ | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| DOCX   | [scripts/render_docx.py](scripts/render_docx.py) | Markdown → Word document with optional `--reference` template inheritance           | Pandoc on PATH (see `docs/archive/phase_3-4/PHASE_3D_TOOLCHAIN.md`)  |
+| ------ | ------------------------------------------------ | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| DOCX   | [scripts/render_docx.py](scripts/render_docx.py) | Markdown → Word document with optional `--reference` template inheritance           | Pandoc on PATH (see `docs/archive/phase_3-4/PHASE_3D_TOOLCHAIN.md`)                    |
 | XLSX   | [scripts/render_xlsx.py](scripts/render_xlsx.py) | JSON envelope → styled multi-sheet Excel workbook (auto status fill, frozen header) | openpyxl (Python, already in venv; see `docs/archive/phase_3-4/PHASE_3E_TOOLCHAIN.md`) |
 
 ## Delegation — formats this skill does NOT own

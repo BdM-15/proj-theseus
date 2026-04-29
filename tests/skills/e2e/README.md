@@ -20,14 +20,14 @@ This harness is double-gated to keep CI / fresh clones from failing:
 
 1. `RUN_SKILL_E2E=1` env var must be set.
 2. Theseus server must be reachable on `THESEUS_E2E_BASE_URL` (default `http://127.0.0.1:9621`).
-3. The active workspace on that server must be `doj_mmwr_old_rfp` (or override via `THESEUS_E2E_WORKSPACE`).
+3. The active workspace on that server must be `afcap5_adab_iss` (or override via `THESEUS_E2E_WORKSPACE`).
 
 ### Local run
 
 ```powershell
 # Terminal 1 — start server pointed at the e2e fixture workspace
-$env:WORKSPACE_NAME = "doj_mmwr_old_rfp"
-$env:WORKING_DIR = "./rag_storage/doj_mmwr_old_rfp"
+$env:WORKSPACE_NAME = "afcap5_adab_iss"
+$env:WORKING_DIR = "./rag_storage/afcap5_adab_iss"
 python app.py
 
 # Terminal 2 — run the harness
@@ -39,9 +39,9 @@ $env:RUN_SKILL_E2E = "1"
 
 Booting LightRAG in-process pulls in MinerU, the OpenAI embedding client, the xAI LLM client, and the full route layer with its closure-captured slice/retrieve helpers. Hitting the running server via HTTP exercises the **same stack a real user invokes** — including the `/api/ui/skills/{name}/invoke` endpoint, runtime-mode dispatch, transcript persistence, and artifact registry. Lower coupling, higher fidelity.
 
-## Why `doj_mmwr_old_rfp`
+## Why `afcap5_adab_iss`
 
-It's already fully processed locally (~500 MB of vdb + KV stores), is a real federal RFP, and is small enough that the LLM tool loop completes in <60 s per skill against Grok. The 500 MB cannot be checked into git, so this harness is a **developer-machine validation tool**, not a CI gate. Branch 146 (`skill-creator-reverify-pass`) and branch 147 (`renderers-grounding-audit`) both depend on running this harness once locally to record per-skill baselines.
+It is the AFCAP V FOPR (FA8051-26-R-1002) for Al Dhafra Air Base (UAE) Installation Support Services. The workspace is fully processed locally (4 source PDFs/XLSX — Amend 4 FOPR + PWS + CLIN price schedule + 1 attachment, 125 chunks, 2,087 entities, 4,615 relationships). It is a real, format-rich federal solicitation small enough that each skill's LLM tool loop completes in well under a minute against Grok. The vdb stores total ~165 MB and cannot be checked into git, so this harness is a **developer-machine validation tool**, not a CI gate. Branch 146 (`skill-creator-reverify-pass`) and branch 147 (`renderers-grounding-audit`) both depend on running this harness once locally to record per-skill baselines.
 
 ## Cost
 

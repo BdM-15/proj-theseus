@@ -33,50 +33,61 @@ from .conftest import invoke_skill, load_run_transcript
 
 # ---------- Per-skill default prompts (used if no evals.json) -------------
 
+# Prompts are written against the AFCAP V FOPR for Al Dhafra Air Base (UAE)
+# Installation Support Services (ISS) — workspace ``afcap5_adab_iss``.
+# The seed corpus contains: Amend 4 FOPR (FA8051-26-R-1002), the PWS, the
+# CLIN price schedule, and one related attachment.
 DEFAULT_PROMPTS: dict[str, str] = {
     "proposal-generator": (
-        "Draft a brief executive summary outline for this opportunity, "
-        "grounded in the workspace requirements and evaluation factors."
+        "Draft a one-paragraph executive summary opening for our response "
+        "to the AFCAP V Al Dhafra Air Base ISS FOPR (FA8051-26-R-1002), "
+        "grounded in the PWS scope and the evaluation subfactors."
     ),
     "compliance-auditor": (
-        "Audit clause coverage in the active workspace and flag the top 3 "
-        "missing or ambiguous compliance items."
+        "Audit the FOPR for the top 5 'shall' requirements that lack a "
+        "clearly mapped deliverable or evaluation factor. Cite chunks."
     ),
     "competitive-intel": (
-        "Who are the likely incumbents and top competitors for this "
-        "opportunity based on the workspace?"
+        "Who is the likely incumbent on installation support services at "
+        "Al Dhafra Air Base, and what recent AFCAP V task orders should "
+        "we benchmark against?"
     ),
     "price-to-win": (
-        "Build a high-level price-to-win cost stack for this opportunity "
-        "using the workspace's labor categories and period of performance."
+        "Build a rough price-to-win cost stack for the base-year MEP "
+        "(Subfactor 1.2) labor on this Al Dhafra ISS effort. Use OCONUS "
+        "per diem assumptions and call out wrap-rate sensitivity."
     ),
     "ot-prototype-strategist": (
-        "Is this opportunity structured as an OT prototype? If so, "
-        "recommend the 4022(d) cost-share path and TRL phasing."
+        "Confirm whether this AFCAP V FOPR is a FAR-based vehicle or an "
+        "OT prototype. If FAR-based, state that clearly and stop."
     ),
     "rfp-reverse-engineer": (
-        "Reverse engineer the CO's hidden decision tree for this RFP. "
-        "Surface hot buttons and ghost language."
+        "Reverse-engineer the CO's hidden priorities on this Al Dhafra "
+        "ISS FOPR. Surface hot buttons, ghost language, and the "
+        "transition-risk emphasis."
     ),
     "subcontractor-sow-builder": (
-        "Draft a brief SOW skeleton for a subcontractor covering the "
-        "workspace's primary technical scope."
+        "Draft a brief subcontractor SOW skeleton for the MEP scope "
+        "(Subfactor 1.2) we plan to push to a teaming partner on this "
+        "Al Dhafra ISS opportunity."
     ),
     "oci-sweeper": (
-        "Sweep the workspace for organizational conflict of interest risks "
-        "per FAR 9.5."
+        "Sweep this Al Dhafra ISS FOPR for OCI risks per FAR 9.5 — focus "
+        "on incumbent transition and any A-E / construction-management "
+        "crossover."
     ),
     "govcon-ontology": (
         "Validate the workspace's entity inventory against the 33-type "
-        "ontology and flag any unusual gaps."
+        "ontology and flag any unusual gaps for an ISS FOPR of this size."
     ),
     "renderers": (
-        "Render a sample compliance matrix DOCX from a small synthetic "
-        "input to verify the script path works."
+        "Render a small compliance-matrix DOCX from 3 sample "
+        "requirement/evaluation pairs drawn from this Al Dhafra ISS FOPR "
+        "to verify the render_docx script path works."
     ),
     "huashu-design": (
         "Sketch a hi-fi HTML mockup for a one-page proposal cover sheet "
-        "for this workspace's opportunity."
+        "for the AFCAP V Al Dhafra ISS opportunity."
     ),
 }
 
@@ -94,7 +105,14 @@ ARTIFACT_SKILLS = {
 # the same transcript shape. Skip the transcript-call assertion for these.
 LEGACY_SKILLS = {"huashu-design"}
 
+# Pure utility skills that don't (and shouldn't) consult the workspace KG.
+# They operate on inputs handed to them by other skills (e.g. renderers takes
+# a Markdown path + flags, runs pandoc, returns a file). Grounding signal is
+# satisfied by the presence of any tool call (read_file / run_script).
+UTILITY_SKILLS = {"renderers"}
+
 CHUNK_CITE_RE = re.compile(r"chunk-[0-9a-f]{4,}", re.IGNORECASE)
+KG_TOOLS = {"kg_chunks", "kg_query", "kg_entities"}
 
 
 def _evals_prompt(skill_name: str) -> str | None:
@@ -171,6 +189,7 @@ def test_skill_invoke_smoke(
     )
 
     transcript_has_kg_call = False
+    transcript_has_any_tool_call = False
     run_id = envelope.get("run_id")
     if run_id and skill_name not in LEGACY_SKILLS:
         try:
@@ -180,17 +199,36 @@ def test_skill_invoke_smoke(
                 for turn in transcript:
                     if not isinstance(turn, dict):
                         continue
-                    tool = (turn.get("tool") or turn.get("tool_name") or "").lower()
-                    if tool in {"kg_chunks", "kg_query", "kg_entities"}:
-                        transcript_has_kg_call = True
-                        break
+                    # Pattern A: assistant turn with tool_calls=[{name: ...}, ...]
+                    for call in turn.get("tool_calls") or []:
+                        if not isinstance(call, dict):
+                            continue
+                        name = (call.get("name") or "").lower()
+                        if name:
+                            transcript_has_any_tool_call = True
+                            if name in KG_TOOLS:
+                                transcript_has_kg_call = True
+                    # Pattern B: tool result turn with kind="tool", name="<tool>"
+                    if (turn.get("kind") or "").lower() == "tool":
+                        name = (turn.get("name") or turn.get("tool") or "").lower()
+                        if name:
+                            transcript_has_any_tool_call = True
+                            if name in KG_TOOLS:
+                                transcript_has_kg_call = True
         except Exception:  # noqa: BLE001
             pass  # absence of run-detail endpoint shouldn't block the smoke
 
-    grounded = cites_chunk or has_entities or transcript_has_kg_call
+    if skill_name in UTILITY_SKILLS:
+        # Utility skills (renderers, etc.) don't consult the KG. Grounding =
+        # "actually invoked at least one tool" rather than "called a kg_* tool".
+        grounded = cites_chunk or has_entities or transcript_has_any_tool_call
+        gap_msg = "no chunk citation, no entities_used, no tool call at all"
+    else:
+        grounded = cites_chunk or has_entities or transcript_has_kg_call
+        gap_msg = "no chunk citation, no entities_used, no kg_* tool call"
     assert grounded, (
-        f"{skill_name}: no grounding signal (no chunk citation, no "
-        f"entities_used, no kg_* tool call). Envelope keys: {list(envelope)}"
+        f"{skill_name}: no grounding signal ({gap_msg}). "
+        f"Envelope keys: {list(envelope)}"
     )
 
     # 3. Artifact emitted where declared
