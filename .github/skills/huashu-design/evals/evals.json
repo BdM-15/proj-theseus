@@ -1,0 +1,73 @@
+{
+  "version": "0.1.0",
+  "skill": "huashu-design",
+  "purpose": "Validate that English (and bilingual) trigger phrases reliably activate this skill after the v0.2.0 frontmatter EN translation. Pre-144, the description was Chinese-only and English prompts could miss the trigger. The Chinese trigger evals already living in test-prompts.json (upstream) cover the body / behavior; these evals exclusively probe the discoverability gap closed by the EN description rewrite.",
+  "prompts": [
+    {
+      "id": "trigger_en_html_prototype",
+      "prompt": "Build me a hi-fi HTML prototype for a habit tracker iOS app — overview style, 5 screens.",
+      "expected_skill": "huashu-design",
+      "expected_signals": [
+        "skill matches without needing the word 'huashu' or any Chinese",
+        "iOS / app-prototype rules apply (ios_frame.jsx, info-density tier)",
+        "no AI-slop tropes (no purple gradient, no Inter)"
+      ],
+      "probes": "English-only trigger discoverability"
+    },
+    {
+      "id": "trigger_en_pitch_deck",
+      "prompt": "Make a 10-page HTML pitch deck for an AI startup — 1920x1080, Junior Designer workflow.",
+      "expected_skill": "huashu-design",
+      "expected_signals": [
+        "skill matches on 'HTML pitch deck'",
+        "deck_stage.js used",
+        "vocalize design system before drafting"
+      ],
+      "probes": "English-only trigger discoverability — slide / deck path"
+    },
+    {
+      "id": "trigger_en_motion_export",
+      "prompt": "I have an HTML animation — export it to MP4 at 60 fps and also a palette-optimized GIF.",
+      "expected_skill": "huashu-design",
+      "expected_signals": [
+        "skill matches on 'export to MP4 / GIF'",
+        "60 fps interpolation path invoked",
+        "palette optimization step present"
+      ],
+      "probes": "English-only trigger discoverability — motion export path (renderers MUST NOT match this)"
+    },
+    {
+      "id": "trigger_en_design_direction",
+      "prompt": "I'm not sure what visual style to go with — recommend 3 design directions for a fintech dashboard.",
+      "expected_skill": "huashu-design",
+      "expected_signals": [
+        "skill matches on 'design direction / visual style'",
+        "fallback advisor mode (5 schools x 20 philosophies)",
+        "3 differentiated directions returned"
+      ],
+      "probes": "English-only trigger discoverability — design-direction advisor fallback"
+    },
+    {
+      "id": "trigger_en_design_review",
+      "prompt": "Review this design for me — score it on a 5-axis expert critique and give me a fix list.",
+      "expected_skill": "huashu-design",
+      "expected_signals": [
+        "skill matches on 'review this design'",
+        "5-axis expert critique invoked (philosophy / hierarchy / detail / function / innovation)",
+        "fix list emitted"
+      ],
+      "probes": "English-only trigger discoverability — review / critique path"
+    },
+    {
+      "id": "trigger_zh_preserved",
+      "prompt": "做一个 SaaS 产品的登录页，给我 3 个风格方向对比看看",
+      "expected_skill": "huashu-design",
+      "expected_signals": [
+        "Chinese trigger phrases still match (description_zh preserved under metadata)",
+        "design-direction advisor fallback invoked",
+        "3 variations in design_canvas"
+      ],
+      "probes": "Bilingual users — Chinese path must NOT regress after EN description rewrite"
+    }
+  ]
+}

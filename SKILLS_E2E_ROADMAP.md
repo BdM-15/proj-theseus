@@ -54,8 +54,8 @@ main (protected — never edited directly)
 | ID | Branch | Wave | Owner intent | Status | FF'd into 142 | Notes |
 |----|--------|------|--------------|--------|---------------|-------|
 | 142 | `142-skills-e2e-hardening` | epic | integration parent | 🟡 active | — | Created 2026-04-29 |
-| 143 | `143-renderers-scope-fix` | 1a | Trim renderers description; delegate non-DOCX/XLSX to huashu-design | ✅ done | ⏳ pending | Went through skill-creator workflow (snapshot → evals → draft → smoke). 6 evals incl. 2 new delegation prompts. Desc 1017/1024 chars. v0.4.0 |
-| 144 | `144-huashu-frontmatter-english` | 1b | Translate `description` to English; preserve Chinese under `metadata.description_zh`; refresh evals | ⏳ not started | ❌ | Material change — **MUST go through skill-creator workflow** |
+| 143 | `143-renderers-scope-fix` | 1a | Trim renderers description; delegate non-DOCX/XLSX to huashu-design | ✅ done | ✅ `9aa1654` | skill-creator workflow followed (snapshot → evals → draft → smoke). 6 evals incl. 2 new delegation prompts. Desc 1017/1024 chars. v0.4.0 |
+| 144 | `144-huashu-frontmatter-english` | 1b | Translate `description` to English; preserve Chinese under `metadata.description_zh`; refresh evals | ✅ done | ⏳ pending | skill-creator workflow followed (snapshot → 6 EN/bilingual evals → draft → smoke). Desc 1002/1024 chars. v0.2.0. Body unchanged (upstream Chinese). |
 | 145 | `145-skills-e2e-test-harness` | 2 | `tests/skills/e2e/` runner + seeded fixture workspace | ⏳ not started | ❌ | Blocks 146 + 147 |
 | 146 | `146-skill-creator-reverify-pass` | 3a | Re-author 9 in-house skills via skill-creator workflow | ⏳ not started | ❌ | Depends on 145 |
 | 147 | `147-renderers-grounding-audit` | 3b | Verify ≥80% claim-to-citation ratio per skill | ⏳ not started | ❌ | Depends on 145 |
