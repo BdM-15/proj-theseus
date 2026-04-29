@@ -3026,6 +3026,17 @@
                               class="skill-transcript-size"
                               x-text="formatBytes(parseInt(f.size, 10) || 0) + ' · ' + (f.mime || 'application/octet-stream')"
                             ></span>
+                            <button
+                              type="button"
+                              class="studio-action"
+                              title="Why this artifact? (reasoning view)"
+                              @click="openReasoning({ skill: skills.current?.name, run_id: skills.run.run_id, filename: f.name, title: skills.run.title || '', created_at: skills.run.created_at || '' })"
+                            >
+                              <i
+                                data-lucide="brain-circuit"
+                                class="w-3 h-3"
+                              ></i>
+                            </button>
                           </li>
                         </template>
                       </ul>
@@ -3485,6 +3496,17 @@
                         >
                           <i data-lucide="download" class="w-3.5 h-3.5"></i>
                         </a>
+                        <button
+                          type="button"
+                          class="studio-action"
+                          title="Why this artifact? (reasoning view)"
+                          @click="openReasoning(d)"
+                        >
+                          <i
+                            data-lucide="brain-circuit"
+                            class="w-3.5 h-3.5"
+                          ></i>
+                        </button>
                         <button
                           type="button"
                           class="studio-action"
@@ -4796,6 +4818,213 @@
       </div>
     </div>
 
+    <!-- ========================== PHASE 6b — REASONING DRAWER ("Why this artifact?") ========================== -->
+    <div
+      x-show="reasoning.open"
+      x-cloak
+      x-transition.opacity
+      class="fixed inset-0 z-[85] bg-black/70 flex items-stretch justify-end"
+      @click.self="closeReasoning()"
+    >
+      <div
+        class="w-full max-w-3xl h-full bg-ink-900 border-l border-edge-strong overflow-y-auto pt-16"
+        @click.stop
+      >
+        <div
+          class="bg-ink-900 border-b border-edge p-4 flex items-start justify-between gap-3 sticky top-0 z-10"
+        >
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 text-xs text-slate-400">
+              <i data-lucide="brain-circuit" class="w-3.5 h-3.5"></i>
+              <span>Why this artifact?</span>
+            </div>
+            <h2
+              class="text-lg font-semibold text-slate-100 break-words mt-1"
+              x-text="reasoning.title || (reasoning.skill + ' \u00b7 ' + reasoning.run_id)"
+            ></h2>
+            <p
+              class="text-xs text-slate-400 mt-1"
+              x-text="reasoning.skill + (reasoning.created_at ? '  \u00b7  ' + reasoning.created_at.slice(0, 19).replace('T', ' ') : '')"
+            ></p>
+          </div>
+          <button
+            @click="closeReasoning()"
+            class="shrink-0 text-slate-400 hover:text-neon-magenta mt-0.5"
+          >
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <div class="p-4">
+          <div
+            x-show="reasoning.loading"
+            class="text-sm text-slate-400 flex items-center gap-2"
+          >
+            <i data-lucide="loader" class="w-4 h-4 animate-spin"></i>
+            <span>Reading transcript\u2026</span>
+          </div>
+
+          <div
+            x-show="!reasoning.loading && reasoning.error"
+            class="text-sm text-neon-magenta border border-neon-magenta/40 rounded p-3"
+            x-text="reasoning.error"
+          ></div>
+
+          <div
+            x-show="!reasoning.loading && !reasoning.error && reasoning.steps.length === 0"
+            class="text-sm text-slate-500"
+          >
+            No transcript was persisted for this run (likely a pre-tools-mode
+            skill). Nothing to render.
+          </div>
+
+          <div
+            x-show="!reasoning.loading && !reasoning.error && reasoning.summary"
+            class="flex flex-wrap gap-2 mb-4 text-xs"
+          >
+            <span class="reasoning-chip">
+              <i data-lucide="layers" class="w-3 h-3"></i>
+              <span x-text="`${reasoning.summary?.turns} turns`"></span>
+            </span>
+            <span class="reasoning-chip">
+              <i data-lucide="wrench" class="w-3 h-3"></i>
+              <span
+                x-text="`${reasoning.summary?.tool_calls} tool calls`"
+              ></span>
+            </span>
+            <span class="reasoning-chip">
+              <i data-lucide="list" class="w-3 h-3"></i>
+              <span x-text="`${reasoning.summary?.messages} steps`"></span>
+            </span>
+            <span
+              class="reasoning-chip"
+              x-show="reasoning.summary?.total_elapsed_ms"
+            >
+              <i data-lucide="timer" class="w-3 h-3"></i>
+              <span
+                x-text="`${(reasoning.summary?.total_elapsed_ms / 1000).toFixed(1)}s reasoning`"
+              ></span>
+            </span>
+          </div>
+
+          <ol
+            x-show="!reasoning.loading && !reasoning.error && reasoning.steps.length"
+            class="reasoning-timeline"
+          >
+            <template x-for="step in reasoning.steps" :key="step.index">
+              <li class="reasoning-step" :data-kind="step.kind">
+                <div class="reasoning-step-header">
+                  <span class="reasoning-step-index" x-text="step.index"></span>
+                  <i
+                    :data-lucide="reasoningStepIcon(step.kind)"
+                    class="w-3.5 h-3.5 reasoning-step-icon"
+                  ></i>
+                  <div class="flex-1 min-w-0">
+                    <div
+                      class="reasoning-step-summary"
+                      x-text="step.summary"
+                    ></div>
+                    <div
+                      x-show="step.preview"
+                      class="reasoning-step-preview"
+                      x-text="step.preview"
+                    ></div>
+                  </div>
+                  <div class="reasoning-step-meta">
+                    <span
+                      x-show="step.tool"
+                      class="reasoning-tool-pill"
+                      x-text="step.tool"
+                    ></span>
+                    <span
+                      x-show="step.elapsed_ms"
+                      class="reasoning-elapsed"
+                      x-text="`${(step.elapsed_ms).toFixed(0)} ms`"
+                    ></span>
+                    <button
+                      type="button"
+                      class="reasoning-step-toggle"
+                      @click="toggleReasoningStep(step.index)"
+                      :title="reasoning.expanded[step.index] ? 'Collapse' : 'Expand'"
+                    >
+                      <i
+                        :data-lucide="reasoning.expanded[step.index] ? 'chevron-up' : 'chevron-down'"
+                        class="w-3.5 h-3.5"
+                      ></i>
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  x-show="step.links?.chunk_ids?.length"
+                  class="reasoning-citations"
+                >
+                  <template
+                    x-for="cid in (step.links?.chunk_ids || [])"
+                    :key="cid"
+                  >
+                    <button
+                      type="button"
+                      class="reasoning-citation-chip"
+                      :title="`Copy chunk id: ${cid}`"
+                      @click="copyToClipboard(cid)"
+                    >
+                      <i data-lucide="link" class="w-3 h-3"></i>
+                      <span x-text="cid"></span>
+                    </button>
+                  </template>
+                </div>
+
+                <div
+                  x-show="reasoning.expanded[step.index]"
+                  x-cloak
+                  class="reasoning-step-detail"
+                >
+                  <template
+                    x-if="step.args && Object.keys(step.args).length"
+                  >
+                    <div>
+                      <div class="reasoning-detail-label">Arguments</div>
+                      <pre
+                        class="reasoning-detail-pre"
+                        x-text="reasoningPrettyJson(step.args)"
+                      ></pre>
+                    </div>
+                  </template>
+                  <template x-if="step.result_preview">
+                    <div>
+                      <div class="reasoning-detail-label">
+                        Result preview
+                        <span
+                          x-show="step.result_truncated"
+                          class="text-neon-magenta"
+                        >
+                          (truncated)
+                        </span>
+                      </div>
+                      <pre
+                        class="reasoning-detail-pre"
+                        x-text="step.result_preview"
+                      ></pre>
+                    </div>
+                  </template>
+                  <template x-if="step.raw?.content">
+                    <div>
+                      <div class="reasoning-detail-label">Content</div>
+                      <pre
+                        class="reasoning-detail-pre"
+                        x-text="step.raw.content"
+                      ></pre>
+                    </div>
+                  </template>
+                </div>
+              </li>
+            </template>
+          </ol>
+        </div>
+      </div>
+    </div>
+
     <!-- ========================== PROMPT PICKER MODAL ========================== -->
     <div
       x-show="promptPicker.open"
@@ -5660,6 +5889,23 @@
             filterFormat: "",
             search: "",
           },
+          // Phase 6b — Reasoning view ("Why this artifact?"). Renders the
+          // deterministic transcript timeline returned by
+          // /api/ui/skills/{name}/runs/{run_id}/reasoning. Pure renderer; no
+          // LLM call. Each step is expandable to its raw tool args + result.
+          reasoning: {
+            open: false,
+            loading: false,
+            error: null,
+            skill: "",
+            run_id: "",
+            title: "",
+            created_at: "",
+            steps: [],
+            summary: null,
+            artifacts: [],
+            expanded: {}, // {[stepIndex]: bool}
+          },
           // Streaming UI helpers
           streamLiveContent: "",
           thinkStartedAt: null,
@@ -5944,6 +6190,12 @@
               this.$nextTick(() => lucide.createIcons()),
             );
             this.$watch("restarting", () =>
+              this.$nextTick(() => lucide.createIcons()),
+            );
+            this.$watch("reasoning.open", () =>
+              this.$nextTick(() => lucide.createIcons()),
+            );
+            this.$watch("reasoning.expanded", () =>
               this.$nextTick(() => lucide.createIcons()),
             );
 
@@ -6565,6 +6817,75 @@
                 this.toast("Could not open run: " + (e?.message || e), "error");
               }
             });
+          },
+          // ===== Phase 6b — Reasoning view =====
+          async openReasoning(d) {
+            this.reasoning.open = true;
+            this.reasoning.loading = true;
+            this.reasoning.error = null;
+            this.reasoning.skill = d.skill;
+            this.reasoning.run_id = d.run_id;
+            this.reasoning.title = d.title || "";
+            this.reasoning.created_at = d.created_at || "";
+            this.reasoning.steps = [];
+            this.reasoning.summary = null;
+            this.reasoning.artifacts = [];
+            this.reasoning.expanded = {};
+            try {
+              const r = await fetch(
+                "/api/ui/skills/" +
+                  encodeURIComponent(d.skill) +
+                  "/runs/" +
+                  encodeURIComponent(d.run_id) +
+                  "/reasoning",
+              );
+              if (!r.ok) throw new Error("HTTP " + r.status);
+              const j = await r.json();
+              this.reasoning.steps = j.steps || [];
+              this.reasoning.summary = j.summary || null;
+              this.reasoning.artifacts = j.artifacts || [];
+              this.reasoning.title = j.title || this.reasoning.title;
+              this.reasoning.created_at =
+                j.created_at || this.reasoning.created_at;
+            } catch (e) {
+              this.reasoning.error = e?.message || String(e);
+            } finally {
+              this.reasoning.loading = false;
+              this.$nextTick(() => {
+                if (window.lucide) lucide.createIcons();
+              });
+            }
+          },
+          closeReasoning() {
+            this.reasoning.open = false;
+          },
+          toggleReasoningStep(idx) {
+            this.reasoning.expanded[idx] = !this.reasoning.expanded[idx];
+          },
+          reasoningStepIcon(kind) {
+            return (
+              {
+                system: "settings",
+                user: "user",
+                assistant_text: "message-circle",
+                tool_action: "wrench",
+              }[kind] || "circle"
+            );
+          },
+          reasoningPrettyJson(value) {
+            try {
+              return JSON.stringify(value, null, 2);
+            } catch {
+              return String(value);
+            }
+          },
+          copyToClipboard(text) {
+            try {
+              navigator.clipboard.writeText(text);
+              this.toast("Copied: " + text, "success");
+            } catch (e) {
+              this.toast("Copy failed", "error");
+            }
           },
           // Phase 4j taxonomy helpers (closed vocabularies — see docs/SKILL_TAXONOMY.md)
           // Persona display config (label + ordering); "none" maps to "Utility & Meta".

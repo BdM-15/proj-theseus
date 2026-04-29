@@ -2535,6 +2535,38 @@ def register_ui(
             raise HTTPException(404, f"Unknown run: {name}/{run_id}")
         return JSONResponse(run)
 
+    @app.get(
+        "/api/ui/skills/{name}/runs/{run_id}/reasoning",
+        tags=["theseus-ui"],
+    )
+    async def get_skill_run_reasoning_route(name: str, run_id: str) -> JSONResponse:
+        """Phase 6b — Deterministic "Why this artifact?" view.
+
+        Walks the persisted ``transcript.json`` for one skill run and renders
+        a numbered reasoning timeline (assistant turns + tool calls + tool
+        results paired by ``call_id``). Pure transcript renderer — **no LLM
+        calls, no inference**. The transcript is the source of truth.
+        """
+        from src.skills.reasoning import build_reasoning_view
+
+        mgr = get_skill_manager()
+        run = mgr.get_run(_workspace_dir(), name, run_id)
+        if run is None:
+            raise HTTPException(404, f"Unknown run: {name}/{run_id}")
+        transcript = run.get("transcript") or []
+        view = await asyncio.to_thread(build_reasoning_view, transcript)
+        return JSONResponse(
+            {
+                "workspace": get_settings().workspace,
+                "skill": name,
+                "run_id": run_id,
+                "title": (run.get("metadata") or {}).get("title"),
+                "created_at": (run.get("metadata") or {}).get("created_at"),
+                "artifacts": run.get("artifacts") or [],
+                **view,
+            }
+        )
+
     @app.delete("/api/ui/skills/{name}/runs/{run_id}", tags=["theseus-ui"])
     async def delete_skill_run_route(name: str, run_id: str) -> JSONResponse:
         """Delete a persisted skill run from disk."""
