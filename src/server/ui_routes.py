@@ -2637,11 +2637,10 @@ def register_ui(
         path = mgr.get_artifact_path(_workspace_dir(), name, run_id, filename)
         if path is None:
             raise HTTPException(404, f"Artifact not found: {name}/{run_id}/{filename}")
-        import mimetypes as _mt
-        mime, _ = _mt.guess_type(path.name)
+        from src.skills.manager import resolve_artifact_mime
         return FileResponse(
             path,
-            media_type=mime or "application/octet-stream",
+            media_type=resolve_artifact_mime(path.name),
             filename=path.name,
         )
 

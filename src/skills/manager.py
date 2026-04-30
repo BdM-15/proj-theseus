@@ -91,6 +91,21 @@ _STUDIO_EXTRA_MIME: dict[str, str] = {
 }
 
 
+def resolve_artifact_mime(filename: str) -> str:
+    """Resolve a stable mime type for a skill artifact filename.
+
+    Precedence: explicit ``_STUDIO_EXTRA_MIME`` map > ``mimetypes.guess_type``
+    > ``application/octet-stream``. The explicit map wins because Windows'
+    registry mislabels common office / markdown formats (e.g. ``.md`` ->
+    ``application/text``) and we want listing + download responses to agree.
+    """
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if ext in _STUDIO_EXTRA_MIME:
+        return _STUDIO_EXTRA_MIME[ext]
+    guessed, _ = mimetypes.guess_type(filename)
+    return guessed or "application/octet-stream"
+
+
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
@@ -1254,11 +1269,10 @@ class SkillManager:
         if artifacts_dir.is_dir():
             for p in sorted(artifacts_dir.iterdir()):
                 if p.is_file():
-                    mime, _ = mimetypes.guess_type(p.name)
                     artifacts.append({
                         "name": p.name,
                         "size": str(p.stat().st_size),
-                        "mime": mime or "application/octet-stream",
+                        "mime": resolve_artifact_mime(p.name),
                     })
         # Tools-mode runs persist a structured transcript (assistant turns +
         # tool calls + tool results) and may write tool_outputs/* sidecar files.
@@ -1370,14 +1384,8 @@ class SkillManager:
                         stat = artifact.stat()
                     except OSError:
                         continue
-                    mime, _ = _mt.guess_type(artifact.name)
+                    mime = resolve_artifact_mime(artifact.name)
                     ext = artifact.suffix.lstrip(".").lower()
-                    # Prefer our explicit map over stdlib guesses — on Windows
-                    # the registry mislabels .md / .docx / .xlsx etc.
-                    if ext in _STUDIO_EXTRA_MIME:
-                        mime = _STUDIO_EXTRA_MIME[ext]
-                    elif mime is None:
-                        mime = "application/octet-stream"
                     rows.append(
                         {
                             "skill": skill_name,
