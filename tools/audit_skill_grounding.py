@@ -236,7 +236,29 @@ COVER_NOTE_EXEMPT_RE = re.compile(
         # Capability / next-turn pointer: "Additional X can be generated...", "More Y available on request"
         (Additional|More|Further|Other)\s+\w+.*\b(can\s+be|may\s+be|are\s+available|available\s+(?:in|on|via))\b.* |
         # Skill self-attestation about process completion (broadened noun list)
-        ([-*]\s+)?(All|Every|Each|No)\s+(\d+\s+)?.{0,80}?\b(executed|cited|grounded|sourced|covered|completed|anchored|invented|fabricated|hallucinated|quoted\s+verbatim|traces?\s+to)\b.* |
+        ([-*]\s+)?(All|Every|Each|No)\s+(\d+\s+)?.{0,80}?\b(executed|cited|grounded|sourced|covered|completed|anchored|invented|fabricated|hallucinated|quoted\s+verbatim|traces?\s+to|written|saved|persisted|emitted)\b.* |
+        # Artifact-written self-attestation: "The PWS Markdown artifact has been written to ..."
+        (The\s+)?[\w\s\-/]{2,60}?\s+(artifact|envelope|file|markdown|JSON|workbook|deck)s?\s+(has|have)\s+been\s+(written|saved|persisted|emitted|generated)\s+to\b.* |
+        # Conditional capability pointer: "Use the renderers skill if a .docx is needed."
+        (Use|Run|Invoke|Call|Hand\s+off\s+to)\s+(?:the\s+)?`?[\w\-/]+`?\s+(?:skill|tool|script|MCP|agent|renderer|generator)\s+(?:if|when|to|for)\b.* |
+        # JSON list-item leak from on-disk artifact's warnings/notes/findings array
+        "[^"]{2,200}\"?\]?\s*$ |
+        # FAR 37.102(d) "no FTEs in body" governance directive (subcontractor-sow-builder
+        # emits a chat-only staffing table separate from the artifact body):
+        # "This staffing table is chat-only", "must not be pasted into the document",
+        # "is ready for handoff to `price-to-win`"
+        (This|The|That)\s+(staffing|FTE|salary|burden|wrap|loaded\s+rate|cost)\s+(table|line|figure|number|breakout|build)\s+(is|are)\s+(chat-?only|ready\s+for\s+(?:handoff|hand-?off|hand\s+off))\b.* |
+        (\*\*)?(It\s+is|These\s+are|This\s+is)\s+NOT\s+part\s+of\s+the\s+(?:sub\s+)?(?:SOW|PWS|artifact|deliverable|document)\b.* |
+        (\*\*)?(must|shall|should)\s+not\s+be\s+(pasted|copied|inserted|included|added)\s+(into|in|to)\s+(the\s+)?(document|appendix|SOW|PWS|artifact|deliverable)\b.* |
+        # Section-level review/approval directive: "All Section 14 assumptions must be reviewed"
+        (All|Each|Every)\s+Section\s+\d+(?:\.\d+)?\s+\w+\s+\*?\*?(must|should|shall)\*?\*?\s+be\s+(reviewed|verified|validated|approved|signed|finalized)\b.* |
+        # Generic refinement caveat / next-step pointer: "Scope may need refinement..."
+        (Scope|Pricing|Staffing|Coverage|Detail|Wording)\s+(may|might|will|could)\s+(need|require)\s+(refinement|further\s+(refinement|detail|definition)|adjustment|tightening)\b.* |
+        # **Bold-line.** fragment from a multi-sentence bold-emphasized advisory block:
+        # "**This table is chat-only. It is NOT part of the sub PWS...**" splits into
+        # leading "**This table is chat-only." + trailing "...document or any appendix.**"
+        \*\*[A-Z][^*\n]{2,80}\.\s*$ |
+        [A-Z][^*\n]{2,200}\.\*\*\s*$ |
         # Definition-list bullet headers like "- **PWS (not SOW)**: Locked."
         # The substantive claim should live in the next sentence, not the header.
         [-*]\s+\*\*[^*]{2,120}\*\*\s*[:.\-—].{0,40}$ |
@@ -248,14 +270,26 @@ COVER_NOTE_EXEMPT_RE = re.compile(
 
 # Bold pointer headers with trailing parenthetical: "**Top warnings** (full list in artifact):"
 # These act as section labels for a list-from-the-artifact, not standalone claims.
+# Inner-paren capacity widened to 160 to accommodate longer FAR-classification
+# parentheticals like "**Non-commercial (FAR Part 15)** (DoD-specialized threat
+# hunting/detection engineering; not routinely sold to the general public)."
 BOLD_POINTER_HEADER_RE = re.compile(
-    r"^\s*[-*]?\s*\*\*[^*\n]{2,120}\*\*\s*\([^)]{2,80}\)\s*[:.\-—]?\s*$",
+    r"^\s*[-*]?\s*\*\*[^*\n]{2,120}\*\*\s*\([^)]{2,160}\)\s*[:.\-—]?\s*$",
 )
 
 # Milestone bullet (artifact field disclosure): "- **M1** (Phase 1, Months 1-3): ...content..."
 # These bullets walk the milestones[] array of the on-disk artifact one-by-one.
 MILESTONE_BULLET_RE = re.compile(
     r"^\s*[-*]\s*\*\*[A-Z]\d+\*\*\s*\([^)]{2,120}\)\s*[:.\-—].*",
+)
+
+# Scope-block bullet (subcontractor-sow-builder Phase 2 disclosure): the skill's
+# 6 scope blocks (Core/Delivery/Technical/Scale/Organizational/Quality) each
+# emit a one-line readout of the form `- <Field>: <text> (... Block N[/M] ...).`
+# The Block label may sit inside the same parens as descriptive content,
+# preceded by `;` or `,` rather than `(`. These are envelope-field readouts.
+SCOPE_BLOCK_BULLET_RE = re.compile(
+    r"^\s*[-*]\s+[A-Z][\w\s/&-]{2,80}:\s+.+?[(;,]\s*Block\s+\d+(?:/\d+)?[^)]*\)\s*\.?\s*$",
 )
 
 # Structured-field readout (artifact field disclosure). Only credited when the
@@ -289,7 +323,15 @@ STRUCTURED_FIELD_RE = re.compile(
         CALC\+\s+context |
         Labor |
         Should-?cost |
-        Government\s+obligation
+        Government\s+obligation |
+        Warnings? |
+        Warning\s+flags? |
+        Scope\s+blocks? |
+        Section\s+\d+(?:[\.\-]\d+)?(?:\s+\([^)]{2,80}\))? |
+        Recommended\s+\w+ |
+        FAR\s+\d+\.\d+(?:-\d+)?\s+notes? |
+        Acquisition\s+intake |
+        Performance\s+work\s+statement
     )\*?\*?\s*[:.\-—]""",
     re.IGNORECASE | re.VERBOSE,
 )
@@ -434,6 +476,8 @@ def _is_structural(sentence: str) -> bool:
     if BOLD_HEADING_RE.match(sentence):
         return True
     if BOLD_POINTER_HEADER_RE.match(sentence):
+        return True
+    if SCOPE_BLOCK_BULLET_RE.match(sentence):
         return True
     if MILESTONE_BULLET_RE.match(sentence):
         return True

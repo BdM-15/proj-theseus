@@ -61,6 +61,17 @@
         "Bare `FAR 16.601` citation without `(c)(2)`",
         "Section 5 table merged with the chat-only Staffing Handoff"
       ]
+    },
+    {
+      "id": "sub-sow-004",
+      "name": "Grounding-audit floor (cover-note skill)",
+      "prompt": "Same as sub-sow-001 — issue the standard chat narrative summary that walks the 6 scope blocks and the 14-section assembly, then disclose the chat-only staffing handoff for price-to-win.",
+      "expected_signals": [
+        "The skill MUST call write_file with target path artifacts/sub_pws_*.md before drafting the chat narrative summary.",
+        "tools/audit_skill_grounding.py --skill subcontractor-sow-builder reports grounding_ratio >= 0.20 (insight-heavy 6-scope-block + 14-section reasoning skill; the on-disk PWS Markdown is the citation-of-record, the chat narrative is the human-readable digest).",
+        "tools/audit_skill_grounding.py reports claims_exempt is at least 0.50 of (claims_total + claims_exempt) (most cover-note prose should be recognized as scope-block readout, FAR 37.102(d) governance directive, structured-field disclosure, or reasoning leap — not unsourced claims).",
+        "No regression below 0.20 across at least three consecutive runs of the same prompt."
+      ]
     }
   ]
 }
