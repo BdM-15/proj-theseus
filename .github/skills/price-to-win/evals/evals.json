@@ -62,6 +62,16 @@
         "The final assistant message does NOT consist solely of bullet stats / artifact-handoff lines — it contains substantive narrative explaining the reasoning behind the target_price.",
         "When tools/audit_skill_grounding.py is run against this run's transcript, grounding_ratio is >= 0.80."
       ]
+    },
+    {
+      "id": "price-to-win-grounding-floor",
+      "name": "Grounding-audit floor",
+      "prompt": "Build me a price-to-win for an FFP services contract: NAICS 541512, 5 senior software developers in the DC metro, 1-year base + 4 option years, GSA MAS commercial pricing. The incumbent's last award was $9.2M.",
+      "expected_signals": [
+        "tools/audit_skill_grounding.py --skill price-to-win reports grounding_ratio >= 0.70 (the on-disk JSON envelope source_chunks are the citation-of-record; derived metrics like Base-year labor mid =  are reasoning leaps Class B with explicit math reconciliation).",
+        "tools/audit_skill_grounding.py reports claims_exempt is at least 0.50 of (claims_total + claims_exempt) (cost-stack work generates many derived/null/methodology lines that are properly exempt).",
+        "No regression below 0.70 across at least three consecutive runs of the same prompt."
+      ]
     }
   ]
 }

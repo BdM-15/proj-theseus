@@ -280,6 +280,24 @@ COVER_NOTE_EXEMPT_RE = re.compile(
         ([-*]\s+)?Next\s+step:?\s+(Run|Invoke|Call|Hand\s+off\s+to|Pass\s+to|Forward\s+to)\b.* |
         # Captured-data observation: "The captured `X` and `Y` references reinforce ..."
         ([-*]\s+)?(The\s+)?captured\s+`?[\w\s,\-/]{2,80}`?\s+(and\s+`?[\w\s,\-/]{2,80}`?\s+)?references?\s+(reinforce|confirm|support|suggest|imply)\b.* |
+        # Labor-line bullet (price-to-win cost-stack disclosure):
+        # "- **5 Senior Software Developers**, DC metro (Washington-...), 1,880 productive hours/FTE/yr."
+        [-*]\s+\*\*\d+\s+[A-Z][\w\s/\-]{2,80}\*\*,\s+.+ |
+        # Derived-metric readout (computed from grounded inputs): "Base-year labor mid = $1.748M."
+        # "Wrap rate = 2.45." "FBR mid = $186.20." "Total bid mid = $9.2M."
+        [\w\-]+(?:\s+[\w\-]+){0,5}\s*[=:]\s*\$?\d+(?:[.,]\d+)?\s*[KMB%]?\b.{0,80}$ |
+        # Null / zero-line declaration: "None specified, carried at $0." / "No hybrid elements ... were specified"
+        ([-*]\s+)?(None|No|Zero)\s+\w+(?:[\s\w/\-()]{2,80})?(?:\s+(?:specified|provided|supplied|given|listed|noted))?\s*[,;:.\-—]\s*(?:carried\s+at\s+\$?0|treated\s+as\s+\$?0|set\s+to\s+\$?0|so\s+(?:pure|just|only)\s+)\b.* |
+        # Reconciliation calculation with parenthetical math:
+        # "Mid exactly reconciles to the incumbent's $9.2M last award (5 FTE × 1,880 hrs × $186.20 FBR × 5.256)."
+        ([-*]\s+)?(?:Mid|High|Low|Total|Bid|Wrap|FBR|Rate)\s+(?:exactly\s+)?(?:reconciles?|matches?|aligns?|equals?|squares?|rounds?)\s+(?:to|with|against)\b.*[×x*].*\)\.?\s*$ |
+        # Methodology vintage caveat: "BLS vintage gap (12-18 months); aged at standard 2.5%/yr but ..."
+        ([-*]\s+)?(BLS|GSA|CALC\+?|OEWS|SCA|Per\s+Diem|FBR|Wrap|Rate|Burden)\s+(vintage|aging|cap|ceiling|gap|drift|lag|stale|fresh)\b.* |
+        # Explicit reasoning-leap acknowledgment (Class B disclosure):
+        # "Reasoning leaps (sweet spot, typical behavior, defensible reads, risk calls) are expert judgment ..."
+        Reasoning\s+leaps?\s+\([^)]{2,200}\)\s+(?:are|is)\b.* |
+        # Artifact-written + capability-pointer combo: "The artifacts/X.json envelope is written and ready for Y"
+        (The\s+)?`?[\w/.\-]{2,80}`?\s+(envelope|artifact|file|workbook|deck)\s+is\s+(written|saved|persisted|emitted|generated|ready)\b.* |
         # Bold-bullet multi-count stat: "**Coverage:** 0 biased-ground-rules, **1 unequal-access**, 0 impaired-objectivity."
         \*\*[\w\s/-]{2,40}:\*\*\s*\d+\s+[\w\-]+(?:,\s*(?:\*\*)?\d+\s+[\w\-]+(?:\*\*)?)+\s*\.?\s*$ |
         # Definition-list bullet headers like "- **PWS (not SOW)**: Locked."
