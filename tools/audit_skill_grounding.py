@@ -21,6 +21,13 @@ A claim (sentence) is considered **grounded** when ANY of the following hold:
    header row, an empty bullet, a code-fence delimiter, a "References:"
    anchor line, or a sentence under 25 chars (e.g. transitions like
    "Here is the matrix:"). These are exempt from the denominator.
+5. It is a cover-note / artifact-handoff sentence (artifact save
+   confirmations like "Saved X to artifacts/Y.json", stats summary
+   bullets like "- Findings: 19 (critical: 8, ...)", pointer lines like
+   "Open the JSON for the full report", or process attestations like
+   "All 10 checks executed against the live KG slice"). These are also
+   exempt — the artifact JSON is the source of truth per skill design
+   contract; cover notes are navigation aids, not domain claims.
 
 Usage::
 
@@ -74,6 +81,41 @@ STRUCTURAL_LINE_RE = re.compile(
         Citations?:\s*$ |
         Sources?:\s*$ |
         \d+\.\s*$           # bare list number
+    )""",
+    re.IGNORECASE | re.VERBOSE,
+)
+
+# Patterns that mark a line as a cover-note / artifact-handoff sentence —
+# exempt from the grounding denominator because the artifact JSON itself is
+# the source of truth (per skill design contract). These are navigation aids,
+# not domain claims about the workspace.
+#
+# Covers:
+#   - Artifact save/write confirmations:
+#       "Saved compliance audit to `artifacts/compliance_audit.json`."
+#       "Wrote ptw_analysis.json to artifacts/."
+#   - Stats summary bullets:
+#       "- Findings: 19 (critical: 8, high: 5, medium: 4, info: 2)"
+#       "- Warnings: 2"
+#       "- Top 3:"
+#       "- Sources cited: chunk-aaaa, chunk-bbbb"
+#   - Pointer / next-action lines:
+#       "Open the JSON for the complete gap report and remediation steps."
+#       "See artifacts/compliance_audit.json for the full report."
+#   - Skill self-attestation (process, not domain):
+#       "All 10 checks (C1-C10) executed against the live KG slice; ..."
+COVER_NOTE_EXEMPT_RE = re.compile(
+    r"""^\s*(
+        # Stats / summary bullets: "- Word: number" or "- Word: ..."
+        [-*]\s+(Findings?|Warnings?|Errors?|Stats?|Counts?|Severity|Top\s+\d+|
+               Sources?\s+cited|Sources?|Citations?|Evidence|Artifact|Output|
+               Total|Skipped|Passed|Failed|Deferred)\b.* |
+        # Artifact save/write confirmations
+        (\*\*)?(Saved|Wrote|Created|Generated|Emitted|Persisted)\b.*\b(artifact|artifacts/|\.json|\.docx|\.xlsx|\.md|\.pptx|\.html)\b.* |
+        # Pointer / next-action lines
+        (Open|See|Refer\s+to|Inspect|Review)\b.*\b(JSON|artifact|artifacts/|file|report|envelope)\b.* |
+        # Skill self-attestation about process completion
+        (All|Every|Each)\s+(\d+\s+)?(checks?|findings?|claims?|items?|entries?|deliverables?)\b.*\b(executed|cited|grounded|sourced|covered|completed)\b.*
     )""",
     re.IGNORECASE | re.VERBOSE,
 )
@@ -166,7 +208,11 @@ def _split_claims(text: str) -> list[str]:
 
 
 def _is_structural(sentence: str) -> bool:
-    return bool(STRUCTURAL_LINE_RE.match(sentence))
+    if STRUCTURAL_LINE_RE.match(sentence):
+        return True
+    if COVER_NOTE_EXEMPT_RE.match(sentence):
+        return True
+    return False
 
 
 def _is_grounded(
