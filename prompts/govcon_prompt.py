@@ -39,12 +39,28 @@ Domain Intelligence Included:
 - Part K: 8 Annotated RFP Examples
 - Part L: Quality Checks
 
-Version: 3.3.0 (Format-Agnostic Mentor Persona)
+Version: 3.4.0 (JSON Structured-Output Extraction Mode — issue #124, Phase 1.2)
 Last Updated: April 2026
-Source: govcon_lightrag_native.txt (~35K tokens)
+Source: govcon_lightrag_native.txt (tuple mode) + govcon_lightrag_json.txt (JSON mode, ~35K tokens each)
 
 Changelog:
 ----------
+v3.4.0 (Apr 2026) - JSON Structured-Output Extraction (issue #124, Phase 1.2)
+  - Added entity_extraction_json_system_prompt loaded from govcon_lightrag_json.txt
+    (materialized by tools/_build_json_prompt.py from the canonical native.txt).
+  - Added entity_extraction_json_user_prompt and entity_continue_extraction_json_user_prompt
+    matching the LightRAG 1.5.0 JSON-mode contract (output is a single JSON object with
+    `entities` and `relationships` arrays; no tuple/completion delimiters).
+  - Added entity_extraction_json_examples=[<one-line Part K back-reference>]
+    (upstream requires non-empty list; real examples are inlined in Part K)
+    (the 8 govcon examples are embedded inline in Part K of the system prompt).
+  - Tuple-mode keys (entity_extraction_system_prompt, entity_extraction_user_prompt,
+    entity_continue_extraction_user_prompt, entity_extraction_examples) retained for
+    rollback during Phase 1.2/1.3 validation. TODO(phase-2.5): delete after JSON lockin.
+  - Canonical relationship type encoding: emitted as the first comma-separated token of
+    each relationship's `keywords` field — matches LightRAG's storage contract for both
+    tuple and JSON paths, so vdb_sync.normalize_relationship_type() needs no change.
+
 v3.3.0 (Apr 2026) - Format-Agnostic Mentor Persona (UCF + non-UCF)
   - Added "Solicitation Format Awareness" block to rag_response and naive_rag_response.
     Mentor now treats UCF (Section A-M) and non-UCF (FAR 16 task orders, FOPRs, BPA calls,
@@ -155,7 +171,7 @@ GOVCON_PROMPTS["DEFAULT_COMPLETION_DELIMITER"] = "<|COMPLETE|>"
 # - Decision trees, metadata requirements, quality checks
 
 def _load_extraction_prompt() -> str:
-    """Load full GovCon extraction prompt from file"""
+    """Load full GovCon extraction prompt (tuple-delimited mode) from file"""
     # Find the prompts directory (this file is in prompts/)
     prompts_dir = Path(__file__).parent
     native_prompt_path = prompts_dir / "extraction" / "govcon_lightrag_native.txt"
@@ -170,8 +186,34 @@ def _load_extraction_prompt() -> str:
         return f.read()
 
 
+def _load_extraction_prompt_json() -> str:
+    """Load full GovCon extraction prompt (JSON structured-output mode) from file.
+
+    Phase 1.2 of issue #124. Used when ``entity_extraction_use_json=True`` is
+    passed to LightRAG. The file is materialized by ``tools/_build_json_prompt.py``
+    from the canonical ``govcon_lightrag_native.txt``.
+    """
+    prompts_dir = Path(__file__).parent
+    json_prompt_path = prompts_dir / "extraction" / "govcon_lightrag_json.txt"
+
+    if not json_prompt_path.exists():
+        raise FileNotFoundError(
+            f"GovCon JSON extraction prompt not found at {json_prompt_path}. "
+            "Run `.\\.venv\\Scripts\\python.exe tools\\_build_json_prompt.py` to "
+            "materialize it from govcon_lightrag_native.txt."
+        )
+
+    with open(json_prompt_path, "r", encoding="utf-8") as f:
+        return f.read()
+
+
 # Load the full extraction system prompt (1300+ lines of domain intelligence)
+# TODO(phase-2.5): delete tuple-mode keys after JSON lockin and afcap5_adab_iss reprocess validation.
 GOVCON_PROMPTS["entity_extraction_system_prompt"] = _load_extraction_prompt()
+
+# Phase 1.2 (issue #124): JSON structured-output system prompt.
+# Used when LightRAG is initialized with ``entity_extraction_use_json=True``.
+GOVCON_PROMPTS["entity_extraction_json_system_prompt"] = _load_extraction_prompt_json()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -226,7 +268,68 @@ Based on the last extraction task, identify and extract any **missed or incorrec
 # The full govcon_lightrag_native.txt contains 12 annotated examples in Part K.
 # We set this to empty list because the examples are embedded in the system prompt.
 # This prevents LightRAG from appending its generic examples.
+# TODO(phase-2.5): delete tuple-mode key after JSON lockin.
 GOVCON_PROMPTS["entity_extraction_examples"] = []
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# JSON-MODE ENTITY EXTRACTION PROMPTS (Phase 1.2 — issue #124)
+# ═══════════════════════════════════════════════════════════════════════════════
+# Used when LightRAG runs with ``entity_extraction_use_json=True``. The system
+# prompt embeds the 8 govcon JSON examples inline (Part K of govcon_lightrag_json.txt),
+# so the examples list is intentionally empty to block upstream's generic defaults.
+GOVCON_PROMPTS["entity_extraction_json_user_prompt"] = """---Task---
+Extract entities and relationships from the `---Input Text---` session below.
+
+---Instructions---
+1. **Strict Adherence to JSON Format:** Your output MUST be a single valid JSON object with `entities` and `relationships` arrays. Do not include any introductory or concluding remarks, explanations, markdown code fences, or any other text before or after the JSON.
+2. **Required Fields:** Each entity object MUST include `name`, `type`, and `description`. Each relationship object MUST include `source`, `target`, `keywords`, and `description`.
+3. **Canonical Relationship Type:** The `keywords` field MUST begin with the canonical UPPERCASE relationship type (e.g. `GUIDES`, `CHILD_OF`, `MEASURED_BY`) as the first comma-separated token. Optional semantic keywords MAY follow after a comma.
+4. **Quantity Limits:** In this response, output at most {max_total_records} total records and at most {max_entity_records} entity objects. Output fewer records if fewer high-value items are present. Only output relationship objects whose `source` and `target` are both included in this response.
+5. **Quantitative Preservation:** Preserve ALL numbers, rates, frequencies, dollar amounts, thresholds, and equipment counts exactly as stated.
+6. **Metadata Embedded in Description:** All type-specific metadata (criticality, modal_verb, weight, threshold, page_limit, clause_number, etc.) belongs inside the `description` field — see Part J of the system prompt.
+7. **Output Language:** Use {language}. Proper nouns (clause numbers, agency names, building IDs) must be preserved exactly as written.
+
+---Entity Types---
+{entity_types_guidance}
+
+---Input Text---
+```
+{input_text}
+```
+
+---Output---
+"""
+
+
+GOVCON_PROMPTS["entity_continue_extraction_json_user_prompt"] = """---Task---
+Based on the last extraction task, identify and extract any **missed or incorrectly described** entities and relationships from the `---Input Text---` session.
+
+---Instructions---
+1. **Focus on Corrections/Additions:**
+  - Do NOT re-output entities and relationships that were correctly and fully extracted in the last task.
+  - If an entity or relationship was missed in the last task, extract and output it now.
+  - If an entity or relationship was incorrectly described, re-output the corrected and complete version.
+2. **Strict Adherence to JSON Format:** Your output MUST be a single valid JSON object with `entities` and `relationships` arrays. Do not include any introductory or concluding remarks, explanations, markdown code fences, or any other text before or after the JSON.
+3. **Same Field Contract:** Honor the same required fields and the canonical UPPERCASE relationship type as the first `keywords` token (see system prompt Part J).
+4. **Quantity Limits:** Output at most {max_total_records} total records and at most {max_entity_records} entity objects in this response.
+5. **Output Language:** Use {language}. Preserve proper nouns exactly as written.
+6. **If nothing was missed or needs correction**, output: `{{"entities": [], "relationships": []}}`
+
+---Output---
+"""
+
+
+# Examples are embedded inline in entity_extraction_json_system_prompt (Part K, 8
+# govcon-specific JSON examples). Upstream LightRAG (prompt.py:validate_entity_
+# extraction_prompt_profile_for_mode) requires this list to be non-empty when
+# entity_extraction_use_json=True, so we provide a single one-line back-reference
+# to Part K. The string flows into the user prompt's `{examples}` placeholder.
+GOVCON_PROMPTS["entity_extraction_json_examples"] = [
+    "(See Part K of the system prompt for 8 govcon-specific JSON examples covering "
+    "L↔M mapping, requirements, clauses, workload metrics, equipment tables, "
+    "special events, GFP/CDRL, and an anti-pattern WRONG/CORRECT contrast.)"
+]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

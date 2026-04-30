@@ -114,14 +114,23 @@ categories:
       - number: 7
         name: labor_category
         title: "Named labor classifications and workforce roles"
-        required_metadata: [position_title, skill_level, clearance_level]
+        required_metadata: [position_title, skill_level, clearance_level, key_personnel_designation]
         content_signals:
           - "Labor mix tables"
           - "position titles"
           - "skill levels"
           - "labor hours"
+          - 'Key Personnel / Key Personnel Positions / key personnel substitution'
         distinction: "Extract ONLY when explicitly named in RFP. If only quantities exist, use WORKLOAD_METRIC."
-        example: '"Program Manager", "Systems Engineer Level III", "Help Desk Analyst"'
+        metadata_conventions: |-
+          key_personnel_designation: set to "key" when the position is explicitly designated as
+          Key Personnel by the RFP (e.g., listed under an "L.X Key Personnel" section, named in a
+          FAR 52.215-22 / agency Key Personnel substitution clause, or called out in a
+          "Key Personnel:" enumeration). Otherwise omit or set to "non-key".
+          When set to "key", emit an additional MANDATES relationship from the governing clause
+          or proposal_instruction to the labor_category, and a SATISFIES relationship from the
+          labor_category to the resume / staffing requirement it fulfills.
+        example: '"Program Manager", "Systems Engineer Level III", "Help Desk Analyst"; key_personnel_designation="key" for PM if RFP lists PM under "Key Personnel"'
 
       - number: 8
         name: performance_standard
@@ -670,6 +679,17 @@ disambiguation_rules:
         "2,400 labor hours/month" (workload volume) → workload_metric
         If RFP names specific positions → labor_category. If only quantities → workload_metric.
 
+  - title: "KEY PERSONNEL designation (labor_category metadata convention)"
+    body: |-
+         "Key Personnel" is NOT a separate entity type — it is a metadata flag on labor_category.
+         When the RFP explicitly designates a position as Key Personnel (e.g., listed under
+         "L.5.2 Key Personnel", named in FAR 52.215-22 / agency Key Personnel substitution clause,
+         or enumerated under "Key Personnel Positions:"), set the labor_category's
+         key_personnel_designation metadata to "key". Otherwise omit it.
+         Always pair a key-designated labor_category with:
+           - a MANDATES edge FROM the governing clause / proposal_instruction TO the labor_category
+           - a SATISFIES edge FROM the labor_category TO the resume / staffing requirement
+         This makes "show me all key personnel positions" a one-hop graph query.
   - title: "STRATEGIC_THEME vs CUSTOMER_PRIORITY vs PAIN_POINT"
     body: |-
          "Technical Approach is significantly more important than Cost" → customer_priority (EXPLICIT weighting)
@@ -731,6 +751,8 @@ example_classifications:
   - {input: "100 events per year",                       type: workload_metric,       note: "NOT 'concept'"}
   - {input: "Program Manager",                           type: labor_category,        note: "in labor table; NOT 'person'"}
   - {input: "Systems Engineer Level III",                type: labor_category,        note: "NOT 'person'"}
+  - {input: "Program Manager (Key Personnel)",           type: labor_category,        note: "key_personnel_designation='key'; NOT a separate entity type"}
+  - {input: "Site Lead listed under L.5.2 Key Personnel", type: labor_category,       note: "key_personnel_designation='key'; pair with MANDATES from L.5.2"}
   - {input: "QASP Standard 3 Aircraft Availability",     type: performance_standard,  note: "NOT 'concept'"}
   - {input: "Subfactor 1.2 Staffing Approach",           type: subfactor,             note: "NOT 'evaluation_factor'"}
   - {input: "DAFI 21-101",                               type: regulatory_reference,  note: "NOT 'document'"}

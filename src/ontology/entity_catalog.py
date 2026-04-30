@@ -95,6 +95,10 @@ class EntityTypeDef(BaseModel):
         default=None,
         description="Inline 'X = ...; Y = ...' disambiguation paragraph.",
     )
+    metadata_conventions: str | None = Field(
+        default=None,
+        description="Free-form prose describing how to populate optional metadata fields (e.g. key_personnel_designation on labor_category).",
+    )
     extraction_rule: str | None = Field(
         default=None,
         description="The *** EXTRACTION RULE *** block (preserved verbatim, asterisks added by renderer).",
@@ -269,6 +273,10 @@ class EntityCatalog(BaseModel):
                 out.append(f"{indent}{note}")
         if entry.distinction:
             out.append(f"{indent}Distinction: {entry.distinction}")
+        if entry.metadata_conventions:
+            out.append(f"{indent}Metadata conventions:")
+            for line in entry.metadata_conventions.rstrip().splitlines():
+                out.append(f"{indent}  {line}")
         if entry.extraction_rule:
             out.append(f"{indent}*** EXTRACTION RULE: {entry.extraction_rule} ***")
         if entry.theme_types:

@@ -240,15 +240,20 @@ async def initialize_raganything():
         )
 
     # ═══════════════════════════════════════════════════════════════════════════════
-    # Output sanitization for the EXTRACT role (Issue #56)
+    # Output sanitization for the EXTRACT role (Issue #56) — TUPLE MODE ONLY
     # ═══════════════════════════════════════════════════════════════════════════════
-    # The extract role still needs the sanitizer wrapper that fixes common LLM
-    # malformation patterns (`#|requirement` → `requirement`, extra pipes in
-    # descriptions). Other roles do not need it — query/keyword/vlm outputs are
-    # consumed differently and don't go through the tuple-delimited parser.
+    # The sanitizer fixes tuple-delimited malformations (`#|requirement` → `requirement`,
+    # stray pipes in descriptions). It only applies to the legacy tuple-delimited
+    # extraction path. In JSON mode (Phase 1.2 / issue #124, ENTITY_EXTRACTION_USE_JSON=true),
+    # LightRAG's _process_json_extraction_result uses json_repair.loads() and the
+    # sanitizer is intentionally bypassed — there is no tuple fallback path.
     # ═══════════════════════════════════════════════════════════════════════════════
-    from src.extraction.output_sanitizer import create_sanitizing_wrapper
-    sanitized_extract_func = create_sanitizing_wrapper(_extract_llm_func)
+    use_json_extraction = os.environ.get("ENTITY_EXTRACTION_USE_JSON", "false").strip().lower() in ("1", "true", "yes", "on")
+    if use_json_extraction:
+        sanitized_extract_func = _extract_llm_func  # JSON mode: no tuple sanitizer
+    else:
+        from src.extraction.output_sanitizer import create_sanitizing_wrapper
+        sanitized_extract_func = create_sanitizing_wrapper(_extract_llm_func)
 
     # llm_model_func is the LEGACY single-callable RAGAnything still expects at
     # the top level. We point it at the query func — it's the safest fallback for
@@ -262,7 +267,8 @@ async def initialize_raganything():
     vision_model_func = _vlm_llm_func
 
     logger.info("✅ Native LightRAG 1.5.0 role_llm_configs routing enabled")
-    logger.info(f"   extract  → {extraction_model:40s}  max_tokens={EXTRACT_MAX_TOKENS:>6}  timeout={EXTRACT_TIMEOUT}s  (sanitized)")
+    _extract_mode_label = "JSON structured output, no sanitizer" if use_json_extraction else "tuple mode, sanitized"
+    logger.info(f"   extract  → {extraction_model:40s}  max_tokens={EXTRACT_MAX_TOKENS:>6}  timeout={EXTRACT_TIMEOUT}s  ({_extract_mode_label})")
     logger.info(f"   query    → {reasoning_model:40s}  max_tokens={QUERY_MAX_TOKENS:>6}  timeout={QUERY_TIMEOUT}s")
     logger.info(f"   keyword  → {extraction_model:40s}  max_tokens={KEYWORD_MAX_TOKENS:>6}  timeout={KEYWORD_TIMEOUT}s")
     logger.info(f"   vlm      → {extraction_model:40s}  max_tokens={VLM_MAX_TOKENS:>6}  timeout={VLM_TIMEOUT}s")
@@ -366,6 +372,10 @@ async def initialize_raganything():
             # PROMPTS.update(GOVCON_PROMPTS) after RAG-Anything initialization
             "language": "English",
         },
+        # Phase 1.2 (issue #124): native JSON structured-output extraction.
+        # When True, LightRAG uses entity_extraction_json_* prompt keys and
+        # _process_json_extraction_result (json_repair-based parser).
+        "entity_extraction_use_json": use_json_extraction,
         # Chunking configuration comes from environment variables:
         # - CHUNK_SIZE controls chunk_token_size (default: 4096)
         # - CHUNK_OVERLAP_SIZE controls chunk_overlap_token_size (default: 600)
