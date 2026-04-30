@@ -46,17 +46,36 @@ class Settings(BaseSettings):
         default=None,
         description="xAI API key (required for LLM operations)"
     )
+    # Per-role LLM models. Env var names match LightRAG 1.5.0's native role registry
+    # (lightrag/api/config.py reads EXTRACT_LLM_MODEL / QUERY_LLM_MODEL / KEYWORD_LLM_MODEL
+    # / VLM_LLM_MODEL at import time). POST_PROCESS_LLM_MODEL is our addition for the
+    # src/inference/ pipeline (not a LightRAG role, but kept in the same naming scheme).
+    # Python attribute names retain the legacy `*_llm_name` suffix to keep call-site
+    # churn minimal; only the .env variable names changed.
     extraction_llm_name: str = Field(
         default="grok-4-1-fast-non-reasoning",
-        description="Non-reasoning model for extraction (literal format compliance)"
+        validation_alias="EXTRACT_LLM_MODEL",
+        description="Non-reasoning model for entity extraction (LightRAG `extract` role)"
     )
     reasoning_llm_name: str = Field(
         default="grok-4.20-0309-reasoning",
-        description="Reasoning model for queries and semantic inference (grok-4.20 = lowest hallucination + strict prompt adherence)"
+        validation_alias="QUERY_LLM_MODEL",
+        description="Reasoning model for queries (LightRAG `query` role) — grok-4.20 = lowest hallucination + strict adherence"
     )
     post_processing_llm_name: str = Field(
         default="grok-4-1-fast-reasoning",
-        description="Reasoning model for post-processing inference algorithms (fast reasoning for throughput)"
+        validation_alias="POST_PROCESS_LLM_MODEL",
+        description="Fast reasoning model for src/inference/ post-processing algorithms (NOT a LightRAG role)"
+    )
+    keyword_llm_name: str = Field(
+        default="grok-4-1-fast-non-reasoning",
+        validation_alias="KEYWORD_LLM_MODEL",
+        description="Non-reasoning model for query-time keyword extraction (LightRAG `keyword` role)"
+    )
+    vlm_llm_name: str = Field(
+        default="grok-4-1-fast-non-reasoning",
+        validation_alias="VLM_LLM_MODEL",
+        description="Non-reasoning model for VLM table/image/equation analysis (LightRAG `vlm` role)"
     )
     llm_timeout: int = Field(
         default=600,

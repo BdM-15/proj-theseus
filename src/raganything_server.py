@@ -277,10 +277,12 @@ async def main():
         ("Workspace",    f"{c.BOLD}{c.WHITE}{settings.workspace}{c.RESET}"),
         ("Storage",      f"{c.YELLOW}{graph_storage}{c.RESET}  ·  {c.DIM}{global_args.working_dir}{c.RESET}"),
         ("", ""),
-        # ── Models ───────────────────────────────────────────────────────────────
-        ("Extraction",      f"{c.CYAN}{settings.extraction_llm_name}{c.RESET}"),
-        ("Post-Processing", f"{c.YELLOW}{settings.post_processing_llm_name}{c.RESET}"),
-        ("Reasoning",       f"{c.MAGENTA}{settings.reasoning_llm_name}{c.RESET}"),
+        # ── Models (LightRAG 1.5.0 per-role dispatch + post-processing) ────────────────
+        ("Extract  (LightRAG)",  f"{c.CYAN}{settings.extraction_llm_name}{c.RESET}"),
+        ("Keyword  (LightRAG)",  f"{c.CYAN}{settings.keyword_llm_name}{c.RESET}"),
+        ("VLM      (LightRAG)",  f"{c.CYAN}{settings.vlm_llm_name}{c.RESET}"),
+        ("Query    (LightRAG)",  f"{c.MAGENTA}{settings.reasoning_llm_name}{c.RESET}"),
+        ("Post-Process",         f"{c.YELLOW}{settings.post_processing_llm_name}{c.RESET}"),
         ("Embeddings",   f"{c.CYAN}{settings.embedding_model}{c.RESET}  {c.DIM}({settings.embedding_dim}D){c.RESET}"),
         ("Reranker",     _format_reranker_line()),
         ("", ""),

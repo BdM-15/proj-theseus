@@ -58,12 +58,12 @@ def _client_kwargs() -> dict[str, str]:
 
 def _resolve_model() -> str:
     # Skills are multi-turn reasoning agents — always use the most powerful
-    # model available. Theseus pins this to REASONING_LLM_NAME.
-    val = os.getenv("REASONING_LLM_NAME", "").strip()
+    # model available. Theseus pins this to QUERY_LLM_MODEL.
+    val = os.getenv("QUERY_LLM_MODEL", "").strip()
     if val:
         return val
     raise RuntimeError(
-        "REASONING_LLM_NAME not set — skill tool runtime requires the "
+        "QUERY_LLM_MODEL not set — skill tool runtime requires the "
         "reasoning model to be configured in .env"
     )
 
