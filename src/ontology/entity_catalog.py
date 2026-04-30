@@ -299,10 +299,15 @@ class EntityCatalog(BaseModel):
 
 
 def _quote_if_needed(signal: str) -> str:
-    """Wrap multi-word signals in quotes, leave single tokens bare (matches Part D style)."""
-    if " " in signal and not (signal.startswith('"') and signal.endswith('"')):
-        return f'"{signal}"'
-    return signal
+    """Wrap multi-word signals in quotes, leave single tokens or already-quoted strings bare."""
+    if " " not in signal:
+        return signal
+    # Already wrapped, or contains internal quotes — leave as-is to avoid ugly double-wrap.
+    if signal.startswith('"') and signal.endswith('"'):
+        return signal
+    if '"' in signal:
+        return signal
+    return f'"{signal}"'
 
 
 # --------------------------------------------------------------------------- #

@@ -101,13 +101,21 @@ def test_render_quotes_multi_word_signals():
     data["categories"][0]["entries"][0]["content_signals"] = [
         "Contractor shall",
         "CLIN",
+        '"already quoted phrase"',
+        'has "internal" quotes here',
     ]
     cat = EntityCatalog.model_validate(data)
     rendered = cat.render_part_d()
+    # Multi-word bare phrases get wrapped.
     assert '"Contractor shall"' in rendered
     # Single-token signals stay bare.
-    assert "CLIN" in rendered
-    assert '"CLIN"' not in rendered
+    assert ", CLIN," in rendered or rendered.endswith(" CLIN") or " CLIN," in rendered
+    # Already-quoted strings are not double-wrapped.
+    assert '""already quoted phrase""' not in rendered
+    assert '"already quoted phrase"' in rendered
+    # Strings with internal quotes are not double-wrapped.
+    assert '"has "internal" quotes here"' not in rendered
+    assert 'has "internal" quotes here' in rendered
 
 
 def test_render_includes_forbidden_and_fallback_blocks():

@@ -1,0 +1,750 @@
+# =============================================================================
+# Govcon Entity Catalog — Single Source of Truth
+# =============================================================================
+#
+# Defines the 33 government-contracting entity types used by Project Theseus.
+# Loaded by `src/ontology/entity_catalog.py` and used to:
+#
+#   1. Derive `VALID_ENTITY_TYPES` (`src/ontology/schema.py`).
+#   2. Render the canonical Part D markdown injected into the LightRAG
+#      extraction prompt via `addon_params["entity_types_guidance"]`
+#      (`src/server/initialization.py`).
+#   3. Drive the JSON-extraction enum/metadata schemas planned in Phase 2/3
+#      of epic #124.
+#
+# When you change this file, also run:
+#   .\.venv\Scripts\python.exe -m pytest tests/ontology
+#   .\.venv\Scripts\python.exe tools/_smoke_phase0_tuple_mode.py
+#
+# See `.github/copilot-instructions.md` § "Cross-Cutting Change Checklist".
+# =============================================================================
+
+version: "1.0"
+
+intro: "You MUST classify every entity into exactly ONE of these 33 types:"
+
+# -----------------------------------------------------------------------------
+# CATEGORIES (ordered — drives Part D presentation)
+# -----------------------------------------------------------------------------
+categories:
+
+  # ---------------------------------------------------------------------------
+  - title: "CONTRACT, EXECUTION, AND COMMERCIAL STRUCTURE"
+    entries:
+
+      - number: 1
+        name: requirement
+        title: "Contractor obligations (shall/should/may statements)"
+        required_metadata: [criticality, modal_verb, req_type, labor_drivers]
+        content_signals:
+          - "Contractor shall"
+          - "Offeror must"
+          - "action verbs"
+        notes:
+          - "Criticality: MANDATORY (shall/must), IMPORTANT (should), OPTIONAL (may)"
+        example: '"Contractor shall provide 24/7 help desk support for 500 users"'
+
+      - number: 2
+        name: contract_line_item
+        title: "CLINs, SLINs, and priced line items"
+        content_signals:
+          - "CLIN"
+          - "SLIN"
+          - "ACRN"
+          - "line item numbers (0001, 0002AA)"
+        must_extract:
+          - "CLIN number"
+          - "contract type (FFP/CPFF/T&M)"
+          - "description"
+          - "PoP"
+        distinction: "CONTRACT_LINE_ITEM = priced contract lines; DELIVERABLE = work products"
+        example: '"CLIN 0001 Base Year Operations FFP", "SLIN 0002AA Option Year 1"'
+
+      - number: 3
+        name: pricing_element
+        title: "Rates, fees, escalation, burden, or pricing methodology components"
+        required_metadata: ["pricing_type (rate/fee/escalation/burden)", value_or_percentage, basis_of_application]
+        content_signals:
+          - "indirect rate"
+          - "fee"
+          - "burden"
+          - "escalation"
+          - "plug rate"
+          - "wrap rate"
+        distinction: "PRICING_ELEMENT = pricing logic component; CONTRACT_LINE_ITEM = priced line"
+        example: '"Award Fee Pool 7%", "Escalation 2.5% annually", "Overhead rate 18%"'
+
+      - number: 4
+        name: government_furnished_item
+        title: "Government-provided equipment, facilities, material, systems, or services"
+        content_signals:
+          - "GFE"
+          - "GFP"
+          - "GFI"
+          - "GOTS"
+          - "Government Furnished"
+          - "Government-provided"
+        distinction: "GOVERNMENT_FURNISHED_ITEM = customer-provided asset; EQUIPMENT = generic physical asset"
+        example: '"Government Furnished Vehicle Fleet", "GFE Test Facility", "GOTS Cyber Tool Suite"'
+
+      - number: 5
+        name: deliverable
+        title: "CDRLs and contract deliverables"
+        patterns:
+          - "CDRL A###"
+          - "DD Form 1423 references"
+        content_signals:
+          - "CDRL"
+          - "Data Item"
+          - "shall submit"
+          - "shall deliver"
+        example: "CDRL A001 Monthly Status Report"
+
+      - number: 6
+        name: workload_metric
+        title: "Quantitative BOE drivers (volumes, counts, frequencies)"
+        required_metadata: [quantity, unit, period, location_if_stated]
+        content_signals:
+          - "Numbers + unit of measure + time period"
+        distinction: |-
+          WORKLOAD_METRIC = quantitative data that drives staffing/cost;
+             REQUIREMENT = obligation statement; CONCEPT = abstract process
+        example: '"12,500 sorties/year", "1,600 customers daily", "100 events/year"'
+
+      - number: 7
+        name: labor_category
+        title: "Named labor classifications and workforce roles"
+        required_metadata: [position_title, skill_level, clearance_level]
+        content_signals:
+          - "Labor mix tables"
+          - "position titles"
+          - "skill levels"
+          - "labor hours"
+        distinction: "Extract ONLY when explicitly named in RFP. If only quantities exist, use WORKLOAD_METRIC."
+        example: '"Program Manager", "Systems Engineer Level III", "Help Desk Analyst"'
+
+      - number: 8
+        name: performance_standard
+        title: "KPIs, surveillance methods, inspection standards, SLAs, AQLs, acceptance criteria"
+        required_metadata: [threshold, measurement_method]
+        content_signals:
+          - "Performance Objective"
+          - "AQL"
+          - "numerical standards"
+          - "QASP"
+          - "SLA"
+        distinction: "PERFORMANCE_STANDARD = measurable threshold/standard; REQUIREMENT = action to perform"
+        example: '"99.9% system uptime", "No more than 2 defects per month", "QASP Standard 3"'
+
+      - number: 9
+        name: transition_activity
+        title: "Phase-in, phase-out, turnover, incumbent handoff tasks"
+        required_metadata: ["phase (phase-in/phase-out/overlap)", duration, dependencies]
+        content_signals:
+          - "transition"
+          - "phase-in"
+          - "phase-out"
+          - "turnover"
+          - "mobilization"
+          - "stand-up"
+        distinction: "TRANSITION_ACTIVITY = temporary transition work; WORK_SCOPE_ITEM = steady-state work scope"
+        example: '"30-Day Transition Plan", "Incumbent Knowledge Transfer", "Phase-In Staffing Ramp"'
+
+  # ---------------------------------------------------------------------------
+  - title: "DOCUMENT STRUCTURE, AUTHORITIES, AND WORK PATTERNS"
+    entries:
+
+      - number: 10
+        name: document_section
+        title: "Numbered, titled, or hierarchical structural units in any solicitation/document"
+        content_signals:
+          - "section labels"
+          - "article/paragraph headers"
+          - "appendix subsections"
+          - "numbered headings"
+        notes:
+          - "Extract BOTH structural identifier AND semantic title when available"
+        distinction: "DOCUMENT_SECTION = structural container; DOCUMENT = attachment/exhibit/standalone doc"
+        example: '"Section C Statement of Work", "Appendix H.2 Appliance Listing", "Paragraph 3.2.1 Maintenance"'
+
+      - number: 11
+        name: document
+        title: "RFP attachments, exhibits, annexes, plans, manuals, referenced standalone documents"
+        patterns:
+          - "Attachment #"
+          - "J-######"
+          - "Exhibit #"
+          - "Annex #"
+          - "Appendix [A-Z]"
+        content_signals:
+          - "Attachment"
+          - "Annex"
+          - "Exhibit"
+          - "Appendix"
+          - "manual"
+          - "plan"
+        distinction: "DOCUMENT = attached/referenced document object; DOCUMENT_SECTION = structural unit inside a doc"
+        example: '"Attachment J-3 Quality Assurance Plan", "Exhibit A Pricing Schedule"'
+
+      - number: 12
+        name: amendment
+        title: "Solicitation changes, modifications, Q&A amendments, updated revisions"
+        content_signals:
+          - "amendment"
+          - "modification"
+          - "revised"
+          - "supersedes"
+          - "replaces"
+          - "deleted in amendment"
+        distinction: "AMENDMENT = change vehicle; DOCUMENT = base document or attachment"
+        example: '"Amendment 0003", "Solicitation Revision 2", "Mod 1 Updated PWS"'
+
+      - number: 13
+        name: clause
+        title: "FAR/DFARS/Agency acquisition regulation clauses and provisions"
+        required_metadata: [clause_number, regulation]
+        patterns:
+          - "FAR 52.###-##"
+          - "DFARS 252.###-####"
+        notes:
+          - |-
+            Agency Supplements: FAR, DFARS, AFFARS, NMCARS, HSAR, DOSAR, GSAM, VAAR,
+               DEAR, NFS, AIDAR, CAR, DIAR, DOLAR, EDAR, EPAAR, FEHBAR, HHSAR, HUDAR,
+               IAAR, JAR, LIFAR, NRCAR, SOFARS, TAR (26+ recognized)
+        example: "FAR 52.212-4, DFARS 252.204-7012"
+
+      - number: 14
+        name: regulatory_reference
+        title: "Incorporated regulations, standards, and directives"
+        content_signals:
+          - "IAW"
+          - "in accordance with"
+          - "per"
+          - "as defined in"
+        patterns:
+          - "DAFI ##-###"
+          - "AR ###-##"
+          - "MIL-STD-###"
+          - "NIST SP ###-###"
+          - "AFI ##-###"
+        distinction: |-
+          REGULATORY_REFERENCE = external regulation/directive cited by
+             authority; DOCUMENT = RFP attachments and exhibits; CLAUSE = FAR/DFARS entries
+        example: '"DAFI 21-101", "NIST SP 800-171", "AR 735-5", "MIL-STD-882E"'
+
+      - number: 15
+        name: technical_specification
+        title: "ICDs, TDPs, drawings, MIL-DTL/MIL-PRF specs, engineering standards"
+        content_signals:
+          - "ICD"
+          - "interface spec"
+          - "drawing"
+          - "TDP"
+          - "MIL-DTL"
+          - "MIL-PRF"
+          - "schematic"
+        distinction: "TECHNICAL_SPECIFICATION = engineering/technical design authority; REGULATORY_REFERENCE = policy/regulatory authority"
+        example: '"MIL-DTL-38999", "Interface Control Document ICD-001", "Drawing 12345 Rev C"'
+
+      - number: 16
+        name: work_scope_item
+        title: "PWS/SOW/SOO tasks, objectives, service packages, or work elements regardless of location"
+        required_metadata: [task_number, scope_description, period_of_performance]
+        content_signals:
+          - "task descriptions"
+          - "objectives"
+          - "performance work"
+          - "scope items"
+          - "work packages"
+        distinction: "WORK_SCOPE_ITEM = semantic work package; DOCUMENT_SECTION = structural container; REQUIREMENT = obligation sentence"
+        example: '"Task 3.2 Network Operations Support", "Objective 4 Airfield Readiness", "Work Package 2 Depot Maintenance"'
+
+  # ---------------------------------------------------------------------------
+  - title: "PROPOSAL AND EVALUATION STRUCTURE"
+    entries:
+
+      - number: 17
+        name: evaluation_factor
+        title: "Top-level scoring criteria that drive proposal structure and page allocation"
+        required_metadata: [weight, importance, subfactors]
+        content_signals:
+          - "will be evaluated"
+          - "most important"
+          - "adjectival rating"
+          - "approximately equal"
+          - "significantly more important"
+          - "descending order"
+        must_extract:
+          - "Weight (40%, 25pts)"
+          - "Importance (Most Important)"
+          - "Subfactors"
+        distinction: "EVALUATION_FACTOR = top-level factors; SUBFACTOR = child criteria"
+        shipley_note: |-
+          Factors form the backbone of the Compliance Matrix — each factor maps to
+             Section L instructions, Section M criteria, and proposal page budgets. When factor
+             weights don't match page allocations, flag the mismatch as a compliance risk.
+        example: "Factor 1 Technical Approach (40%) - Most Important"
+
+      - number: 18
+        name: subfactor
+        title: "Evaluation subfactor hierarchy (children of evaluation_factor)"
+        required_metadata: [parent_factor, subfactor_number, weight_if_stated]
+        content_signals:
+          - "Numbered child criteria (1.1, 1.2)"
+          - "subfactor"
+          - "sub-element"
+        distinction: "SUBFACTOR = child of evaluation_factor with own identifier/weight"
+        example: '"Subfactor 1.2 Staffing Approach (15%)", "Element B.2 Integration"'
+
+      - number: 19
+        name: proposal_instruction
+        title: "Proposal preparation, format, submission, and response requirements"
+        required_metadata: [page_limit, format_reqs, volume]
+        content_signals:
+          - "page limit"
+          - "font size"
+          - "shall not exceed"
+          - "volume"
+          - "submit"
+          - "organize"
+          - "address each"
+          - "demonstrate"
+          - "describe your approach"
+        must_extract:
+          - "Page limits"
+          - "formatting (font/margins)"
+          - "volume organization"
+          - "submission mechanics"
+        shipley_note: |-
+          Instructions form the L-side of the Compliance Matrix. Each instruction
+             maps to evaluation criteria (M-side). Extract response directives ("describe",
+             "demonstrate", "provide evidence") — these tell evaluators what to score.
+        example: "Technical Volume limited to 25 pages, 12pt Times New Roman"
+
+      - number: 20
+        name: proposal_volume
+        title: "Named proposal containers or response volumes"
+        required_metadata: [volume_id, "purpose (technical/management/past_performance/cost/other)", associated_factors]
+        content_signals:
+          - "Volume I"
+          - "Volume II"
+          - "Oral Presentation Volume"
+          - "Annex B Response Volume"
+        distinction: "PROPOSAL_VOLUME = container; PROPOSAL_INSTRUCTION = rule/constraint applying to it"
+        example: '"Volume I Technical", "Volume III Past Performance"'
+
+      - number: 21
+        name: past_performance_reference
+        title: "Reference contracts, PPQs, CPARS records, relevance examples"
+        content_signals:
+          - "past performance"
+          - "PPQ"
+          - "CPARS"
+          - "reference contract"
+          - "relevancy rating"
+          - "similar in size"
+          - "similar in scope"
+          - "relevancy"
+          - "recency"
+        distinction: "PAST_PERFORMANCE_REFERENCE = evidence/reference object; EVALUATION_FACTOR = scoring criterion"
+        shipley_note: |-
+          Past performance references are proof points in the FAB chain (Feature →
+             Advantage → Benefit). They prove discriminators are real, not theoretical. Extract
+             relevancy criteria (size, scope, complexity, dollar value) — these define what
+             "similar" means to this evaluator.
+        example: '"Contract W912-1234 Afghanistan BOS", "CPARS Exceptional Rating 2024"'
+
+  # ---------------------------------------------------------------------------
+  - title: "STRATEGIC AND ANALYTICAL SIGNAL"
+    entries:
+
+      - number: 22
+        name: strategic_theme
+        title: "Capture strategy signals INFERRED from document patterns"
+        required_metadata: [theme_type]
+        theme_types: [DISCRIMINATOR, PROOF_POINT, WIN_THEME]
+        extraction_rule: |-
+          STRATEGIC_THEME captures insights the PROPOSER synthesizes
+             from reading between the lines. These are NOT explicitly stated by the customer —
+             they are strategic conclusions drawn from patterns, emphasis, requirements structure,
+             and evaluation criteria. If the customer EXPLICITLY states importance, use
+             CUSTOMER_PRIORITY instead.
+        shipley_definitions:
+          - |-
+            DISCRIMINATOR: A capability or approach that (1) differs from competitors AND
+                 (2) the customer acknowledges as important. Both conditions required. Inferred
+                 from unique requirements, unusual specificity, or evaluation criteria that favor
+                 a particular approach. The RFP won't say "this is a discriminator" — you infer it.
+          - |-
+            WIN_THEME: A proposal message that links a customer benefit to a discriminating
+                 feature. Win themes are CRAFTED by the proposer, not stated by the customer.
+                 "Strategies are things to do. Themes are things to say." Inferred from the
+                 intersection of customer priorities + pain points + evaluation weights.
+          - |-
+            PROOF_POINT: Evidence that backs a discriminator claim — certifications, metrics,
+                 past performance results, staffing credentials. Part of the FAB chain
+                 (Feature → Advantage → Benefit). Inferred when the RFP creates an opportunity
+                 to demonstrate capability (e.g., "demonstrate experience with..." signals a
+                 proof point opportunity).
+        content_signals:
+          - 'Ghost language ("contractors without X may struggle to...")'
+          - "unusual specificity in requirements"
+          - "evaluation criteria that favor niche capabilities"
+          - "repeated emphasis on a theme across multiple sections"
+          - "requirements that align with known incumbent weaknesses"
+        example: '"Integrated Logistics Approach (WIN_THEME)", "CMMI Level 3 Maturity (PROOF_POINT)"'
+
+      - number: 23
+        name: customer_priority
+        title: "What the customer EXPLICITLY states matters most"
+        required_metadata: ["priority_signal (stated/weighted)", source_section]
+        content_signals:
+          - "paramount"
+          - "critical"
+          - "essential"
+          - "significantly more important"
+          - "highest priority"
+          - '"of utmost importance"'
+          - '"overriding concern"'
+          - '"cannot be overstated"'
+          - "evaluation factor weights"
+          - 'adjectival ratings ("most important", "significantly more important than")'
+          - "repeated emphasis across multiple sections"
+        extraction_rule: |-
+          CUSTOMER_PRIORITY captures what the customer DIRECTLY tells
+             you is important — through explicit language, weighting, or emphasis. If you must
+             READ BETWEEN THE LINES, use STRATEGIC_THEME instead.
+        sub_patterns:
+          - label: "STATED PRIORITY"
+            description: |-
+              Direct importance language ("Cybersecurity is paramount",
+                   "Mission readiness is the overriding concern")
+          - label: "WEIGHTED PRIORITY"
+            description: |-
+              Evaluation factor emphasis ("Technical Approach is
+                   significantly more important than Cost", "Past Performance and Technical
+                   are equal and more important than Price")
+        shipley_note: |-
+          Customer priorities are Hot Buttons — what keeps decision-makers up at
+             night. They drive Executive Summary organization and should appear in every
+             volume's theme statements. Repeated emphasis across multiple sections signals
+             a true hot button vs. boilerplate.
+        example: |-
+          "Cybersecurity Is Paramount", "Mission Readiness Is the Top Priority",
+             "Technical Approach is significantly more important than Cost"
+
+      - number: 24
+        name: pain_point
+        title: "Problem statements, deficiencies, shortfalls, or issues the government wants resolved"
+        required_metadata: ["severity (critical/moderate/minor)", source_evidence]
+        content_signals:
+          - "deficiencies"
+          - "current contract lacks"
+          - "shortfall"
+          - "lessons learned"
+          - "challenge"
+          - "issue"
+          - '"incumbent failed"'
+          - '"historically problematic"'
+          - '"area of concern"'
+        distinction: "PAIN_POINT = problem to solve; REQUIREMENT = action/solution expected"
+        shipley_note: |-
+          Pain points are Ghost opportunities — you can raise a competitor's likely
+             weakness without naming them ("Contractors without X may struggle to..."). Each
+             pain point should map to a discriminator that solves it via the FAB chain.
+        example: '"Current Turnaround Delays Impact Mission", "Fragmented Asset Visibility Problem"'
+
+  # ---------------------------------------------------------------------------
+  - title: "STANDARD ENTITIES"
+    entries:
+
+      - number: 25
+        name: organization
+        title: "Agencies, military units, contractors"
+        required_metadata: ["role (customer/contractor/subcontractor/partner)", "org_type (agency/military_unit/company)"]
+        content_signals:
+          - "Company names"
+          - "agency names"
+          - "military designations"
+        patterns:
+          - '"Inc."'
+          - '"LLC"'
+          - '"Corp."'
+          - "acronyms (NAVAIR, GSA)"
+        example: "Naval Air Systems Command, Marine Corps Logistics Command"
+
+      - number: 26
+        name: program
+        title: "Government programs and initiatives"
+        required_metadata: [program_name, sponsoring_agency, contract_type_if_stated]
+        content_signals:
+          - "Program names"
+          - "major acquisition titles"
+          - "acronyms"
+        distinction: "PROGRAM = services/initiatives; EQUIPMENT = physical items"
+        example: "MCPP II, Navy MBOS, F-35 Lightning II Program"
+
+      - number: 27
+        name: equipment
+        title: "Physical hardware, vehicles, machinery"
+        required_metadata: [quantity, model_or_nsn, condition_or_status]
+        patterns:
+          - "Model numbers (M1A1, RG-24)"
+          - "NSN numbers"
+          - "TAMCN codes"
+        content_signals:
+          - "Physical descriptions"
+          - "quantities"
+          - "specifications"
+        distinction: "EQUIPMENT = physical item; TECHNOLOGY = software/system"
+        example: "Concorde RG-24 Battery, 6200 Tennant Floor Scrubber"
+
+      - number: 28
+        name: technology
+        title: "Software, systems, platforms"
+        required_metadata: [version, vendor_or_provider, purpose]
+        content_signals:
+          - "Version numbers"
+          - "software names"
+          - "system names"
+        patterns:
+          - '"Windows Server 2022"'
+          - '"Python 3.11"'
+          - '"AWS GovCloud"'
+        distinction: "TECHNOLOGY = software/logical; EQUIPMENT = hardware/physical"
+        example: "AWS GovCloud, ServiceNow, GCSS-MC"
+
+      - number: 29
+        name: location
+        title: "Performance locations, facilities, bases"
+        required_metadata: [site_name, "region (CONUS/OCONUS/specific)", "classification (base/building/facility)"]
+        content_signals:
+          - "Base names"
+          - "building numbers"
+          - "geographic areas"
+        patterns:
+          - '"Building ###"'
+          - '"NAS [Name]"'
+          - '"CONUS/OCONUS"'
+        example: "Naval Air Station Pensacola, Building 2959"
+
+      - number: 30
+        name: event
+        title: "Milestones, deadlines, scheduled activities"
+        required_metadata: [date_or_timeframe, "event_type (milestone/deadline/recurring)"]
+        content_signals:
+          - "Dates"
+          - "deadlines"
+          - "scheduled activities"
+        distinction: "EVENT = scheduled/time-bound; CONCEPT = process/methodology"
+        example: "Kickoff Meeting, Contract Award Date"
+
+      - number: 31
+        name: person
+        title: "Key personnel, POCs, roles"
+        content_signals:
+          - "Names"
+          - "titles"
+          - "roles"
+          - "contact information"
+        example: "Contracting Officer, Program Manager"
+
+      - number: 32
+        name: compliance_artifact
+        title: "Certifications, accreditations, authorizations, and maintained compliance objects"
+        content_signals:
+          - "certification"
+          - "accreditation"
+          - "authorization"
+          - "ATO"
+          - "ISO 9001"
+          - "CMMI"
+          - "license"
+        distinction: "COMPLIANCE_ARTIFACT = maintained evidence/compliance object; DELIVERABLE = one-time submission"
+        example: '"ISO 9001:2015 Certification", "Authority to Operate (ATO)"'
+
+      - number: 33
+        name: concept
+        title: "Named methodologies, frameworks, and abstract domain processes"
+        extraction_rule: |-
+          CONCEPT is NOT a catch-all. It captures NAMED methodologies
+             and abstract processes that don't fit the 32 types above. Before using CONCEPT,
+             verify the entity doesn't fit: WORK_SCOPE_ITEM (task/deliverable scope),
+             REQUIREMENT (obligation), PERFORMANCE_STANDARD (threshold/SLA), TECHNOLOGY
+             (software/platform), REGULATORY_REFERENCE (external standard), or
+             TECHNICAL_SPECIFICATION (engineering authority).
+        valid_examples:
+          - '"Earned Value Management" (methodology, not a requirement or standard)'
+          - '"Risk Management Framework" (abstract process, not a regulation like NIST SP 800-37)'
+          - '"Condition-Based Maintenance" (approach, not a specific work task)'
+          - '"Lean Six Sigma" (methodology, not a technology or specification)'
+          - '"Agile Development Methodology" (approach, not a software platform)'
+        invalid_examples:
+          - '"Contractor shall implement EVM" → REQUIREMENT (obligation verb = requirement)'
+          - '"NIST SP 800-37 RMF" → REGULATORY_REFERENCE (external standard)'
+          - '"ServiceNow ITSM Platform" → TECHNOLOGY (software)'
+          - '"Task 3.2 Network Monitoring" → WORK_SCOPE_ITEM (scoped task)'
+          - '"99.9% system uptime" → PERFORMANCE_STANDARD (measurable threshold)'
+          - '"Monthly Status Report" → DELIVERABLE (submission artifact)'
+        government_obligation_pattern: '"Government shall provide..." → CONCEPT (NOT a contractor requirement)'
+        content_signals:
+          - "Named processes"
+          - '"-ology"/"-ment" suffixes'
+          - '"approach"'
+          - '"methodology"'
+          - '"framework"'
+          - '"process"'
+          - '"model"'
+          - '"strategy" (when describing HOW, not WHAT)'
+        example: '"Earned Value Management", "Condition-Based Maintenance Plus (CBM+)"'
+
+# -----------------------------------------------------------------------------
+# DISAMBIGUATION RULES
+# -----------------------------------------------------------------------------
+disambiguation_rules:
+
+  - title: "REQUIREMENT vs WORKLOAD_METRIC"
+    body: |-
+        "Contractor shall process repairs" → requirement (obligation)
+        "500 repairs/month" → workload_metric (quantitative driver)
+        Both often appear together — extract BOTH and link with QUANTIFIES
+
+  - title: "REQUIREMENT vs PERFORMANCE_STANDARD"
+    body: |-
+        "Contractor shall maintain aircraft" → requirement (what to do)
+        "98% aircraft availability measured monthly" → performance_standard (pass/fail)
+        Extract BOTH, link: performance_standard --MEASURES--> requirement
+
+  - title: "WORK_SCOPE_ITEM vs REQUIREMENT"
+    body: |-
+         "Task 3.2 Network Operations Support" → work_scope_item (work package/title)
+         "Contractor shall monitor the network 24/7" → requirement (obligation)
+         Work scope item = semantic bucket of work; requirement = directive/action statement
+
+  - title: "PROPOSAL_VOLUME vs PROPOSAL_INSTRUCTION"
+    body: |-
+         "Volume I Technical" → proposal_volume
+         "Volume I shall not exceed 25 pages" → proposal_instruction
+         Volume = container; instruction = rule applied to the container
+
+  - title: "EVALUATION_FACTOR vs SUBFACTOR"
+    body: |-
+        "Factor 1 Technical Approach" (top-level) → evaluation_factor
+        "Subfactor 1.2 Staffing Approach" (child) → subfactor
+        Link: subfactor --CHILD_OF--> evaluation_factor
+
+  - title: "DOCUMENT_SECTION vs DOCUMENT"
+    body: |-
+         "Section C.3.2 Maintenance" → document_section
+         "Attachment J-3 Quality Assurance Plan" → document
+         Document section = heading-based subdivision; document = standalone attachment/exhibit/manual
+
+  - title: "DOCUMENT vs REGULATORY_REFERENCE"
+    body: |-
+        "Attachment J-3 QA Plan" (attached to RFP) → document
+        "DAFI 21-101" (external regulation cited) → regulatory_reference
+        "MIL-STD-882E" (external standard cited) → regulatory_reference
+        Rule: If it's attached/exhibited in the RFP → document. If cited by authority → regulatory_reference.
+
+  - title: "REGULATORY_REFERENCE vs TECHNICAL_SPECIFICATION"
+    body: |-
+         "NIST SP 800-171" → regulatory_reference
+         "MIL-DTL-38999" → technical_specification
+         Regulation = policy/standards authority; specification = engineering design authority
+
+  - title: "CONTRACT_LINE_ITEM vs DELIVERABLE"
+    body: |-
+        "CLIN 0001 Base Year Operations" → contract_line_item (priced line)
+        "CDRL A001 Monthly Status Report" → deliverable (work product)
+        CLINs are pricing structures; deliverables are work products
+
+  - title: "GOVERNMENT_FURNISHED_ITEM vs EQUIPMENT"
+    body: |-
+         "Government Furnished Vehicles" → government_furnished_item
+         "Forklift Model XYZ" → equipment
+         GFI is about ownership/responsibility; equipment is generic physical asset
+
+  - title: "LABOR_CATEGORY vs WORKLOAD_METRIC"
+    body: |-
+        "Program Manager" (named role) → labor_category
+        "2,400 labor hours/month" (workload volume) → workload_metric
+        If RFP names specific positions → labor_category. If only quantities → workload_metric.
+
+  - title: "STRATEGIC_THEME vs CUSTOMER_PRIORITY vs PAIN_POINT"
+    body: |-
+         "Technical Approach is significantly more important than Cost" → customer_priority (EXPLICIT weighting)
+         "Mission readiness is the highest priority" → customer_priority (EXPLICIT statement)
+         "Contractors without cleared personnel may face access delays" → strategic_theme (INFERRED ghost language → discriminator opportunity)
+         "Integrated logistics approach reduces transition risk" → strategic_theme (INFERRED win theme)
+         "Current readiness shortfalls delay sortie generation" → pain_point (problem statement)
+         *** KEY RULE: If the CUSTOMER says it → customer_priority. If the PROPOSER infers it → strategic_theme. ***
+
+# -----------------------------------------------------------------------------
+# FORBIDDEN TYPES (NEVER USE)
+# -----------------------------------------------------------------------------
+forbidden_types:
+  - other
+  - UNKNOWN
+  - process
+  - table
+  - image
+  - plan
+  - policy
+  - standard
+  - instruction
+  - system
+  - regulation
+  - framework
+  - objective
+  - methodology
+  - approach
+  - strategy
+  - model
+
+# -----------------------------------------------------------------------------
+# FALLBACK MAPPING (LLM hygiene — coerce forbidden labels to canonical types)
+# -----------------------------------------------------------------------------
+fallback_mapping:
+  - {from: "Plans/Policies/Manuals",                                 to: "document"}
+  - {from: "Systems/Tools/Software/Platforms",                       to: "technology"}
+  - {from: "Tables/Lists/Schedules",                                 to: "document (if data table) or concept (if named methodology)"}
+  - {from: "Named Processes/Methodologies/Frameworks",               to: "concept (only if not a regulation, technology, or work task)"}
+  - {from: "Amendments/Revisions/Mods",                              to: "amendment"}
+  - {from: "MIL-STD/DAFI/AR/NIST references",                        to: "regulatory_reference"}
+  - {from: "MIL-DTL/MIL-PRF/ICD/TDP/drawings",                       to: "technical_specification"}
+  - {from: "CLINs/SLINs/Line Items",                                 to: "contract_line_item"}
+  - {from: "QASP/SLA/AQL/threshold entries",                         to: "performance_standard"}
+  - {from: "Numbered volumes/quantities/rates",                      to: "workload_metric"}
+  - {from: "Volume I/II/III containers",                             to: "proposal_volume"}
+  - {from: "Page limits/font/margin/submission rules",               to: "proposal_instruction"}
+  - {from: "GFE/GFP/GFI/GOTS",                                       to: "government_furnished_item"}
+  - {from: "Certification/ATO/accreditation",                        to: "compliance_artifact"}
+
+# -----------------------------------------------------------------------------
+# EXAMPLE CLASSIFICATIONS (canonical input → type → why-not-other-type)
+# -----------------------------------------------------------------------------
+example_classifications:
+  - {input: "CLIN 0001 Base Year",                       type: contract_line_item,    note: "NOT 'concept'"}
+  - {input: "SLIN 0002AA Option Year 1",                 type: contract_line_item,    note: "NOT 'concept'"}
+  - {input: "12,500 sorties/year",                       type: workload_metric,       note: "NOT 'concept'"}
+  - {input: "1,600 customers daily",                     type: workload_metric,       note: "NOT 'concept'"}
+  - {input: "100 events per year",                       type: workload_metric,       note: "NOT 'concept'"}
+  - {input: "Program Manager",                           type: labor_category,        note: "in labor table; NOT 'person'"}
+  - {input: "Systems Engineer Level III",                type: labor_category,        note: "NOT 'person'"}
+  - {input: "QASP Standard 3 Aircraft Availability",     type: performance_standard,  note: "NOT 'concept'"}
+  - {input: "Subfactor 1.2 Staffing Approach",           type: subfactor,             note: "NOT 'evaluation_factor'"}
+  - {input: "DAFI 21-101",                               type: regulatory_reference,  note: "NOT 'document'"}
+  - {input: "NIST SP 800-171",                           type: regulatory_reference,  note: "NOT 'document'"}
+  - {input: "MIL-STD-882E",                              type: regulatory_reference,  note: "NOT 'document'"}
+  - {input: "MIL-DTL-38999",                             type: technical_specification, note: "NOT 'regulatory_reference'"}
+  - {input: "Volume I Technical",                        type: proposal_volume,       note: "NOT 'proposal_instruction'"}
+  - {input: "Technical Volume limited to 25 pages",      type: proposal_instruction,  note: "NOT 'proposal_volume'"}
+  - {input: "Amendment 0003",                            type: amendment,             note: "NOT 'document'"}
+  - {input: "Safety Plan",                               type: document,              note: "NOT 'plan'"}
+  - {input: "Quality Assurance Plan",                    type: document,              note: "NOT 'plan'"}
+  - {input: "WAWF System",                               type: technology,            note: "NOT 'system'"}
+  - {input: "RFID System",                               type: technology,            note: "NOT 'system'"}
+  - {input: "Change Control Process",                    type: concept,               note: "named methodology, NOT 'process'"}
+  - {input: "Earned Value Management",                   type: concept,               note: "named methodology, NOT 'requirement'"}
+  - {input: "MCPP Program",                              type: program,               note: "named initiative"}
+  - {input: "M1A1 Tank",                                 type: equipment,             note: "physical asset"}
