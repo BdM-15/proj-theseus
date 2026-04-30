@@ -540,48 +540,70 @@ async def initialize_raganything():
     # ═══════════════════════════════════════════════════════════════════════════════
     # SHIM: RAGAnything 1.2.10 ↔ LightRAG 1.5.0 `role_llm_funcs` incompatibility
     # ═══════════════════════════════════════════════════════════════════════════════
-    # BaseModalProcessor.__init__ snapshots `self.global_config = asdict(lightrag)`
-    # (raganything/modalprocessors.py ~line 389). asdict() only walks dataclass
-    # fields, but LightRAG 1.5.0 exposes `role_llm_funcs` as a @property backed
-    # by the private `_role_llm_states` map (lightrag.py:934) — so the snapshot
-    # silently drops it.
+    # LightRAG 1.5.0 exposes `role_llm_funcs` as a @property (lightrag.py:934)
+    # backed by the private `_role_llm_states` map — it is NOT a dataclass field
+    # and therefore NOT in `lightrag.__dict__`.
     #
-    # When the modal pipeline later calls `extract_entities(global_config=...)`,
-    # operate.py:3287 does `global_config["role_llm_funcs"]["extract"]` and
-    # raises KeyError → RAGAnything catches it and silently falls back to a bare
-    # `{entity_type: "table"}` placeholder, killing all govcon decomposition of
-    # tables/images/equations.
+    # RAGAnything 1.2.10's multimodal pipeline reads global_config in two
+    # orthogonal ways, BOTH of which miss the property:
     #
-    # Reproduced under v1.2.10 + LightRAG 1.5.0 with 73 `Error processing table
-    # content: 'role_llm_funcs'` failures in afcap5_adab_iss_t1. Confirmed
-    # upstream `main` (post v1.2.10) still uses `asdict(lightrag)` — no PR in
-    # flight as of 2026-04-30. See proj-theseus issue #118 (orthogonal — table
-    # boilerplate dominates retrieval even when this works).
+    #   (a) BaseModalProcessor.__init__ snapshots `self.global_config =
+    #       asdict(lightrag)` (modalprocessors.py:389) — asdict() only walks
+    #       dataclass fields, drops the property.
     #
-    # Fix: replace each modal processor's snapshot with LightRAG's own
-    # `_build_global_config()` output, which populates role_llm_funcs from the
-    # live `_role_llm_states` map (lightrag.py:1474). Remove this block once
-    # raganything releases an LR-1.5-aware version.
+    #   (b) processor.py lines 750, 1257, 1354 pass `self.lightrag.__dict__`
+    #       directly to `extract_entities(...)` and `merge_nodes_and_edges(...)`,
+    #       bypassing the snapshot entirely. `__dict__` is the raw instance
+    #       dict and does NOT trigger property descriptors.
+    #
+    # The actual extract_entities call site for multimodal chunks is path (b),
+    # so patching processor.global_config (path a) accomplishes nothing — we
+    # confirmed this with a fresh _t2 reprocess after committing 5697f7e: the
+    # 'role_llm_funcs' KeyError still fired identically.
+    #
+    # Real fix: inject role_llm_funcs INTO `lightrag.__dict__` directly. Direct
+    # dict-key reads (`d["role_llm_funcs"]`) read the dict, not the descriptor,
+    # so the injected entry wins. Normal attribute access (`lightrag.role_llm_funcs`)
+    # still goes through the property because data-descriptor lookup precedes
+    # instance dict — so we don't break LightRAG's own internals.
+    #
+    # Confirmed upstream `main` (post v1.2.10) still uses `asdict(lightrag)` and
+    # `self.lightrag.__dict__` — no PR in flight as of 2026-04-30. Remove this
+    # block once raganything releases an LR-1.5-aware version. See proj-theseus
+    # issue #118 (orthogonal — table boilerplate dominates retrieval).
     # ═══════════════════════════════════════════════════════════════════════════════
-    _build_gc = getattr(_rag_anything.lightrag, "_build_global_config", None)
-    _live_role_funcs = getattr(_rag_anything.lightrag, "role_llm_funcs", None)
+    _lr = _rag_anything.lightrag
+    _build_gc = getattr(_lr, "_build_global_config", None)
+    _live_role_funcs = getattr(_lr, "role_llm_funcs", None)
     if callable(_build_gc) and _live_role_funcs:
-        _patched = 0
-        for _modal_kind, _modal_proc in _rag_anything.modal_processors.items():
-            try:
-                _modal_proc.global_config = _build_gc()
-                _patched += 1
-            except Exception as _shim_err:  # pragma: no cover - defensive
-                logger.warning(
-                    "⚠️ role_llm_funcs shim failed for modal processor '%s': %s",
-                    _modal_kind, _shim_err,
-                )
-        logger.info(
-            "✅ Shim applied: rebuilt global_config for %d modal processors via "
-            "lightrag._build_global_config() (workaround for raganything 1.2.10 ↔ "
-            "lightrag 1.5.0 asdict() snapshot bug; role_llm_funcs roles=%s)",
-            _patched, sorted(_live_role_funcs.keys()),
-        )
+        try:
+            _full_gc = _build_gc()
+            # (1) Inject directly into lightrag.__dict__ so processor.py's
+            #     `self.lightrag.__dict__["role_llm_funcs"]` lookups succeed.
+            _lr.__dict__["role_llm_funcs"] = _full_gc.get("role_llm_funcs", {})
+            # (2) Also refresh each modal processor's snapshot for completeness
+            #     (covers any future code path that reads processor.global_config).
+            _patched = 0
+            for _modal_kind, _modal_proc in _rag_anything.modal_processors.items():
+                try:
+                    _modal_proc.global_config = _full_gc
+                    _patched += 1
+                except Exception as _shim_err:  # pragma: no cover - defensive
+                    logger.warning(
+                        "⚠️ role_llm_funcs shim failed for modal processor '%s': %s",
+                        _modal_kind, _shim_err,
+                    )
+            logger.info(
+                "✅ Shim applied: injected role_llm_funcs into lightrag.__dict__ "
+                "(roles=%s) AND rebuilt global_config for %d modal processors "
+                "(workaround for raganything 1.2.10 ↔ lightrag 1.5.0 property/asdict bug)",
+                sorted(_live_role_funcs.keys()), _patched,
+            )
+        except Exception as _shim_err:
+            logger.error(
+                "❌ role_llm_funcs shim failed: %s — multimodal extraction will fall "
+                "back to bare table/image/equation placeholders", _shim_err,
+            )
     else:
         logger.warning(
             "⚠️ Cannot apply role_llm_funcs shim: _build_global_config callable=%s, "
@@ -681,6 +703,10 @@ async def initialize_raganything():
                 
                 # Map RAG-Anything statuses to valid LightRAG statuses
                 if status_value == 'handling':
+                    filtered_doc_data['status'] = DocStatus.PROCESSING.value
+                elif status_value == 'parsing':
+                    # RAG-Anything 1.2.10+ emits 'parsing' during MinerU parse phase.
+                    # Semantically equivalent to PROCESSING for LightRAG's doc_status FSM.
                     filtered_doc_data['status'] = DocStatus.PROCESSING.value
                 elif status_value == 'ready':
                     filtered_doc_data['status'] = DocStatus.PENDING.value

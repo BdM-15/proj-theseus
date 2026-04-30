@@ -957,12 +957,16 @@ def _validate_prompts():
             f"Expected at least {MIN_EXPECTED_CHARS:,} chars. Check govcon_lightrag_native.txt."
         )
     
-    # Validate critical sections are present
+    # Validate critical sections are present.
+    # Note: Part D is no longer a literal section in the .txt template — it is rendered
+    # at runtime from prompts/extraction/govcon_entity_types.yaml via the
+    # `{entity_types_guidance}` placeholder (Phase 1.1c of epic #124). We verify the
+    # placeholder exists instead of looking for the rendered header.
     required_sections = [
         "PART A: ROLE DEFINITION",
         "PART B: QUANTITATIVE DETAIL PRESERVATION",
         "PART C: CRITICAL DISTINCTIONS",
-        "PART D: THE 33 ENTITY TYPES",
+        "{entity_types_guidance}",  # Part D placeholder — rendered from YAML at init time
         "PART E: COMMON SOLICITATION STRUCTURE PATTERNS",
         "PART F: RELATIONSHIP PATTERNS",
         "PART K: ANNOTATED RFP EXAMPLES",
