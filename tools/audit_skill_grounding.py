@@ -238,7 +238,11 @@ COVER_NOTE_EXEMPT_RE = re.compile(
         # Skill self-attestation about process completion (broadened noun list)
         ([-*]\s+)?(All|Every|Each|No)\s+(\d+\s+)?.{0,80}?\b(executed|cited|grounded|sourced|covered|completed|anchored|invented|fabricated|hallucinated|quoted\s+verbatim|traces?\s+to|written|saved|persisted|emitted)\b.* |
         # Artifact-written self-attestation: "The PWS Markdown artifact has been written to ..."
+        # Two shapes:
+        #   (a) "The PWS Markdown artifact has been written to ..."
+        #   (b) "The artifact `artifacts/foo.json` has been written ..."
         (The\s+)?[\w\s\-/]{2,60}?\s+(artifact|envelope|file|markdown|JSON|workbook|deck)s?\s+(has|have)\s+been\s+(written|saved|persisted|emitted|generated)\s+to\b.* |
+        (The\s+)?(artifact|envelope|file|markdown|JSON|workbook|deck)\s+`?[\w/.\-]{2,80}`?\s+(has|have)\s+been\s+(written|saved|persisted|emitted|generated)\b.* |
         # Conditional capability pointer: "Use the renderers skill if a .docx is needed."
         (Use|Run|Invoke|Call|Hand\s+off\s+to)\s+(?:the\s+)?`?[\w\-/]+`?\s+(?:skill|tool|script|MCP|agent|renderer|generator)\s+(?:if|when|to|for)\b.* |
         # JSON list-item leak from on-disk artifact's warnings/notes/findings array
@@ -259,6 +263,25 @@ COVER_NOTE_EXEMPT_RE = re.compile(
         # leading "**This table is chat-only." + trailing "...document or any appendix.**"
         \*\*[A-Z][^*\n]{2,80}\.\s*$ |
         [A-Z][^*\n]{2,200}\.\*\*\s*$ |
+        # KG-availability / data-gap meta-disclosure (oci-sweeper, competitive-intel):
+        # "No structured `incumbent`, `prior_contract`, ... entities were present in the KG"
+        ([-*]\s+)?(No|Few|Some|Limited|Sparse|Insufficient|Partial)\s+(structured\s+)?[`\w\s,\-/]{2,200}?\s+(were|was|are|is)\s+(present|found|available|surfaced|captured|extracted|located|emerged)\s+(in|from|across|by|via)\b.* |
+        # Negative-signal meta-disclosure: "No strong signals of X surfaced in the top chunks, so ..."
+        ([-*]\s+)?(No|Few|Limited|Sparse)\s+(strong\s+)?(signals?|evidence|references?|hits?|matches?|results?)\s+(of|for|on)\b.* |
+        # Methodology-fallback meta: "Analysis therefore relied on hybrid chunk retrieval ..."
+        ([-*]\s+)?(Analysis|Search|Retrieval|Lookup|Query)\s+(?:therefore\s+)?(?:thus\s+)?(?:then\s+)?(?:relied|defaulted|fell\s+back|reverted)\s+(?:on|to)\b.* |
+        # Warnings-array narrative: "Warnings note data gaps (e.g., ...)"
+        ([-*]\s+)?Warnings?\s+(note|flag|highlight|capture|reflect|record|surface)\b.* |
+        # Capture-team recommendation directive: "Capture lead should escalate the medium-risk finding ..."
+        ([-*]\s+)?(Capture(?:\s+(?:lead|team|manager))?|PM|Pricing\s+lead|Bid\s+lead|Proposal\s+manager|KO|CO|AO)\s+should\s+(escalate|review|address|coordinate|draft|finalize|verify|validate|approve|sign|consult|engage)\b.* |
+        # Conditional risk-reasoning leap (Class B): "If the KO confirms no non-public data crossed ..."
+        ([-*]\s+)?If\s+the\s+(KO|CO|AO|customer|government|agency|prime|sub|contractor|incumbent|partner)\s+(confirms?|accepts?|denies?|grants?|approves?|rejects?|agrees?|certifies?|attests?)\b.* |
+        # Next-step pointer: "Next step: Run proposal-generator to ..."
+        ([-*]\s+)?Next\s+step:?\s+(Run|Invoke|Call|Hand\s+off\s+to|Pass\s+to|Forward\s+to)\b.* |
+        # Captured-data observation: "The captured `X` and `Y` references reinforce ..."
+        ([-*]\s+)?(The\s+)?captured\s+`?[\w\s,\-/]{2,80}`?\s+(and\s+`?[\w\s,\-/]{2,80}`?\s+)?references?\s+(reinforce|confirm|support|suggest|imply)\b.* |
+        # Bold-bullet multi-count stat: "**Coverage:** 0 biased-ground-rules, **1 unequal-access**, 0 impaired-objectivity."
+        \*\*[\w\s/-]{2,40}:\*\*\s*\d+\s+[\w\-]+(?:,\s*(?:\*\*)?\d+\s+[\w\-]+(?:\*\*)?)+\s*\.?\s*$ |
         # Definition-list bullet headers like "- **PWS (not SOW)**: Locked."
         # The substantive claim should live in the next sentence, not the header.
         [-*]\s+\*\*[^*]{2,120}\*\*\s*[:.\-—].{0,40}$ |
@@ -331,7 +354,21 @@ STRUCTURED_FIELD_RE = re.compile(
         Recommended\s+\w+ |
         FAR\s+\d+\.\d+(?:-\d+)?\s+notes? |
         Acquisition\s+intake |
-        Performance\s+work\s+statement
+        Performance\s+work\s+statement |
+        Parties |
+        KO\s+question(?:\s+to\s+ask)? |
+        Question |
+        Recommendation |
+        Mitigation |
+        Coverage |
+        Risk\s+(?:class|level|score|profile) |
+        Verdict |
+        Black-?hat\s+(?:envelope|read|brief) |
+        Top\s+\d+\s+likely\s+competitors? |
+        Incumbent |
+        Competitors? |
+        Award\s+history |
+        Pricing\s+benchmarks?
     )\*?\*?\s*[:.\-—]""",
     re.IGNORECASE | re.VERBOSE,
 )
