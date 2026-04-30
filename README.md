@@ -2,7 +2,7 @@
 
 **Ontology-Based RAG for Federal RFP Capture & Proposal Intelligence**
 
-[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/BdM-15/proj-theseus)
+[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](https://github.com/BdM-15/proj-theseus)
 [![Python](https://img.shields.io/badge/python-3.13+-green.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
 
@@ -270,7 +270,7 @@ proj-theseus/
 └── theseus-skills/               # Organizational mirror / pointers (see docs/SKILLS.md)
 ```
 
-### Agent Skills + MCP Integration (v1.2.0)
+### Agent Skills + MCP Integration (v1.3.0)
 
 Project Theseus implements the open [Agent Skills specification](https://agentskills.io/specification) (Anthropic-originated; adopted by Claude Code, Cursor, Copilot, Junie, Roo Code, Goose, Amp). Skills live under `.github/skills/<name>/` and are **dual-use**: the same `SKILL.md` files are read by **GitHub Copilot / VS Code** when the repo is open AND by the in-app **Skills** page when invoked against an active workspace.
 
@@ -295,7 +295,9 @@ Project Theseus implements the open [Agent Skills specification](https://agentsk
 | `govcon-ontology`           | Authoritative reference for the 33-entity / 35-relationship schema        | —                                                             |
 | `skill-creator`             | Foundational meta-skill for authoring / refining / evaluating skills      | —                                                             |
 
-**Studio cross-skill artifact library** (`/ui` → Studio tab): single index of every deliverable produced by any skill across all runs. Filters by skill / format / free-text. Per-row actions: anchor pin (sticks to top, persisted to localStorage), inline preview (PDF / DOCX via Mammoth.js / XLSX via SheetJS / video / image / MD / JSON / CSV / TXT), "Why this artifact?" reasoning view (deterministic transcript-to-prose renderer over `transcript.json`), download, open originating run. JSON envelopes are parsed for `chunk-<hex>` ids and rendered as clickable chips that open the chunk-preview modal — closes the **artifact → chunk → entity** audit chain in two clicks.
+**Studio cross-skill artifact library** (`/ui` → Studio tab): single index of every deliverable produced by any skill across all runs. Filters by skill / format / free-text. Per-row actions: anchor pin (sticks to top, persisted to localStorage), inline preview (PDF / DOCX via Mammoth.js / XLSX via SheetJS / video / image / MD / JSON / CSV / TXT), "Why this artifact?" reasoning view (deterministic transcript-to-prose renderer over `transcript.json`), download, open originating run. JSON envelopes are parsed for `chunk-<hex>` ids and rendered as clickable chips that open the chunk-preview modal — closes the **artifact → chunk → entity** audit chain in two clicks. Studio is **read-only by design**: every artifact has full provenance via an audited `SkillManager.invoke(...)` run, so the namespace is append-only. User-uploaded inputs live in a separate (planned) Library lane (#123) to preserve the audit chain.
+
+**v1.3.0 — Skills E2E hardening epic** (`142`): added `tests/skills/e2e/` smoke harness; `tools/skill_grounding_audit.py` per-skill citation-discipline floor + `--enforce` mode; tightened `renderers` skill scope to DOCX + XLSX (delegating PPTX / PDF / motion to `huashu-design`); re-verified all in-house skills via `skill-creator`; consolidated artifact-mime resolution behind `resolve_artifact_mime()` helper (closed `.md` mime drift bug). 142 passing / 25 skipped in `tests/skills`. Historical roadmap archived at [docs/archive/skills_e2e/](docs/archive/skills_e2e/README.md).
 
 See [docs/SKILL_TAXONOMY.md](docs/SKILL_TAXONOMY.md) for the three-axis persona / phase / capability taxonomy and [docs/SKILL_SPEC_COMPLIANCE.md](docs/SKILL_SPEC_COMPLIANCE.md) for the open-spec audit + migration plan.
 
@@ -514,6 +516,6 @@ MIT License - See [LICENSE](LICENSE) for details.
 ---
 
 **Last Updated**: April 2026  
-**Version**: 1.2.0  
+**Version**: 1.3.0  
 **Status**: Production capture workbench — Neo4j storage, multimodal ingest, Shipley-mentor querying, 12 dual-use Agent Skills + 8 federal-data MCPs, Studio cross-skill artifact library  
 **Processing cost**: ~$2 per ~425-page RFP (xAI Grok + OpenAI embeddings)

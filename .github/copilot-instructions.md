@@ -341,7 +341,7 @@ ALL development happens on feature branches. `main` is updated only via fast-for
 
 **Active integration branches:**
 
-- _None._ The skills + MCP epic (Phases 2.x–6.x) merged to `main` as `v1.2.0`. New feature branches now branch from `main` directly. If a future multi-branch epic starts, list its integration branch here.
+- _None._ The skills + MCP epic (Phases 2.x–6.x) merged to `main` as `v1.2.0`; the skills E2E hardening epic (`142-skills-e2e-hardening`, sub-branches 143–148) merged to `main` as `v1.3.0`. New feature branches now branch from `main` directly. If a future multi-branch epic starts, list its integration branch here.
 
 **Standard fast-forward sequence** (after the user says "merge it" / "ship it" / "continue"):
 
