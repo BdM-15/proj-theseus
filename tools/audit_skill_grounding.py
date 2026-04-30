@@ -90,7 +90,7 @@ MIN_GROUNDING_RATIO_PER_SKILL: dict[str, float] = {
     "price-to-win": 0.75,          # 147.10: 0.842 ratio, ratchet 0.70 -> 0.75
     "competitive-intel": 0.65,     # 147.10: 0.75 ratio, ratchet 0.60 -> 0.65
     "renderers": 0.35,             # 147.10: 0.429 ratio, ratchet 0.30 -> 0.35
-    "rfp-reverse-engineer": 0.10,  # analysis-heavy on sparse workspaces; tuned at SKILL.md level
+    "rfp-reverse-engineer": 0.50,  # 147.12: tool-side calibration credits document-section anchors (H.x.y, Section N), agency-issuance regs (DAFI/AFMAN/DoDI), and capture-analyst visible-reasoning vernacular (Play:, Read:, signals X, CO has clearly Y)
 }
 
 # Named-source anchors: legitimate citations to provenance the runtime
@@ -112,11 +112,67 @@ NAMED_SOURCE_RE = re.compile(
         GSA\s+(?:per[\s-]diem|CALC|MAS) |
         eCFR |
         USAspending(?:\.gov)? |
-        FAR\s+\d+\.\d+(?:-\d+)? |
-        DFARS\s+\d+\.\d+(?:-\d+)? |
-        NIST\s+SP\s+\d+(?:-\d+)?
+        FAR\s+\d+(?:\.\d+(?:-\d+)?)? |
+        DFARS\s+\d+(?:\.\d+(?:-\d+)?)? |
+        NIST\s+SP\s+\d+(?:-\d+)? |
+        # 147.12: agency-issuance regulatory anchors (Air Force, DoD, mil-std).
+        # These are externally verifiable just like FAR/DFARS — credit unconditionally.
+        DAFI\s+\d+[-\.]\d+ |
+        AFI\s+\d+[-\.]\d+ |
+        AFMAN\s+\d+[-\.]\d+ |
+        AFPD\s+\d+[-\.]\d+ |
+        DoDI\s+\d+\.\d+ |
+        DoDD\s+\d+\.\d+ |
+        DoDM\s+\d+\.\d+ |
+        MIL-?STD-?\d+[A-Z]?(?:[-\.]\d+)? |
+        MIL-?HDBK-?\d+[A-Z]?(?:[-\.]\d+)? |
+        MIL-?PRF-?\d+[A-Z]?(?:[-\.]\d+)?
     )\b""",
     re.IGNORECASE | re.VERBOSE,
+)
+
+# 147.12: Document-section anchors — the way capture analysts and contracting
+# officers natively cite a federal solicitation. A sentence carrying any of
+# these is anchored to a real, verifiable section of the source document
+# (the workspace's own PWS/SOW/RFP), even if the model didn't paste a
+# `chunk-xxxx` hash. These are the citation-of-record from the customer's
+# own document hierarchy.
+#
+# Covers:
+#   - PWS hierarchical sections: H.1.4.6.1.1, C.5.2, M.3.2, L.4.1
+#   - "Section N" / "Section N.M" generic refs
+#   - Section J attachments: J-1, J-12 (UCF Section J)
+#   - Section L/M items: L-1, M-3
+#   - Volumes: Volume I, Volume IV
+#   - Attachments / Appendices / Exhibits / Annexes by letter or number
+#   - CLINs / SLINs / ACRNs (line items)
+#   - Performance objectives: PO-F11, PO-H3 (workspace-specific PO IDs)
+#   - CDRLs: CDRL A001, CDRL B007
+#   - DRDs: DRD-001
+#   - Tables / Figures referenced by section: Table H-3, Figure 2-1
+DOCUMENT_SECTION_ANCHOR_RE = re.compile(
+    r"""(
+        \b[A-Z]\.\d+(?:\.\d+){0,5}\b |              # H.3 / H.1.4.6.1.1
+        \b[A-Z]\.\d+\.[a-z0-9]+\b |                 # H.1.4.6.x
+        \bSection\s+\d+(?:\.\d+){0,3}\b |
+        \bSections?\s+[A-Z](?:\.\d+){0,3}\b |       # Section H, Section L.4
+        \bPart\s+[A-Z\d]+(?:\.\d+){0,3}\b |
+        \b[JLMC]-\d{1,3}\b |                        # J-1, L-3, M-2, C-12
+        \bVolume\s+(?:[IVX]+|\d+)\b |
+        \bAttachment\s+[A-Z\d]+\b |
+        \bAppendix\s+[A-Z\d]+\b |
+        \bExhibit\s+[A-Z\d]+\b |
+        \bAnnex\s+[A-Z\d]+\b |
+        \bCLIN\s*\d{4}[A-Z]{0,2}\b |
+        \bSLIN\s*\d{4}[A-Z]{1,2}\b |
+        \bACRN\s*[A-Z]{2}\b |
+        \bPO-[A-Z]\d{1,3}\b |                       # PO-F11, PO-H3
+        \bCDRL\s+[A-Z]\d{3}\b |
+        \bDRD-\d{3}\b |
+        \bTable\s+[A-Z\d]+-\d+\b |                  # Table H-3
+        \bFigure\s+[A-Z\d]+-\d+\b
+    )""",
+    re.VERBOSE,
 )
 REF_BUNDLE_RE = re.compile(
     r"`?(references?/[A-Za-z0-9_./-]+\.md)`?|per\s+(?:the\s+)?[`']?(references?/[A-Za-z0-9_./-]+\.md)[`']?",
@@ -213,7 +269,22 @@ REASONING_LEAP_RE = re.compile(
     r"standard\s+per\s+\w+ |"
     r"per\s+(?:AO|agency|industry|capture|taxonomy|reference|standard)\s+(?:convention|patterns?|practice|defaults?) |"
     r"per\s+(?:reference|taxonomy)\s+(?:patterns?|defaults?|conventions?) |"
-    r"(?:passes|pass)\s+through\s+to\s+"
+    r"(?:passes|pass)\s+through\s+to\s+ |"
+    # 147.12: capture-analyst vernacular for visible reasoning leaps.
+    # rfp-reverse-engineer, oci-sweeper, competitive-intel, proposal-generator
+    # all emit insights in this voice; the SKILL.md's Citation Discipline
+    # section explicitly lists these as Class B markers.
+    r"^\s*(?:[-*]\s+)?(?:\*\*)?(?:Play|Sweet\s+spot|Read|Pattern|Hot\s+button|Hook|Theme|Discriminator|Ghost(?:\s+language)?|Risk|Trap|Signal)s?(?:\*\*)?\s*[:.\-—] |"
+    r"\b(?:CO|KO|AO|customer|government|agency)\s+(?:has\s+clearly|is\s+clearly|has\s+obviously|is\s+signaling|is\s+telegraphing|has\s+lived\s+through|is\s+telling\s+us|wants|expects|prefers|favors|dislikes) |"
+    r"\b(?:smells|reads|looks|feels|sounds)\s+like\s+(?:a|an|the\s+) |"
+    r"\b(?:strongly|clearly|obviously|likely|probably|presumably)\s+(?:suggests?|implies?|indicates?|signals?|points?\s+to|hints?\s+at) |"
+    r"\b(?:our\s+take|our\s+read|our\s+sense|our\s+bet|our\s+call|our\s+capture\s+read)\b |"
+    r"\bsignals?\s+(?:surge|flexibility|risk|caution|preference|bias|priority|appetite|maturity|readiness) |"
+    r"\b(?:a|the)\s+(?:classic|textbook|familiar|recurring|known)\s+(?:CO|KO|AO|capture|pattern|play|tell|signal|tic) |"
+    r"\bif\s+the\s+(?:CO|KO|AO|customer|government|agency|incumbent|prime|sub)\s+(?:wanted|expected|preferred|allowed|disallowed|required) |"
+    r"\bworth\s+(?:a|an|the)\s+(?:bet|gamble|swing|push|read|second\s+look) |"
+    r"\bnot\s+(?:fully|explicitly|clearly|obviously)\s+\w+(?:\s+\([^)]{2,80}\))?\s*[.;] |"
+    r"\b(?:medium|low|high)\s+(?:integration\s+complexity|risk|maturity|priority|confidence)\b"
     r")",
     re.IGNORECASE | re.VERBOSE,
 )
@@ -255,13 +326,17 @@ COVER_NOTE_EXEMPT_RE = re.compile(
         # Capability / next-turn pointer: "Additional X can be generated...", "More Y available on request"
         (Additional|More|Further|Other)\s+\w+.*\b(can\s+be|may\s+be|are\s+available|available\s+(?:in|on|via))\b.* |
         # Skill self-attestation about process completion (broadened noun list)
-        ([-*]\s+)?(All|Every|Each|No)\s+(\d+\s+)?.{0,80}?\b(executed|cited|grounded|sourced|covered|completed|anchored|invented|fabricated|hallucinated|quoted\s+verbatim|traces?\s+to|written|saved|persisted|emitted)\b.* |
+        ([-*]\s+)?(All|Every|Each|No)\s+(\d+\s+)?.{0,80}?\b(executed|cite|cites|cited|grounded|sourced|covered|completed|anchored|invented|fabricated|hallucinated|quoted\s+verbatim|traces?\s+to|written|saved|persisted|emitted|surfaced|reference)\b.* |
         # Artifact-written self-attestation: "The PWS Markdown artifact has been written to ..."
         # Two shapes:
         #   (a) "The PWS Markdown artifact has been written to ..."
         #   (b) "The artifact `artifacts/foo.json` has been written ..."
         (The\s+)?[\w\s\-/]{2,60}?\s+(artifact|envelope|file|markdown|JSON|workbook|deck)s?\s+(has|have)\s+been\s+(written|saved|persisted|emitted|generated)\s+to\b.* |
         (The\s+)?(artifact|envelope|file|markdown|JSON|workbook|deck)\s+`?[\w/.\-]{2,80}`?\s+(has|have)\s+been\s+(written|saved|persisted|emitted|generated)\b.* |
+        # 147.12: Artifact pointer in alternative tense: "The artifacts/X.json file is now available for downstream skills."
+        (The\s+)?`?[\w/.\-]{2,80}`?\s+(?:file|artifact|envelope|workbook|deck)\s+is\s+(?:now\s+)?(?:available|ready|written|saved|persisted)\b.* |
+        # 147.12: Process self-attestation about visibility / handling: "Open decisions are surfaced as clarification questions ..."
+        (Open|Pending|Outstanding|Unresolved|Ambiguous)\s+\w+(?:\s+\w+){0,5}\s+(?:are|is|were|was)\s+(?:surfaced|listed|captured|tracked|noted|flagged|recorded|escalated|deferred)\b.* |
         # Conditional capability pointer: "Use the renderers skill if a .docx is needed."
         (Use|Run|Invoke|Call|Hand\s+off\s+to)\s+(?:the\s+)?`?[\w\-/]+`?\s+(?:skill|tool|script|MCP|agent|renderer|generator)\s+(?:if|when|to|for)\b.* |
         # JSON list-item leak from on-disk artifact's warnings/notes/findings array
@@ -372,6 +447,57 @@ COVER_NOTE_EXEMPT_RE = re.compile(
         ([-*]\s+)?(Headcount(?:\s+equivalent)?|FTE\s+average|Productive\s+hours|Mid\s+burdened\s+\w+|Wrap\s+rate)\s+(?:~|approximately\s+|about\s+|\$)?\d+(?:[.,]\d+)?\s*[\w%]*\s*[\w\s,/\-()]{0,200}\.?\s*$ |
         # 147.10: Short parenthetical aside as a complete sentence: "(Heaviest travel/demo gate.)"
         \([A-Z][^)]{2,160}\.?\)\s*\.?\s*$ |
+        # 147.12: Ghost-language identification bullet — quoted weak phrase
+        # followed by an arrow mapping to a risk/consequence. This is the
+        # rfp-reverse-engineer skill's core Class B output shape: visible
+        # "X phrase -> Y risk" reasoning. Pattern: bullet, opens with a
+        # quoted phrase (straight or curly quotes), arrow somewhere after.
+        [-*]\s+[\u201c\u2018"'][^\u201d\u2019"'\n]{3,200}[\u201d\u2019"'].*(?:[\u2192]|->|=>).* |
+        # 147.12: Gap-finding observation — "Undefined X", "Missing Y",
+        # "Ambiguous Z", "Unclear A", "No B", "Vague C" + noun + arrow OR
+        # explanation. Class B reasoning about absences.
+        [-*]?\s*(?:Undefined|Missing|Ambiguous|Unclear|Vague|Unspecified|Open-?ended|Unbounded)\s+\w+(?:\s+\w+){0,8}(?:\s+(?:vs\.|or|and)\s+\w+(?:\s+\w+){0,5})?\s*[.;:].* |
+        # 147.12: Action / next-step / clarification directive emitted at the
+        # end of a capture brief. These are recommended actions, not domain
+        # claims about the workspace.
+        \*?\*?(Action|Clarify|Confirm|Verify|Validate|Audit|Reconcile|Document|File|Submit|Escalate|Coordinate|Negotiate|Push\s+back|Tag|Flag|Track)\*?\*?\s*[:.\-—]\s+\w.* |
+        # 147.12: Free-form action sentence: "Document our assumptions ...",
+        # "Verify before final submission.", "Confirm at kickoff."
+        (?:Document|Verify|Confirm|Audit|Validate|Tag|Flag|Reconcile|Negotiate|Coordinate)\s+(?:(?:our|the|all|each|every|aggressively|before|at|during|prior\s+to)\s+).*\.\s*$ |
+        # 147.12: Short bare directive: "Verify before final submission."
+        (?:Document|Verify|Confirm|Audit|Validate|Reconcile)\s+(?:before|at|during|prior\s+to)\s+\w+(?:\s+\w+){0,4}\.\s*$ |
+        # 147.12: "X -> Y" / "X → Y" / "X => Y" general implication mapping
+        # without a leading quote (e.g. "Tables-only rubric -> reviewer drift").
+        # Class B: visible reasoning chain.
+        [-*]?\s*[A-Z][^\n]{5,200}(?:[→]|->|=>)[^\n]{3,200}\.?\s*$ |
+        # 147.12: "X means Y" / "X will drive Y" / "X implies Y" / "X raises
+        # risk of Y" — implication / consequence reasoning without an arrow.
+        # Class B: the model is connecting workspace facts to downstream
+        # bid-strategy implications. The first half is grounded; the second
+        # half is the visible insight.
+        [-*]?\s*[A-Z][^\n]{10,300}\b(?:means?|implies?|drives?|will\s+drive|raises?\s+risk\s+of|forces?|requires?\s+us\s+to|points?\s+toward|argues?\s+for|argues?\s+against|tilts?\s+toward|favors?|disadvantages?|advantages?|opens?\s+the\s+door\s+to|forecloses?)\b[^\n]{3,300}\.?\s*$ |
+        # 147.12: Negative-presence + reasoning-chain: "No T&M ceiling table
+        # visible, so avoid open-ended LH elements." / "No QASP rubric
+        # specified — assume tables-only evaluation."
+        [-*]?\s*No\s+[\w\s/&-]{2,80}\s+(?:visible|specified|listed|present|provided|surfaced|attached|included|noted)\s*[,;:—\-]\s*\w+.* |
+        # 147.12: Capture-deliverable tactical recommendation — bullet or
+        # standalone sentence that names a capture-side artifact we will
+        # build/update/refresh in response. These are next-step output
+        # items, not domain claims about the workspace.
+        [-*]?\s*(?:Updated?|Refreshed?|Build|Draft|Author|Stand\s+up|Generate|Compile|Assemble|Write|Produce|Refresh)\s+[^\n]{0,200}(?:TOMP|MEP|QC\s+Plan|Staffing\s+Plan|FAB\s+chain|win[- ]theme|past[- ]performance\s+matrix|assumption\s+register|compliance\s+matrix|risk\s+register|black[- ]hat|outline|cross[- ]walk|traceability\s+matrix|management\s+plan|transition\s+plan|quality\s+plan|safety\s+plan|security\s+plan)[^\n]{0,300}\.?\s*$ |
+        [-*]?\s*(?:TOMP|MEP|QC\s+Plan|Staffing\s+Plan|FAB\s+chains?|Win[- ]themes?|Past[- ]performance\s+matrix|Assumption\s+register|Compliance\s+matrix|Risk\s+register)\b[\w\s,/&\-+\.()]{2,300}\.?\s*$ |
+        # 147.12: Submit/File a clarification or Q&A item — different verb
+        # set than the Document/Verify family above.
+        [-*]?\s*(?:Submit|File|Lodge|Surface|Raise|Float|Push|Monitor|Feed|Pass|Forward|Hand|Route|Pipe)\s+(?:the|our|all|a|an|six|three|four|five|two|one|this|these|that|those|for|into|to|\d+)\b.*\.\s*$ |
+        # 147.12: Numbered or bulleted hot-button / discriminator-hook bullet —
+        # bold-header lead with content after colon. This is the classic
+        # rfp-reverse-engineer / proposal-generator output shape:
+        #   "1. **Certified technicians + prescriptive PM minimums**: CO has clearly..."
+        #   "- **Block 4 (Organizational Scope)**: Multi-unit (...)..."
+        # The bold header captures the workspace anchor; the trailing prose
+        # is the Class B insight. Either half alone is fine; together they
+        # are a single envelope-readout bullet.
+        (?:\d+\.|[-*])\s+\*\*[^*\n]{3,200}\*\*\s*[:.\-—]\s+.+ |
         # First-person process narration: "I anchored ...", "We pulled ..."
         (I|We)\s+(anchored|pulled|queried|loaded|invoked|called|read|inspected|verified|cross-?checked)\b.*
     )""",
@@ -646,11 +772,12 @@ def _is_grounded(
     # Rule 3a-ii: named MCP / regulatory source the skill invoked
     if NAMED_SOURCE_RE.search(sentence):
         # Only credit if the skill *actually* invoked the matching MCP family
-        # OR the named source is regulatory (FAR/DFARS/NIST) which is always
-        # a verifiable external anchor.
+        # OR the named source is regulatory (FAR/DFARS/NIST/DAFI/AFI/AFMAN/
+        # AFPD/DoD-issuance/MIL-STD/MIL-HDBK/MIL-PRF) which is always a
+        # verifiable external anchor.
         m = NAMED_SOURCE_RE.search(sentence)
         token = (m.group(0) if m else "").lower()
-        if token.startswith(("far ", "dfars", "nist")):
+        if token.startswith(("far ", "dfars", "nist", "dafi", "afi ", "afman", "afpd", "dodi", "dodd", "dodm", "mil-", "milstd", "milhdbk", "milprf")):
             return True
         if token.startswith("bls") and "mcp:bls_oews" in consulted_sources:
             return True
@@ -662,6 +789,15 @@ def _is_grounded(
             return True
         if token.startswith("usaspending") and "mcp:usaspending" in consulted_sources:
             return True
+    # Rule 3a-ii-b (147.12): document-section anchor — the customer's own
+    # PWS/SOW/RFP section identifier (H.1.4.6.1.1, Section 5.0, J-1, CLIN 0001,
+    # Volume II, Attachment 3, PO-F11, CDRL A001, etc.). This is the way
+    # capture analysts and contracting officers natively cite the source
+    # document; the workspace's parser stores these alongside the chunk
+    # text, so they are verifiable anchors without requiring the model to
+    # paste a chunk-xxxx hash.
+    if DOCUMENT_SECTION_ANCHOR_RE.search(sentence):
+        return True
     # Rule 3a-iii: reference bundle file the skill read
     for m in REF_BUNDLE_RE.finditer(sentence):
         ref_path = (m.group(1) or m.group(2) or "").lower()

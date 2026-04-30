@@ -10,7 +10,7 @@ metadata:
   capability: analyze
   runtime: tools
   category: capture_intelligence
-  version: 0.4.0
+  version: 0.5.0
   status: active
   # Phase 4h: pure KG + reasoning skill. No MCPs declared (closed-by-default).
 ---
@@ -65,18 +65,18 @@ Any sentence that asserts what the RFP says, what the CO chose, what the KG cont
 
 Class A examples that the audit currently flags as unsourced — fix them like this:
 
-| Bad (flat assertion)                                                                                  | Good (anchored)                                                                                                                                                                |
-| ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| "FFP Task Order under AFCAP V IDIQ."                                                                  | "FFP Task Order under AFCAP V IDIQ [chunk-3a2f]."                                                                                                                              |
+| Bad (flat assertion)                                                                                 | Good (anchored)                                                                                                                                                                |
+| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| "FFP Task Order under AFCAP V IDIQ."                                                                 | "FFP Task Order under AFCAP V IDIQ [chunk-3a2f]."                                                                                                                              |
 | "Attachment 1 uses AQL-style thresholds (95% operational equipment, zero discrepancies on escorts)." | "Attachment 1 uses AQL-style thresholds (95% operational equipment, zero discrepancies on escorts) [chunk-7b91, chunk-7b92]."                                                  |
-| "Active KG contains ~400 entities heavy on `requirement` and `performance_standard`."                 | "Active KG slice (per the `kg_entities` call above) contains ~400 entities heavy on `requirement` and `performance_standard`."                                                 |
-| "Block 1 (Mission/Service Model): Locked on single-site OCONUS ISS at ADAB/380 ECES."                 | "Block 1 (Mission/Service Model): Locked on single-site OCONUS ISS at ADAB/380 ECES [chunk-1c44] — see `decision_tree_reconstruction.block_1` in the JSON for full citations." |
+| "Active KG contains ~400 entities heavy on `requirement` and `performance_standard`."                | "Active KG slice (per the `kg_entities` call above) contains ~400 entities heavy on `requirement` and `performance_standard`."                                                 |
+| "Block 1 (Mission/Service Model): Locked on single-site OCONUS ISS at ADAB/380 ECES."                | "Block 1 (Mission/Service Model): Locked on single-site OCONUS ISS at ADAB/380 ECES [chunk-1c44] — see `decision_tree_reconstruction.block_1` in the JSON for full citations." |
 
 For the narrative, when you're summarizing a JSON section that already carries N citations, you may write `[see decision_tree.block_1 source_chunk_ids]` instead of repeating 6 chunk ids inline.
 
 ### Class B — Reasoning leaps (DO NOT strip; frame visibly)
 
-Your judgment about what a signal *means* for our capture posture, the proposal team's playbook, capture-side patterns, or what is "likely" to come next. These are not facts in the RFP — they're you reasoning on top of the facts.
+Your judgment about what a signal _means_ for our capture posture, the proposal team's playbook, capture-side patterns, or what is "likely" to come next. These are not facts in the RFP — they're you reasoning on top of the facts.
 
 **Rule:** Do not strip these. Frame them with a visible-judgment marker so a reader (and the audit) can tell it's a reasoning leap, not an unsourced fact:
 
@@ -258,28 +258,29 @@ Write to `{run_dir}/artifacts/rfp_reverse_engineering.json` via `write_file`.
 
 **⚠️ Steps 10–12 below are REQUIRED.** The JSON envelope is for the downstream `proposal-generator` skill. The capture team also needs the human-readable narrative — do not stop the run after `write_file`.
 
-### 10. Load the narrative template (mandatory tool call)
+### 10. (Optional) Load the bullet template
 
-Before writing any narrative, call `read_file({"path": "references/narrative_template.md"})`. The template is a strict bullet skeleton you will fill in literally in step 11. **Do not skip this tool call** and do not write the narrative from memory of the SKILL.md examples — the template has the exact bullet forms and the self-audit regex you need.
+If you find yourself reaching for paragraph prose or losing track of which bullets carry anchors, optionally call `read_file({"path": "references/narrative_template.md"})` for a strict bullet skeleton you can fill in literally. The template is a low-degree-of-freedom fallback for runs where the model is drifting toward unsourced paragraph synthesis. **It is no longer mandatory** — a senior capture analyst writes naturally in their own voice with citation discipline; the template exists as a guardrail, not a cage.
 
-### 11. Render the narrative from the template
+### 11. Render the narrative in your natural capture-analyst voice
 
-Output the narrative by filling the bullet skeleton from `references/narrative_template.md` literally. Substitute `<placeholders>` with values from the JSON envelope you wrote in step 9. Every bullet is one of two forms only:
+Write the brief the way a senior capture lead would — short paragraphs and bullets are both fine, mix them as the material demands. The discipline is **citation, not format**:
 
-- **Class A bullet** (factual): ends with `[see <jsonpath>.source_chunk_ids]` (cheapest — the JSON envelope on disk is the citation), `[chunk-xxxx]`, `[entity: <Name>]`, or `[per references/<file>.md]`.
-- **Class B bullet** (judgment): begins with one of the visible-judgment markers — `**Our read:**`, `**In our capture experience,**`, `**Likely …**`, `**Classic … pattern —**`, `**Rule of thumb:**`.
+- **Class A** (factual lift from the workspace): cite the source. Acceptable anchors are `[chunk-xxxx]`, `[entity: <Name>]`, `[per references/<file>.md]`, `[see <jsonpath>.source_chunk_ids]`, **or** the natural document-section identifier the CO uses (`H.3`, `H.1.4.6.1.1`, `Section M.4`, `Attachment J-1`, `CDRL A001`, `FAR Part 45`, `DAFI 36-2903`, `MIL-STD-810H`). The audit credits any of these.
+- **Class B** (your judgment, capture vernacular): frame visibly. Acceptable openers are `Our read:`, `Play:`, `Sweet spot:`, `Hot button:`, `Hook:`, `Theme:`, `Discriminator:`, `Ghost:`, `Risk:`, `Trap:`, `Signal:`, `Pattern:`, `Read:`, `In our capture experience…`, `Likely the CO will…`, `Classic … pattern —`, `Rule of thumb:`. Or the equivalent embedded mid-sentence: `the CO has clearly …`, `signals X`, `smells like a Y`, `worth a bet`, `means our price-to-win must …`, `will drive Z strategy`, `raises risk of W`.
 
-**No paragraph prose.** **No preamble.** **No "Workspace Context" intro paragraph.** The template begins with `# RFP Reverse-Engineering Brief — <solicitation_id>` — start there. Why the strict bullet form: paragraph prose has too many degrees of freedom and the model reliably drops anchors mid-paragraph. Bullets force one claim per line, one anchor per claim, mechanical compliance. The brief stays just as readable for a human capture lead.
-
-If you cannot honestly anchor a bullet to the JSON envelope **and** cannot honestly frame it as a Class B judgment, drop the bullet. A shorter brief is fine; a brief with unsourced facts is not.
+**Do not** dress up Class A facts in Class B language to dodge the audit — it's transparent and it produces a worse brief. **Do not** invent citations. If a bullet has neither a workspace anchor nor a visible-judgment marker and is not actually a recommended action / capture-deliverable handoff (e.g. "Update the win-theme spine," "Submit the six clarification questions"), drop it. A shorter brief is fine.
 
 ### 12. Self-audit before returning
 
-Apply the regex check from `references/narrative_template.md` ("Self-audit regex" section) mentally to every bullet:
+Mentally walk every paragraph and bullet:
 
-1. Each line beginning `- ` MUST either end with `]` (anchor tag) OR begin with `- **Our read:**`, `- **In our capture experience,**`, `- **Likely`, `- **Classic`, or `- **Rule of thumb:**`.
-2. If a bullet fails: rewrite to add the anchor (look up the path in the JSON envelope you just wrote on disk), demote to a Class B bullet with a marker, or delete it. **Do not** invent chunk ids. **Do not** dress a Class A fact in Class B language to dodge the audit — it produces a worse brief.
-3. Headings (`#`, `##`) and code fences are exempt.
+1. Does it assert a fact about the workspace? It needs an anchor — chunk id, entity tag, document section identifier, or regulatory citation.
+2. Does it express your judgment / read / play / pattern recognition? It needs a visible-judgment marker so a reader (and the audit) can tell it's reasoning, not unsourced fact.
+3. Is it a recommended next-step action or capture-deliverable handoff? Phrase it that way (`Submit the …`, `Update the …`, `Feed this envelope into …`) — these are credited as cover-note actions, not domain claims.
+4. Headings (`#`, `##`) and code fences are exempt.
+
+If a line fits none of those four shapes, rewrite or drop it. **Do not** invent chunk ids. The grounding-ratio audit (`tools/audit_skill_grounding.py`) enforces ≥0.50 for this skill.
 
 ## What This Skill Does NOT Cover
 
@@ -292,7 +293,7 @@ Apply the regex check from `references/narrative_template.md` ("Self-audit regex
 
 ## References
 
-- [references/narrative_template.md](references/narrative_template.md) — Strict bullet skeleton for step 10 narrative output. Loaded only when the run reaches the narrative step. Lowers degree-of-freedom so anchor compliance is mechanical.
+- [references/narrative_template.md](references/narrative_template.md) — **Optional** strict bullet skeleton for the step-11 narrative. Use as a fallback when the run is drifting toward unsourced paragraph synthesis; not loaded by default in v0.5.0+.
 - [references/reverse_engineering_catalog.md](references/reverse_engineering_catalog.md) — Section A (3 intake-question backwards-inference table), Section B (6 scope-block reverse-walk patterns), Section C (Hot-Button Decoder).
 - [references/discriminator_hooks.md](references/discriminator_hooks.md) — Discriminator-hook pattern catalog: ghost preferences, "most highly rated" cues, past-performance unlock phrases, FAB-chain trigger language.
 - [references/rfp_signal_patterns.md](references/rfp_signal_patterns.md) — Section D (Ghost Language Catalog), missing-section signal table, contract-type detection patterns, security-tier escalation cues.
