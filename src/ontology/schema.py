@@ -3,6 +3,8 @@ from enum import Enum
 from pydantic import BaseModel, Field, model_validator, field_validator
 import logging
 
+from src.ontology.entity_catalog import get_default_catalog
+
 logger = logging.getLogger(__name__)
 
 # ==========================================
@@ -12,28 +14,22 @@ logger = logging.getLogger(__name__)
 CriticalityLevel = Literal["MANDATORY", "IMPORTANT", "OPTIONAL", "INFORMATIONAL"]
 RequirementType = Literal["FUNCTIONAL", "PERFORMANCE", "SECURITY", "TECHNICAL", "INTERFACE", "MANAGEMENT", "DESIGN", "QUALITY", "OTHER"]
 ThemeType = Literal["DISCRIMINATOR", "PROOF_POINT", "WIN_THEME"]
-EntityType = Literal[
-    "organization", "concept", "event", "technology", "person", "location",
-    "requirement", "clause", "document_section", "document", "deliverable",
-    "evaluation_factor", "proposal_instruction", "proposal_volume", "program", "equipment",
-    "strategic_theme", "work_scope_item", "contract_line_item", "workload_metric",
-    "labor_category", "subfactor", "regulatory_reference", "performance_standard",
-    "pricing_element", "government_furnished_item", "compliance_artifact",
-    "transition_activity", "technical_specification", "past_performance_reference",
-    "customer_priority", "pain_point", "amendment"
-]
 
-# Set for fast validation lookups (Branch 040 pattern)
-VALID_ENTITY_TYPES = {
-    "organization", "concept", "event", "technology", "person", "location",
-    "requirement", "clause", "document_section", "document", "deliverable",
-    "evaluation_factor", "proposal_instruction", "proposal_volume", "program", "equipment",
-    "strategic_theme", "work_scope_item", "contract_line_item", "workload_metric",
-    "labor_category", "subfactor", "regulatory_reference", "performance_standard",
-    "pricing_element", "government_furnished_item", "compliance_artifact",
-    "transition_activity", "technical_specification", "past_performance_reference",
-    "customer_priority", "pain_point", "amendment"
-}
+# ─────────────────────────────────────────────────────────────────────────────
+# VALID_ENTITY_TYPES — single source of truth: prompts/extraction/govcon_entity_types.yaml
+#
+# Phase 1.1c (#126) of epic #124. The catalog YAML is loaded once at import and
+# its `entity_type_names` set is exposed here as `VALID_ENTITY_TYPES`. The hard-
+# coded set (and parallel `EntityType = Literal[...]`) was removed because it
+# silently drifted from Part D in the past. Adding/removing a type now means
+# editing ONE file (the YAML) — `tests/ontology/test_entity_catalog_coherence.py`
+# guards parity at CI time.
+#
+# `EntityType` is preserved as a runtime str alias for typing convenience; static
+# Literal-narrowing of entity names is not used anywhere in the codebase.
+# ─────────────────────────────────────────────────────────────────────────────
+VALID_ENTITY_TYPES: frozenset[str] = get_default_catalog().entity_type_names
+EntityType = str  # runtime alias; values must satisfy `name in VALID_ENTITY_TYPES`
 
 # Valid relationship types - canonical set matching extraction prompt Part F.1/J
 # These are the ONLY valid values for the relationship_type / keywords field.

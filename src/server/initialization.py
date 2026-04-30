@@ -65,13 +65,12 @@ async def initialize_raganything():
     openai_api_key = settings.embedding_binding_api_key
     working_dir = global_args.working_dir
     
-    # Government contracting entity types - SINGLE SOURCE OF TRUTH from schema.py
-    # This ensures consistency between:
-    # - LightRAG/RAG-Anything extraction (this list)
-    # - Semantic post-processing validation (schema.py InferredRelationship)
-    # - Post-processing (schema.py VALID_ENTITY_TYPES)
-    entity_types = list(VALID_ENTITY_TYPES)
-    logger.info(f"📋 Loaded {len(entity_types)} entity types from schema.py")
+    # Government contracting entity types - SINGLE SOURCE OF TRUTH:
+    # `prompts/extraction/govcon_entity_types.yaml` (loaded by EntityCatalog).
+    # `VALID_ENTITY_TYPES` (re-exported from schema.py) is derived from that YAML;
+    # the rendered Part D markdown is injected into the extraction prompt below
+    # via `entity_types_guidance`.
+    logger.info(f"📋 Loaded {len(VALID_ENTITY_TYPES)} entity types from govcon_entity_types.yaml")
     
     # MinerU configuration from centralized settings
     parser = settings.parser
@@ -318,25 +317,19 @@ async def initialize_raganything():
     rerank_func = make_govcon_rerank_func()
 
     # ═══════════════════════════════════════════════════════════════════════════════
-    # entity_types_guidance — replaces legacy addon_params["entity_types"] list
+    # entity_types_guidance — rendered from prompts/extraction/govcon_entity_types.yaml
     # ═══════════════════════════════════════════════════════════════════════════════
     # LightRAG 1.5.0 dropped the `entity_types: list` shape (and hard-fails the
-    # ENTITY_TYPES env var). The substitution token is now `{entity_types_guidance}`,
-    # a single string injected into the extraction prompt.
+    # ENTITY_TYPES env var). The substitution token is `{entity_types_guidance}`,
+    # a single string injected into the extraction prompt at the PART D anchor.
     #
-    # Our `prompts/extraction/govcon_lightrag_native.txt` already contains Part D
-    # (the full 33-type catalog with metadata, signals, and disambiguation rules),
-    # so the guidance string is a one-line catalog summary that points at Part D
-    # for detail. This keeps the prompt coherent without duplicating Part D.
+    # Phase 1.1c (#126) of epic #124: the full Part D markdown is generated from
+    # the canonical YAML catalog (single source of truth shared with schema.py's
+    # `VALID_ENTITY_TYPES`). The inline Part D copy was deleted from
+    # `prompts/extraction/govcon_lightrag_native.txt` to eliminate drift risk.
     # ═══════════════════════════════════════════════════════════════════════════════
-    entity_types_guidance = (
-        "Use exactly one of these 33 government contracting entity types: "
-        + ", ".join(entity_types)
-        + ". See Part D (THE 33 ENTITY TYPES) above for detailed definitions, "
-        + "required metadata, content signals, and disambiguation rules. "
-        + "Forbidden generic types (other, plan, system, process, framework, etc.) "
-        + "are listed in the FALLBACK MAPPING section."
-    )
+    from src.ontology.entity_catalog import get_default_catalog
+    entity_types_guidance = get_default_catalog().render_part_d()
 
     # Build per-role LightRAG configs (1.5.0 native role dispatch).
     role_llm_configs = {

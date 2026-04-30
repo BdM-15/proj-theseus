@@ -56,22 +56,23 @@ This project has **three independent prompt systems** that MUST stay aligned. Ch
 
 **When modifying entity types, relationship types, or domain vocabulary, you MUST audit ALL of the following:**
 
-1. **Schema** (`src/ontology/schema.py`): `VALID_ENTITY_TYPES`, `VALID_RELATIONSHIP_TYPES`, Pydantic models
-2. **Extraction prompt** (`prompts/extraction/govcon_lightrag_native.txt`): Part D entity catalog, Part F relationship rules, Part J output format
-3. **Multimodal prompts** (`prompts/multimodal/govcon_multimodal_prompts.py`): System prompts, processing prompts, query prompts — must reference correct entity type names and canonical relationship types
-4. **Query/response prompts** (`prompts/govcon_prompt.py`): `rag_response`, `naive_rag_response` — Shipley mentor framework must reference current entity vocabulary
-5. **Inference prompts** (`prompts/relationship_inference/*.md`): Algorithm-specific prompts that reference entity/relationship types
-6. **Test fixtures** (`tools/test_query_prompt.py`, `tests/`): Signal detection patterns, expected entity types, relationship type assertions
-7. **VDB sync** (`src/inference/vdb_sync.py`): Normalization logic for relationship types
-8. **Skill taxonomy** (`docs/SKILL_TAXONOMY.md` + every `.github/skills/*/SKILL.md`): When the persona vocabulary in the extraction prompt's `USER PERSONAS YOU SUPPORT` block changes (add / remove / rename a persona), update `docs/SKILL_TAXONOMY.md` § "Persona Vocabulary" AND audit `metadata.personas_primary` / `metadata.personas_secondary` across every SKILL.md frontmatter. The persona ID set, the Shipley-phase set, and the capability-verb set are all closed vocabularies — `tests/skills/test_skill_taxonomy.py` will fail any drift.
+1. **Entity catalog YAML** (`prompts/extraction/govcon_entity_types.yaml`): single source of truth for the 33-type entity ontology. Updated by editing the YAML — schema's `VALID_ENTITY_TYPES` is derived from it at import time and the extraction prompt's Part D is rendered from it via `{entity_types_guidance}`. Run `pytest tests/ontology` to enforce parity.
+2. **Schema** (`src/ontology/schema.py`): `VALID_RELATIONSHIP_TYPES`, Pydantic models. (`VALID_ENTITY_TYPES` is auto-derived from the YAML in #1 — do not hand-edit.)
+3. **Extraction prompt** (`prompts/extraction/govcon_lightrag_native.txt`): Part F relationship rules, Part J output format. (Part D is now a `{entity_types_guidance}` placeholder rendered from the YAML — do not paste a static catalog back in.)
+4. **Multimodal prompts** (`prompts/multimodal/govcon_multimodal_prompts.py`): System prompts, processing prompts, query prompts — must reference correct entity type names and canonical relationship types
+5. **Query/response prompts** (`prompts/govcon_prompt.py`): `rag_response`, `naive_rag_response` — Shipley mentor framework must reference current entity vocabulary
+6. **Inference prompts** (`prompts/relationship_inference/*.md`): Algorithm-specific prompts that reference entity/relationship types
+7. **Test fixtures** (`tools/test_query_prompt.py`, `tests/`): Signal detection patterns, expected entity types, relationship type assertions
+8. **VDB sync** (`src/inference/vdb_sync.py`): Normalization logic for relationship types
+9. **Skill taxonomy** (`docs/SKILL_TAXONOMY.md` + every `.github/skills/*/SKILL.md`): When the persona vocabulary in the extraction prompt's `USER PERSONAS YOU SUPPORT` block changes (add / remove / rename a persona), update `docs/SKILL_TAXONOMY.md` § "Persona Vocabulary" AND audit `metadata.personas_primary` / `metadata.personas_secondary` across every SKILL.md frontmatter. The persona ID set, the Shipley-phase set, and the capability-verb set are all closed vocabularies — `tests/skills/test_skill_taxonomy.py` will fail any drift.
 
-**Rule: No PR that changes entity types, relationship types, Shipley methodology, or skill personas should be committed without confirming all 8 areas above are aligned.**
+**Rule: No PR that changes entity types, relationship types, Shipley methodology, or skill personas should be committed without confirming all 9 areas above are aligned.**
 
 ### Domain Vocabulary Reference
 
-- **33 entity types**: Defined in `src/ontology/schema.py` → `VALID_ENTITY_TYPES`
+- **33 entity types**: Defined in `prompts/extraction/govcon_entity_types.yaml` — re-exported as `src/ontology/schema.py` → `VALID_ENTITY_TYPES` and rendered into the extraction prompt as `{entity_types_guidance}`
 - **43 relationship types**: Defined in `src/ontology/schema.py` → `VALID_RELATIONSHIP_TYPES` (32 extraction + 11 inference-only)
-- **Shipley methodology**: Discriminators, win themes, hot buttons, proof points, FAB chains, ghost language, compliance matrix — defined in extraction prompt Part D and query prompt `rag_response`
+- **Shipley methodology**: Discriminators, win themes, hot buttons, proof points, FAB chains, ghost language, compliance matrix — defined in extraction prompt Part D (rendered from the entity catalog YAML) and query prompt `rag_response`
 
 ---
 
