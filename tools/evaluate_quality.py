@@ -103,32 +103,37 @@ def parse_report(report_path: Path) -> list[dict]:
         mode = mode_match.group(1) if mode_match else "unknown"
         query = mode_match.group(2).strip() if mode_match else ""
 
-        # Split into workspace answers using ### afcapv headers
-        ws_splits = re.split(r"(?=^### afcapv)", block, flags=re.MULTILINE)
+        # Split into workspace answers using ### <workspace> headers, but NOT
+        # on ### References (which is a per-answer subsection).
+        ws_splits = re.split(r"(?=^### (?!References\b)[A-Za-z0-9_]+\s*$)", block, flags=re.MULTILINE)
         answers = {}
+        ws_order = []
         for ws_block in ws_splits:
-            ws_match = re.match(r"### (afcapv_bos_i_t\d+)", ws_block)
+            ws_match = re.match(r"### (?!References\b)([A-Za-z0-9_]+)\s*\n", ws_block)
             if ws_match:
                 ws_name = ws_match.group(1)
-                # Remove the header and response time line
-                content = re.sub(r"^### afcapv_bos_i_t\d+\s*\n", "", ws_block)
+                # Remove the header line
+                content = re.sub(r"^### (?!References\b)[A-Za-z0-9_]+\s*\n", "", ws_block)
+                # Strip trailing response-time / horizontal-rule markers
                 content = re.sub(r"\n\*Response time:.*?\*\s*$", "", content, flags=re.DOTALL)
                 content = re.sub(r"\n---\s*$", "", content)
-                # Remove trailing reference sections from next question
                 content = content.strip()
+                if ws_name not in answers:
+                    ws_order.append(ws_name)
                 answers[ws_name] = content
 
         if len(answers) == 2:
-            ws_names = sorted(answers.keys())
+            # Preserve report order (A then B) rather than alphabetical
+            ws_a, ws_b = ws_order[0], ws_order[1]
             results.append({
                 "id": qid,
                 "category": category,
                 "mode": mode,
                 "query": query,
-                "ws_a_name": ws_names[0],
-                "ws_a_answer": answers[ws_names[0]],
-                "ws_b_name": ws_names[1],
-                "ws_b_answer": answers[ws_names[1]],
+                "ws_a_name": ws_a,
+                "ws_a_answer": answers[ws_a],
+                "ws_b_name": ws_b,
+                "ws_b_answer": answers[ws_b],
             })
 
     return results
@@ -274,6 +279,10 @@ def write_evaluation_report(results: list[dict], output_path: Path):
     ties = 0
     valid_count = 0
 
+    # Resolve actual workspace labels from the first parsed result (fallback to A/B)
+    label_a = results[0]["ws_a_name"] if results else "A"
+    label_b = results[0]["ws_b_name"] if results else "B"
+
     # Executive summary table
     lines += [
         "## Executive Summary",
@@ -293,13 +302,13 @@ def write_evaluation_report(results: list[dict], output_path: Path):
         b_score = sum(deblined[d]["ws_b"] for d in DIMENSIONS if d in deblined)
         delta = b_score - a_score
 
-        winner_label = deblined["winner"].replace("ws_a", "t4").replace("ws_b", "t5")
+        winner_label = deblined["winner"].replace("ws_a", label_a).replace("ws_b", label_b)
         if winner_label == "tie":
             winner_label = "TIE"
             ties += 1
-        elif "t4" in winner_label:
+        elif winner_label == label_a:
             ws_a_wins += 1
-        else:
+        elif winner_label == label_b:
             ws_b_wins += 1
 
         conf = deblined.get("confidence", "?")
@@ -317,7 +326,7 @@ def write_evaluation_report(results: list[dict], output_path: Path):
 
     lines += [
         "",
-        f"**Overall: t4 wins {ws_a_wins}, t5 wins {ws_b_wins}, ties {ties}** (out of {valid_count} evaluated)",
+        f"**Overall: {label_a} wins {ws_a_wins}, {label_b} wins {ws_b_wins}, ties {ties}** (out of {valid_count} evaluated)",
         "",
     ]
 
@@ -326,7 +335,7 @@ def write_evaluation_report(results: list[dict], output_path: Path):
         lines += [
             "## Dimension Breakdown (Aggregate)",
             "",
-            "| Dimension | t4 Total | t5 Total | t4 Avg | t5 Avg | Better |",
+            f"| Dimension | {label_a} Total | {label_b} Total | {label_a} Avg | {label_b} Avg | Better |",
             "|:----------|:--------:|:--------:|:------:|:------:|:------:|",
         ]
         for d in DIMENSIONS:
@@ -334,7 +343,7 @@ def write_evaluation_report(results: list[dict], output_path: Path):
             b_t = ws_b_total[d]
             a_avg = a_t / valid_count
             b_avg = b_t / valid_count
-            better = "t4" if a_t > b_t else ("t5" if b_t > a_t else "TIE")
+            better = label_a if a_t > b_t else (label_b if b_t > a_t else "TIE")
             lines.append(
                 f"| {d.capitalize()} | {a_t}/{valid_count*5} | {b_t}/{valid_count*5} | {a_avg:.1f} | {b_avg:.1f} | **{better}** |"
             )
@@ -344,7 +353,7 @@ def write_evaluation_report(results: list[dict], output_path: Path):
         b_grand = sum(ws_b_total.values())
         lines += [
             "",
-            f"**Grand Total: t4 = {a_grand}/{valid_count*25}, t5 = {b_grand}/{valid_count*25}**",
+            f"**Grand Total: {label_a} = {a_grand}/{valid_count*25}, {label_b} = {b_grand}/{valid_count*25}**",
             "",
         ]
 
@@ -365,7 +374,7 @@ def write_evaluation_report(results: list[dict], output_path: Path):
         lines += [f"*Position randomization applied: {was_shuffled}*", ""]
 
         lines += [
-            "| Dimension | t4 | t5 | Justification |",
+            f"| Dimension | {label_a} | {label_b} | Justification |",
             "|:----------|:--:|:--:|:--------------|",
         ]
         for d in DIMENSIONS:
@@ -375,13 +384,13 @@ def write_evaluation_report(results: list[dict], output_path: Path):
 
         a_total = sum(deblined[d]["ws_a"] for d in DIMENSIONS if d in deblined)
         b_total = sum(deblined[d]["ws_b"] for d in DIMENSIONS if d in deblined)
-        winner = deblined["winner"].replace("ws_a", "t4").replace("ws_b", "t5")
+        winner = deblined["winner"].replace("ws_a", label_a).replace("ws_b", label_b)
         if winner == "tie":
             winner = "TIE"
 
         lines += [
             "",
-            f"**Total: t4={a_total}/25, t5={b_total}/25 → Winner: {winner}** ({deblined.get('confidence', '?')} confidence)",
+            f"**Total: {label_a}={a_total}/25, {label_b}={b_total}/25 \u2192 Winner: {winner}** ({deblined.get('confidence', '?')} confidence)",
             "",
             f"> {deblined.get('overall_reasoning', 'No reasoning provided.')}",
             "",
