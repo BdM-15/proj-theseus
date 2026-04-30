@@ -50,10 +50,12 @@ async def main() -> int:
     print(f"\nInserting test text ({len(test_text)} chars)...")
     await rag.ainsert(test_text)
 
-    full_ents = await rag.full_entities.get_all()
-    full_rels = await rag.full_relations.get_all()
-    n_ents = sum(len(v.get("entity_names", [])) for v in full_ents.values())
-    n_rels = sum(len(v.get("relation_pairs", [])) for v in full_rels.values())
+    # LightRAG 1.5.0 removed JsonKVStorage.get_all() — count entities/relations
+    # from the graph storage instead. With NetworkXStorage (default for tests)
+    # the underlying graph exposes node/edge counts directly.
+    graph = rag.chunk_entity_relation_graph
+    n_ents = await graph.get_node_count() if hasattr(graph, "get_node_count") else len(graph._graph.nodes)
+    n_rels = await graph.get_edge_count() if hasattr(graph, "get_edge_count") else len(graph._graph.edges)
 
     print("\n=== SMOKE TEST RESULT ===")
     print(f"Entities extracted: {n_ents}")

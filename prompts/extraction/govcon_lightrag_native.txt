@@ -2138,8 +2138,8 @@ DELIMITER REFERENCE
 
 - Field separator (between tuple elements): {tuple_delimiter}
 - Completion marker (end of output): {completion_delimiter}
-- Entity types to extract: {entity_types}
+- Entity types to extract: {entity_types_guidance}
 
 Language: {language}
 
-Entity types to extract: [{entity_types}]
+Entity types to extract: {entity_types_guidance}

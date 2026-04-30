@@ -107,6 +107,73 @@ async def call_llm_async(
         raise LLMError(f"LLM API call failed", cause=e, model=model)
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# REVIEWER role — full-volume single-voice rewriting (Phase 1.0)
+# ═══════════════════════════════════════════════════════════════════════════════
+# Sits OUTSIDE LightRAG's role_llm_configs (extract/query/keyword/vlm) because
+# reviewer passes operate on assembled volumes, not on chunks/queries. Uses the
+# reasoning model with a much larger output budget and longer timeout to allow
+# it to ingest a full proposal volume and emit a unified-voice rewrite in a
+# single call.
+# ═══════════════════════════════════════════════════════════════════════════════
+@async_retry(max_attempts=2, base_delay=2.0, max_delay=60.0)
+async def call_llm_reviewer(
+    prompt: str,
+    system_prompt: Optional[str] = None,
+    model: Optional[str] = None,
+    temperature: float = 0.2,
+    max_tokens: int = 180000,
+    timeout: float = 1800.0,
+) -> str:
+    """
+    Call the reviewer LLM for full-volume single-voice rewriting.
+
+    Distinct from `call_llm_async`:
+      - Defaults to the reasoning model (best for synthesis/judgment).
+      - 180k max output tokens (vs. 128k default) to fit a full proposal volume.
+      - 30 min timeout (vs. default ~10 min) for long synthesis passes.
+      - Lower retry count (2 vs. 3) — reviewer calls are expensive.
+
+    Args:
+        prompt: Full assembled volume + review instructions.
+        system_prompt: Optional reviewer persona / style guide.
+        model: Override (default: settings.reasoning_llm_name).
+        temperature: Slightly higher than extraction (0.2) for prose smoothing.
+        max_tokens: Output budget (default 180000).
+        timeout: Per-call timeout in seconds (default 1800).
+
+    Returns:
+        Rewritten volume text.
+    """
+    settings = get_settings()
+    if model is None:
+        model = settings.reasoning_llm_name
+
+    client = _get_client()
+
+    messages = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": prompt})
+
+    call_kwargs: dict[str, Any] = {
+        "model": model,
+        "messages": messages,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "timeout": timeout,
+    }
+
+    _xai_breaker._acquire_permission()
+    try:
+        response = await client.chat.completions.create(**call_kwargs)
+        _xai_breaker.record_success()
+        return response.choices[0].message.content
+    except Exception as e:
+        _xai_breaker.record_failure()
+        raise LLMError("Reviewer LLM API call failed", cause=e, model=model)
+
+
 async def call_llm_batch(
     prompts: List[str],
     system_prompt: Optional[str] = None,

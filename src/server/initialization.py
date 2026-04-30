@@ -24,6 +24,7 @@ _apply_mineru_error_patch()
 # Now safe to import LightRAG and related modules
 import logging
 from lightrag.api.config import global_args
+from lightrag.lightrag import RoleLLMConfig
 from lightrag.llm.openai import openai_complete_if_cache, openai_embed
 from lightrag.utils import EmbeddingFunc
 from raganything import RAGAnything, RAGAnythingConfig
@@ -147,120 +148,125 @@ async def initialize_raganything():
     logger.info(f"   - context_filter_content_types: {getattr(config, 'context_filter_content_types', ['text'])}")
     
     # ═══════════════════════════════════════════════════════════════════════════════
-    # DUAL-MODEL LLM ROUTING (Extraction vs Query)
+    # NATIVE PER-ROLE LLM ROUTING (LightRAG 1.5.0 role_llm_configs)
     # ═══════════════════════════════════════════════════════════════════════════════
-    # LightRAG recommends non-reasoning models for extraction because:
-    # - Extraction needs literal format compliance (exact delimiters)
-    # - Reasoning models "over-interpret" → entity names become sentences
-    # - Hallucination rate: 12% (reasoning) vs 4% (non-reasoning)
+    # LightRAG 1.5.0 ships first-class per-role LLM dispatch via the role_llm_configs
+    # dataclass field. Four roles ship with the library:
+    #   extract  — entity/relationship extraction (literal format compliance)
+    #   query    — RAG query answering (nuanced synthesis, Shipley mentor persona)
+    #   keyword  — keyword extraction for retrieval (small JSON output)
+    #   vlm      — vision/multimodal table+image+equation analysis
     #
-    # Query needs reasoning models because:
-    # - Users ask nuanced questions requiring synthesis
-    # - Need to draw conclusions from knowledge graph
-    # - Provide contextual explanations
+    # This replaces the legacy heuristic-based routing (is_extraction_task() +
+    # EXTRACTION_MARKERS). Each role gets a dedicated wrapper so token budgets,
+    # timeouts, and model selection are explicit per-role rather than inferred.
     #
-    # Detection: Extraction prompts contain "tuple_delimiter" or entity extraction markers
+    # Token budget rationale (Phase 1.0 plan, see issue #125):
+    #   extract  → 32000  (full chunk extraction, dense entity tables)
+    #   query    → 131072 (128K mentor responses, full Shipley reasoning chains)
+    #   keyword  → 4096   (small JSON keyword lists; large budgets cause HTTP 500)
+    #   vlm      → 8000   (table/image descriptions are bounded)
+    #
+    # POST_PROCESSING and REVIEWER are NOT LightRAG roles — they are invoked by
+    # src/inference/* and src/utils/llm_client.py respectively (outside the
+    # LightRAG extraction pipeline).
     # ═══════════════════════════════════════════════════════════════════════════════
-    
-    # Model configuration from centralized settings
     extraction_model = settings.extraction_llm_name
     reasoning_model = settings.reasoning_llm_name
-    
-    # Extraction detection markers (from LightRAG prompts)
-    EXTRACTION_MARKERS = [
-        "tuple_delimiter",           # Core extraction delimiter
-        "entity_types",              # Entity type specification
-        "completion_delimiter",      # Extraction completion marker
-        "record_delimiter",          # Record separator
-        "-Real Data-",               # Extraction input marker
-        "extract entities",          # Direct extraction instruction
-    ]
-    
-    def is_extraction_task(prompt: str, system_prompt: str) -> bool:
-        """Detect if this is an extraction task vs query task"""
-        combined = f"{system_prompt or ''} {prompt or ''}".lower()
-        return any(marker.lower() in combined for marker in EXTRACTION_MARKERS)
-    
-    async def base_llm_model_func(prompt, system_prompt=None, history_messages=[], **kwargs):
-        # Route to appropriate model based on task type
-        if is_extraction_task(prompt, system_prompt):
-            model = extraction_model
-        else:
-            model = reasoning_model
 
-        # Ensure max_tokens is always set — without it the API falls back to the model's
-        # conservative default (~4K for grok-4-1-fast-non-reasoning), which truncates
-        # large PWS chunks mid-output, resulting in 0 relationships extracted.
-        # Exception: structured output calls (response_format present) are small JSON
-        # responses — keyword extraction only needs ~200 tokens. Passing 128k causes
-        # HTTP 500 on grok-4-1 endpoints for structured format requests.
-        # Force-assign (not setdefault) so we override any max_tokens LightRAG passes in.
-        if 'response_format' in kwargs:
-            kwargs['max_tokens'] = 4096
-        else:
-            kwargs.setdefault('max_tokens', settings.llm_max_output_tokens)
+    # Per-role token budgets (#125 acceptance: explicit per-role config)
+    EXTRACT_MAX_TOKENS = 32000
+    QUERY_MAX_TOKENS = settings.llm_max_output_tokens  # 128000 from .env
+    KEYWORD_MAX_TOKENS = 4096
+    VLM_MAX_TOKENS = 8000
 
+    # Per-role timeouts (seconds)
+    EXTRACT_TIMEOUT = settings.llm_timeout  # 600s default
+    QUERY_TIMEOUT = 900
+    KEYWORD_TIMEOUT = 60
+    VLM_TIMEOUT = 300
+
+    async def _extract_llm_func(prompt, system_prompt=None, history_messages=[], **kwargs):
+        kwargs.setdefault("max_tokens", EXTRACT_MAX_TOKENS)
         return await openai_complete_if_cache(
-            model,
-            prompt,
-            system_prompt=system_prompt,
-            history_messages=history_messages,
-            api_key=xai_api_key,
-            base_url=xai_base_url,
-            **kwargs,
+            extraction_model, prompt,
+            system_prompt=system_prompt, history_messages=history_messages,
+            api_key=xai_api_key, base_url=xai_base_url, **kwargs,
         )
-    
+
+    async def _query_llm_func(prompt, system_prompt=None, history_messages=[], **kwargs):
+        kwargs.setdefault("max_tokens", QUERY_MAX_TOKENS)
+        return await openai_complete_if_cache(
+            reasoning_model, prompt,
+            system_prompt=system_prompt, history_messages=history_messages,
+            api_key=xai_api_key, base_url=xai_base_url, **kwargs,
+        )
+
+    async def _keyword_llm_func(prompt, system_prompt=None, history_messages=[], **kwargs):
+        # Keyword extraction always returns small structured JSON — large budgets
+        # trigger HTTP 500 on grok-4-1 endpoints for structured-format requests.
+        kwargs["max_tokens"] = KEYWORD_MAX_TOKENS
+        return await openai_complete_if_cache(
+            extraction_model, prompt,
+            system_prompt=system_prompt, history_messages=history_messages,
+            api_key=xai_api_key, base_url=xai_base_url, **kwargs,
+        )
+
+    async def _vlm_llm_func(prompt, system_prompt=None, history_messages=[], image_data=None, messages=None, **kwargs):
+        kwargs.setdefault("max_tokens", VLM_MAX_TOKENS)
+        if messages:
+            return await openai_complete_if_cache(
+                extraction_model, "", system_prompt=None, history_messages=[],
+                messages=messages, api_key=xai_api_key, base_url=xai_base_url, **kwargs,
+            )
+        if image_data:
+            built_messages = [{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}},
+                ],
+            }]
+            if system_prompt:
+                built_messages.insert(0, {"role": "system", "content": system_prompt})
+            return await openai_complete_if_cache(
+                extraction_model, "", system_prompt=None, history_messages=[],
+                messages=built_messages, api_key=xai_api_key, base_url=xai_base_url, **kwargs,
+            )
+        # No image data — fall back to plain text completion via extract model.
+        return await openai_complete_if_cache(
+            extraction_model, prompt,
+            system_prompt=system_prompt, history_messages=history_messages,
+            api_key=xai_api_key, base_url=xai_base_url, **kwargs,
+        )
+
     # ═══════════════════════════════════════════════════════════════════════════════
-    # Native LightRAG Extraction with Output Sanitization (Issue #56)
+    # Output sanitization for the EXTRACT role (Issue #56)
     # ═══════════════════════════════════════════════════════════════════════════════
-    # Using LightRAG's native tuple-delimited extraction format with a lightweight
-    # sanitization wrapper that fixes common LLM malformation patterns:
-    # - #|requirement → requirement (hash prefix from delimiter leakage)
-    # - Extra pipes in descriptions causing field count errors
-    # 
-    # This approach preserves native LightRAG performance while preventing entity drops.
-    # Our GovCon ontology is injected via addon_params and PROMPTS override.
+    # The extract role still needs the sanitizer wrapper that fixes common LLM
+    # malformation patterns (`#|requirement` → `requirement`, extra pipes in
+    # descriptions). Other roles do not need it — query/keyword/vlm outputs are
+    # consumed differently and don't go through the tuple-delimited parser.
     # ═══════════════════════════════════════════════════════════════════════════════
     from src.extraction.output_sanitizer import create_sanitizing_wrapper
-    
-    llm_model_func = create_sanitizing_wrapper(base_llm_model_func)
-    logger.info("✅ Using native LightRAG extraction with output sanitization (Issue #56)")
-    logger.info(f"✅ DUAL-MODEL routing enabled:")
-    logger.info(f"   Extraction: {extraction_model} (non-reasoning for literal format compliance)")
-    logger.info(f"   Query:      {reasoning_model} (reasoning for nuanced answers)")
-    logger.info(f"   Sanitizer:  Fixes malformed delimiters (#|type → type)")
-    
-    # Define vision function (multimodal Grok wrapper)
-    # NOTE: Vision/multimodal processing is extraction (generating descriptions for tables/images)
-    #       so it uses the extraction model for literal format compliance
-    async def vision_model_func(prompt, system_prompt=None, history_messages=[], image_data=None, messages=None, **kwargs):
-        if messages:
-            kwargs.setdefault('max_tokens', settings.llm_max_output_tokens)
-            return await openai_complete_if_cache(
-                extraction_model, "", system_prompt=None, history_messages=[],
-                messages=messages, api_key=xai_api_key, base_url=xai_base_url, **kwargs
-            )
-        elif image_data:
-            messages = [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}},
-                    ],
-                }
-            ]
-            if system_prompt:
-                messages.insert(0, {"role": "system", "content": system_prompt})
-            kwargs.setdefault('max_tokens', settings.llm_max_output_tokens)
-            return await openai_complete_if_cache(
-                extraction_model, "", system_prompt=None, history_messages=[],
-                messages=messages,
-                api_key=xai_api_key, base_url=xai_base_url, **kwargs
-            )
-        else:
-            # Use base function (which auto-routes based on task)
-            return await base_llm_model_func(prompt, system_prompt, history_messages, **kwargs)
+    sanitized_extract_func = create_sanitizing_wrapper(_extract_llm_func)
+
+    # llm_model_func is the LEGACY single-callable RAGAnything still expects at
+    # the top level. We point it at the query func — it's the safest fallback for
+    # any callsite that bypasses role routing (debug scripts, ad-hoc helpers).
+    # All real extraction/query/keyword/vlm traffic flows through role_llm_configs.
+    llm_model_func = _query_llm_func
+
+    # Vision function for RAGAnything modal processors (kept as a separate top-level
+    # callable because RAGAnything's RAGAnything(...) constructor takes vision_model_func
+    # explicitly, distinct from LightRAG's vlm role).
+    vision_model_func = _vlm_llm_func
+
+    logger.info("✅ Native LightRAG 1.5.0 role_llm_configs routing enabled")
+    logger.info(f"   extract  → {extraction_model:40s}  max_tokens={EXTRACT_MAX_TOKENS:>6}  timeout={EXTRACT_TIMEOUT}s  (sanitized)")
+    logger.info(f"   query    → {reasoning_model:40s}  max_tokens={QUERY_MAX_TOKENS:>6}  timeout={QUERY_TIMEOUT}s")
+    logger.info(f"   keyword  → {extraction_model:40s}  max_tokens={KEYWORD_MAX_TOKENS:>6}  timeout={KEYWORD_TIMEOUT}s")
+    logger.info(f"   vlm      → {extraction_model:40s}  max_tokens={VLM_MAX_TOKENS:>6}  timeout={VLM_TIMEOUT}s")
     
     # Embedding function: use LightRAG's native openai_embed with built-in truncation
     # LightRAG 1.4.13 openai_embed.func accepts max_token_size for auto-truncation.
@@ -311,9 +317,58 @@ async def initialize_raganything():
     from src.extraction.govcon_reranker import make_govcon_rerank_func
     rerank_func = make_govcon_rerank_func()
 
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # entity_types_guidance — replaces legacy addon_params["entity_types"] list
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # LightRAG 1.5.0 dropped the `entity_types: list` shape (and hard-fails the
+    # ENTITY_TYPES env var). The substitution token is now `{entity_types_guidance}`,
+    # a single string injected into the extraction prompt.
+    #
+    # Our `prompts/extraction/govcon_lightrag_native.txt` already contains Part D
+    # (the full 33-type catalog with metadata, signals, and disambiguation rules),
+    # so the guidance string is a one-line catalog summary that points at Part D
+    # for detail. This keeps the prompt coherent without duplicating Part D.
+    # ═══════════════════════════════════════════════════════════════════════════════
+    entity_types_guidance = (
+        "Use exactly one of these 33 government contracting entity types: "
+        + ", ".join(entity_types)
+        + ". See Part D (THE 33 ENTITY TYPES) above for detailed definitions, "
+        + "required metadata, content signals, and disambiguation rules. "
+        + "Forbidden generic types (other, plan, system, process, framework, etc.) "
+        + "are listed in the FALLBACK MAPPING section."
+    )
+
+    # Build per-role LightRAG configs (1.5.0 native role dispatch).
+    role_llm_configs = {
+        "extract": RoleLLMConfig(
+            func=sanitized_extract_func,
+            kwargs={"max_tokens": EXTRACT_MAX_TOKENS},
+            timeout=EXTRACT_TIMEOUT,
+            metadata={"model": extraction_model, "host": xai_base_url, "binding": "openai"},
+        ),
+        "query": RoleLLMConfig(
+            func=_query_llm_func,
+            kwargs={"max_tokens": QUERY_MAX_TOKENS},
+            timeout=QUERY_TIMEOUT,
+            metadata={"model": reasoning_model, "host": xai_base_url, "binding": "openai"},
+        ),
+        "keyword": RoleLLMConfig(
+            func=_keyword_llm_func,
+            kwargs={"max_tokens": KEYWORD_MAX_TOKENS},
+            timeout=KEYWORD_TIMEOUT,
+            metadata={"model": extraction_model, "host": xai_base_url, "binding": "openai"},
+        ),
+        "vlm": RoleLLMConfig(
+            func=_vlm_llm_func,
+            kwargs={"max_tokens": VLM_MAX_TOKENS},
+            timeout=VLM_TIMEOUT,
+            metadata={"model": extraction_model, "host": xai_base_url, "binding": "openai"},
+        ),
+    }
+
     lightrag_kwargs = {
         "addon_params": {
-            "entity_types": entity_types,
+            "entity_types_guidance": entity_types_guidance,
             # NOTE: entity_extraction_system_prompt and examples are now handled via 
             # PROMPTS.update(GOVCON_PROMPTS) after RAG-Anything initialization
             "language": "English",
@@ -327,6 +382,9 @@ async def initialize_raganything():
         # LLM timeout: default 180s causes Worker timeout (2×=360s) failures on complex chunks
         # Increased to 600s (10 min) to handle extraction from dense requirement tables
         "default_llm_timeout": llm_timeout,
+
+        # Phase 1.0 — native per-role LLM routing (LightRAG 1.5.0)
+        "role_llm_configs": role_llm_configs,
     }
 
     # Wire reranker only if enabled (avoid passing None which LightRAG also accepts,
@@ -341,8 +399,13 @@ async def initialize_raganything():
     if hasattr(global_args, 'graph_storage') and global_args.graph_storage == "Neo4JStorage":
         lightrag_kwargs["graph_storage"] = global_args.graph_storage
     
-    # LLM function ready for RAG-Anything (no adapter wrapping needed)
-    llm_model_func_wrapped = llm_model_func
+    # LLM function for RAGAnything top-level + modal processors. RAGAnything's
+    # TableModalProcessor / EquationModalProcessor invoke this for table-to-text
+    # description and equation analysis — both are extraction-shaped tasks
+    # (literal format, structured output), so we route them through the
+    # sanitized extract func to match the legacy behavior. Image processing has
+    # its own vision_model_func passed separately above (_vlm_llm_func).
+    llm_model_func_wrapped = sanitized_extract_func
     
     _rag_anything = RAGAnything(
         config=config,
