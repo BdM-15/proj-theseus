@@ -14,9 +14,15 @@ For each skill the server reports as installed, this test:
 Skills that emit a deliverable (artifact) get an additional check that the
 ``run_dir/artifacts/`` directory was populated.
 
+When ``RUN_GROUNDING_AUDIT=1`` is set, each skill's transcript is also fed
+through ``tools/audit_skill_grounding.py`` and a grounding ratio is logged.
+With ``ENFORCE_GROUNDING_RATIO=1`` (off by default) the run hard-fails any
+skill below ``MIN_GROUNDING_RATIO`` (default 0.80); without it, sub-threshold
+ratios are recorded as ``xfail`` while citation rules are tightened.
+
 The harness is intentionally permissive on response *content* — branch 147
-will tighten this with a quantified grounding-ratio audit. This branch only
-proves the loop runs end-to-end.
+adds the quantified grounding-ratio audit. This branch only proves the loop
+runs end-to-end + the audit infrastructure works.
 """
 
 from __future__ import annotations
@@ -246,3 +252,48 @@ def test_skill_invoke_smoke(
                         f"{skill_name}: ARTIFACT_SKILLS member but no artifact "
                         f"emitted — investigate in branch 147"
                     )
+
+    # 4. Grounding-ratio audit (opt-in via RUN_GROUNDING_AUDIT=1).
+    # Branch 147 establishes the baseline; the hard ``ratio >= 0.80`` assertion
+    # is gated behind ``ENFORCE_GROUNDING_RATIO=1`` until each skill's SKILL.md
+    # citation rules are tightened. UTILITY + LEGACY skills are exempt — pure
+    # render utilities legitimately produce zero workspace claims.
+    import os as _os
+    if (
+        _os.getenv("RUN_GROUNDING_AUDIT", "").strip().lower() in {"1", "true", "yes"}
+        and skill_name not in UTILITY_SKILLS
+        and skill_name not in LEGACY_SKILLS
+        and run_id
+    ):
+        repo_root = Path(__file__).resolve().parents[3]
+        ws = _os.getenv("THESEUS_E2E_WORKSPACE", "afcap5_adab_iss")
+        transcript_path = (
+            repo_root / "rag_storage" / ws / "skill_runs" / skill_name / run_id / "transcript.json"
+        )
+        if transcript_path.exists():
+            # Local import keeps tools/ off the import path for non-audit runs
+            import sys as _sys
+            _sys.path.insert(0, str(repo_root / "tools"))
+            try:
+                from audit_skill_grounding import audit as _audit  # noqa: WPS433
+            finally:
+                _sys.path.pop(0)
+            report = _audit(transcript_path)
+            ratio = report.get("grounding_ratio", 0.0)
+            min_required = float(_os.getenv("MIN_GROUNDING_RATIO", "0.80"))
+            print(
+                f"\n[grounding] {skill_name}: ratio={ratio:.2f} "
+                f"({report['claims_grounded']}/{report['claims_total']} "
+                f"grounded, {report['claims_exempt']} exempt)"
+            )
+            if _os.getenv("ENFORCE_GROUNDING_RATIO", "").strip().lower() in {"1", "true", "yes"}:
+                assert ratio >= min_required, (
+                    f"{skill_name}: grounding_ratio={ratio:.2f} "
+                    f"< required {min_required:.2f}. "
+                    f"Unsourced examples: {report['unsourced_examples'][:3]}"
+                )
+            elif ratio < min_required:
+                pytest.xfail(
+                    f"{skill_name}: grounding_ratio={ratio:.2f} "
+                    f"< {min_required:.2f} (xfail until SKILL.md citation rules tightened)"
+                )
