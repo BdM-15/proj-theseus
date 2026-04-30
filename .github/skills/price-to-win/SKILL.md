@@ -10,7 +10,7 @@ metadata:
   capability: estimate
   runtime: tools
   category: pricing
-  version: 0.3.0
+  version: 0.4.0
   status: active
   # Phase 4g: declare which vendored MCP servers this skill needs.
   # The runtime exposes only these MCPs to the agent loop, namespaced
@@ -51,6 +51,32 @@ The three upstream IGCE Builder skills this is derived from are written for **co
 | Verdict            | Refused — CO call                   | Required — capture call                                           |
 
 You MAY (and should) state evaluative judgments: "the incumbent likely prices at ~$X/hr fully burdened with a ~2.93x wrap, putting their base-year labor at $Y; to win on cost we should target 5–10% under, ~$Z." Use ranges, cite the math, name the assumptions.
+
+## Citation Discipline for the Narrative (CRITICAL — read before step 10)
+
+The value of this skill is **grounded reasoning** — your expert judgment layered on top of workspace evidence and tool-pulled market data, with anchors readers can verify. Two classes of sentence, two rules:
+
+**Class A — Factual anchors (MUST cite).** Any sentence that asserts a specific fact about the workspace or the market data you just pulled. Cite inline using `[chunk-xxxx]` for KG facts, or name the specific BLS series / CALC+ keyword + N / GSA city for tool-pulled facts. Examples:
+
+- Incumbent identity, last award value, contract vehicle, NAICS, PSC, PoP, place of performance, period of performance, requirement specifics, evaluation factors, set-aside language → `[chunk-xxxx]`.
+- BLS wage figures, CALC+ percentiles, GSA per-diem cells → name the source inline (e.g., "BLS series OEUS47900015-1252 P50 = $152,340" or "CALC+ Software Developer III, N=47, P50=$205").
+
+**Class B — Reasoning leaps & methodology (citation-exempt — DO NOT strip).** Your expert layer on top: pattern recognition, heuristics, capture intuition, FAB chains, risk calls, what-could-go-wrong, second-order implications, comparison to typical industry behavior. These are the *whole point* of the skill. They do **not** need a chunk citation — but they should be visibly framed as judgment ("typically...", "the classic capture pattern is...", "in my experience this size of award implies...", "a defensible read is..."). Examples that should NEVER be stripped:
+
+- "5–10% under incumbent is the classic capture sweet spot."
+- "This wrap looks aggressive for a non-cleared GSA MAS; the incumbent is probably on a richer vehicle."
+- "The lack of a Past Performance evaluation factor suggests the agency is signaling a lower technical bar — price will dominate."
+- "If the incumbent's actual wrap is closer to 3.2x, our mid scenario understates by ~$400k."
+
+**Bad form** (an unanchored factual claim — must cite or remove):
+
+> ❌ "The incumbent's last award of $9.2M implies an effective ~$186/hr fully burdened rate."
+
+**Good form** (same insight, anchored):
+
+> ✅ "The incumbent's last award of $9.2M [chunk-a3f2c401] implies an effective ~$186/hr fully burdened rate (5 seniors × 1,880 productive hours × 5-year sum-of-years factor ~5.256 at 2.5% escalation). That's right on the GSA MAS commercial wrap range — typical for a non-cleared services BPA."
+
+The second sentence carries the *same* reasoning-model insight as the first; it just lets a capture manager click through to the chunk that says $9.2M and verify the anchor isn't hallucinated.
 
 ## Operating Discipline
 
@@ -259,6 +285,17 @@ After `write_file` succeeds, produce a narrative summary (capture-team-readable,
 6. Top 3 risk flags (BLS data gap, thin CALC+ pool, vehicle assumption, etc.).
 7. What we DON'T know about the competitor (subcontractor mix, actual wrap, OCI exposure).
 8. FAR citations supporting the cost methodology.
+
+**Apply the Citation Discipline rules above.** Every Class A factual claim (incumbent identity, award value, NAICS, PSC, PoP, BLS figure, CALC+ percentile, GSA per-diem cell) MUST carry an inline anchor (`[chunk-xxxx]` for KG facts; named source for tool-pulled facts). Class B reasoning leaps and methodology heuristics are explicitly permitted *and expected* without chunk citations — those are the reasoning-model value-add and stripping them defeats the skill's purpose. Frame judgments visibly ("typically...", "the classic pattern is...", "a defensible read is...") so the reader can tell anchor from insight.
+
+### 11. Self-audit before returning
+
+Before your final message, scan your own draft. For each sentence:
+
+- If it asserts a specific workspace or market fact and has no `[chunk-xxxx]` anchor and names no specific BLS series / CALC+ keyword / GSA city → **add the anchor or remove the sentence**.
+- If it is a reasoning leap, heuristic, or comparison to typical industry behavior → **leave it alone**. Verify it is visibly framed as judgment.
+
+A run that emits the JSON envelope but has uncited Class A claims in the narrative is a **partially failed run** — the artifact is valid, the cover note is not.
 
 If the user asked for a workbook, hand the JSON envelope to the `renderers` skill (`render_xlsx.py`) for a competitor-cost-stack .xlsx.
 

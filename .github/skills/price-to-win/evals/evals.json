@@ -49,6 +49,19 @@
         "fee_mid is approximately equal to fee_bearing_cost_mid * (base_fee_pct + award_pool_pct * earned_pct_assumption) within 1% tolerance.",
         "Methodology citations include 'FAR 16.405-2' AND '10 USC 3322(a)'."
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "Build me a price-to-win for an FFP services contract: NAICS 541512, 5 senior software developers in the DC metro, 1-year base + 4 option years, GSA MAS commercial pricing. The incumbent's last award was $9.2M. In your final narrative, anchor every workspace-derived fact with an inline [chunk-xxxx] citation, but preserve your expert reasoning and capture intuition (do NOT strip judgment-based heuristics).",
+      "expected_output": "Same JSON envelope as eval 1, plus a narrative summary in the final assistant message where (a) every Class A factual claim about the workspace (incumbent identity, $9.2M award value, NAICS, PSC, PoP, period of performance, etc.) carries an inline [chunk-xxxx] anchor referencing a chunk that was returned by an earlier kg_chunks call, (b) tool-pulled market data (BLS series IDs, CALC+ N + percentiles, GSA per-diem cells) names its source inline, and (c) Class B reasoning leaps and capture heuristics (e.g., 'X% under incumbent is the classic capture sweet spot', 'this wrap looks aggressive for a non-cleared GSA MAS', 'price will dominate on this evaluation') remain present, visibly framed as judgment, and are NOT stripped. The narrative grounding-ratio (claims with inline anchor / total Class A claims) should be ≥ 0.80.",
+      "expectations": [
+        "The skill called write_file with target path matching 'artifacts/ptw_*.json' (envelope still produced).",
+        "The final assistant message contains at least 3 inline 'chunk-' citations matching the regex 'chunk-[0-9a-f]{4,}'.",
+        "Each inline 'chunk-xxxx' citation in the final message refers to a chunk_id that was returned by an earlier kg_chunks or kg_query tool call in this transcript.",
+        "The final assistant message contains at least one sentence that is visibly framed as a reasoning leap or capture heuristic (e.g., contains 'typically', 'classic', 'sweet spot', 'in capture', 'a defensible read', 'pattern', 'rule of thumb', 'aggressive', 'conservative', 'likely', or similar judgment-language).",
+        "The final assistant message does NOT consist solely of bullet stats / artifact-handoff lines — it contains substantive narrative explaining the reasoning behind the target_price.",
+        "When tools/audit_skill_grounding.py is run against this run's transcript, grounding_ratio is >= 0.80."
+      ]
     }
   ]
 }

@@ -17,6 +17,14 @@ A claim (sentence) is considered **grounded** when ANY of the following hold:
    workspace KG, not just their own session).
 3. It cites a named entity (``Entity:Name``, ``[Entity Name]``) that
    appears in the entity slice returned by a ``kg_entities`` tool call.
+3a. It cites a **named source** that the runtime can verify the skill
+   actually consulted in this run — a ``references/...`` file the skill
+   read via ``read_file``, an MCP tool the skill invoked (e.g.,
+   ``BLS series OEUS47900015-1252``, ``CALC+ N=47``, ``GSA per diem
+   Huntsville``), or a parenthetical attribution to the user prompt
+   (e.g., ``(user query)``, ``(per the prompt)``, ``(user-supplied)``).
+   These are legitimate anchors — the skill is honestly attributing the
+   provenance, even if the underlying datum didn't come from the KG.
 4. It is a structural / non-claim sentence: a Markdown heading, a table
    header row, an empty bullet, a code-fence delimiter, a "References:"
    anchor line, or a sentence under 25 chars (e.g. transitions like
@@ -28,7 +36,6 @@ A claim (sentence) is considered **grounded** when ANY of the following hold:
    "All 10 checks executed against the live KG slice"). These are also
    exempt — the artifact JSON is the source of truth per skill design
    contract; cover notes are navigation aids, not domain claims.
-
 Usage::
 
     python tools/audit_skill_grounding.py <transcript.json>
@@ -67,6 +74,36 @@ from typing import Any
 CHUNK_CITE_RE = re.compile(r"chunk-[0-9a-f]{4,}", re.IGNORECASE)
 KG_TOOLS = {"kg_chunks", "kg_query", "kg_entities"}
 
+# Named-source anchors: legitimate citations to provenance the runtime
+# can verify the skill consulted, even when it isn't a kg_* hit.
+#
+#   - parenthetical user-prompt attributions: "(user query)",
+#     "(per the prompt)", "(user-supplied)", "(from the user)"
+#   - MCP tool data hand-offs by family: "BLS series ...", "CALC+",
+#     "GSA per diem ...", "eCFR ...", "USAspending ..."
+#   - explicit "per the X reference" hand-off to a bundled reference file
+USER_ATTR_RE = re.compile(
+    r"(?:\(|\b)(?:user(?:[-\s](?:query|prompt|supplied|input|provided|specified|stated))?|per\s+the\s+(?:user|prompt|query)|from\s+the\s+(?:user|prompt))(?:\)|\b)",
+    re.IGNORECASE,
+)
+NAMED_SOURCE_RE = re.compile(
+    r"""\b(
+        BLS\s+(?:series|OEWS|wage|OE[UN][A-Z0-9_-]+) |
+        CALC\+? |
+        GSA\s+(?:per[\s-]diem|CALC|MAS) |
+        eCFR |
+        USAspending(?:\.gov)? |
+        FAR\s+\d+\.\d+(?:-\d+)? |
+        DFARS\s+\d+\.\d+(?:-\d+)? |
+        NIST\s+SP\s+\d+(?:-\d+)?
+    )\b""",
+    re.IGNORECASE | re.VERBOSE,
+)
+REF_BUNDLE_RE = re.compile(
+    r"`?(references?/[A-Za-z0-9_./-]+\.md)`?|per\s+(?:the\s+)?[`']?(references?/[A-Za-z0-9_./-]+\.md)[`']?",
+    re.IGNORECASE,
+)
+
 # Sentence terminators. Keep ASCII-only; the prompts produce ASCII punct.
 SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z\(\[`])")
 
@@ -82,6 +119,38 @@ STRUCTURAL_LINE_RE = re.compile(
         Sources?:\s*$ |
         \d+\.\s*$           # bare list number
     )""",
+    re.IGNORECASE | re.VERBOSE,
+)
+
+# Bold-only "heading" lines: **Foo**, **Foo: Bar**, **Foo (baz)**.
+# These act as section labels in skill output but aren't true claims.
+# Match a line that is *entirely* one or two bold runs and optional
+# trailing punctuation — no narrative prose after the closing ``**``.
+BOLD_HEADING_RE = re.compile(
+    r"^\s*[-*]?\s*\*\*[^*\n]{2,80}\*\*\s*[:.\-—]?\s*$",
+)
+
+# Class B reasoning-leap markers — visible-judgment framing the SKILL
+# instructions explicitly preserve. When a sentence opens with or
+# prominently contains one of these, it is judgment / heuristic, not a
+# factual claim, and is exempt from the grounding denominator.
+REASONING_LEAP_RE = re.compile(
+    r"\b("
+    r"in\s+(?:my|our)\s+(?:experience|capture|view|read) |"
+    r"a\s+defensible\s+read |"
+    r"the\s+classic\s+\w+\s+(?:sweet\s+spot|pattern|play|move) |"
+    r"classic\s+capture\s+sweet\s+spot |"
+    r"rule\s+of\s+thumb |"
+    r"typical(?:ly)?\s+(?:agency|prime|sub|capture|wraps?|prices?) |"
+    r"would\s+(?:overstate|understate|hand|risk|trigger|tip|signal) |"
+    r"sits?\s+comfortably |"
+    r"comfortably\s+inside |"
+    r"(?:aggressive|conservative)\s+(?:read|posture|stance|bid) |"
+    r"likely\s+(?:to\s+|prices?\s+|wraps?\s+|implies?\s+|lands?\s+|tip\s+) |"
+    r"this\s+is\s+\*?not\*?\s+the\s+\w+ |"
+    r"heuristic |"
+    r"(?:our|the)\s+(?:read|take|posture|stance)\s+(?:is|here)"
+    r")",
     re.IGNORECASE | re.VERBOSE,
 )
 
@@ -189,6 +258,35 @@ def _retrieved_entities(turns: list[dict[str, Any]]) -> set[str]:
     return {n for n in names if len(n) >= 3 and not n.startswith("none")}
 
 
+def _consulted_named_sources(turns: list[dict[str, Any]]) -> set[str]:
+    """Collect named provenance anchors the runtime can verify the skill
+    actually consulted in this run.
+
+    Includes: bundled reference files read via ``read_file``, MCP tool
+    families invoked (``mcp__bls_oews__*`` → 'bls', ``mcp__gsa_calc__*`` →
+    'calc', etc.), and raw script paths run via ``run_script``.
+    """
+    sources: set[str] = set()
+    for turn in turns:
+        if (turn.get("kind") or "").lower() != "tool":
+            continue
+        name = (turn.get("name") or "").lower()
+        # read_file calls — record the path the skill loaded
+        if name == "read_file":
+            args = turn.get("arguments") or turn.get("args") or {}
+            if isinstance(args, dict):
+                p = args.get("path") or args.get("file") or ""
+                if isinstance(p, str) and p:
+                    sources.add(p.lower())
+        # MCP tool calls — record family from `mcp__<family>__<tool>` shape
+        if name.startswith("mcp__"):
+            parts = name.split("__")
+            if len(parts) >= 2:
+                family = parts[1]
+                sources.add(f"mcp:{family}")
+    return sources
+
+
 def _split_claims(text: str) -> list[str]:
     """Split response into candidate claim sentences (line-aware)."""
     out: list[str] = []
@@ -210,7 +308,11 @@ def _split_claims(text: str) -> list[str]:
 def _is_structural(sentence: str) -> bool:
     if STRUCTURAL_LINE_RE.match(sentence):
         return True
+    if BOLD_HEADING_RE.match(sentence):
+        return True
     if COVER_NOTE_EXEMPT_RE.match(sentence):
+        return True
+    if REASONING_LEAP_RE.search(sentence):
         return True
     return False
 
@@ -219,6 +321,7 @@ def _is_grounded(
     sentence: str,
     retrieved_chunks: set[str],
     retrieved_entities: set[str],
+    consulted_sources: set[str],
 ) -> bool:
     # Rule 1+2: any chunk-xxxx citation in the sentence
     for match in CHUNK_CITE_RE.findall(sentence):
@@ -231,6 +334,36 @@ def _is_grounded(
     for ent in retrieved_entities:
         if ent and ent in sent_lower:
             return True
+    # Rule 3a-i: parenthetical attribution to the user prompt
+    if USER_ATTR_RE.search(sentence):
+        return True
+    # Rule 3a-ii: named MCP / regulatory source the skill invoked
+    if NAMED_SOURCE_RE.search(sentence):
+        # Only credit if the skill *actually* invoked the matching MCP family
+        # OR the named source is regulatory (FAR/DFARS/NIST) which is always
+        # a verifiable external anchor.
+        m = NAMED_SOURCE_RE.search(sentence)
+        token = (m.group(0) if m else "").lower()
+        if token.startswith(("far ", "dfars", "nist")):
+            return True
+        if token.startswith("bls") and "mcp:bls_oews" in consulted_sources:
+            return True
+        if token.startswith("calc") and "mcp:gsa_calc" in consulted_sources:
+            return True
+        if token.startswith("gsa") and any(s in consulted_sources for s in ("mcp:gsa_perdiem", "mcp:gsa_calc")):
+            return True
+        if token.startswith("ecfr") and "mcp:ecfr" in consulted_sources:
+            return True
+        if token.startswith("usaspending") and "mcp:usaspending" in consulted_sources:
+            return True
+    # Rule 3a-iii: reference bundle file the skill read
+    for m in REF_BUNDLE_RE.finditer(sentence):
+        ref_path = (m.group(1) or m.group(2) or "").lower()
+        if not ref_path:
+            continue
+        # Match if any consulted source path ends with this reference
+        if any(s.endswith(ref_path) or ref_path in s for s in consulted_sources):
+            return True
     return False
 
 
@@ -239,6 +372,7 @@ def audit(transcript_path: Path) -> dict[str, Any]:
     final = _final_assistant_text(turns)
     chunks = _retrieved_chunk_ids(turns)
     entities = _retrieved_entities(turns)
+    consulted = _consulted_named_sources(turns)
 
     # Skill / run id from path: rag_storage/<ws>/skill_runs/<skill>/<run_id>/transcript.json
     parts = transcript_path.resolve().parts
@@ -260,7 +394,7 @@ def audit(transcript_path: Path) -> dict[str, Any]:
             claims_exempt += 1
             continue
         claims_total += 1
-        if _is_grounded(sent, chunks, entities):
+        if _is_grounded(sent, chunks, entities, consulted):
             claims_grounded += 1
         else:
             if len(unsourced) < 10:
