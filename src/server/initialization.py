@@ -337,11 +337,34 @@ async def initialize_raganything():
     from src.ontology.entity_catalog import get_default_catalog
     entity_types_guidance = get_default_catalog().render_part_d()
 
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Phase 1.3 (issue #124): xAI strict json_schema response_format for `extract`.
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Forces xAI to return EXACTLY the {name, type, description} / {source, target,
+    # keywords, description} shape that LightRAG's _process_json_extraction_result
+    # parser reads. Without this, json_object mode lets xAI improvise field names
+    # ({entity, type} or {subject, relation, object}) — those drop on parse.
+    # `type` is constrained to the 33-entity-type enum; `keywords` first token is
+    # constrained to the canonical extraction-time relationship types via regex.
+    # Toggle via ENTITY_EXTRACTION_STRICT_SCHEMA=true (requires USE_JSON=true too).
+    # ═══════════════════════════════════════════════════════════════════════════════
+    use_strict_schema = (
+        use_json_extraction
+        and os.environ.get("ENTITY_EXTRACTION_STRICT_SCHEMA", "false").strip().lower() in ("1", "true", "yes", "on")
+    )
+    extract_kwargs: dict = {"max_tokens": EXTRACT_MAX_TOKENS}
+    if use_strict_schema:
+        from src.ontology.extraction_schema import build_response_format
+        extract_kwargs["response_format"] = build_response_format()
+        logger.info("✅ Strict JSON schema enforcement ENABLED for `extract` role (xAI json_schema strict=true)")
+    elif use_json_extraction:
+        logger.info("ℹ️  Strict JSON schema NOT enabled — using prompt-only JSON mode (set ENTITY_EXTRACTION_STRICT_SCHEMA=true to enforce)")
+
     # Build per-role LightRAG configs (1.5.0 native role dispatch).
     role_llm_configs = {
         "extract": RoleLLMConfig(
             func=sanitized_extract_func,
-            kwargs={"max_tokens": EXTRACT_MAX_TOKENS},
+            kwargs=extract_kwargs,
             timeout=EXTRACT_TIMEOUT,
             metadata={"model": extraction_model, "host": xai_base_url, "binding": "openai"},
         ),
