@@ -10,7 +10,7 @@ metadata:
   capability: analyze
   runtime: tools
   category: capture_intelligence
-  version: 0.2.0
+  version: 0.3.0
   status: active
   # Phase 4h: pure KG + reasoning skill. No MCPs declared (closed-by-default).
 ---
@@ -50,6 +50,51 @@ The upstream `sow-pws-builder` skill walks a **federal contracting officer** FOR
 - **Workspace-first.** All reasoning anchors on entities and chunks already in the active Theseus KG. Use `kg_entities` and `kg_chunks`.
 - **Format-agnostic input.** UCF Section L/M, FAR 16 task order, FOPR, BPA call, OTA, agency-specific format — they all map to the same 14-section spec when reverse-flowed. If sections are reordered or merged, normalize silently.
 - **Cite signals, not guesses.** Every entry in `hot_buttons`, `discriminator_hooks`, `ghost_language` must cite the chunk_id or entity_id that triggered the inference + the matching pattern from `references/rfp_signal_patterns.md`.
+
+## Citation Discipline for the Narrative (CRITICAL — read before step 10)
+
+The JSON envelope (steps 4–9) carries `source_chunk_ids[]` on every entry. The **prose narrative** (step 10) is where models reliably drop citations and downgrade to flat assertions. This section exists to prevent that.
+
+**Two classes of sentences. Treat them differently.**
+
+### Class A — Factual anchors (MUST cite)
+
+Any sentence that asserts what the RFP says, what the CO chose, what the KG contains, what a clause cites, what a deliverable threshold is, or any specific number / proper noun lifted from the workspace.
+
+**Rule:** End the sentence (or the relevant clause) with `[chunk-xxxx]` (or `[chunk-xxxx, chunk-yyyy]` when 2–3 chunks support it). If the fact came from a `kg_entities` call rather than a chunk, use `[entity: <Name>]`. If it came from a `references/...` bundle file you read, use `[per references/<file>.md]`.
+
+Class A examples that the audit currently flags as unsourced — fix them like this:
+
+| Bad (flat assertion)                                                                                  | Good (anchored)                                                                                                                                                                |
+| ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| "FFP Task Order under AFCAP V IDIQ."                                                                  | "FFP Task Order under AFCAP V IDIQ [chunk-3a2f]."                                                                                                                              |
+| "Attachment 1 uses AQL-style thresholds (95% operational equipment, zero discrepancies on escorts)." | "Attachment 1 uses AQL-style thresholds (95% operational equipment, zero discrepancies on escorts) [chunk-7b91, chunk-7b92]."                                                  |
+| "Active KG contains ~400 entities heavy on `requirement` and `performance_standard`."                 | "Active KG slice (per the `kg_entities` call above) contains ~400 entities heavy on `requirement` and `performance_standard`."                                                 |
+| "Block 1 (Mission/Service Model): Locked on single-site OCONUS ISS at ADAB/380 ECES."                 | "Block 1 (Mission/Service Model): Locked on single-site OCONUS ISS at ADAB/380 ECES [chunk-1c44] — see `decision_tree_reconstruction.block_1` in the JSON for full citations." |
+
+For the narrative, when you're summarizing a JSON section that already carries N citations, you may write `[see decision_tree.block_1 source_chunk_ids]` instead of repeating 6 chunk ids inline.
+
+### Class B — Reasoning leaps (DO NOT strip; frame visibly)
+
+Your judgment about what a signal *means* for our capture posture, the proposal team's playbook, capture-side patterns, or what is "likely" to come next. These are not facts in the RFP — they're you reasoning on top of the facts.
+
+**Rule:** Do not strip these. Frame them with a visible-judgment marker so a reader (and the audit) can tell it's a reasoning leap, not an unsourced fact:
+
+- "In our capture experience, …"
+- "A defensible read is that …"
+- "This is the classic … pattern — …"
+- "Likely the CO will …"
+- "Our read: …"
+- "Rule of thumb on OCONUS Air Force ISS recompetes: …"
+- "The CO's posture here would overstate … if …"
+
+Class B examples — keep these as-is, do **not** add `[chunk-xxxx]`:
+
+- "Our read: this is a price-disciplined recompete with the incumbent already inside the building."
+- "Likely the CO will issue an amendment to fix the FAR 52.237-2 trap before close."
+- "Classic OCONUS ISS pattern — high QASP density signals their performance anxiety, not yours."
+
+The audit tool now exempts visible-judgment framing from the grounding denominator. **Do not** dress up Class A facts in Class B language to dodge the audit — it's transparent and it produces a worse brief.
 
 ## Workflow Checklist
 
@@ -211,9 +256,45 @@ Load `references/far_citations.md` Section E (Trap Detector). Check the `clause`
 
 Write to `{run_dir}/artifacts/rfp_reverse_engineering.json` via `write_file`.
 
+**⚠️ Step 10 below is REQUIRED.** The JSON envelope is for the downstream `proposal-generator` skill. The capture team also needs the human-readable narrative — do not stop the run after `write_file`.
+
 ### 10. Present a capture-team narrative
 
 8–12 short sections covering: inferred contract type and why it matters for our cost stack; top 3 hot buttons with discriminator plays; top 3 ghost-language risks needing Q&A; CO errors detected (52.237-2 trap, CPFF form ambiguity, CPARS-QASP confusion); top 5 clarification questions to file in the next Q&A round; what the proposal team should hand to `proposal-generator` next.
+
+**Apply the Citation Discipline rules above as you write.** Every Class A sentence (what the RFP says, what the CO chose, KG content, clause citations, numeric thresholds, proper nouns lifted from chunks) ends with `[chunk-xxxx]`, `[entity: Name]`, `[per references/...]`, or `[see <json.section>.source_chunk_ids]`. Every Class B sentence (your capture-side judgment) opens with a visible-judgment marker ("Our read:", "In our capture experience,", "Likely …", "Classic … pattern —").
+
+**Required narrative shape — every prose sentence ends with one tag.** Use `[see <json.path>.source_chunk_ids]` to point at the JSON envelope you just wrote (cheaper than copy-pasting chunk ids; the audit trusts it because the artifact is on disk). Example excerpt — copy this discipline:
+
+```markdown
+## Inferred contract type
+
+The CO published a PWS, not a SOW [see inferred_intake_answers.sow_or_pws.source_chunk_ids].
+Contract type is FFP with monthly per-CLIN pricing [see inferred_intake_answers.contract_type.source_chunk_ids].
+Total Evaluated Price is the sole price discriminator [see decision_tree_reconstruction.block_5.source_chunk_ids].
+
+**Our read:** pure FFP at a single OCONUS site rewards aggressive LN/OCN labor-mix discipline and
+predictive-maintenance automation — there is no cost-reimbursement buffer to absorb a slow ramp.
+
+## Top hot buttons
+
+1. 24/7 coverage stated without surge multiplier [see hot_buttons[0].source_chunk_ids] — discriminator: tiered/follow-the-sun model.
+2. 5-day transition window [see hot_buttons[1].source_chunk_ids] — discriminator: pre-positioned bench.
+3. AQL-style availability standards on bench stock [see hot_buttons[2].source_chunk_ids] — discriminator: predictive-restock automation.
+
+**In our capture experience,** Air Force OCONUS ISS recompetes that combine FFP + AQL availability
+favor incumbents with mature CMMS data — fold that into the Past Performance volume.
+```
+
+The template is non-negotiable: **no prose sentence may end without one of the four anchor forms or open with a visible-judgment marker.** Do not abbreviate the brief to dodge this — emit fewer sections if you must, but every sentence carries its own anchor.
+
+### 11. Self-audit before returning
+
+Before handing the narrative back, scan it once more end-to-end:
+
+1. For every sentence that asserts an RFP fact, KG fact, clause citation, threshold, or proper noun: confirm it has a `[chunk-xxxx]`, `[entity: …]`, `[per references/…]`, or `[see <json.section>.source_chunk_ids]` tail. If missing, add the anchor (look it up from the JSON envelope you just wrote) **or** prepend a visible-judgment marker if the sentence is actually your inference rather than a stated fact.
+2. For every Class B sentence (your judgment): confirm the visible-judgment marker is present.
+3. Do not invent citations. **Do not delete the narrative or skip step 10 to chase a higher ratio** — a partially-anchored brief still has more capture value than no brief. The audit is a guide, not a gate.
 
 ## What This Skill Does NOT Cover
 

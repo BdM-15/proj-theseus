@@ -61,7 +61,7 @@ The value of this skill is **grounded reasoning** — your expert judgment layer
 - Incumbent identity, last award value, contract vehicle, NAICS, PSC, PoP, place of performance, period of performance, requirement specifics, evaluation factors, set-aside language → `[chunk-xxxx]`.
 - BLS wage figures, CALC+ percentiles, GSA per-diem cells → name the source inline (e.g., "BLS series OEUS47900015-1252 P50 = $152,340" or "CALC+ Software Developer III, N=47, P50=$205").
 
-**Class B — Reasoning leaps & methodology (citation-exempt — DO NOT strip).** Your expert layer on top: pattern recognition, heuristics, capture intuition, FAB chains, risk calls, what-could-go-wrong, second-order implications, comparison to typical industry behavior. These are the *whole point* of the skill. They do **not** need a chunk citation — but they should be visibly framed as judgment ("typically...", "the classic capture pattern is...", "in my experience this size of award implies...", "a defensible read is..."). Examples that should NEVER be stripped:
+**Class B — Reasoning leaps & methodology (citation-exempt — DO NOT strip).** Your expert layer on top: pattern recognition, heuristics, capture intuition, FAB chains, risk calls, what-could-go-wrong, second-order implications, comparison to typical industry behavior. These are the _whole point_ of the skill. They do **not** need a chunk citation — but they should be visibly framed as judgment ("typically...", "the classic capture pattern is...", "in my experience this size of award implies...", "a defensible read is..."). Examples that should NEVER be stripped:
 
 - "5–10% under incumbent is the classic capture sweet spot."
 - "This wrap looks aggressive for a non-cleared GSA MAS; the incumbent is probably on a richer vehicle."
@@ -76,7 +76,7 @@ The value of this skill is **grounded reasoning** — your expert judgment layer
 
 > ✅ "The incumbent's last award of $9.2M [chunk-a3f2c401] implies an effective ~$186/hr fully burdened rate (5 seniors × 1,880 productive hours × 5-year sum-of-years factor ~5.256 at 2.5% escalation). That's right on the GSA MAS commercial wrap range — typical for a non-cleared services BPA."
 
-The second sentence carries the *same* reasoning-model insight as the first; it just lets a capture manager click through to the chunk that says $9.2M and verify the anchor isn't hallucinated.
+The second sentence carries the _same_ reasoning-model insight as the first; it just lets a capture manager click through to the chunk that says $9.2M and verify the anchor isn't hallucinated.
 
 ## Operating Discipline
 
@@ -286,7 +286,7 @@ After `write_file` succeeds, produce a narrative summary (capture-team-readable,
 7. What we DON'T know about the competitor (subcontractor mix, actual wrap, OCI exposure).
 8. FAR citations supporting the cost methodology.
 
-**Apply the Citation Discipline rules above.** Every Class A factual claim (incumbent identity, award value, NAICS, PSC, PoP, BLS figure, CALC+ percentile, GSA per-diem cell) MUST carry an inline anchor (`[chunk-xxxx]` for KG facts; named source for tool-pulled facts). Class B reasoning leaps and methodology heuristics are explicitly permitted *and expected* without chunk citations — those are the reasoning-model value-add and stripping them defeats the skill's purpose. Frame judgments visibly ("typically...", "the classic pattern is...", "a defensible read is...") so the reader can tell anchor from insight.
+**Apply the Citation Discipline rules above.** Every Class A factual claim (incumbent identity, award value, NAICS, PSC, PoP, BLS figure, CALC+ percentile, GSA per-diem cell) MUST carry an inline anchor (`[chunk-xxxx]` for KG facts; named source for tool-pulled facts). Class B reasoning leaps and methodology heuristics are explicitly permitted _and expected_ without chunk citations — those are the reasoning-model value-add and stripping them defeats the skill's purpose. Frame judgments visibly ("typically...", "the classic pattern is...", "a defensible read is...") so the reader can tell anchor from insight.
 
 ### 11. Self-audit before returning
 

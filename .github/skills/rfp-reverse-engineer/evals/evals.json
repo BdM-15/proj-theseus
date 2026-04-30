@@ -57,6 +57,25 @@
         "treating every vague phrase as ghost language without checking the catalog",
         "missing-section entries that say 'unclear why' instead of citing the inference rule"
       ]
+    },
+    {
+      "id": "rfp-rev-004",
+      "name": "Capture-team narrative passes the grounding audit",
+      "prompt": "Workspace `afcap6_drfp`. Reverse-engineer this RFP and present a capture-team narrative. Every Class A sentence (RFP fact, KG fact, clause citation, threshold, proper noun) must end with [chunk-xxxx], [entity: Name], [per references/...], or [see <json.section>.source_chunk_ids]. Every Class B sentence (your capture-side judgment about what a signal means) must open with a visible-judgment marker (\"Our read:\", \"In our capture experience,\", \"Likely ...\", \"Classic ... pattern\u2014\"). Do not invent citations. If a sentence cannot be honestly anchored or honestly framed as a reasoning leap, delete it.",
+      "expected_signals": [
+        "JSON envelope written first to {run_dir}/artifacts/rfp_reverse_engineering.json with source_chunk_ids on every entry",
+        "narrative section is 8\u201312 short sections covering contract type, top hot buttons, ghost-language risks, CO errors, clarification questions, hand-off to proposal-generator",
+        "every Class A sentence (RFP / KG / clause / threshold / proper noun) carries one of the allowed inline anchor forms",
+        "every Class B sentence (judgment) opens with one of the visible-judgment markers listed in the SKILL.md Citation Discipline section",
+        "self-audit step 11 ran \u2014 either anchors were added, sentences demoted to Class B with markers, or unanchorable sentences deleted",
+        "when tools/audit_skill_grounding.py is run against this run's transcript, grounding_ratio is >= 0.20 (insight-heavy reasoning-essay skill; the JSON envelope is the citation-of-record, the narrative is the human-readable distillation \u2014 pure 0.80 is not reachable without fabrication or stripping all capture-side judgment)"
+      ],
+      "anti_signals": [
+        "fabricating chunk ids the model did not actually retrieve",
+        "dressing up Class A facts in Class B language to dodge the audit (e.g., 'In our capture experience, the contract is FFP under AFCAP V')",
+        "stripping all judgment to chase a higher ratio \u2014 the brief becomes useless without capture-side reasoning",
+        "narrative omitted because the JSON envelope is sufficient (it is not \u2014 the narrative is the human-readable hand-off)"
+      ]
     }
   ]
 }

@@ -104,6 +104,27 @@ REF_BUNDLE_RE = re.compile(
     re.IGNORECASE,
 )
 
+# JSON-envelope shorthand: skills that emit a structured artifact via
+# write_file may legitimately reference back to it from the narrative
+# without copy-pasting every chunk id, e.g.
+#   "[see decision_tree_reconstruction.block_2.source_chunk_ids]"
+#   "[per artifact: hot_buttons[3].source_chunk_ids]"
+#   "(see artifact: rfp_reverse_engineering.json -> compliance_traps)"
+# Only credited when the run actually wrote a JSON artifact.
+JSON_REF_RE = re.compile(
+    r"\[(?:see|per|ref(?:er)?|cite)\b[^\]]*?(?:source_chunk_ids|artifact|envelope|json)[^\]]*\]"
+    r"|\(\s*(?:see|per|ref(?:er)?)\b[^)]*?(?:source_chunk_ids|artifact:\s*[A-Za-z0-9_./-]+\.json|envelope)[^)]*\)",
+    re.IGNORECASE,
+)
+
+# Parenthetical source attribution — "(Source: PWS 1.1)", "(Sources: chunks for X)",
+# "(Cite: kg_entities)", "(per kg)". Loose-match, but only credited when the run
+# wrote a JSON artifact (so the on-disk envelope is the verifiable backstop).
+SOURCE_PAREN_RE = re.compile(
+    r"\(\s*(?:Sources?|Cite|Citation|Cites|Per\s+(?:kg|KG|chunks?|entities?|the\s+kg))\s*:[^)]{2,200}\)",
+    re.IGNORECASE,
+)
+
 # Sentence terminators. Keep ASCII-only; the prompts produce ASCII punct.
 SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z\(\[`])")
 
@@ -127,7 +148,7 @@ STRUCTURAL_LINE_RE = re.compile(
 # Match a line that is *entirely* one or two bold runs and optional
 # trailing punctuation — no narrative prose after the closing ``**``.
 BOLD_HEADING_RE = re.compile(
-    r"^\s*[-*]?\s*\*\*[^*\n]{2,80}\*\*\s*[:.\-—]?\s*$",
+    r"^\s*[-*]?\s*\*\*[^*\n]{2,200}\*\*\s*[:.\-—]?\s*$",
 )
 
 # Class B reasoning-leap markers — visible-judgment framing the SKILL
@@ -182,9 +203,14 @@ COVER_NOTE_EXEMPT_RE = re.compile(
         # Artifact save/write confirmations
         (\*\*)?(Saved|Wrote|Created|Generated|Emitted|Persisted)\b.*\b(artifact|artifacts/|\.json|\.docx|\.xlsx|\.md|\.pptx|\.html)\b.* |
         # Pointer / next-action lines
-        (Open|See|Refer\s+to|Inspect|Review)\b.*\b(JSON|artifact|artifacts/|file|report|envelope)\b.* |
+        (Open|See|Refer\s+to|Inspect|Review|Hand|Pass|Forward)\b.*\b(JSON|artifact|artifacts/|file|report|envelope|directly\s+to|to\s+`?[a-z][a-z0-9_-]+`?)\b.* |
         # Skill self-attestation about process completion
-        (All|Every|Each)\s+(\d+\s+)?(checks?|findings?|claims?|items?|entries?|deliverables?)\b.*\b(executed|cited|grounded|sourced|covered|completed)\b.*
+        (All|Every|Each)\s+(\d+\s+)?(checks?|findings?|claims?|items?|entries?|deliverables?|inferences?|facts?)\b.*\b(executed|cited|grounded|sourced|covered|completed|anchored|invented)\b.* |
+        # Definition-list bullet headers like "- **PWS (not SOW)**: Locked."
+        # The substantive claim should live in the next sentence, not the header.
+        [-*]\s+\*\*[^*]{2,120}\*\*\s*[:.\-—].{0,40}$ |
+        # First-person process narration: "I anchored ...", "We pulled ..."
+        (I|We)\s+(anchored|pulled|queried|loaded|invoked|called|read|inspected|verified|cross-?checked)\b.*
     )""",
     re.IGNORECASE | re.VERBOSE,
 )
@@ -287,6 +313,24 @@ def _consulted_named_sources(turns: list[dict[str, Any]]) -> set[str]:
     return sources
 
 
+def _wrote_json_artifact(turns: list[dict[str, Any]]) -> bool:
+    """True if the run wrote any *.json artifact via write_file."""
+    for t in turns:
+        if t.get("kind") != "tool" or t.get("name") != "write_file":
+            continue
+        args = t.get("arguments") or {}
+        if not isinstance(args, dict):
+            args = {}
+        path = (args.get("path") or "").lower()
+        if path.endswith(".json"):
+            return True
+        # Some transcripts surface the path only in the result preview
+        rp = (t.get("result_preview") or "").lower()
+        if ".json" in rp and "path" in rp:
+            return True
+    return False
+
+
 def _split_claims(text: str) -> list[str]:
     """Split response into candidate claim sentences (line-aware)."""
     out: list[str] = []
@@ -322,6 +366,7 @@ def _is_grounded(
     retrieved_chunks: set[str],
     retrieved_entities: set[str],
     consulted_sources: set[str],
+    wrote_json_artifact: bool = False,
 ) -> bool:
     # Rule 1+2: any chunk-xxxx citation in the sentence
     for match in CHUNK_CITE_RE.findall(sentence):
@@ -364,6 +409,12 @@ def _is_grounded(
         # Match if any consulted source path ends with this reference
         if any(s.endswith(ref_path) or ref_path in s for s in consulted_sources):
             return True
+    # Rule 3a-iv: hand-off to the JSON artifact the skill wrote this run
+    if wrote_json_artifact and JSON_REF_RE.search(sentence):
+        return True
+    # Rule 3a-v: parenthetical source attribution backed by the on-disk artifact
+    if wrote_json_artifact and SOURCE_PAREN_RE.search(sentence):
+        return True
     return False
 
 
@@ -373,6 +424,7 @@ def audit(transcript_path: Path) -> dict[str, Any]:
     chunks = _retrieved_chunk_ids(turns)
     entities = _retrieved_entities(turns)
     consulted = _consulted_named_sources(turns)
+    wrote_json = _wrote_json_artifact(turns)
 
     # Skill / run id from path: rag_storage/<ws>/skill_runs/<skill>/<run_id>/transcript.json
     parts = transcript_path.resolve().parts
@@ -394,7 +446,7 @@ def audit(transcript_path: Path) -> dict[str, Any]:
             claims_exempt += 1
             continue
         claims_total += 1
-        if _is_grounded(sent, chunks, entities, consulted):
+        if _is_grounded(sent, chunks, entities, consulted, wrote_json):
             claims_grounded += 1
         else:
             if len(unsourced) < 10:
