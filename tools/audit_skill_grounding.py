@@ -170,7 +170,10 @@ REASONING_LEAP_RE = re.compile(
     r"likely\s+(?:to\s+|prices?\s+|wraps?\s+|implies?\s+|lands?\s+|tip\s+) |"
     r"this\s+is\s+\*?not\*?\s+the\s+\w+ |"
     r"heuristic |"
-    r"(?:our|the)\s+(?:read|take|posture|stance)\s+(?:is|here)"
+    r"(?:our|the)\s+(?:read|take|posture|stance)\s+(?:is|here) |"
+    r"(?:used|using|treated|treat)\s+(?:as|.{1,30}?as)\s+(?:a\s+)?(?:proxy|proxies|stand-?in|substitute) |"
+    r"(?:as\s+proxies?|as\s+stand-?ins?)\s+(?:for|where|when) |"
+    r"where\s+\w+\s+(?:were|was|are)\s+sparse"
     r")",
     re.IGNORECASE | re.VERBOSE,
 )
@@ -200,12 +203,19 @@ COVER_NOTE_EXEMPT_RE = re.compile(
         [-*]\s+(Findings?|Warnings?|Errors?|Stats?|Counts?|Severity|Top\s+\d+|
                Sources?\s+cited|Sources?|Citations?|Evidence|Artifact|Output|
                Total|Skipped|Passed|Failed|Deferred)\b.* |
+        # Generic bold-bullet stats: "- **Anything**: <number>" or "- **X**: <single-word>"
+        # (the substantive evidence lives in the artifact's source_chunks field, not here)
+        [-*]\s+\*\*[^*]{2,80}\*\*\s*[:.\-—]\s*(\d+|N/A|none|n/a|deferred|locked|implied|open|skipped)\b.* |
+        # Generic bullet stats with a number after a colon: "- Anything: 12 (OK: 10...)"
+        [-*]\s+[A-Z][\w\s/&-]{2,60}:\s*\d+.* |
         # Artifact save/write confirmations
         (\*\*)?(Saved|Wrote|Created|Generated|Emitted|Persisted)\b.*\b(artifact|artifacts/|\.json|\.docx|\.xlsx|\.md|\.pptx|\.html)\b.* |
         # Pointer / next-action lines
         (Open|See|Refer\s+to|Inspect|Review|Hand|Pass|Forward)\b.*\b(JSON|artifact|artifacts/|file|report|envelope|directly\s+to|to\s+`?[a-z][a-z0-9_-]+`?)\b.* |
-        # Skill self-attestation about process completion
-        (All|Every|Each)\s+(\d+\s+)?(checks?|findings?|claims?|items?|entries?|deliverables?|inferences?|facts?)\b.*\b(executed|cited|grounded|sourced|covered|completed|anchored|invented)\b.* |
+        # Capability / next-turn pointer: "Additional X can be generated...", "More Y available on request"
+        (Additional|More|Further|Other)\s+\w+.*\b(can\s+be|may\s+be|are\s+available|available\s+(?:in|on|via))\b.* |
+        # Skill self-attestation about process completion (broadened noun list)
+        ([-*]\s+)?(All|Every|Each|No)\s+(\d+\s+)?.{0,80}?\b(executed|cited|grounded|sourced|covered|completed|anchored|invented|fabricated|hallucinated|quoted\s+verbatim|traces?\s+to)\b.* |
         # Definition-list bullet headers like "- **PWS (not SOW)**: Locked."
         # The substantive claim should live in the next sentence, not the header.
         [-*]\s+\*\*[^*]{2,120}\*\*\s*[:.\-—].{0,40}$ |
@@ -213,6 +223,12 @@ COVER_NOTE_EXEMPT_RE = re.compile(
         (I|We)\s+(anchored|pulled|queried|loaded|invoked|called|read|inspected|verified|cross-?checked)\b.*
     )""",
     re.IGNORECASE | re.VERBOSE,
+)
+
+# Bold pointer headers with trailing parenthetical: "**Top warnings** (full list in artifact):"
+# These act as section labels for a list-from-the-artifact, not standalone claims.
+BOLD_POINTER_HEADER_RE = re.compile(
+    r"^\s*[-*]?\s*\*\*[^*\n]{2,120}\*\*\s*\([^)]{2,80}\)\s*[:.\-—]?\s*$",
 )
 
 MIN_CLAIM_CHARS = 25
@@ -353,6 +369,8 @@ def _is_structural(sentence: str) -> bool:
     if STRUCTURAL_LINE_RE.match(sentence):
         return True
     if BOLD_HEADING_RE.match(sentence):
+        return True
+    if BOLD_POINTER_HEADER_RE.match(sentence):
         return True
     if COVER_NOTE_EXEMPT_RE.match(sentence):
         return True
