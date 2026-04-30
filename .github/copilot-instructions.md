@@ -341,7 +341,7 @@ ALL development happens on feature branches. `main` is updated only via fast-for
 
 **Active integration branches:**
 
-- _None._ The skills + MCP epic (Phases 2.x–6.x) merged to `main` as `v1.2.0`; the skills E2E hardening epic (`142-skills-e2e-hardening`, sub-branches 143–148) merged to `main` as `v1.3.0`. New feature branches now branch from `main` directly. If a future multi-branch epic starts, list its integration branch here.
+- **`149-lightrag-json-extraction-epic`** (issue #124) — LightRAG tuple-to-JSON extraction migration. Sub-branches `150-phase0-dep-upgrade-baseline` through `160-phase4-lockin` FF into `149`. `149` only FFs to `main` at Phase 4 lockin with tag `v1.4.0`. `main` stays at v1.3.0 throughout. Prior epics: skills + MCP → `v1.2.0`; skills E2E hardening (`142`) → `v1.3.0`.
 
 **Standard fast-forward sequence** (after the user says "merge it" / "ship it" / "continue"):
 
