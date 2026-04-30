@@ -10,7 +10,7 @@ metadata:
   capability: estimate
   runtime: tools
   category: pricing
-  version: 0.1.0
+  version: 0.2.0
   status: active
   upstream: https://github.com/1102tools/federal-contracting-skills
   # Phase 4g: declare which vendored MCP servers this skill needs.
@@ -188,6 +188,8 @@ Read [references/ot_authority_taxonomy.md](references/ot_authority_taxonomy.md) 
 - **Consortium-brokered**: add 5% management fee on top of government obligation (NOT deducted from performer share).
 
 ### 9. Assemble and present the bid envelope
+
+**REQUIRED — DO NOT SKIP**: Before drafting any narrative summary, you MUST call `write_file` with target path `artifacts/<workflow_specific_name>.json` and the JSON envelope below as the content. The narrative in step 10 is a summary of what is on disk; if the artifact is not written, the narrative has no citation-of-record and the run fails the grounding audit. Do not say "the artifact has been written" unless you have actually invoked `write_file` in this turn.
 
 JSON envelope (the renderer skill will turn this into .xlsx if needed):
 

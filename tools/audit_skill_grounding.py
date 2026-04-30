@@ -104,6 +104,13 @@ REF_BUNDLE_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Bare-filename reference: "per ot_authority_taxonomy.md", "per cost_models/foo.md",
+# "trl_milestone_patterns.md §1/3". Credited only if a consulted_sources path
+# ends with that basename (so an unread file isn't a free citation).
+BARE_REF_RE = re.compile(
+    r"\b([A-Za-z0-9_]+(?:/[A-Za-z0-9_]+)?\.md)\b",
+)
+
 # JSON-envelope shorthand: skills that emit a structured artifact via
 # write_file may legitimately reference back to it from the narrative
 # without copy-pasting every chunk id, e.g.
@@ -126,7 +133,16 @@ SOURCE_PAREN_RE = re.compile(
 )
 
 # Sentence terminators. Keep ASCII-only; the prompts produce ASCII punct.
-SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z\(\[`])")
+# Negative lookbehind avoids splitting after common abbreviations
+# (vs., e.g., i.e., etc., cf., U.S., No., Inc., Corp., Co., Ltd., approx., ca.)
+# Each lookbehind must include the trailing dot \u2014 the split position is
+# right after that dot, so the lookbehind's window ends there too.
+_ABBREV_NO_SPLIT = (
+    r"(?<!\bvs\.)(?<!\be\.g\.)(?<!\bi\.e\.)(?<!\betc\.)(?<!\bcf\.)"
+    r"(?<!\bU\.S\.)(?<!\bNo\.)(?<!\bInc\.)(?<!\bCorp\.)(?<!\bLtd\.)"
+    r"(?<!\bapprox\.)(?<!\bca\.)(?<!\bSr\.)(?<!\bJr\.)"
+)
+SENTENCE_SPLIT_RE = re.compile(_ABBREV_NO_SPLIT + r"(?<=[.!?])\s+(?=[A-Z\(\[`])")
 
 # Patterns that mark a line as structural (not a claim).
 STRUCTURAL_LINE_RE = re.compile(
@@ -173,7 +189,12 @@ REASONING_LEAP_RE = re.compile(
     r"(?:our|the)\s+(?:read|take|posture|stance)\s+(?:is|here) |"
     r"(?:used|using|treated|treat)\s+(?:as|.{1,30}?as)\s+(?:a\s+)?(?:proxy|proxies|stand-?in|substitute) |"
     r"(?:as\s+proxies?|as\s+stand-?ins?)\s+(?:for|where|when) |"
-    r"where\s+\w+\s+(?:were|was|are)\s+sparse"
+    r"where\s+\w+\s+(?:were|was|are)\s+sparse |"
+    r"default\s+(?:for|value|assumption|per) |"
+    r"standard\s+per\s+\w+ |"
+    r"per\s+(?:AO|agency|industry|capture|taxonomy|reference|standard)\s+(?:convention|patterns?|practice|defaults?) |"
+    r"per\s+(?:reference|taxonomy)\s+(?:patterns?|defaults?|conventions?) |"
+    r"(?:passes|pass)\s+through\s+to\s+"
     r")",
     re.IGNORECASE | re.VERBOSE,
 )
@@ -229,6 +250,48 @@ COVER_NOTE_EXEMPT_RE = re.compile(
 # These act as section labels for a list-from-the-artifact, not standalone claims.
 BOLD_POINTER_HEADER_RE = re.compile(
     r"^\s*[-*]?\s*\*\*[^*\n]{2,120}\*\*\s*\([^)]{2,80}\)\s*[:.\-—]?\s*$",
+)
+
+# Milestone bullet (artifact field disclosure): "- **M1** (Phase 1, Months 1-3): ...content..."
+# These bullets walk the milestones[] array of the on-disk artifact one-by-one.
+MILESTONE_BULLET_RE = re.compile(
+    r"^\s*[-*]\s*\*\*[A-Z]\d+\*\*\s*\([^)]{2,120}\)\s*[:.\-—].*",
+)
+
+# Structured-field readout (artifact field disclosure). Only credited when the
+# run wrote a JSON artifact — these field names are the on-disk envelope's
+# keys being spelled out for the human reader, source_chunks live in the JSON.
+STRUCTURED_FIELD_RE = re.compile(
+    r"""^\s*[-*]?\s*\*?\*?(
+        Deliverables? |
+        Exit\s+criterion |
+        Exit\s+criteria |
+        Traces?\s+to |
+        TRL\s+in/?out |
+        Payment\s+type |
+        Total\s+\w+(?:\s+mid)? |
+        Totals? |
+        Authority |
+        Milestone\s+structure |
+        Workflow\s+chosen |
+        Bid\s+cost\s+stack\s+summary |
+        Bid\s+recommendation |
+        Hand-?off |
+        Statutory\s+citations? |
+        KG\s+sources? |
+        Rationale |
+        Top\s+\d+\s+risk\s+flags? |
+        Materials?/?ODCs? |
+        Travel |
+        Consortium\s+fee |
+        Headcount(?:\s+equivalent)? |
+        Mid\s+burdened\s+\w+ |
+        CALC\+\s+context |
+        Labor |
+        Should-?cost |
+        Government\s+obligation
+    )\*?\*?\s*[:.\-—]""",
+    re.IGNORECASE | re.VERBOSE,
 )
 
 MIN_CLAIM_CHARS = 25
@@ -372,6 +435,8 @@ def _is_structural(sentence: str) -> bool:
         return True
     if BOLD_POINTER_HEADER_RE.match(sentence):
         return True
+    if MILESTONE_BULLET_RE.match(sentence):
+        return True
     if COVER_NOTE_EXEMPT_RE.match(sentence):
         return True
     if REASONING_LEAP_RE.search(sentence):
@@ -427,11 +492,26 @@ def _is_grounded(
         # Match if any consulted source path ends with this reference
         if any(s.endswith(ref_path) or ref_path in s for s in consulted_sources):
             return True
+    # Rule 3a-iii-b: bare-filename reference (e.g. "per trl_milestone_patterns.md")
+    # — credited only if a consulted source path ends with the basename.
+    for m in BARE_REF_RE.finditer(sentence):
+        bare = m.group(1).lower()
+        # Skip generic / common names; require at least one underscore or a path slash
+        if "/" not in bare and "_" not in bare:
+            continue
+        basename = bare.rsplit("/", 1)[-1]
+        if any(s.endswith("/" + basename) or s.endswith(basename) for s in consulted_sources):
+            return True
     # Rule 3a-iv: hand-off to the JSON artifact the skill wrote this run
     if wrote_json_artifact and JSON_REF_RE.search(sentence):
         return True
     # Rule 3a-v: parenthetical source attribution backed by the on-disk artifact
     if wrote_json_artifact and SOURCE_PAREN_RE.search(sentence):
+        return True
+    # Rule 3a-vi: structured-field readout of an artifact key (Deliverables:,
+    # Exit criterion:, Traces to:, etc.) \u2014 the value lives in the JSON,
+    # source_chunks live alongside it.
+    if wrote_json_artifact and STRUCTURED_FIELD_RE.match(sentence):
         return True
     return False
 

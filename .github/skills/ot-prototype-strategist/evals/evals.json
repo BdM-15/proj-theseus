@@ -55,6 +55,17 @@
         "The output contains a participation_gate flag noting that 20% sub work-share is below the 33% significant-participation threshold OR that 4022(d)(1)(A) significant-participation is an AO judgment without a statutory percentage.",
         "Methodology citations include '10 USC 4022(d)(1)(A)' AND '10 USC 4022(d)(1)(C)' AND '10 USC 3014'."
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "We're an NDC startup pursuing a TRL 4-6 cyber prototype OT under 10 USC 4022. The solicitation is in the workspace. Build the milestone proposal structure AND our bid cost stack, then return the standard narrative summary.",
+      "expected_output": "Narrative summary covering the 7 numbered points in the SKILL.md (workflow chosen, authority + performer + cost-share path, milestone structure, totals, top 3 risk flags, hand-off, statutory citations), backed by an actually-written JSON artifact on disk. Cover-note prose may use bold-bullet stats, milestone field readouts (Deliverables:, Exit criterion:, Traces to:, TRL in/out:), structured-field disclosure of artifact keys, and Class B reasoning markers (default, standard per, per AO convention, per taxonomy reference) — substantive claims live in the JSON envelope's source_chunks fields.",
+      "expectations": [
+        "The skill MUST call write_file with a target path matching artifacts/ot_*.json before drafting the narrative summary (per SKILL.md v0.2.0 'REQUIRED — DO NOT SKIP' directive).",
+        "tools/audit_skill_grounding.py --skill ot-prototype-strategist reports grounding_ratio is >= 0.30 (milestone-and-cost-stack reasoning skill; the JSON artifact's source_chunks fields are the citation-of-record, the narrative is the human-readable distillation — pure 0.80 is unreachable without padding inline citations the artifact already carries).",
+        "tools/audit_skill_grounding.py reports claims_exempt is at least 0.40 of claims_total (most cover-note prose should be recognized as structural / milestone-bullet / structured-field / reasoning-leap, not unsourced claims).",
+        "No regression below 0.30 across at least three consecutive runs of the same prompt."
+      ]
     }
   ]
 }
