@@ -71,6 +71,7 @@ explicit = true
 # Override torch/torchvision to use CUDA 12.4 builds
 torch = { index = "pytorch-cu124" }
 torchvision = { index = "pytorch-cu124" }
+lightrag-hku = { git = "https://github.com/HKUDS/LightRAG.git", rev = "7ad1e82096ade043de530baf9565e90184749f50" }
 
 [dependency-groups]
 dev = [

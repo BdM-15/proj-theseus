@@ -1057,7 +1057,7 @@ requires-dist = [
     { name = "ftfy", specifier = ">=6.3.1" },
     { name = "huggingface-hub", specifier = ">=0.34.0,<1.0.0" },
     { name = "instructor", specifier = ">=1.15.0" },
-    { name = "lightrag-hku", specifier = ">=1.4.13" },
+    { name = "lightrag-hku", git = "https://github.com/HKUDS/LightRAG.git?rev=7ad1e82096ade043de530baf9565e90184749f50" },
     { name = "neo4j", specifier = ">=5.0.0" },
     { name = "openai", specifier = ">=2.0.0,<3.0.0" },
     { name = "pyarrow", specifier = "<19" },
@@ -1523,8 +1523,8 @@ wheels = [
 
 [[package]]
 name = "lightrag-hku"
-version = "1.4.13"
-source = { registry = "https://pypi.org/simple" }
+version = "1.5.0"
+source = { git = "https://github.com/HKUDS/LightRAG.git?rev=7ad1e82096ade043de530baf9565e90184749f50#7ad1e82096ade043de530baf9565e90184749f50" }
 dependencies = [
     { name = "aiohttp" },
     { name = "configparser" },
@@ -1540,14 +1540,11 @@ dependencies = [
     { name = "pydantic" },
     { name = "pypinyin" },
     { name = "python-dotenv" },
+    { name = "pyyaml" },
     { name = "setuptools" },
     { name = "tenacity" },
     { name = "tiktoken" },
     { name = "xlsxwriter" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/b1/c9/6dc760199eca1a80358e14a46f36502d7bcefef8a8ec1017bae5a89129c3/lightrag_hku-1.4.13.tar.gz", hash = "sha256:53873bd0a2aa29509692f9bddf15f9338bdede5acd27339a69f9726d2a7d0ea5", size = 3757456, upload-time = "2026-04-02T17:01:53.985Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f2/7a/caaeb5634db84e3f5b72e16a2b906f49fd01825655ebfc685566d6af848c/lightrag_hku-1.4.13-py3-none-any.whl", hash = "sha256:44d356dc9c61a867a0d209be432fcbf31a4aef010ba4de348271f1343d8692c5", size = 3651157, upload-time = "2026-04-02T17:01:50.782Z" },
 ]
 
 [[package]]
