@@ -542,9 +542,9 @@ async def initialize_raganything():
     # ═══════════════════════════════════════════════════════════════════════════════
     # BaseModalProcessor.__init__ snapshots `self.global_config = asdict(lightrag)`
     # (raganything/modalprocessors.py ~line 389). asdict() only walks dataclass
-    # fields; `role_llm_funcs` is installed onto `lightrag.__dict__` AFTER
-    # construction by LightRAG 1.5.0's `_rebuild_role_llm_funcs()` (lightrag.py
-    # ~line 986), so it never appears in the snapshot.
+    # fields, but LightRAG 1.5.0 exposes `role_llm_funcs` as a @property backed
+    # by the private `_role_llm_states` map (lightrag.py:934) — so the snapshot
+    # silently drops it.
     #
     # When the modal pipeline later calls `extract_entities(global_config=...)`,
     # operate.py:3287 does `global_config["role_llm_funcs"]["extract"]` and
@@ -558,24 +558,36 @@ async def initialize_raganything():
     # flight as of 2026-04-30. See proj-theseus issue #118 (orthogonal — table
     # boilerplate dominates retrieval even when this works).
     #
-    # Fix: inject the live `role_llm_funcs` mapping into each modal processor's
-    # snapshot. Remove this block once raganything releases an LR-1.5-aware
-    # version (likely changes the snapshot to a live `lightrag.__dict__` ref).
+    # Fix: replace each modal processor's snapshot with LightRAG's own
+    # `_build_global_config()` output, which populates role_llm_funcs from the
+    # live `_role_llm_states` map (lightrag.py:1474). Remove this block once
+    # raganything releases an LR-1.5-aware version.
     # ═══════════════════════════════════════════════════════════════════════════════
-    _live_role_llm_funcs = _rag_anything.lightrag.__dict__.get("role_llm_funcs")
-    if _live_role_llm_funcs:
+    _build_gc = getattr(_rag_anything.lightrag, "_build_global_config", None)
+    _live_role_funcs = getattr(_rag_anything.lightrag, "role_llm_funcs", None)
+    if callable(_build_gc) and _live_role_funcs:
+        _patched = 0
         for _modal_kind, _modal_proc in _rag_anything.modal_processors.items():
-            if isinstance(_modal_proc.global_config, dict):
-                _modal_proc.global_config["role_llm_funcs"] = _live_role_llm_funcs
+            try:
+                _modal_proc.global_config = _build_gc()
+                _patched += 1
+            except Exception as _shim_err:  # pragma: no cover - defensive
+                logger.warning(
+                    "⚠️ role_llm_funcs shim failed for modal processor '%s': %s",
+                    _modal_kind, _shim_err,
+                )
         logger.info(
-            "✅ Shim applied: injected role_llm_funcs into %d modal processors "
-            "(workaround for raganything 1.2.10 ↔ lightrag 1.5.0 asdict() snapshot bug)",
-            len(_rag_anything.modal_processors),
+            "✅ Shim applied: rebuilt global_config for %d modal processors via "
+            "lightrag._build_global_config() (workaround for raganything 1.2.10 ↔ "
+            "lightrag 1.5.0 asdict() snapshot bug; role_llm_funcs roles=%s)",
+            _patched, sorted(_live_role_funcs.keys()),
         )
     else:
         logger.warning(
-            "⚠️ role_llm_funcs not found on lightrag.__dict__ — modal multimodal "
-            "extraction may fall back to bare table/image/equation placeholders"
+            "⚠️ Cannot apply role_llm_funcs shim: _build_global_config callable=%s, "
+            "role_llm_funcs available=%s — modal multimodal extraction may fall "
+            "back to bare table/image/equation placeholders",
+            callable(_build_gc), bool(_live_role_funcs),
         )
 
     # ═══════════════════════════════════════════════════════════════════════════════
