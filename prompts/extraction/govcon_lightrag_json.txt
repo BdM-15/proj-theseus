@@ -2,7 +2,10 @@ GOVCON ONTOLOGY - LIGHTRAG NATIVE JSON FORMAT
 ======================================================================
 Model: xAI Grok (response_format=json_object)
 Output: LightRAG JSON Structured Output (entities[] + relationships[])
-Version: 7.0 (Phase 1.2 - Tuple-Delimited → JSON Migration, issue #124)
+Version: 7.1 (Phase 1.2 - Tuple-Delimited → JSON Migration, issue #124)
+        7.1 strengthens Part J keywords rule to forbid space-joined or
+        comma-joined CANONICAL types (e.g. "CONTAINS PHASE_OF") — observed
+        leak in afcap5_adab_iss_t1 reprocess.
 Source: Converted from govcon_lightrag_native.txt v6.5
 Total Size: ~35K tokens (full domain intelligence preserved)
 
@@ -1347,16 +1350,28 @@ RELATIONSHIP OBJECT (4 required fields):
   "description": "<complete sentence explaining the relationship>"
 }}
 
-CRITICAL: `keywords` MUST begin with the canonical UPPERCASE relationship type
-as its first comma-separated token. Optional additional semantic keywords MAY
-follow after a comma. Examples:
+CRITICAL: `keywords` MUST begin with EXACTLY ONE canonical UPPERCASE relationship
+type as its first comma-separated token. Optional additional semantic keywords
+MAY follow AFTER A COMMA (never a space). Examples:
   "keywords": "GUIDES"
   "keywords": "GUIDES, golden thread, L↔M mapping"
   "keywords": "CHILD_OF"
   "keywords": "MEASURED_BY, threshold, monthly inspection"
 
-The first token is parsed by downstream inference as the typed edge label.
-Extra tokens enrich VDB embedding semantics but never override the type.
+NEVER concatenate two canonical types with a space (or any other separator) in a
+single `keywords` field. If two distinct canonical relationships exist between
+the same source and target, emit TWO separate relationship objects — one per
+canonical type. Examples of FORBIDDEN keywords (DO NOT EMIT):
+  "keywords": "CONTAINS PHASE_OF"        ← space-joined, WRONG
+  "keywords": "REQUIRES USES"            ← space-joined, WRONG
+  "keywords": "INCLUDES SEQUENCE"        ← space-joined, WRONG
+  "keywords": "VALIDATES, REVIEWS"       ← comma-joined CANONICAL types, WRONG (split into 2 relationships)
+  "keywords": "CHILD_OF, CONTAINS"       ← comma-joined CANONICAL types, WRONG (split into 2 relationships)
+
+The first token is parsed by downstream inference as the typed edge label and
+MUST match the regex `^[A-Z][A-Z0-9_]*$`. Extra tokens after the first comma
+enrich VDB embedding semantics (lowercase phrases, free text) but never override
+the type and MUST NOT themselves be canonical UPPERCASE types.
 
 VALID ENTITY TYPES (33 — see Part D / {entity_types_guidance}):
 requirement, clause, document_section, document, deliverable, evaluation_factor,
@@ -1453,7 +1468,10 @@ CRITICAL OUTPUT RULES:
    - work_scope_item: task_number, scope_description
    - proposal_volume: volume_id, purpose
    - pricing_element: pricing_type, value_or_percentage, basis
-4. RELATIONSHIP keywords: FIRST token = canonical UPPERCASE type. Extra tokens MAY follow.
+4. RELATIONSHIP keywords: FIRST token = EXACTLY ONE canonical UPPERCASE type
+   (regex `^[A-Z][A-Z0-9_]*$`). Optional lowercase semantic phrases MAY follow
+   after a comma. NEVER space-join two types ("CONTAINS PHASE_OF" is WRONG).
+   NEVER comma-join two canonical types either — emit TWO relationship objects.
 5. RELATIONSHIP description: complete sentence; explains WHY the two entities connect.
 6. Only emit relationships whose `source` AND `target` both appear in `entities` (or are valid cross-chunk references to known canonical entities).
 7. Avoid forced relationships — see Example 8 anti-pattern. RELATED_TO is a last resort.

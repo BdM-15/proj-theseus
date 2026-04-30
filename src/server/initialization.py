@@ -536,7 +536,48 @@ async def initialize_raganything():
     logger.info("   table    → TableModalProcessor    (govcon TABLE_ANALYSIS_SYSTEM + table_prompt)")
     logger.info("   image    → ImageModalProcessor    (govcon IMAGE_ANALYSIS_SYSTEM + vision_prompt)")
     logger.info("   equation → EquationModalProcessor (govcon EQUATION_ANALYSIS_SYSTEM + equation_prompt)")
-    
+
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # SHIM: RAGAnything 1.2.10 ↔ LightRAG 1.5.0 `role_llm_funcs` incompatibility
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # BaseModalProcessor.__init__ snapshots `self.global_config = asdict(lightrag)`
+    # (raganything/modalprocessors.py ~line 389). asdict() only walks dataclass
+    # fields; `role_llm_funcs` is installed onto `lightrag.__dict__` AFTER
+    # construction by LightRAG 1.5.0's `_rebuild_role_llm_funcs()` (lightrag.py
+    # ~line 986), so it never appears in the snapshot.
+    #
+    # When the modal pipeline later calls `extract_entities(global_config=...)`,
+    # operate.py:3287 does `global_config["role_llm_funcs"]["extract"]` and
+    # raises KeyError → RAGAnything catches it and silently falls back to a bare
+    # `{entity_type: "table"}` placeholder, killing all govcon decomposition of
+    # tables/images/equations.
+    #
+    # Reproduced under v1.2.10 + LightRAG 1.5.0 with 73 `Error processing table
+    # content: 'role_llm_funcs'` failures in afcap5_adab_iss_t1. Confirmed
+    # upstream `main` (post v1.2.10) still uses `asdict(lightrag)` — no PR in
+    # flight as of 2026-04-30. See proj-theseus issue #118 (orthogonal — table
+    # boilerplate dominates retrieval even when this works).
+    #
+    # Fix: inject the live `role_llm_funcs` mapping into each modal processor's
+    # snapshot. Remove this block once raganything releases an LR-1.5-aware
+    # version (likely changes the snapshot to a live `lightrag.__dict__` ref).
+    # ═══════════════════════════════════════════════════════════════════════════════
+    _live_role_llm_funcs = _rag_anything.lightrag.__dict__.get("role_llm_funcs")
+    if _live_role_llm_funcs:
+        for _modal_kind, _modal_proc in _rag_anything.modal_processors.items():
+            if isinstance(_modal_proc.global_config, dict):
+                _modal_proc.global_config["role_llm_funcs"] = _live_role_llm_funcs
+        logger.info(
+            "✅ Shim applied: injected role_llm_funcs into %d modal processors "
+            "(workaround for raganything 1.2.10 ↔ lightrag 1.5.0 asdict() snapshot bug)",
+            len(_rag_anything.modal_processors),
+        )
+    else:
+        logger.warning(
+            "⚠️ role_llm_funcs not found on lightrag.__dict__ — modal multimodal "
+            "extraction may fall back to bare table/image/equation placeholders"
+        )
+
     # ═══════════════════════════════════════════════════════════════════════════════
     # CRITICAL: REPLACE LightRAG's ENTIRE prompt system with GovCon versions
     # ═══════════════════════════════════════════════════════════════════════════════
