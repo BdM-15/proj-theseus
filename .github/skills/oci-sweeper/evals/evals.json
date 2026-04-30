@@ -14,10 +14,7 @@
         "mitigation",
         "firewall"
       ],
-      "anti_signals": [
-        "no OCI risk found",
-        "out of scope"
-      ],
+      "anti_signals": ["no OCI risk found", "out of scope"],
       "expectations": [
         "calls kg_entities with types including 'company' or 'incumbent' or 'subcontractor'",
         "calls kg_query for relationships involving partner / incumbent entities",
@@ -37,10 +34,7 @@
         "mitigation",
         "non-disclosure"
       ],
-      "anti_signals": [
-        "no conflict",
-        "skill not applicable"
-      ],
+      "anti_signals": ["no conflict", "skill not applicable"],
       "expectations": [
         "envelope flags biased_ground_rules class for customer-support / partner overlap",
         "finding cites FAR 9.505-1 OR 9.505-2 in citation field",
@@ -58,10 +52,7 @@
         "prior contract",
         "mitigation"
       ],
-      "anti_signals": [
-        "no risk",
-        "not enough data"
-      ],
+      "anti_signals": ["no risk", "not enough data"],
       "expectations": [
         "envelope contains at least one finding with class='unequal_access'",
         "finding references FAR 9.505-4 in citation field",
@@ -74,10 +65,20 @@
       "id": "oci-sweeper-grounding-floor",
       "name": "Grounding-audit floor",
       "prompt": "Scan this workspace for OCI risk. The incumbent on the predecessor contract is one of our partners on this bid.",
-      "expected_signals": [
-        "tools/audit_skill_grounding.py --skill oci-sweeper reports grounding_ratio >= 0.7 (OCI sweep is FAR-citation-heavy — pure 0.80 is reachable; the on-disk JSON envelope source_chunks are the citation-of-record, the chat narrative is the human-readable digest).",
+      "expectations": [
+        "tools/audit_skill_grounding.py --skill oci-sweeper reports grounding_ratio >= 0.90 (OCI sweep is FAR-citation-heavy; the on-disk JSON envelope source_chunks are the citation-of-record, the chat narrative is the human-readable digest).",
         "tools/audit_skill_grounding.py reports claims_exempt is at least 0.40 of (claims_total + claims_exempt).",
         "No regression below 0.7 across at least three consecutive runs of the same prompt."
+      ],
+      "expected_signals": [
+        "tools/audit_skill_grounding.py --skill oci-sweeper reports grounding_ratio >= 0.90 (OCI sweep is FAR-citation-heavy; the on-disk JSON envelope source_chunks are the citation-of-record, the chat narrative is the human-readable digest).",
+        "tools/audit_skill_grounding.py reports claims_exempt is at least 0.40 of (claims_total + claims_exempt).",
+        "No regression below 0.7 across at least three consecutive runs of the same prompt."
+      ],
+      "anti_signals": [
+        "grounding_ratio drops below the per-skill floor of 0.90",
+        "the skill emits OCI findings without citing the FAR 9.5 sub-clause that triggered the class",
+        "the skill confuses the three OCI classes (biased ground rules vs. unequal access vs. impaired objectivity)"
       ]
     }
   ]

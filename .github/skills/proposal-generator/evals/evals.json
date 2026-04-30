@@ -42,7 +42,7 @@
       "prompt": "Generate the compliance matrix for this RFP, then return the standard cover note.",
       "expected_output": "A short Markdown cover note that summarizes the artifact via the bullet shape defined in the Final Assistant Message section (matrix rows, themes, FAB chains, volumes, warnings, top-warnings list, sources cited). Cover notes must NOT restate facts about the workspace as standalone narrative claims; substantive evidence lives in artifacts/proposal_draft.json's source_chunks fields.",
       "expectations": [
-        "tools/audit_skill_grounding.py --skill proposal-generator reports grounding_ratio is >= 0.50 (cover-note-style skill; the JSON artifact's source_chunks fields are the citation-of-record, the assistant message is a structural summary — pure 0.80 is unreachable without padding the cover note with anchored prose it is not designed to produce).",
+        "tools/audit_skill_grounding.py --skill proposal-generator reports grounding_ratio is >= 0.85 (cover-note-style skill; the JSON artifact's source_chunks fields are the citation-of-record, the assistant message is a structural summary; 147.10 calibration credits structural envelope-field readouts and traceability-gap findings as exempt).",
         "tools/audit_skill_grounding.py reports claims_exempt > claims_unsourced (most cover-note prose should be recognized as structural / pointer / self-attestation, not unsourced claims).",
         "No regression below 0.50 across at least three consecutive runs of the same prompt."
       ]

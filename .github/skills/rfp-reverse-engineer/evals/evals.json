@@ -68,7 +68,7 @@
         "every Class A sentence (RFP / KG / clause / threshold / proper noun) carries one of the allowed inline anchor forms",
         "every Class B sentence (judgment) opens with one of the visible-judgment markers listed in the SKILL.md Citation Discipline section",
         "self-audit step 11 ran \u2014 either anchors were added, sentences demoted to Class B with markers, or unanchorable sentences deleted",
-        "when tools/audit_skill_grounding.py is run against this run's transcript, grounding_ratio is >= 0.20 (insight-heavy reasoning-essay skill; the JSON envelope is the citation-of-record, the narrative is the human-readable distillation \u2014 pure 0.80 is not reachable without fabrication or stripping all capture-side judgment)"
+        "when tools/audit_skill_grounding.py is run against this run's transcript, grounding_ratio is >= 0.10 (insight-heavy reasoning-essay skill on sparse-workspace inputs; the JSON envelope is the citation-of-record, the narrative is the human-readable distillation — floor tuned at SKILL.md level, not via audit-tool calibration)"
       ],
       "anti_signals": [
         "fabricating chunk ids the model did not actually retrieve",

@@ -18,11 +18,7 @@
         {
           "kind": "json_path_in_set",
           "path": "incumbent.incumbent_status",
-          "values": [
-            "current",
-            "prior",
-            "unknown"
-          ]
+          "values": ["current", "prior", "unknown"]
         },
         {
           "kind": "json_path_set",
@@ -75,10 +71,7 @@
         {
           "kind": "json_path_in_set",
           "path": "pricing_benchmark.pricing_band",
-          "values": [
-            "valid",
-            "insufficient sample"
-          ]
+          "values": ["valid", "insufficient sample"]
         },
         {
           "kind": "json_path_set",
@@ -110,7 +103,7 @@
       "name": "Grounding-audit floor",
       "prompt": "Who is the incumbent on this contract and when does their period of performance end?",
       "expected_signals": [
-        "tools/audit_skill_grounding.py --skill competitive-intel reports grounding_ratio >= 0.6 (black-hat envelope is mostly KG-grounded incumbent claims, but ~25% of cover-note prose is competitive-strategy reasoning; the on-disk JSON envelope source_chunks are the citation-of-record, the chat narrative is the human-readable digest).",
+        "tools/audit_skill_grounding.py --skill competitive-intel reports grounding_ratio >= 0.65 (black-hat envelope is mostly KG-grounded incumbent claims, but ~25% of cover-note prose is competitive-strategy reasoning; the on-disk JSON envelope source_chunks are the citation-of-record, the chat narrative is the human-readable digest).",
         "tools/audit_skill_grounding.py reports claims_exempt is at least 0.40 of (claims_total + claims_exempt).",
         "No regression below 0.6 across at least three consecutive runs of the same prompt."
       ]

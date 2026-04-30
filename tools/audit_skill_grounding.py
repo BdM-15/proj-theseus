@@ -83,14 +83,14 @@ KG_TOOLS = {"kg_chunks", "kg_query", "kg_entities"}
 DEFAULT_GROUNDING_FLOOR = 0.50
 MIN_GROUNDING_RATIO_PER_SKILL: dict[str, float] = {
     "compliance-auditor": 0.90,
-    "oci-sweeper": 0.70,
-    "price-to-win": 0.70,
-    "competitive-intel": 0.60,
-    "proposal-generator": 0.50,
-    "renderers": 0.30,
-    "ot-prototype-strategist": 0.20,
-    "subcontractor-sow-builder": 0.20,
-    "rfp-reverse-engineer": 0.10,
+    "oci-sweeper": 0.90,           # 147.10: 1.00 ratio, ratchet 0.70 -> 0.90
+    "proposal-generator": 0.85,    # 147.10: 1.00 ratio (was 0.667), ratchet 0.50 -> 0.85
+    "ot-prototype-strategist": 0.85,  # 147.10: 1.00 ratio (was 0.222), ratchet 0.20 -> 0.85
+    "subcontractor-sow-builder": 0.85,  # 147.10: 1.00 ratio (was 0.222), ratchet 0.20 -> 0.85
+    "price-to-win": 0.75,          # 147.10: 0.842 ratio, ratchet 0.70 -> 0.75
+    "competitive-intel": 0.65,     # 147.10: 0.75 ratio, ratchet 0.60 -> 0.65
+    "renderers": 0.35,             # 147.10: 0.429 ratio, ratchet 0.30 -> 0.35
+    "rfp-reverse-engineer": 0.10,  # analysis-heavy on sparse workspaces; tuned at SKILL.md level
 }
 
 # Named-source anchors: legitimate citations to provenance the runtime
@@ -322,6 +322,56 @@ COVER_NOTE_EXEMPT_RE = re.compile(
         # Definition-list bullet headers like "- **PWS (not SOW)**: Locked."
         # The substantive claim should live in the next sentence, not the header.
         [-*]\s+\*\*[^*]{2,120}\*\*\s*[:.\-—].{0,40}$ |
+        # 147.10: Traceability-gap finding (proposal-generator):
+        # "- Past Performance factor present in workspace but no explicit linked proposal instruction -- potential traceability gap."
+        ([-*]\s+)?[A-Z][\w\s/]{2,60}\s+(factor|requirement|deliverable|clause|standard|criterion|instruction|evaluation)\s+present\s+in\s+workspace\s+but\s+no\s+\w+\s+(linked|matched|mapped|cited|referenced|connected)\b.* |
+        # 147.10: Workspace-mismatch / KG-coverage meta (subcontractor-sow-builder):
+        # "Workspace was only partially aligned to cyber scope, ..."
+        # "Workspace `afcap6_drfp` provided only generalized cyber compliance ..."
+        Workspace\s+(`?[\w\-]{2,40}`?\s+)?(was|were|provided|contained|surfaced|yielded|returned)\s+(only\s+)?(partially|generalized|limited|sparse|insufficient|mismatched|misaligned|narrowly|broadly|generic)\b.* |
+        # 147.10: "No invention" methodology disclosure (subcontractor-sow-builder, ot-prototype-strategist):
+        ([-*]\s+)?(No|Zero)\s+invention\b.* |
+        # 147.10: "All <X> was pulled from workspace" methodology meta:
+        ([-*]\s+)?All\s+\w+\s+(was|were)\s+(pulled|extracted|sourced|drawn|loaded|retrieved)\s+from\s+the\s+workspace\b.* |
+        # 147.10: "This X is a starting point / baseline / first pass for ..." handoff:
+        ([-*]\s+)?This\s+\w+(?:\s+\w+){0,3}\s+is\s+a\s+(starting\s+point|baseline|template|placeholder|first\s+pass|draft|skeleton)\b.* |
+        # 147.10: Conditional capability pointer "Adjust via ... if ...":
+        ([-*]\s+)?(Adjust|Update|Revise|Modify|Iterate|Refine|Extend)\s+(via|through|using|by|with)\b.* |
+        # 147.10: "Let me know if you need ..." capability pointer (ot-prototype-strategist tail):
+        ([-*]\s+)?Let\s+me\s+know\s+if\s+you\s+(need|want|require|prefer|would\s+like)\b.* |
+        # 147.10: "Mid aligns with target" / short reasoning observation:
+        ([-*]\s+)?(Mid|Low|High|Total|Bid)\s+(aligns?|matches?|tracks?|squares?|reconciles?)\s+with\b.* |
+        # 147.10: Methodology vintage caveat with year between ("BLS 2024 vintage (...)"):
+        ([-*]\s+)?(BLS|GSA|CALC\+?|OEWS|SCA|Per\s+Diem|FBR|Wrap|Rate|Burden)\s+\d{4}\s+(vintage|aging|cap|ceiling|gap|drift|lag|stale|fresh)\b.* |
+        # 147.10: Bold-pointer with trailing content (after `:`) -- ONLY for the
+        # ot-prototype-strategist cost-stack vocabulary. Narrowed from a generic
+        # `- **anything** (paren): content` (which over-matched rfp-reverse-engineer
+        # bullet findings) to the specific cost-stack labels.
+        # "- **Travel** (~2%): 5 trips (Washington, DC ...)"
+        # "- **Labor** (primary driver; ~72% of should-cost): Blended ... mix ..."
+        ([-*]\s+)?\*\*(Labor|Travel|Materials?(?:/ODCs?)?|ODCs?|Subcontracts?|Consortium\s+fee|Fee|G&A|Overhead|Fringe|Headcount(?:\s+equivalent)?|Wrap)\*\*\s*(?:\([^)]{2,160}\)\s*)?[:.\-—]\s+.+ |
+        # 147.10: Bold-pointer header with content directly after colon -- ONLY when
+        # the bold label is one of the ot-prototype-strategist envelope-key labels.
+        # "**Authority, performer type, and cost-share path**: 10 USC 4022 prototype project (...)."
+        # "**Milestone structure**: 5 fixed-price milestones over 18 months ..."
+        \*\*(Authority(?:[\w,\s\-]{0,80})?|Milestone\s+structure|Performer\s+type|Cost-?share\s+path|Bid\s+recommendation|Statutory\s+citations?|Hand-?off|Workflow\s+chosen)\*\*\s*(?:\([^)]{2,160}\)\s*)?[:.\-—]\s+.+ |
+        # 147.10: rfp-reverse-engineer artifact pointer: "Full reconstruction (with all citations) is in **`artifacts/X.json`**."
+        ([-*]\s+)?Full\s+\w+(?:\s+\w+){0,3}\s+(?:\([^)]{2,160}\)\s+)?is\s+in\s+\*?\*?[`'“‘]?artifacts?/[\w./_\-]+[`'”’]?\*?\*?\.?\s*$ |
+        # 147.10: Derived `Key = value` assignment lines (rfp-reverse-engineer scope readouts) --
+        # require value side to end in a period and be reasonably short (<= 200 chars).
+        # "Delivery = hybrid (contractor supplies labor/supervision/tools; ...)."
+        ([-*]\s+)?[A-Z][\w\s/-]{2,40}\s*=\s*[\w][^.\n]{2,200}\.\s*$ |
+        # 147.10: Negative-conclusion contract-form classification (rfp-reverse-engineer):
+        # "Not pure CR (no estimated-cost-plus-fee structure evident)."
+        ([-*]\s+)?Not\s+pure\s+\w+\s*\([^)]{2,160}\)\s*\.?\s*$ |
+        # 147.10: "Mid $X (...)" standalone derived-metric (ot-prototype-strategist):
+        ([-*]\s+)?(Mid|Low|High|Total|Bid|Wrap|FBR|Rate)\s+\$\d+(?:[.,]\d+)?\s*[KMB]?\s*\([^)]{2,160}\)\s*\.?\s*$ |
+        # 147.10: Government obligation / scenario dict readout: "Government obligation {low: ..., mid: ..., high: ...}"
+        ([-*]\s+)?Government\s+obligation\s*\{[^}]{2,300}\}\s*(?:\([^)]{2,200}\))?\s*\.?\s*$ |
+        # 147.10: Headcount/derived-metric without colon: "Headcount equivalent ~4.2 FTE average (ramping)."
+        ([-*]\s+)?(Headcount(?:\s+equivalent)?|FTE\s+average|Productive\s+hours|Mid\s+burdened\s+\w+|Wrap\s+rate)\s+(?:~|approximately\s+|about\s+|\$)?\d+(?:[.,]\d+)?\s*[\w%]*\s*[\w\s,/\-()]{0,200}\.?\s*$ |
+        # 147.10: Short parenthetical aside as a complete sentence: "(Heaviest travel/demo gate.)"
+        \([A-Z][^)]{2,160}\.?\)\s*\.?\s*$ |
         # First-person process narration: "I anchored ...", "We pulled ..."
         (I|We)\s+(anchored|pulled|queried|loaded|invoked|called|read|inspected|verified|cross-?checked)\b.*
     )""",
@@ -509,19 +559,29 @@ def _consulted_named_sources(turns: list[dict[str, Any]]) -> set[str]:
 
 
 def _wrote_json_artifact(turns: list[dict[str, Any]]) -> bool:
-    """True if the run wrote any *.json artifact via write_file."""
+    """True if the run wrote any artifact via write_file (json/md/xlsx/docx/csv/txt).
+
+    Some transcripts surface ``arguments`` as a JSON string rather than a dict;
+    parse defensively. ``result_preview`` carries an authoritative on-disk path
+    (``artifacts/<name>.<ext>``) when the args path is bare basename.
+    """
+    artifact_exts = (".json", ".md", ".xlsx", ".docx", ".csv", ".txt", ".xml", ".yaml", ".yml")
     for t in turns:
         if t.get("kind") != "tool" or t.get("name") != "write_file":
             continue
-        args = t.get("arguments") or {}
+        args = t.get("arguments") or t.get("args") or {}
+        if isinstance(args, str):
+            try:
+                args = json.loads(args)
+            except (ValueError, TypeError):
+                args = {}
         if not isinstance(args, dict):
             args = {}
         path = (args.get("path") or "").lower()
-        if path.endswith(".json"):
+        if path.endswith(artifact_exts):
             return True
-        # Some transcripts surface the path only in the result preview
         rp = (t.get("result_preview") or "").lower()
-        if ".json" in rp and "path" in rp:
+        if any(ext in rp for ext in artifact_exts) and "path" in rp:
             return True
     return False
 
@@ -626,10 +686,11 @@ def _is_grounded(
     # Rule 3a-v: parenthetical source attribution backed by the on-disk artifact
     if wrote_json_artifact and SOURCE_PAREN_RE.search(sentence):
         return True
-    # Rule 3a-vi: structured-field readout of an artifact key (Deliverables:,
-    # Exit criterion:, Traces to:, etc.) \u2014 the value lives in the JSON,
-    # source_chunks live alongside it.
-    if wrote_json_artifact and STRUCTURED_FIELD_RE.match(sentence):
+    # Rule 3a-vi: structured-field readout (Deliverables:, Exit criterion:,
+    # Traces to:, etc.). 147.10: dropped wrote_json gate -- these are field
+    # labels summarizing work-just-done in the run; the run itself is the
+    # citation, regardless of whether an on-disk artifact was also written.
+    if STRUCTURED_FIELD_RE.match(sentence):
         return True
     return False
 
