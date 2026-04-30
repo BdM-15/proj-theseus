@@ -66,6 +66,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -73,6 +74,24 @@ from typing import Any
 
 CHUNK_CITE_RE = re.compile(r"chunk-[0-9a-f]{4,}", re.IGNORECASE)
 KG_TOOLS = {"kg_chunks", "kg_query", "kg_entities"}
+
+# Per-skill grounding floors (147.9). Insight-heavy skills are honestly
+# allowed below 0.80 because the on-disk JSON envelope (with source_chunks)
+# is the citation-of-record; the chat narrative is a human-readable digest.
+# Pure utility skills (renderers) and skills with no narrative outputs are
+# given the DEFAULT_GROUNDING_FLOOR.
+DEFAULT_GROUNDING_FLOOR = 0.50
+MIN_GROUNDING_RATIO_PER_SKILL: dict[str, float] = {
+    "compliance-auditor": 0.90,
+    "oci-sweeper": 0.70,
+    "price-to-win": 0.70,
+    "competitive-intel": 0.60,
+    "proposal-generator": 0.50,
+    "renderers": 0.30,
+    "ot-prototype-strategist": 0.20,
+    "subcontractor-sow-builder": 0.20,
+    "rfp-reverse-engineer": 0.10,
+}
 
 # Named-source anchors: legitimate citations to provenance the runtime
 # can verify the skill consulted, even when it isn't a kg_* hit.
@@ -699,6 +718,19 @@ def main(argv: list[str] | None = None) -> int:
         help="Workspace dir under rag_storage/ (default: afcap5_adab_iss)",
     )
     parser.add_argument("--all", action="store_true", help="Audit latest transcript for every skill")
+    parser.add_argument(
+        "--enforce",
+        action="store_true",
+        help="Exit non-zero if any audited skill is below its per-skill floor (or --fail-under). "
+        "Also activated by env var ENFORCE_GROUNDING_RATIO=1.",
+    )
+    parser.add_argument(
+        "--fail-under",
+        type=float,
+        default=None,
+        help="Override the per-skill floor with a single ratio (e.g. 0.50). "
+        "Used only when --enforce (or ENFORCE_GROUNDING_RATIO=1) is set.",
+    )
     args = parser.parse_args(argv)
 
     paths: list[Path]
@@ -724,6 +756,21 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(results[0], indent=2))
     else:
         print(json.dumps(results, indent=2))
+
+    enforce = args.enforce or os.environ.get("ENFORCE_GROUNDING_RATIO", "0") == "1"
+    if enforce:
+        violations: list[str] = []
+        for r in results:
+            skill = r.get("skill") or "<unknown>"
+            ratio = r.get("grounding_ratio", 0.0)
+            floor = args.fail_under if args.fail_under is not None else MIN_GROUNDING_RATIO_PER_SKILL.get(skill, DEFAULT_GROUNDING_FLOOR)
+            if ratio < floor:
+                violations.append(f"{skill}: {ratio:.3f} < floor {floor:.2f}")
+        if violations:
+            print("\nGROUNDING FLOOR VIOLATIONS:", file=sys.stderr)
+            for v in violations:
+                print(f"  - {v}", file=sys.stderr)
+            return 1
     return 0
 
 

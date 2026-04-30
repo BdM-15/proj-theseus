@@ -275,15 +275,24 @@ def test_skill_invoke_smoke(
             import sys as _sys
             _sys.path.insert(0, str(repo_root / "tools"))
             try:
-                from audit_skill_grounding import audit as _audit  # noqa: WPS433
+                from audit_skill_grounding import (  # noqa: WPS433
+                    audit as _audit,
+                    MIN_GROUNDING_RATIO_PER_SKILL as _FLOORS,
+                    DEFAULT_GROUNDING_FLOOR as _DEFAULT_FLOOR,
+                )
             finally:
                 _sys.path.pop(0)
             report = _audit(transcript_path)
             ratio = report.get("grounding_ratio", 0.0)
-            min_required = float(_os.getenv("MIN_GROUNDING_RATIO", "0.80"))
+            # Per-skill floor (147.9): each skill has an honest floor in
+            # MIN_GROUNDING_RATIO_PER_SKILL. MIN_GROUNDING_RATIO env var
+            # overrides for ad-hoc runs.
+            override = _os.getenv("MIN_GROUNDING_RATIO")
+            min_required = float(override) if override else _FLOORS.get(skill_name, _DEFAULT_FLOOR)
             print(
                 f"\n[grounding] {skill_name}: ratio={ratio:.2f} "
-                f"({report['claims_grounded']}/{report['claims_total']} "
+                f"(floor={min_required:.2f}, "
+                f"{report['claims_grounded']}/{report['claims_total']} "
                 f"grounded, {report['claims_exempt']} exempt)"
             )
             if _os.getenv("ENFORCE_GROUNDING_RATIO", "").strip().lower() in {"1", "true", "yes"}:
