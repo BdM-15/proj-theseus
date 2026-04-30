@@ -68,7 +68,8 @@
         "every Class A sentence (RFP / KG / clause / threshold / proper noun) carries one of the allowed inline anchor forms",
         "every Class B sentence (judgment) opens with one of the visible-judgment markers listed in the SKILL.md Citation Discipline section",
         "self-audit step 11 ran \u2014 either anchors were added, sentences demoted to Class B with markers, or unanchorable sentences deleted",
-        "when tools/audit_skill_grounding.py is run against this run's transcript, grounding_ratio is >= 0.10 (insight-heavy reasoning-essay skill on sparse-workspace inputs; the JSON envelope is the citation-of-record, the narrative is the human-readable distillation — floor tuned at SKILL.md level, not via audit-tool calibration)"
+        "narrative is rendered from references/narrative_template.md as a strict bullet form — every bullet ends with `[see <jsonpath>.source_chunk_ids]`, `[chunk-xxxx]`, `[entity: …]`, or `[per references/…]`, OR opens with a visible-judgment marker (Our read:, In our capture experience,, Likely …, Classic … pattern—)",
+        "when tools/audit_skill_grounding.py is run against this run's transcript, grounding_ratio is >= 0.10 (147.11 skill-creator pass added a strict bullet template + mandatory template-load step + restructured step 10→12 workflow as defensive improvements. Two live iterations confirmed the model still defaults to paragraph prose without loading the template, so the floor is held at 0.10. The JSON envelope on disk is the citation-of-record; the narrative is a human-readable distillation. Future model improvements OR an explicit user prompt referencing the template are expected to lift the live ratio toward 0.50.)"
       ],
       "anti_signals": [
         "fabricating chunk ids the model did not actually retrieve",
