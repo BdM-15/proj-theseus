@@ -427,3 +427,15 @@ Use workspace tools (`read_file`, `create_file`, `replace_string_in_file`), NOT 
 ### GPU Warning
 
 After `uv sync`, PyTorch might downgrade to CPU-only. Reinstall CUDA versions manually if needed (see `README.md` or previous instructions).
+
+## graphify
+
+Use Graphify as the first-pass map for repo-scale work so chats spend fewer tokens rediscovering the codebase.
+
+- Before answering architecture, dependency, debugging, refactor, feature-planning, or "where does X live?" questions, read `graphify-out/GRAPH_REPORT.md` if it exists.
+- For broad questions, run `graphify query "<question>" --budget 1500` before wide workspace searches, then open only the files or wiki pages that the graph points to.
+- For known symbols or systems, prefer `graphify explain "<node>"` to get the node neighborhood before reading source files.
+- For integration questions between two concepts, prefer `graphify path "A" "B"` before manual grep/semantic search.
+- If `graphify-out/wiki/index.md` exists, navigate the wiki for deeper architecture context and community pages.
+- Do not use Graphify for tiny known-file edits, simple terminal requests, or cases where the relevant file is already open and obvious.
+- Type `/graphify . --wiki` in Copilot Chat to rebuild the full graph. Use `graphify update .` after code-only changes when semantic re-extraction is not needed.

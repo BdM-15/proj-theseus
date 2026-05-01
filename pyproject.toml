@@ -74,6 +74,7 @@ torchvision = { index = "pytorch-cu124" }
 
 [dependency-groups]
 dev = [
+    "graphifyy>=0.5.7",
     "pytest>=9.0.3",
 ]
 
