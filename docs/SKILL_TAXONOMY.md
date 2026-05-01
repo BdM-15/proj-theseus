@@ -150,6 +150,12 @@ All 11 in-tree skills (10 pre-existing + new `oci-sweeper`) at branch
 | `skill-creator`             | none               | []                                    | []                                           | meta         |
 | `subcontractor-sow-builder` | contracts_manager  | [program_manager, capture_manager]    | [strategy, proposal_development, post_award] | draft        |
 
+**Developer-tool skills** (not govcon platform skills — not shown in Theseus UI, no KG queries):
+
+| Skill                           | `capability` | Note                                                          |
+| ------------------------------- | ------------ | ------------------------------------------------------------- |
+| `improve-codebase-architecture` | meta         | Vendored from mattpocock/skills (Apache-2.0); graphify-backed |
+
 ---
 
 ## 7. UI consumption pattern

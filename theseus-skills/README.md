@@ -8,15 +8,39 @@ We do **not** duplicate skill content here — both VS Code/Copilot and the Thes
 2. Host any **Theseus-runtime-only** tooling (eval harnesses, mock context fixtures, integration tests) that should not pollute the agent-discoverable directory
 3. Document Theseus-specific invocation contracts that go beyond the cross-platform SKILL.md
 
-## Index
+## Skill tiers
 
-| Skill                | Source of truth                        | Theseus runtime adapter        |
-| -------------------- | -------------------------------------- | ------------------------------ |
-| huashu-design        | `.github/skills/huashu-design/` (vendored — see UPSTREAM.md) | `src/skills/manager.py` (auto) |
-| govcon-ontology      | `.github/skills/govcon-ontology/`      | `src/skills/manager.py` (auto) |
-| proposal-generator   | `.github/skills/proposal-generator/`   | `src/skills/manager.py` (auto) |
-| compliance-auditor   | `.github/skills/compliance-auditor/`   | `src/skills/manager.py` (auto) |
-| competitive-intel    | `.github/skills/competitive-intel/`    | `src/skills/manager.py` (auto) |
+Every skill under `.github/skills/` falls into exactly one of three tiers, controlled by `metadata:` in the skill's SKILL.md frontmatter:
+
+| Tier                 | `metadata.developer_only`            | Shown in Theseus UI?                | Queries KG / workspace? |
+| -------------------- | ------------------------------------ | ----------------------------------- | ----------------------- |
+| **Theseus platform** | absent or `false`                    | ✅ Yes                              | ✅ Yes                  |
+| **Developer-only**   | `true`                               | ❌ No (filtered by `list_skills()`) | ❌ No                   |
+| **Dual-purpose**     | absent or `false` + KG-optional body | ✅ Yes                              | Optional                |
+
+All skills under `.github/skills/` are Copilot Chat skills by the agentskills.io spec — both tiers are invokable from Copilot Chat by a developer. Copilot Chat is developer-side only and does not serve as a Theseus platform agent for end users. The tier distinction controls only what appears in the Theseus UI.
+
+When adding a new skill, pick the tier first and set `metadata.developer_only` accordingly. The `src/skills/manager.py` `list_skills()` method enforces the UI filter automatically.
+
+## Index — Theseus platform skills
+
+Skills shown in the Theseus govcon UI. Query the active workspace KG and use govcon personas.
+
+| Skill              | Source of truth                                              | Theseus runtime adapter        |
+| ------------------ | ------------------------------------------------------------ | ------------------------------ |
+| huashu-design      | `.github/skills/huashu-design/` (vendored — see UPSTREAM.md) | `src/skills/manager.py` (auto) |
+| govcon-ontology    | `.github/skills/govcon-ontology/`                            | `src/skills/manager.py` (auto) |
+| proposal-generator | `.github/skills/proposal-generator/`                         | `src/skills/manager.py` (auto) |
+| compliance-auditor | `.github/skills/compliance-auditor/`                         | `src/skills/manager.py` (auto) |
+| competitive-intel  | `.github/skills/competitive-intel/`                          | `src/skills/manager.py` (auto) |
+
+## Index — Developer-only skills
+
+Not shown in the Theseus UI (`metadata.developer_only: true`). Invokable from Copilot Chat only. Do not query the KG or govcon workspace.
+
+| Skill                         | Source of truth                                                              | Notes                                                 |
+| ----------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------- |
+| improve-codebase-architecture | `.github/skills/improve-codebase-architecture/` (vendored — see UPSTREAM.md) | Uses `graphify-out/GRAPH_REPORT.md` as dependency map |
 
 ## Adding a Theseus-only Test Fixture
 
