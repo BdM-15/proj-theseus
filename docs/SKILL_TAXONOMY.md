@@ -152,6 +152,7 @@ All 11 in-tree skills (10 pre-existing + new `oci-sweeper`) at branch
 | `grill-me-capture`          | capture_manager    | [proposal_manager]                    | [capture, strategy]                                | analyze      |
 | `grill-me-proposal`         | proposal_manager   | [proposal_writer, capture_manager]    | [strategy, proposal_development]                   | analyze      |
 | `grill-me-ptw`              | cost_estimator     | [capture_manager]                     | [capture, strategy]                                | analyze      |
+| `workload-analyzer`         | cost_estimator     | [capture_manager]                     | [capture, strategy]                                | analyze      |
 | `rfp-reverse-engineer`      | capture_manager    | [proposal_manager]                    | [capture, strategy]                                | analyze      |
 | `skill-creator`             | none               | []                                    | []                                                 | meta         |
 | `subcontractor-sow-builder` | contracts_manager  | [program_manager, capture_manager]    | [strategy, proposal_development, post_award]       | draft        |
