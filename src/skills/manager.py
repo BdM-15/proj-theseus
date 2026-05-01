@@ -557,10 +557,14 @@ class SkillManager:
 
     # ---- Public read API ---------------------------------------------
 
-    def list_skills(self) -> list[dict[str, Any]]:
+    def list_skills(self, include_developer: bool = False) -> list[dict[str, Any]]:
         if not self._skills:
             self.discover()
-        return [s.to_summary() for s in self._skills.values()]
+        return [
+            s.to_summary()
+            for s in self._skills.values()
+            if include_developer or not (s.frontmatter.metadata or {}).get("developer_only", False)
+        ]
 
     def get_skill(self, name: str) -> Optional[Skill]:
         if not self._skills:
