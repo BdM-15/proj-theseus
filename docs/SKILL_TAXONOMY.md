@@ -159,6 +159,7 @@ All 11 in-tree skills (10 pre-existing + new `oci-sweeper`) at branch
 | `grill-me`                      | meta         | Vendored from mattpocock/skills (Apache-2.0); developer plan stress-tester; govcon variants planned |
 | `to-prd`                        | meta         | Vendored from mattpocock/skills (Apache-2.0); PRD publisher to GitHub Issues                        |
 | `to-issues`                     | meta         | Vendored from mattpocock/skills (Apache-2.0); vertical-slice issue creator                          |
+| `tdd`                           | meta         | Vendored from mattpocock/skills (Apache-2.0); red-green-refactor loop                               |
 
 ---
 
