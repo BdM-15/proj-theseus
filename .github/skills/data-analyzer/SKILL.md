@@ -24,6 +24,7 @@ approach — do not impose a domain lens. Govcon-specific variants (e.g., `workl
 build on this foundation via skill composition.
 
 **References (load when needed):**
+
 - `references/statistical-methods.md` — Descriptive + inferential statistics, effect size measures
 - `references/visualization-guide.md` — Chart selection guide, design principles
 - `references/pitfalls.md` — Common analytical pitfalls and how to avoid them
@@ -107,16 +108,16 @@ build on this foundation via skill composition.
 
 ## Quick Reference
 
-| Action | Trigger phrase |
-|--------|----------------|
-| Full EDA | "Analyze this dataset comprehensively" |
-| Quick summary | "Summarize key statistics" |
-| Pattern detection | "Find patterns in this dataset" |
-| Hypothesis test | "Test if [A] affects [B]" |
-| Comparative analysis | "Compare [group A] vs [group B]" |
-| Correlation analysis | "What correlates with [variable]?" |
-| Anomaly detection | "Find anomalies in this data" |
-| Trend analysis | "Analyze trends over time" |
+| Action               | Trigger phrase                         |
+| -------------------- | -------------------------------------- |
+| Full EDA             | "Analyze this dataset comprehensively" |
+| Quick summary        | "Summarize key statistics"             |
+| Pattern detection    | "Find patterns in this dataset"        |
+| Hypothesis test      | "Test if [A] affects [B]"              |
+| Comparative analysis | "Compare [group A] vs [group B]"       |
+| Correlation analysis | "What correlates with [variable]?"     |
+| Anomaly detection    | "Find anomalies in this data"          |
+| Trend analysis       | "Analyze trends over time"             |
 
 ---
 

@@ -17,12 +17,12 @@
 
 ## Data Overview
 
-| Attribute | Value |
-|-----------|-------|
-| Source | [Where data came from] |
-| Time Period | [Date range] |
-| Sample Size | [N observations] |
-| Key Variables | [List main variables] |
+| Attribute     | Value                  |
+| ------------- | ---------------------- |
+| Source        | [Where data came from] |
+| Time Period   | [Date range]           |
+| Sample Size   | [N observations]       |
+| Key Variables | [List main variables]  |
 
 ## Data Quality Assessment
 
