@@ -1,0 +1,20 @@
+{
+  "skill_name": "data-analyzer",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Here is a CSV with monthly sales data for 3 product lines over 2 years. Analyze it: find trends, identify which product line is growing fastest, check for seasonality, and flag any anomalies. Give me the key findings.\n\nProduct,Month,Revenue\nWidget-A,2024-01,45200\nWidget-A,2024-02,43800\nWidget-A,2024-03,51200\nWidget-B,2024-01,12400\nWidget-B,2024-02,18600\nWidget-B,2024-03,22100\nWidget-C,2024-01,98000\nWidget-C,2024-02,95500\nWidget-C,2024-03,88200",
+      "expected_output": "EDA covering trend direction per product line, growth rate comparison, note on Widget-C declining while Widget-B accelerates, check for seasonality pattern, summary statistics, and at least one anomaly flag or clean bill of health with reasoning."
+    },
+    {
+      "id": 2,
+      "prompt": "I have employee survey data. Group A (new process, n=45) had satisfaction scores: mean=7.2, std=1.4. Group B (old process, n=48) had scores: mean=6.5, std=1.6. Test whether the new process actually improved satisfaction or if this could be random chance.",
+      "expected_output": "Formulates H0/H1, selects independent-samples t-test, checks assumptions (normality, equal variance), computes or estimates t-statistic and p-value, calculates effect size (Cohen's d), interprets both statistical and practical significance, states conclusion in plain language."
+    },
+    {
+      "id": 3,
+      "prompt": "Compare these three customer segments by revenue and churn rate. Tell me which segment to focus on and why.\n\nSegment | Avg Revenue | Churn Rate | Count\nEnterprise | $42,000 | 4% | 120\nMid-Market | $8,500 | 11% | 580\nSMB | $1,200 | 28% | 2400",
+      "expected_output": "Calculates total revenue contribution per segment, lifetime value estimate factoring churn, identifies the highest-leverage segment, provides a driver analysis, and recommends a specific focus with quantified expected impact — not just 'it depends'."
+    }
+  ]
+}

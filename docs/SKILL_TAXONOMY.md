@@ -145,6 +145,7 @@ All 11 in-tree skills (10 pre-existing + new `oci-sweeper`) at branch
 | `oci-sweeper`               | legal_compliance   | [capture_manager, contracts_manager]  | [pursuit, capture]                                 | audit        |
 | `price-to-win`              | cost_estimator     | [capture_manager]                     | [capture, strategy, proposal_development]          | estimate     |
 | `proposal-generator`        | proposal_writer    | [proposal_manager, capture_manager]   | [proposal_development]                             | draft        |
+| `data-analyzer`             | none               | []                                    | []                                                 | analyze      |
 | `renderers`                 | none               | []                                    | []                                                 | render       |
 | `grill-me-govcon`           | capture_manager    | [proposal_manager, cost_estimator]    | [pursuit, capture, strategy, proposal_development] | analyze      |
 | `grill-me-bid-strategy`     | capture_manager    | []                                    | [pursuit, capture]                                 | analyze      |
