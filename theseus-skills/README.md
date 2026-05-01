@@ -44,6 +44,7 @@ Not shown in the Theseus UI (`metadata.developer_only: true`). Invokable from Co
 | caveman                       | `.github/skills/caveman/` (vendored — see UPSTREAM.md)                       | Ultra-compressed communication mode; no KG access     |
 | grill-me                      | `.github/skills/grill-me/` (vendored — see UPSTREAM.md)                      | Generic plan stress-tester; govcon variants planned   |
 | to-prd                        | `.github/skills/to-prd/` (vendored — see UPSTREAM.md)                        | Converts conversation context to PRD; files to GitHub Issues |
+| to-issues                     | `.github/skills/to-issues/` (vendored — see UPSTREAM.md)                     | Breaks plan into vertical-slice GitHub issues                |
 
 ## Adding a Theseus-only Test Fixture
 
