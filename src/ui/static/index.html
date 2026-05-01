@@ -3666,7 +3666,7 @@
                   <div
                     class="px-3 py-1.5 border-b border-edge/30 flex items-start gap-2"
                     :class="{
-                      'text-neon-red': ev.kind === 'error',
+                      'text-neon-red bg-neon-red/10 border-l-2 border-l-neon-red/70': ev.kind === 'error',
                       'text-neon-amber': ev.kind === 'warning',
                       'text-neon-lime': ev.kind === 'success',
                       'text-neon-cyan': ev.kind === 'phase' || ev.kind === 'batch',

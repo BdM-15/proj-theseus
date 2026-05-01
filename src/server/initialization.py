@@ -286,6 +286,18 @@ async def initialize_raganything():
             api_key=xai_api_key, base_url=xai_base_url, **kwargs,
         )
 
+    async def _modal_llm_func(prompt, system_prompt=None, history_messages=[], **kwargs):
+        kwargs.setdefault("max_tokens", VLM_MAX_TOKENS)
+        response_format = kwargs.get("response_format") or {}
+        json_schema = response_format.get("json_schema") if isinstance(response_format, dict) else None
+        if isinstance(json_schema, dict) and json_schema.get("name") == "GovConExtractionResult":
+            kwargs.pop("response_format", None)
+        return await openai_complete_if_cache(
+            extraction_model, prompt,
+            system_prompt=system_prompt, history_messages=history_messages,
+            api_key=xai_api_key, base_url=xai_base_url, **kwargs,
+        )
+
     # ═══════════════════════════════════════════════════════════════════════════════
     # Output sanitization for the EXTRACT role (Issue #56) — TUPLE MODE ONLY
     # ═══════════════════════════════════════════════════════════════════════════════
@@ -482,12 +494,12 @@ async def initialize_raganything():
         lightrag_kwargs["graph_storage"] = global_args.graph_storage
     
     # LLM function for RAGAnything top-level + modal processors. RAGAnything's
-    # TableModalProcessor / EquationModalProcessor invoke this for table-to-text
-    # description and equation analysis — both are extraction-shaped tasks
-    # (literal format, structured output), so we route them through the
-    # sanitized extract func to match the legacy behavior. Image processing has
-    # its own vision_model_func passed separately above (_vlm_llm_func).
-    llm_model_func_wrapped = sanitized_extract_func
+    # TableModalProcessor / EquationModalProcessor parse their own JSON shape
+    # ({detailed_description, entity_info}); do NOT route them through the strict
+    # GovCon extraction schema ({entities, relationships}) or every table falls
+    # back with "Missing required fields in response".
+    llm_model_func_wrapped = _modal_llm_func
+    logger.info("✅ RAG-Anything modal LLM uses non-strict table/equation parser path")
     
     _rag_anything = RAGAnything(
         config=config,

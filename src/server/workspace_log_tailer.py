@@ -165,6 +165,7 @@ def _classify(record_logger: str, message: str, level: str) -> dict:
     """Tag a parsed line with category + kind + optional phase metadata."""
     name = record_logger or ""
     msg = message or ""
+    upper = level.upper() if level else ""
 
     # Category — which audit bucket (processing / query / other).
     if any(name == n or name.startswith(n + ".") for n in _PROCESSING_LOGGERS):
@@ -172,7 +173,7 @@ def _classify(record_logger: str, message: str, level: str) -> dict:
     elif any(name == n or name.startswith(n + ".") for n in _QUERY_LOGGERS):
         category = "query"
     elif name == "lightrag" or name.startswith("lightrag."):
-        if any(m in msg for m in _LIGHTRAG_PROCESSING_MARKERS):
+        if any(m in msg for m in _LIGHTRAG_PROCESSING_MARKERS) or upper in {"WARNING", "ERROR", "CRITICAL"}:
             category = "processing"
         elif any(m in msg for m in _LIGHTRAG_QUERY_MARKERS):
             category = "query"
@@ -182,7 +183,6 @@ def _classify(record_logger: str, message: str, level: str) -> dict:
         category = "other"
 
     # Kind — visual style hint.
-    upper = level.upper() if level else ""
     if upper == "ERROR" or upper == "CRITICAL":
         kind = "error"
     elif upper == "WARNING":

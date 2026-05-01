@@ -172,6 +172,9 @@ class GovConProcessingCallback(ProcessingCallback):
             )
             
             logger.info("✅ Cumulative semantic enhancement complete")
+            logger.info(f"   Final Neo4j entities: {inference_result.get('final_entity_count', 0)}")
+            logger.info(f"   Final Neo4j relationships: {inference_result.get('final_relationship_count', 0)}")
+            logger.info(f"   Final VDB relationship entries: {inference_result.get('vdb_relationship_count', 0)}")
             logger.info(f"   Entities corrected: {inference_result.get('entities_corrected', 0)}")
             logger.info(f"   Relationships inferred: {inference_result.get('relationships_inferred', 0)}")
             logger.info(f"   View results in Neo4j Browser: http://localhost:7474")

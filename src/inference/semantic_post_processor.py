@@ -30,6 +30,7 @@ import os
 import re
 import asyncio
 import json
+from pathlib import Path
 from typing import Dict, Callable, Awaitable, List
 from pydantic import ValidationError
 
@@ -44,6 +45,28 @@ logger = logging.getLogger(__name__)
 
 # Convert set to list for prompt generation
 ALLOWED_TYPES = list(VALID_ENTITY_TYPES)
+
+
+def _count_vdb_entries(rag_storage_path: str, filename: str) -> int | None:
+    """Return the current number of entries in a LightRAG VDB JSON file."""
+    if not rag_storage_path:
+        return None
+
+    path = Path(rag_storage_path) / filename
+    if not path.exists():
+        return None
+
+    try:
+        with path.open(encoding="utf-8") as file:
+            payload = json.load(file)
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.warning("Could not read %s for final count reporting: %s", path, exc)
+        return None
+
+    data = payload.get("data", []) if isinstance(payload, dict) else payload
+    if isinstance(data, (list, dict)):
+        return len(data)
+    return None
 
 
 def get_semantic_post_processing_config():
@@ -699,11 +722,12 @@ async def _semantic_post_processor_neo4j(
         entities = neo4j_io.get_all_entities()
         relationships = neo4j_io.get_all_relationships()
         
-        # Capture initial counts from main processing (before post-processing)
-        initial_entity_count = len(entities)
-        initial_rel_count = len(relationships)
+        # Capture the graph as it enters post-processing. Final reported counts
+        # are taken only after Phase 5 so logs do not mix pre/post snapshots.
+        starting_entity_count = len(entities)
+        starting_rel_count = len(relationships)
         phase_times['Phase 1 · Data Loading'] = time.time() - phase_start
-        logger.info(f"  📊 Main Processing Results: {initial_entity_count} entities, {initial_rel_count} relationships")
+        logger.info(f"  📊 Starting graph snapshot: {starting_entity_count} entities, {starting_rel_count} relationships")
         logger.info(f"  ⏱️  Phase 1 completed in {phase_times['Phase 1 · Data Loading']:.1f}s")
         
         if not entities:
@@ -918,15 +942,6 @@ async def _semantic_post_processor_neo4j(
         phase_times['Phase 4 · Rel Inference'] = time.time() - phase_start
         logger.info(f"  ⏱️  Phase 4 completed in {phase_times['Phase 4 · Rel Inference']:.1f}s")
 
-        # Capture final counts HERE (after Phase 4, before Phase 5).
-        # Phase 5 VDB sync calls ainsert_custom_kg() which, when GRAPH_STORAGE=Neo4JStorage,
-        # writes additional native-typed rels back to Neo4j, inflating counts beyond
-        # initial_rel_count + relationships_inferred.
-        type_counts = neo4j_io.get_entity_count_by_type()
-        rel_counts = neo4j_io.get_relationship_count_by_type()
-        final_entity_count = sum(type_counts.values())
-        final_relationship_count = sum(rel_counts.values())
-        
         # Phase 5: Sync inferred relationships to LightRAG VDBs (Issue #65 - Critical Fix)
         # Without this, agent queries via /query miss algorithm-discovered relationships
         phase_start = time.time()
@@ -948,6 +963,15 @@ async def _semantic_post_processor_neo4j(
         
         phase_times['Phase 5 · VDB Sync'] = time.time() - phase_start
         logger.info(f"  ⏱️  Phase 5 completed in {phase_times['Phase 5 · VDB Sync']:.1f}s")
+
+        # Authoritative final counts: capture only after every processing phase,
+        # including VDB sync side effects, has finished.
+        type_counts = neo4j_io.get_entity_count_by_type()
+        rel_counts = neo4j_io.get_relationship_count_by_type()
+        final_entity_count = sum(type_counts.values())
+        final_relationship_count = sum(rel_counts.values())
+        vdb_entity_count = _count_vdb_entries(rag_storage_path, "vdb_entities.json")
+        vdb_relationship_count = _count_vdb_entries(rag_storage_path, "vdb_relationships.json")
         
         # Summary statistics
         processing_time = time.time() - start_time
@@ -968,19 +992,25 @@ async def _semantic_post_processor_neo4j(
         # Show all types, sorted by count
         for entity_type, count in sorted(type_counts.items(), key=lambda x: x[1], reverse=True):
             logger.info(f"  {entity_type:30s}: {count:4d}")
+
+        logger.info("\n📊 Relationship Type Distribution (final Neo4j graph):")
+        for relationship_type, count in sorted(rel_counts.items(), key=lambda x: x[1], reverse=True):
+            logger.info(f"  {relationship_type:30s}: {count:4d}")
         
         # Show summary counts
         logger.info("\n" + "="*60)
-        logger.info("📈 FINAL COUNTS:")
+        logger.info("📈 FINAL COUNTS (after all processing complete):")
         logger.info("="*60)
-        logger.info(f"  Main Processing Entities:      {initial_entity_count}")
-        logger.info(f"  Main Processing Relationships: {initial_rel_count}")
+        logger.info(f"  Final Neo4j Entities:          {final_entity_count}")
+        logger.info(f"  Final Neo4j Relationships:     {final_relationship_count}")
+        if vdb_entity_count is not None:
+            logger.info(f"  Final VDB Entity Entries:      {vdb_entity_count}")
+        if vdb_relationship_count is not None:
+            logger.info(f"  Final VDB Relationship Entries: {vdb_relationship_count}")
+        logger.info(f"  ─────────────────────────────────────")
         logger.info(f"  Post-Processing Retyped Rels:  {relationships_retyped}")
         logger.info(f"  Post-Processing Added Rels:    {relationships_inferred}")
         logger.info(f"  VDB Synced Relationships:      {relationships_synced}")
-        logger.info(f"  ─────────────────────────────────────")
-        logger.info(f"  Final Entity Count:            {final_entity_count}")
-        logger.info(f"  Final Relationship Count:      {final_relationship_count}")
         logger.info("="*60)
         
         return {
@@ -990,6 +1020,13 @@ async def _semantic_post_processor_neo4j(
             "relationships_synced": relationships_synced,
             "processing_time": processing_time,
             "entity_type_counts": type_counts,
+            "relationship_type_counts": rel_counts,
+            "starting_entity_count": starting_entity_count,
+            "starting_relationship_count": starting_rel_count,
+            "final_entity_count": final_entity_count,
+            "final_relationship_count": final_relationship_count,
+            "vdb_entity_count": vdb_entity_count,
+            "vdb_relationship_count": vdb_relationship_count,
             "vdb_sync_status": vdb_sync_stats.get("status", "unknown")
         }
         

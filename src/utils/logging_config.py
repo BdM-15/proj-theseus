@@ -240,6 +240,25 @@ class ServerFilter(logging.Filter):
         return True
 
 
+def _remove_workspace_file_handlers(target_logger: logging.Logger) -> None:
+    """Remove direct per-workspace file handlers from external loggers.
+
+    ``setup_logging`` may run repeatedly as workspaces are recreated. Root
+    handlers are cleared each time, but external loggers such as ``lightrag``
+    can keep direct handlers when they have ``propagate=False``. Remove the
+    previous workspace file handlers before attaching the new ones so errors do
+    not leak to stale workspace logs.
+    """
+    for handler in list(target_logger.handlers):
+        base_filename = str(getattr(handler, "baseFilename", ""))
+        if getattr(handler, "_theseus_workspace_file_handler", False) or base_filename.endswith(("_processing.log", "_errors.log")):
+            target_logger.removeHandler(handler)
+            try:
+                handler.close()
+            except Exception:
+                pass
+
+
 def setup_logging(
     log_level: str = "INFO",
     log_dir: str = "logs",
@@ -312,16 +331,8 @@ def setup_logging(
     processing_handler.setLevel(logging.INFO)
     processing_handler.setFormatter(detailed_formatter)
     processing_handler.addFilter(ProcessingFilter())
+    processing_handler._theseus_workspace_file_handler = True
     root_logger.addHandler(processing_handler)
-    
-    # CRITICAL: LightRAG's logger has propagate=False, so we must add our handler directly
-    # This captures "Chunk X of N extracted" messages from lightrag.operate (Branch 040 pattern)
-    lightrag_logger = logging.getLogger("lightrag")
-    lightrag_logger.addHandler(processing_handler)
-    
-    # Also capture raganything logs (multimodal processing)
-    raganything_logger = logging.getLogger("raganything")
-    raganything_logger.addHandler(processing_handler)
     
     # ========================================================================
     # 2. SERVER.LOG - Server operations
@@ -350,7 +361,17 @@ def setup_logging(
     )
     error_handler.setLevel(logging.ERROR)
     error_handler.setFormatter(detailed_formatter)
+    error_handler._theseus_workspace_file_handler = True
     root_logger.addHandler(error_handler)
+
+    # CRITICAL: LightRAG's logger has propagate=False, so root handlers alone do
+    # not receive its records. Attach both processing and error handlers directly
+    # so workspace errors land in <workspace>_errors.log as well as processing.log.
+    for external_logger_name in ("lightrag", "raganything"):
+        external_logger = logging.getLogger(external_logger_name)
+        _remove_workspace_file_handlers(external_logger)
+        external_logger.addHandler(processing_handler)
+        external_logger.addHandler(error_handler)
     
     # ========================================================================
     # 4. CONSOLE OUTPUT - Filtered (no health check spam)
