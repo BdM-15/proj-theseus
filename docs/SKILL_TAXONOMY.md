@@ -152,11 +152,12 @@ All 11 in-tree skills (10 pre-existing + new `oci-sweeper`) at branch
 
 **Developer-tool skills** (not govcon platform skills — not shown in Theseus UI, no KG queries):
 
-| Skill                           | `capability` | Note                                                          |
-| ------------------------------- | ------------ | ------------------------------------------------------------- |
-| `improve-codebase-architecture` | meta         | Vendored from mattpocock/skills (Apache-2.0); graphify-backed             |
-| `caveman`                       | meta         | Vendored from mattpocock/skills (Apache-2.0); communication mode modifier |
+| Skill                           | `capability` | Note                                                                                                |
+| ------------------------------- | ------------ | --------------------------------------------------------------------------------------------------- |
+| `improve-codebase-architecture` | meta         | Vendored from mattpocock/skills (Apache-2.0); graphify-backed                                       |
+| `caveman`                       | meta         | Vendored from mattpocock/skills (Apache-2.0); communication mode modifier                           |
 | `grill-me`                      | meta         | Vendored from mattpocock/skills (Apache-2.0); developer plan stress-tester; govcon variants planned |
+| `to-prd`                        | meta         | Vendored from mattpocock/skills (Apache-2.0); PRD publisher to GitHub Issues                        |
 
 ---
 
