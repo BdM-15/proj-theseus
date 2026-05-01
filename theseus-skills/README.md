@@ -41,6 +41,7 @@ Not shown in the Theseus UI (`metadata.developer_only: true`). Invokable from Co
 | Skill                         | Source of truth                                                              | Notes                                                 |
 | ----------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------- |
 | improve-codebase-architecture | `.github/skills/improve-codebase-architecture/` (vendored — see UPSTREAM.md) | Uses `graphify-out/GRAPH_REPORT.md` as dependency map |
+| caveman                       | `.github/skills/caveman/` (vendored — see UPSTREAM.md)                       | Ultra-compressed communication mode; no KG access     |
 
 ## Adding a Theseus-only Test Fixture
 

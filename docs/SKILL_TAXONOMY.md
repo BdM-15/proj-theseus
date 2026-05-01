@@ -154,7 +154,8 @@ All 11 in-tree skills (10 pre-existing + new `oci-sweeper`) at branch
 
 | Skill                           | `capability` | Note                                                          |
 | ------------------------------- | ------------ | ------------------------------------------------------------- |
-| `improve-codebase-architecture` | meta         | Vendored from mattpocock/skills (Apache-2.0); graphify-backed |
+| `improve-codebase-architecture` | meta         | Vendored from mattpocock/skills (Apache-2.0); graphify-backed             |
+| `caveman`                       | meta         | Vendored from mattpocock/skills (Apache-2.0); communication mode modifier |
 
 ---
 
