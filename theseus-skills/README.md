@@ -42,6 +42,7 @@ Not shown in the Theseus UI (`metadata.developer_only: true`). Invokable from Co
 | ----------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------- |
 | improve-codebase-architecture | `.github/skills/improve-codebase-architecture/` (vendored — see UPSTREAM.md) | Uses `graphify-out/GRAPH_REPORT.md` as dependency map |
 | caveman                       | `.github/skills/caveman/` (vendored — see UPSTREAM.md)                       | Ultra-compressed communication mode; no KG access     |
+| grill-me                      | `.github/skills/grill-me/` (vendored — see UPSTREAM.md)                      | Generic plan stress-tester; govcon variants planned   |
 
 ## Adding a Theseus-only Test Fixture
 
