@@ -185,8 +185,24 @@ async def initialize_raganything():
     KEYWORD_TIMEOUT = 60
     VLM_TIMEOUT = 300
 
+    use_json_extraction = os.environ.get("ENTITY_EXTRACTION_USE_JSON", "false").strip().lower() in ("1", "true", "yes", "on")
+    use_strict_schema = (
+        use_json_extraction
+        and os.environ.get("ENTITY_EXTRACTION_STRICT_SCHEMA", "false").strip().lower() in ("1", "true", "yes", "on")
+    )
+    strict_extraction_response_format = None
+    if use_strict_schema:
+        from src.ontology.extraction_schema import build_response_format
+        strict_extraction_response_format = build_response_format()
+
     async def _extract_llm_func(prompt, system_prompt=None, history_messages=[], **kwargs):
         kwargs.setdefault("max_tokens", EXTRACT_MAX_TOKENS)
+        # LightRAG's native JSON extraction path passes response_format={"type": "json_object"}
+        # at the call site. For Phase 1.3 strict mode, the extract role must replace
+        # that looser setting with xAI's json_schema envelope immediately before the
+        # provider call; RoleLLMConfig.kwargs alone is overwritten by the call-time value.
+        if strict_extraction_response_format is not None:
+            kwargs["response_format"] = strict_extraction_response_format
         return await openai_complete_if_cache(
             extraction_model, prompt,
             system_prompt=system_prompt, history_messages=history_messages,
@@ -248,7 +264,6 @@ async def initialize_raganything():
     # LightRAG's _process_json_extraction_result uses json_repair.loads() and the
     # sanitizer is intentionally bypassed — there is no tuple fallback path.
     # ═══════════════════════════════════════════════════════════════════════════════
-    use_json_extraction = os.environ.get("ENTITY_EXTRACTION_USE_JSON", "false").strip().lower() in ("1", "true", "yes", "on")
     if use_json_extraction:
         sanitized_extract_func = _extract_llm_func  # JSON mode: no tuple sanitizer
     else:
@@ -344,21 +359,24 @@ async def initialize_raganything():
     # keywords, description} shape that LightRAG's _process_json_extraction_result
     # parser reads. Without this, json_object mode lets xAI improvise field names
     # ({entity, type} or {subject, relation, object}) — those drop on parse.
-    # `type` is constrained to the 33-entity-type enum; `keywords` first token is
-    # constrained to the canonical extraction-time relationship types via regex.
-    # Toggle via ENTITY_EXTRACTION_STRICT_SCHEMA=true (requires USE_JSON=true too).
+    # `type` is constrained to the 33-entity-type enum. xAI strict mode rejects
+    # JSON-Schema `pattern`, so relationship keyword canonicalization remains prompt
+    # + downstream normalization. Toggle via ENTITY_EXTRACTION_STRICT_SCHEMA=true.
     # ═══════════════════════════════════════════════════════════════════════════════
-    use_strict_schema = (
-        use_json_extraction
-        and os.environ.get("ENTITY_EXTRACTION_STRICT_SCHEMA", "false").strip().lower() in ("1", "true", "yes", "on")
-    )
     extract_kwargs: dict = {"max_tokens": EXTRACT_MAX_TOKENS}
     if use_strict_schema:
-        from src.ontology.extraction_schema import build_response_format
-        extract_kwargs["response_format"] = build_response_format()
+        extract_kwargs["response_format"] = strict_extraction_response_format
         logger.info("✅ Strict JSON schema enforcement ENABLED for `extract` role (xAI json_schema strict=true)")
     elif use_json_extraction:
         logger.info("ℹ️  Strict JSON schema NOT enabled — using prompt-only JSON mode (set ENTITY_EXTRACTION_STRICT_SCHEMA=true to enforce)")
+
+    extract_metadata = {"model": extraction_model, "host": xai_base_url, "binding": "openai"}
+    if use_strict_schema:
+        # LightRAG's cache identity currently includes only role/binding/model/host.
+        # Add a non-provider host suffix in metadata (not the actual base_url used by
+        # _extract_llm_func) so strict-schema responses never reuse prompt-only JSON
+        # cache entries from the same workspace/chunk.
+        extract_metadata["host"] = f"{xai_base_url}#strict-jsonschema"
 
     # Build per-role LightRAG configs (1.5.0 native role dispatch).
     role_llm_configs = {
@@ -366,7 +384,7 @@ async def initialize_raganything():
             func=sanitized_extract_func,
             kwargs=extract_kwargs,
             timeout=EXTRACT_TIMEOUT,
-            metadata={"model": extraction_model, "host": xai_base_url, "binding": "openai"},
+            metadata=extract_metadata,
         ),
         "query": RoleLLMConfig(
             func=_query_llm_func,
