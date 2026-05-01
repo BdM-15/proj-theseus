@@ -194,6 +194,37 @@ async def initialize_raganything():
     if use_strict_schema:
         from src.ontology.extraction_schema import build_response_format
         strict_extraction_response_format = build_response_format()
+        strict_schema = strict_extraction_response_format["json_schema"]["schema"]
+        strict_entity_types = strict_schema["properties"]["entities"]["items"]["properties"]["type"]["enum"]
+        logger.info("=" * 88)
+        logger.info("✅ STRICT JSON SCHEMA STARTUP CHECK: ENABLED")
+        logger.info(
+            "   ENTITY_EXTRACTION_USE_JSON=%s | ENTITY_EXTRACTION_STRICT_SCHEMA=%s",
+            os.environ.get("ENTITY_EXTRACTION_USE_JSON"),
+            os.environ.get("ENTITY_EXTRACTION_STRICT_SCHEMA"),
+        )
+        logger.info(
+            "   response_format=%s | schema=%s | entity_type_enum=%d | additionalProperties=%s",
+            strict_extraction_response_format.get("type"),
+            strict_extraction_response_format["json_schema"].get("name"),
+            len(strict_entity_types),
+            strict_schema.get("additionalProperties"),
+        )
+        logger.info(
+            "   extract role will override LightRAG JSON-mode response_format={type: json_object} at provider boundary"
+        )
+        logger.info("   extract cache identity marker: host suffix #strict-jsonschema")
+        logger.info("=" * 88)
+    else:
+        logger.warning("=" * 88)
+        logger.warning("⚠️  STRICT JSON SCHEMA STARTUP CHECK: DISABLED")
+        logger.warning(
+            "   ENTITY_EXTRACTION_USE_JSON=%s | ENTITY_EXTRACTION_STRICT_SCHEMA=%s",
+            os.environ.get("ENTITY_EXTRACTION_USE_JSON"),
+            os.environ.get("ENTITY_EXTRACTION_STRICT_SCHEMA"),
+        )
+        logger.warning("   Extraction will run in %s mode", "prompt-only JSON" if use_json_extraction else "tuple")
+        logger.warning("=" * 88)
 
     async def _extract_llm_func(prompt, system_prompt=None, history_messages=[], **kwargs):
         kwargs.setdefault("max_tokens", EXTRACT_MAX_TOKENS)
@@ -330,7 +361,14 @@ async def initialize_raganything():
     # injection). LightRAG's API server constructs LightRAG without passing
     # chunking_func, so setting global_args.chunking_func has no effect — we must
     # inject it via lightrag_kwargs. See src/extraction/govcon_chunking.py.
-    from src.extraction.govcon_chunking import govcon_chunking_func
+    from src.extraction.govcon_chunking import BANNER_TEMPLATE, govcon_chunking_func
+    logger.info("=" * 88)
+    logger.info("✅ GOVCON DOCUMENT CLASSIFIER STARTUP CHECK: CONFIGURED")
+    logger.info("   chunking_func=src.extraction.govcon_chunking.govcon_chunking_func")
+    logger.info("   banner_template=%s", BANNER_TEMPLATE)
+    logger.info("   labels=solicitation | pws | cdrl_exhibit | template | unknown")
+    logger.info("   LightRAG provides the chunking_func hook; GovCon template/solicitation labeling is Theseus-owned")
+    logger.info("=" * 88)
 
     # Local BGE reranker (optional — gated by ENABLE_RERANK env var).
     # Returns None when disabled, in which case LightRAG skips reranking entirely.
@@ -468,11 +506,28 @@ async def initialize_raganything():
         logger.error(f"Failed to initialize LightRAG: {error_msg}")
         raise RuntimeError(f"LightRAG initialization failed: {error_msg}")
 
+    effective_extract_kwargs = dict(getattr(_rag_anything.lightrag, "role_llm_kwargs", {}).get("extract") or {})
+    effective_response_format = effective_extract_kwargs.get("response_format") or {}
+    effective_schema = effective_response_format.get("json_schema") or {}
+    extract_role_state = getattr(_rag_anything.lightrag, "_role_llm_states", {}).get("extract")
+    extract_metadata = getattr(extract_role_state, "metadata", {}) if extract_role_state else {}
+    logger.info("=" * 88)
+    logger.info("🔎 EFFECTIVE EXTRACT ROLE AFTER LightRAG INIT")
+    logger.info("   response_format.type=%s", effective_response_format.get("type", "<none>"))
+    logger.info("   json_schema.name=%s", effective_schema.get("name", "<none>"))
+    logger.info("   strict=%s", effective_schema.get("strict", "<none>"))
+    logger.info("   extract_cache_identity_host=%s", extract_metadata.get("host", "<unknown>"))
+    if use_strict_schema and effective_response_format.get("type") != "json_schema":
+        logger.error("❌ STRICT SCHEMA EXPECTED BUT NOT EFFECTIVE — do not process documents until fixed")
+    logger.info("=" * 88)
+
     # Verify the GovCon chunking_func actually landed on the LightRAG instance
     active_chunker = getattr(_rag_anything.lightrag, "chunking_func", None)
     chunker_name = getattr(active_chunker, "__name__", repr(active_chunker))
     if chunker_name == "govcon_chunking_func":
         logger.info("✅ GovCon chunking_func registered on LightRAG instance (banner injection active)")
+        logger.info("   Every classified document chunk will start with [GOVCON_DOC: type=...; note=...]")
+        logger.info("   Persisted chunks also carry govcon_doc_type metadata when classified")
     else:
         logger.warning(
             "⚠️  Active chunking_func is '%s' (expected 'govcon_chunking_func'). "
