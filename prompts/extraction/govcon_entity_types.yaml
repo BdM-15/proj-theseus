@@ -139,12 +139,22 @@ categories:
         title: "Named labor classifications and workforce roles"
         required_metadata: [position_title, skill_level, clearance_level, key_personnel_designation]
         content_signals:
-          - "Labor mix tables"
-          - "position titles"
-          - "skill levels"
-          - "labor hours"
-          - 'Key Personnel / Key Personnel Positions / key personnel substitution'
-        distinction: "Extract ONLY when explicitly named in RFP. If only quantities exist, use WORKLOAD_METRIC."
+          - "Labor mix tables, staffing plans, PWS Appendix / Attachment labor categories"
+          - "Named position titles: Program Manager, Systems Engineer Level III, Help Desk Analyst"
+          - "Skill level suffixes: Level I / II / III / IV, Junior / Mid / Senior, Entry / Journeyman / Expert"
+          - "Clearance phrases: TS/SCI required, Secret clearance, Public Trust suitability"
+          - "Key Personnel signals: 'Key Personnel', 'Key Personnel Positions', 'shall designate a', FAR 52.215-22"
+          - "Experience/education requirements tied to a named role: 'Requires 5 years experience as a...'"
+        distinction: |-
+          LABOR_CATEGORY = named position/role explicitly called out in the RFP (title + metadata extractable);
+          WORKLOAD_METRIC = labor hours or FTE counts without a named role title (12 FTEs, 1,200 labor hours/year);
+          WORK_SCOPE_ITEM = semantic work package label, not a person role (e.g., 'Systems Engineering' as a task area);
+          ORGANIZATION = a company, office, or government entity — not a person position
+        notes:
+          - "Extraction trigger: ONLY extract when the RFP explicitly names the position. Inferred roles are NOT labor_categories."
+          - "skill_level: capture the explicit level suffix (Level III, Senior, Journeyman) or omit if unstated — do not infer."
+          - "clearance_level: capture verbatim (TS/SCI, Secret, Public Trust) when stated for this role — omit if not specified."
+          - "key_personnel_designation: 'key' ONLY when the RFP explicitly designates the role under a Key Personnel clause or section; otherwise 'non-key'."
         metadata_conventions: |-
           key_personnel_designation: set to "key" when the position is explicitly designated as
           Key Personnel by the RFP (e.g., listed under an "L.X Key Personnel" section, named in a
@@ -153,7 +163,8 @@ categories:
           When set to "key", emit an additional MANDATES relationship from the governing clause
           or proposal_instruction to the labor_category, and a SATISFIES relationship from the
           labor_category to the resume / staffing requirement it fulfills.
-        example: '"Program Manager", "Systems Engineer Level III", "Help Desk Analyst"; key_personnel_designation="key" for PM if RFP lists PM under "Key Personnel"'
+        example: '"Systems Engineer Level III. Skill level: III. Clearance: TS/SCI. Key_personnel: non-key." / "Program Manager — key_personnel: key (listed under Section L Key Personnel clause)."'
+        anti_pattern: '"1,200 labor hours/year for engineering support" — this is a WORKLOAD_METRIC; no named position title means no labor_category.'
 
       - number: 8
         name: performance_standard
