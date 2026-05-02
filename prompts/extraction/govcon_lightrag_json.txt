@@ -489,11 +489,11 @@ When processing an RFP, prioritize extraction in this order:
 
 1. PROGRAM - Identify top-level program FIRST (provides context for all others)
 2. DOCUMENT_SECTION - Map document structure (provides location context even outside UCF)
-3. EVALUATION_FACTOR + SUBFACTOR - Critical for proposal planning
+3. EVALUATION_FACTOR (including subfactors via hierarchy_level) - Critical for proposal planning
 4. PROPOSAL_INSTRUCTION + PROPOSAL_VOLUME - Determine proposal structure
 5. REQUIREMENT - Core work obligations
 6. CONTRACT_LINE_ITEM + PRICING_ELEMENT - Pricing structure and commercial logic
-7. WORK_SCOPE_ITEM + TRANSITION_ACTIVITY - Work packages and phase-in/phase-out scope
+7. WORK_SCOPE_ITEM - Work packages, phase-in/phase-out tasks, and transition scope (no separate transition_activity type)
 8. WORKLOAD_METRIC + LABOR_CATEGORY - Quantitative BOE drivers and named labor roles
 9. PERFORMANCE_STANDARD - Quality standards, thresholds, and surveillance rules
 10. DOCUMENT + AMENDMENT - Structural source documents and changes
@@ -530,19 +530,19 @@ Pattern 2: Commercial / Pricing Content
    Content signals: CLIN/SLIN structure, price schedules, fee tables, escalation, rate tables
 
 Pattern 3: Work Scope Content
-   Entity types: work_scope_item, requirement, deliverable, transition_activity, workload_metric, performance_standard
-   Content signals: task descriptions, objectives, performance work, shall-statements, QASP/SLA tables, transition plans
+   Entity types: work_scope_item, requirement, deliverable, workload_metric, performance_standard
+   Content signals: task descriptions, objectives, performance work, shall-statements, QASP/SLA tables, transition plans (phase-in/phase-out tasks → work_scope_item)
 
 Pattern 4: Proposal Preparation Content
-   Entity types: proposal_instruction, proposal_volume, evaluation_factor, subfactor, past_performance_reference
-   Content signals: page limits, font/margin rules, response volume names, "will be evaluated", weighting, PPQ/CPARS instructions
+   Entity types: proposal_instruction, proposal_volume, evaluation_factor, past_performance_reference
+   Content signals: page limits, font/margin rules, response volume names, "will be evaluated", weighting, PPQ/CPARS instructions (subfactors are evaluation_factor entities with hierarchy_level=subfactor)
 
 Pattern 5: Governing Authorities
    Entity types: clause, regulatory_reference, technical_specification, compliance_artifact
    Content signals: FAR/DFARS clauses, DAFI/NIST references, MIL-DTL/ICD/drawing references, certifications/ATOs
 
 Pattern 6: Resource / Ownership Content
-   Entity types: government_furnished_item, equipment, technology, location, organization, person
+   Entity types: government_furnished_item, equipment, technology, location, organization
    Content signals: GFE/GFI/GFP, facilities, systems furnished by government, asset inventories, POCs
 
 Pattern 7: Strategic Signal
@@ -550,14 +550,14 @@ Pattern 7: Strategic Signal
    Content signals: mission emphasis, paramount/critical language, known deficiencies, lessons learned, repeated priorities
 
 UCF Examples (Common but NOT mandatory):
-- Section A / cover page → document_section, organization, person, event
+- Section A / cover page → document_section, organization, event
 - Section B / pricing schedule → document_section, contract_line_item, pricing_element
 - Section C / PWS-SOW-SOO → document_section, work_scope_item, requirement, workload_metric, performance_standard
 - Section H / special requirements → document_section, requirement, labor_category, location, government_furnished_item
 - Section I / clauses → document_section, clause
 - Section J / attachments → document_section, document, technical_specification, deliverable
 - Section L / instructions → document_section, proposal_instruction, proposal_volume
-- Section M / evaluation → document_section, evaluation_factor, subfactor, strategic_theme, customer_priority
+- Section M / evaluation → document_section, evaluation_factor, strategic_theme, customer_priority
 
 Non-UCF Label Mapping:
 - "Proposal Instructions" / "Response Format" / "Submission Requirements" → proposal_instruction
@@ -587,7 +587,7 @@ Attachment J-0200000-18 Performance Work Statement.
 Extract:
 - DOCUMENT: "Attachment J-0200000-18 Performance Work Statement"
 - WORK_SCOPE_ITEM: "Performance Work Statement"
-- Link: DOCUMENT --CONTAINS--> WORK_SCOPE_ITEM
+- Link: WORK_SCOPE_ITEM --CHILD_OF--> DOCUMENT
 
 ================================================================================
 PART F: RELATIONSHIP PATTERNS AND INFERENCE RULES
@@ -616,20 +616,20 @@ PART F: RELATIONSHIP PATTERNS AND INFERENCE RULES
 ║                                                                              ║
 ║    requirement → MEASURED_BY  → performance_standard                         ║
 ║    requirement → SATISFIED_BY → deliverable                                  ║
-║    requirement → EVALUATED_BY → evaluation_factor / subfactor                ║
+║    requirement → EVALUATED_BY → evaluation_factor                            ║
 ║    requirement → GOVERNED_BY  → clause / regulatory_reference                ║
 ║    requirement ← QUANTIFIES   ← workload_metric                              ║
 ║                                                                              ║
 ║  For EVERY `proposal_instruction` from a Section L (or non-UCF equivalent)   ║
-║  chunk, attempt to find its target evaluation_factor / subfactor in the      ║
+║  chunk, attempt to find its target evaluation_factor in the                  ║
 ║  same or adjacent chunk:                                                     ║
 ║                                                                              ║
-║    proposal_instruction → GUIDES → evaluation_factor / subfactor             ║
+║    proposal_instruction → GUIDES → evaluation_factor                         ║
 ║                                                                              ║
 ║  For EVERY `evaluation_factor` from a Section M (or non-UCF equivalent)      ║
-║  chunk, attempt to find its subfactors and the requirements it scores:      ║
+║  chunk, attempt to find its child evaluation_factors (subfactors) and the requirements it scores:      ║
 ║                                                                              ║
-║    evaluation_factor       → HAS_SUBFACTOR → subfactor                       ║
+║    evaluation_factor       → CHILD_OF → child_evaluation_factor (hierarchy_level=subfactor) ║
 ║    requirement/deliverable → EVALUATED_BY → evaluation_factor                ║
 ║                                                                              ║
 ║  These are not optional decorations — they are the bid-team’s primary use    ║
@@ -638,59 +638,60 @@ PART F: RELATIONSHIP PATTERNS AND INFERENCE RULES
 ║  If the companion entity exists and is not yet emitted, emit it too.         ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
-F.1 Mandatory Relationship Types
+F.1 Mandatory Relationship Types (23 extraction-time types)
 ---------------------------------
 Use EXACTLY these relationship types. The relationship_type field in the output
 MUST match one of these types verbatim (UPPERCASE_WITH_UNDERSCORES). Do NOT
 invent new types, use free-text descriptions, or vary the casing.
 
-─── STRUCTURAL ───
-CHILD_OF - Hierarchical structure (sections, subsections, numbered documents)
-ATTACHMENT_OF - Documents attached to document sections or parent documents
-CONTAINS - Parent contains child
+─── STRUCTURAL (4) ───
+CHILD_OF - Hierarchical structure: sections→parent, evaluation_factor→parent factor, document→parent doc
 AMENDS - Amendment modifies a document, section, or requirement
 SUPERSEDED_BY - Prior version replaced by a later version
 REFERENCES - Entity mentions another entity by name
 
-─── EVALUATION & PROPOSAL ───
+─── EVALUATION & PROPOSAL (4) ───
 GUIDES - Proposal instructions or volumes that guide evaluation responses
 EVALUATED_BY - Requirements/deliverables/past performance/work scope items evaluated in factors
-HAS_SUBFACTOR - Evaluation factor has subfactor (Factor 1 → Subfactor 1.1)
 MEASURED_BY - Requirement is measured by performance standard
 EVIDENCES - Past performance reference or compliance artifact evidences a theme, factor, or requirement
 
-─── WORK & DELIVERABLES ───
-PRODUCES - Work scope items or transition activities produce deliverables
+─── WORK & DELIVERABLES (7) ───
+PRODUCES - Work scope items produce deliverables
 SATISFIED_BY - Requirement satisfied by deliverable or capability
 TRACKED_BY - Deliverable tracked by CDRL
 SUBMITTED_TO - Deliverable submitted to organization
 STAFFED_BY - Requirement or work scope item staffed by labor category
 PRICED_UNDER - Deliverable or requirement priced under contract line item
-FUNDS - Contract line item funds a requirement or deliverable
 QUANTIFIES - Workload metric quantifies a service requirement
 
-─── AUTHORITY & GOVERNANCE ───
-GOVERNED_BY - Requirement governed by policy/document
-MANDATES - Regulatory reference mandates a requirement
+─── AUTHORITY & GOVERNANCE (4) ───
+GOVERNED_BY - Requirement governed by policy/document/clause
 CONSTRAINED_BY - Work scope or pricing element constrained by authority/spec
 DEFINES - One entity defines/explains another
 APPLIES_TO - Requirement/standard applies to equipment; instruction applies to volume
 
-─── RESOURCE & OPERATIONAL ───
+─── RESOURCE & OPERATIONAL (2) ───
 HAS_EQUIPMENT - Location has equipment
 PROVIDED_BY - Government furnished item is provided by organization
-COORDINATED_WITH - Activity coordinated with organization
-REPORTED_TO - Documentation reported to organization
 
-─── STRATEGIC & CAPTURE ───
+─── STRATEGIC & CAPTURE (2) ───
 ADDRESSES - Requirement or solution addresses customer priority or pain point
-RESOLVES - Requirement, deliverable, or transition activity resolves a pain point
-SUPPORTS - One entity enables/supports another
-RELATED_TO - Semantic similarity, shared topics
+RELATED_TO - Semantic similarity, shared topics (last resort — prefer typed edges)
 
-⛔ BANNED TYPES (these are NOT valid — NEVER use them):
-belongs_to, contained_in, part_of, has, is_a, type_of, member_of, associated_with
-→ Use the specific types above. See F.10 for table co-occurrence mapping rules.
+NORMALIZATION — if you would use a removed type, use the canonical replacement:
+  CONTAINS / ATTACHMENT_OF / HAS_SUBFACTOR → CHILD_OF (child entity → parent entity direction)
+  FUNDS → PRICED_UNDER (deliverable/req → contract_line_item direction)
+  MANDATES → GOVERNED_BY (requirement → clause/regulatory_reference direction)
+  RESOLVES / SUPPORTS → ADDRESSES or RELATED_TO
+  COORDINATED_WITH → RELATED_TO
+  REPORTED_TO → SUBMITTED_TO
+
+⛔ BANNED TYPES (NEVER use — these produce phantom duplicate edges or are covered above):
+CONTAINS, ATTACHMENT_OF, HAS_SUBFACTOR, FUNDS, MANDATES, RESOLVES, SUPPORTS,
+COORDINATED_WITH, REPORTED_TO, belongs_to, contained_in, part_of, has, is_a,
+type_of, member_of, associated_with
+→ See F.10 for table co-occurrence mapping rules.
 
 F.2 Proposal Instruction ↔ Evaluation Mapping (The "Golden Thread")
 --------------------------------------------------------------------
@@ -736,23 +737,22 @@ Algorithm:
 1. Extract topic keywords from instruction name (remove "Volume", "Plan", stopwords)
 2. Extract topic keywords from factor name (remove "Factor", stopwords)
 3. If similarity >= 0.50 (strong match): GUIDES with confidence 0.90
-4. If similarity >= 0.30 (moderate match): GUIDES with confidence 0.75
-5. If keyword appears in factor description: GUIDES with confidence 0.70
+4. If keyword appears in factor description: GUIDES with confidence 0.70
 
 Pattern 21-30: Cross-Volume References
 If Submission Instruction mentions multiple volumes addressing same factor:
 "Technical and Management Volumes collectively address Factors 1-3"
 → Create GUIDES relationships for BOTH volumes to ALL three factors
 
-Pattern 31-40: Subfactor Decomposition
-If Factor has subfactors:
+Pattern 31-40: Evaluation Factor Subfactor Decomposition
+If a parent evaluation_factor has child evaluation_factor entities (hierarchy_level=subfactor):
 Factor 1: Technical Approach
-  - Subfactor 1.1: System Architecture
-  - Subfactor 1.2: Integration Methodology
+  - Subfactor 1.1: System Architecture  (→ evaluation_factor, hierarchy_level=subfactor)
+  - Subfactor 1.2: Integration Methodology  (→ evaluation_factor, hierarchy_level=subfactor)
 
 And Submission Instruction mentions specific technical topics:
 "Include architecture diagrams and integration plans"
-→ Create GUIDES relationships to specific subfactors
+→ Create GUIDES relationships to specific child evaluation_factors (subfactors)
 
 Pattern 41-50: Implicit Format Instructions
 When factor description implies required content:
@@ -996,7 +996,7 @@ EXAMPLES:
   "Volume I Technical" --CHILD_OF--> "Section L Proposal Instructions"
   "Factor 1 Technical Approach" --CHILD_OF--> "Section M Evaluation Criteria"
   "Technical Volume limited to 25 pages" --CHILD_OF--> "Section L"
-  "Subfactor 1.1 TOMP" --CHILD_OF--> "Factor 1 Technical Approach" (via HAS_SUBFACTOR)
+  "Subfactor 1.1 TOMP" --CHILD_OF--> "Factor 1 Technical Approach" (hierarchy_level=subfactor on the child entity)
 
 Confidence: 0.90 (high - entity appears within the section text)
 WHY THIS MATTERS: Queries like "What does Section M evaluate?" cannot traverse
@@ -1063,8 +1063,8 @@ requirement ↔ deliverable         → SATISFIED_BY
 requirement ↔ performance_standard → MEASURED_BY
 requirement ↔ workload_metric     → QUANTIFIES
 work_scope_item ↔ deliverable     → PRODUCES
-deliverable ↔ contract_line_item  → PRICED_UNDER (deliverable→CLIN) or FUNDS (CLIN→deliverable)
-requirement ↔ contract_line_item  → PRICED_UNDER (req→CLIN) or FUNDS (CLIN→req)
+deliverable ↔ contract_line_item  → PRICED_UNDER (deliverable→CLIN)
+requirement ↔ contract_line_item  → PRICED_UNDER (req→CLIN)
 
 ─── EVALUATION ───
 requirement ↔ evaluation_factor   → EVALUATED_BY
@@ -1072,12 +1072,12 @@ deliverable ↔ evaluation_factor   → EVALUATED_BY
 work_scope_item ↔ evaluation_factor → EVALUATED_BY
 
 ─── STRUCTURAL ───
-entity ↔ document_section         → CHILD_OF (entity→section) or CONTAINS (section→entity)
-entity ↔ document                 → CHILD_OF (entity→document) or CONTAINS (document→entity)
+entity ↔ document_section         → CHILD_OF (entity→section direction always)
+entity ↔ document                 → CHILD_OF (entity→document direction always)
 
 ─── AUTHORITY ───
-requirement ↔ clause              → GOVERNED_BY (req→clause) or MANDATES (clause→req)
-requirement ↔ regulatory_reference → GOVERNED_BY (req→reg) or MANDATES (reg→req)
+requirement ↔ clause              → GOVERNED_BY (req→clause direction always)
+requirement ↔ regulatory_reference → GOVERNED_BY (req→reg direction always)
 
 ─── RESOURCE ───
 requirement ↔ labor_category      → STAFFED_BY
@@ -1087,7 +1087,7 @@ deliverable ↔ organization        → SUBMITTED_TO
 
 ─── STRATEGIC ───
 requirement ↔ customer_priority   → ADDRESSES
-requirement ↔ pain_point          → RESOLVES
+requirement ↔ pain_point          → ADDRESSES
 
 DEFAULT: If none of the above pairs match, use RELATED_TO (not belongs_to).
 
@@ -1292,15 +1292,17 @@ Examples of CORRECT workload metric descriptions:
 ✅ "1,600 customers daily at peak service windows. Quantity: 1,600. Unit: customers. Period: per day."
 ❌ "High sortie volume annually" (missing exact quantity and unit)
 
-FOR EVERY SUBFACTOR entity:
-✓ Parent evaluation factor clearly identified by name
+FOR EVERY EVALUATION_FACTOR SUBFACTOR (hierarchy_level=subfactor):
+Subfactors are NOT a separate entity type — they are evaluation_factor entities with hierarchy_level=subfactor.
+✓ Type: evaluation_factor with hierarchy_level=subfactor (or element / area as appropriate)
+✓ Parent evaluation factor clearly identified by name in description
 ✓ Subfactor identifier preserved (1.1, B.2, Element 2, etc.)
 ✓ Weight or points extracted if stated
 ✓ CHILD_OF relationship created linking to parent evaluation_factor
 
 Examples of CORRECT subfactor descriptions:
-✅ "Subfactor 1.2 Staffing Approach under Factor 1 Technical Approach. Parent: Factor 1 Technical Approach. Identifier: 1.2. Weight: 15%."
-✅ "Element B.2 System Integration under Factor B Technical. Parent: Factor B Technical. Identifier: B.2. Weight: Not stated."
+✅ "Subfactor 1.2 Staffing Approach under Factor 1 Technical Approach. Type: evaluation_factor. hierarchy_level: subfactor. Parent: Factor 1 Technical Approach. Identifier: 1.2. Weight: 15%."
+✅ "Element B.2 System Integration under Factor B Technical. Type: evaluation_factor. hierarchy_level: element. Parent: Factor B Technical. Identifier: B.2. Weight: Not stated."
 ❌ "Staffing subfactor" (missing parent factor and identifier)
 
 FOR EVERY LABOR_CATEGORY entity:
@@ -1312,11 +1314,6 @@ Examples of CORRECT labor category descriptions:
 ✅ "Systems Engineer Level III requiring TS/SCI clearance. Position: Systems Engineer. Skill Level: Level III/Senior. Clearance: TS/SCI."
 ✅ "Program Manager with PMP certification required. Position: Program Manager. Skill Level: Senior. Clearance: Secret."
 ❌ "Senior engineer" (missing exact title and clearance)
-
-FOR EVERY TRANSITION_ACTIVITY entity:
-✓ Phase identified (phase-in, phase-out, or overlap period)
-✓ Duration or timeline captured (30-day, 90-day, per PWS schedule, etc.)
-✓ Key dependencies noted (incumbent cooperation, GFE transfer, security clearance processing)
 
 FOR EVERY PRICING_ELEMENT entity:
 ✓ Pricing type identified (indirect rate, fee, escalation factor, wrap rate, plug rate)
@@ -1348,7 +1345,7 @@ TOP-LEVEL SHAPE:
 ENTITY OBJECT (3 required fields):
 {{
   "name":        "<canonical entity name, Title Case for proper nouns>",
-  "type":        "<one of the 33 valid entity types, lowercase_with_underscores>",
+  "type":        "<one of the 32 valid entity types, lowercase_with_underscores>",
   "description": "<full description with ALL type-specific metadata embedded>"
 }}
 
@@ -1383,21 +1380,18 @@ MUST match the regex `^[A-Z][A-Z0-9_]*$`. Extra tokens after the first comma
 enrich VDB embedding semantics (lowercase phrases, free text) but never override
 the type and MUST NOT themselves be canonical UPPERCASE types.
 
-VALID ENTITY TYPES (33 — see Part D / {entity_types_guidance}):
-requirement, clause, document_section, document, deliverable, evaluation_factor,
-proposal_instruction, proposal_volume, program, equipment, strategic_theme,
-work_scope_item, contract_line_item, workload_metric, labor_category, subfactor,
-regulatory_reference, performance_standard, pricing_element, government_furnished_item,
-compliance_artifact, transition_activity, technical_specification,
-past_performance_reference, customer_priority, pain_point, amendment,
-organization, technology, concept, location, event, person
+VALID ENTITY TYPES (32 — see Part D / {entity_types_guidance}):
+requirement, contract_line_item, pricing_element, government_furnished_item, deliverable,
+workload_metric, labor_category, performance_standard, contract_vehicle,
+document_section, document, amendment, clause, regulatory_reference, technical_specification,
+work_scope_item, evaluation_factor, period_of_performance, proposal_instruction,
+proposal_volume, past_performance_reference, strategic_theme, customer_priority, pain_point,
+organization, program, equipment, technology, location, event, compliance_artifact, concept
 
-VALID RELATIONSHIP TYPES (32 extraction-time — UPPERCASE_WITH_UNDERSCORES):
+VALID RELATIONSHIP TYPES (23 extraction-time — UPPERCASE_WITH_UNDERSCORES):
 
 ─── STRUCTURAL (Document Hierarchy & Cross-References) ───
-CHILD_OF           Source is a child/subsection of target
-ATTACHMENT_OF      Source document is attached to target section or document
-CONTAINS           Target is contained within source
+CHILD_OF           Source is a child/subsection/subfactor of target (child → parent direction always)
 AMENDS             Source amendment modifies target document/section/requirement
 SUPERSEDED_BY      Source version is replaced by target (newer) version
 REFERENCES         Source entity mentions or cites target entity by name
@@ -1405,23 +1399,20 @@ REFERENCES         Source entity mentions or cites target entity by name
 ─── EVALUATION & PROPOSAL (Section L↔M Golden Thread) ───
 GUIDES             Source instruction/volume guides response to target factor
 EVALUATED_BY       Source requirement/deliverable/work_scope is evaluated under target
-HAS_SUBFACTOR      Source evaluation factor has target as a subfactor
 MEASURED_BY        Source requirement is measured by target performance standard
 EVIDENCES          Source evidence/artifact evidences target theme/factor
 
 ─── WORK & DELIVERABLES (Traceability Chain) ───
-PRODUCES           Source work scope/transition activity produces target deliverable
+PRODUCES           Source work scope produces target deliverable
 SATISFIED_BY       Source requirement is satisfied by target deliverable/capability
 TRACKED_BY         Source deliverable is tracked by target CDRL identifier
 SUBMITTED_TO       Source deliverable is submitted to target organization
 STAFFED_BY         Source requirement/work scope is staffed by target labor category
 PRICED_UNDER       Source deliverable/requirement is priced under target CLIN
-FUNDS              Source CLIN funds target requirement or deliverable
 QUANTIFIES         Source workload metric quantifies target service requirement
 
 ─── AUTHORITY & GOVERNANCE ───
-GOVERNED_BY        Source requirement is governed by target policy/regulation
-MANDATES           Source clause/regulation mandates target requirement
+GOVERNED_BY        Source requirement is governed by target policy/regulation/clause
 CONSTRAINED_BY     Source work/pricing is constrained by target authority/spec
 DEFINES            Source entity defines or explains target entity
 APPLIES_TO         Source standard applies to target equipment/volume
@@ -1429,54 +1420,53 @@ APPLIES_TO         Source standard applies to target equipment/volume
 ─── RESOURCE & OPERATIONAL ───
 HAS_EQUIPMENT      Source location has target equipment
 PROVIDED_BY        Source GFM/GFI is provided by target organization
-COORDINATED_WITH   Source activity is coordinated with target organization
-REPORTED_TO        Source documentation/report is reported to target organization
 
 ─── STRATEGIC & CAPTURE INTELLIGENCE ───
 ADDRESSES          Source requirement/capability addresses target priority/pain
-RESOLVES           Source requirement/deliverable/activity resolves target pain
-SUPPORTS           Source entity enables or supports target entity
 RELATED_TO         Generic semantic similarity (use sparingly — prefer typed edges)
 
+NORMALIZATION (do not emit these — normalize to canonical type):
+  CONTAINS / ATTACHMENT_OF / HAS_SUBFACTOR → CHILD_OF (reverse: child→parent)
+  FUNDS → PRICED_UNDER (reverse: deliverable/req→CLIN)
+  MANDATES → GOVERNED_BY (reverse: req→clause/reg)
+  RESOLVES / SUPPORTS → ADDRESSES or RELATED_TO
+  COORDINATED_WITH → RELATED_TO
+  REPORTED_TO → SUBMITTED_TO
+
 SOURCE → TARGET DIRECTIONALITY (enforce strictly):
-  CHILD_OF:        child_entity → parent_entity
-  ATTACHMENT_OF:   attachment → parent_section/document
+  CHILD_OF:        child_entity → parent_entity (sections, subfactors, doc attachments)
   GUIDES:          proposal_instruction/proposal_volume → evaluation_factor
   EVALUATED_BY:    requirement/deliverable/work_scope → evaluation_factor
-  HAS_SUBFACTOR:   evaluation_factor → subfactor
   MEASURED_BY:     requirement → performance_standard
-  PRODUCES:        work_scope_item/transition_activity → deliverable
+  PRODUCES:        work_scope_item → deliverable
   SATISFIED_BY:    requirement → deliverable/compliance_artifact
   TRACKED_BY:      deliverable → deliverable (CDRL)
   SUBMITTED_TO:    deliverable → organization
   STAFFED_BY:      requirement/work_scope → labor_category
   PRICED_UNDER:    deliverable/requirement → contract_line_item
-  FUNDS:           contract_line_item → requirement/deliverable
   QUANTIFIES:      workload_metric → requirement
   GOVERNED_BY:     requirement → document/regulatory_reference/clause
-  MANDATES:        clause/regulatory_reference → requirement
   CONSTRAINED_BY:  work_scope_item/pricing_element → regulation/spec
   HAS_EQUIPMENT:   location → equipment
   PROVIDED_BY:     government_furnished_item → organization
   EVIDENCES:       past_performance/compliance_artifact → theme/factor
   APPLIES_TO:      requirement/standard → equipment; instruction → volume
   ADDRESSES:       requirement/work_scope → customer_priority/pain_point
-  RESOLVES:        requirement/deliverable/transition → pain_point
 
 CRITICAL OUTPUT RULES:
 1. ENTITY name: Title Case for proper nouns; preserve exact citations for clauses (e.g. "FAR 52.212-1").
-2. ENTITY type: MUST be EXACTLY one of the 33 valid types (lowercase_with_underscores). Anything else → entity is dropped.
+2. ENTITY type: MUST be EXACTLY one of the 32 valid types (lowercase_with_underscores). Anything else → entity is dropped.
 3. ENTITY DENSITY FLOOR (do NOT collapse enumerated lists):
    When a chunk contains a numbered or bulleted list of ≥3 items where each
    item is a distinct CDRL, requirement, performance_standard, deliverable,
-   evaluation_factor / subfactor, workload_metric, or labor_category — emit
+   evaluation_factor (including subfactors), workload_metric, or labor_category — emit
    ONE entity per item. Do NOT roll them up into a single parent entity
    ("the 16 CDRLs", "all subfactors", "all metrics").
      • CDRL list A001–A016 → 16 deliverable entities (one per CDRL line)
-     • 4 evaluation subfactors → 4 subfactor entities + 1 evaluation_factor
+     • 4 evaluation subfactors → 4 evaluation_factor entities (hierarchy_level=subfactor) + 1 parent evaluation_factor
      • 5‐line performance metrics table → 5 performance_standard entities
    The parent ("CDRL Schedule", "Factor 1 Technical") is also emitted, with
-   CHILD_OF / HAS_SUBFACTOR / CONTAINS edges to each child.
+   CHILD_OF edges to each child (child entity → parent entity direction).
    Page limits, dates, FAR/DFARS clause numbers, and adjectival rating scales
    (Outstanding/Good/Acceptable/Marginal/Unacceptable) MUST be preserved
    verbatim in the relevant entity’s `description` — never paraphrased away.
@@ -1488,7 +1478,7 @@ CRITICAL OUTPUT RULES:
    - clause: clause_number, regulation (FAR/DFARS/agency-supplement)
    - labor_category: position_title, skill_level, clearance_level
    - workload_metric: quantity, unit, period
-   - subfactor: parent_factor, subfactor_number, weight
+   - evaluation_factor (when hierarchy_level=subfactor): parent_factor, subfactor_number, weight
    - work_scope_item: task_number, scope_description
    - proposal_volume: volume_id, purpose
    - pricing_element: pricing_type, value_or_percentage, basis
@@ -1735,10 +1725,10 @@ Output:
     {{"name": "Volume II - Technical Volume", "type": "proposal_volume", "description": "Technical Volume submitted by offerors. Page limit: {{N}} pages. Format: {{font}}. Volume_id: II. Purpose: address Subfactors 1.A-1.D."}},
     {{"name": "L.4 Technical Volume Submission Instruction", "type": "proposal_instruction", "description": "Offerors shall submit a Technical Volume not exceeding {{N}} pages, {{font}}, addressing Subfactors 1.A through 1.D. Page_limit: {{N}}. Format_reqs: {{font}}. Modal verb: shall. Criticality: MANDATORY."}},
     {{"name": "Factor 1 - Technical", "type": "evaluation_factor", "description": "Technical evaluation factor containing four subfactors (1.A-1.D). Importance: more important than Factor 2 (Price). Subfactors: 1.A (rated tradeoff), 1.B, 1.C, 1.D (1.B-1.D are pass/fail gates)."}},
-    {{"name": "Subfactor 1.A - Plan A", "type": "subfactor", "description": "Tradeoff subfactor rated combined technical/risk on a five-level adjectival scale: Outstanding, Good, Acceptable, Marginal, Unacceptable. Parent_factor: Factor 1. Subfactor_number: 1.A. More important than Factor 2 Price."}},
-    {{"name": "Subfactor 1.B - Plan B", "type": "subfactor", "description": "Acceptable/Unacceptable gate; Unacceptable renders proposal un-awardable. Page limit: {{M}} pages. Must address {{N}}-day crisis continuity. Parent_factor: Factor 1. Subfactor_number: 1.B."}},
-    {{"name": "Subfactor 1.C - Plan C", "type": "subfactor", "description": "Acceptable/Unacceptable gate; must satisfy FAR 52.XXX-XX(h)(3) minimums. Parent_factor: Factor 1. Subfactor_number: 1.C."}},
-    {{"name": "Subfactor 1.D - Plan D", "type": "subfactor", "description": "Acceptable/Unacceptable gate; must be task-order-specific (generic basic-contract plans are unacceptable). Parent_factor: Factor 1. Subfactor_number: 1.D."}},
+    {{"name": "Subfactor 1.A - Plan A", "type": "evaluation_factor", "description": "Tradeoff subfactor rated combined technical/risk on a five-level adjectival scale: Outstanding, Good, Acceptable, Marginal, Unacceptable. Parent_factor: Factor 1. Subfactor_number: 1.A. More important than Factor 2 Price. hierarchy_level: subfactor."}},
+    {{"name": "Subfactor 1.B - Plan B", "type": "evaluation_factor", "description": "Acceptable/Unacceptable gate; Unacceptable renders proposal un-awardable. Page limit: {{M}} pages. Must address {{N}}-day crisis continuity. Parent_factor: Factor 1. Subfactor_number: 1.B. hierarchy_level: subfactor."}},
+    {{"name": "Subfactor 1.C - Plan C", "type": "evaluation_factor", "description": "Acceptable/Unacceptable gate; must satisfy FAR 52.XXX-XX(h)(3) minimums. Parent_factor: Factor 1. Subfactor_number: 1.C. hierarchy_level: subfactor."}},
+    {{"name": "Subfactor 1.D - Plan D", "type": "evaluation_factor", "description": "Acceptable/Unacceptable gate; must be task-order-specific (generic basic-contract plans are unacceptable). Parent_factor: Factor 1. Subfactor_number: 1.D. hierarchy_level: subfactor."}},
     {{"name": "Factor 2 - Price", "type": "evaluation_factor", "description": "Price evaluation factor. Importance: less important than Subfactor 1.A. Evaluated on Total Evaluated Price (TEP) for reasonableness and realism."}},
     {{"name": "Staffing Matrix (Plan A)", "type": "deliverable", "description": "Required content of Subfactor 1.A. Lists FTEs, labor hours, and qualifications. Submitted as part of Technical Volume."}},
     {{"name": "Mobilization Schedule with Critical Path", "type": "deliverable", "description": "Required content of Subfactor 1.A. Critical path required NLT {{date}}. Tied to Deliverable Tracking ID X."}},
@@ -1751,10 +1741,10 @@ Output:
   "relationships": [
     {{"source": "L.4 Technical Volume Submission Instruction", "target": "Volume II - Technical Volume", "keywords": "APPLIES_TO, submission instruction governs volume", "description": "L.4 instruction applies to the Technical Volume offerors submit."}},
     {{"source": "L.4 Technical Volume Submission Instruction", "target": "Factor 1 - Technical", "keywords": "GUIDES, instruction directs response to evaluation factor", "description": "L.4 directs offerors to address Subfactors 1.A-1.D of Factor 1."}},
-    {{"source": "Factor 1 - Technical", "target": "Subfactor 1.A - Plan A", "keywords": "HAS_SUBFACTOR", "description": "Factor 1 contains Subfactor 1.A as the only tradeoff subfactor."}},
-    {{"source": "Factor 1 - Technical", "target": "Subfactor 1.B - Plan B", "keywords": "HAS_SUBFACTOR", "description": "Factor 1 contains Subfactor 1.B as a pass/fail gate."}},
-    {{"source": "Factor 1 - Technical", "target": "Subfactor 1.C - Plan C", "keywords": "HAS_SUBFACTOR", "description": "Factor 1 contains Subfactor 1.C as a pass/fail gate."}},
-    {{"source": "Factor 1 - Technical", "target": "Subfactor 1.D - Plan D", "keywords": "HAS_SUBFACTOR", "description": "Factor 1 contains Subfactor 1.D as a pass/fail gate."}},
+    {{"source": "Subfactor 1.A - Plan A", "target": "Factor 1 - Technical", "keywords": "CHILD_OF, subfactor hierarchy", "description": "Subfactor 1.A is a child evaluation factor (hierarchy_level=subfactor) under Factor 1 Technical."}},
+    {{"source": "Subfactor 1.B - Plan B", "target": "Factor 1 - Technical", "keywords": "CHILD_OF, subfactor hierarchy", "description": "Subfactor 1.B is a pass/fail child evaluation factor under Factor 1 Technical."}},
+    {{"source": "Subfactor 1.C - Plan C", "target": "Factor 1 - Technical", "keywords": "CHILD_OF, subfactor hierarchy", "description": "Subfactor 1.C is a pass/fail child evaluation factor under Factor 1 Technical."}},
+    {{"source": "Subfactor 1.D - Plan D", "target": "Factor 1 - Technical", "keywords": "CHILD_OF, subfactor hierarchy", "description": "Subfactor 1.D is a task-order-specific child evaluation factor under Factor 1 Technical."}},
     {{"source": "Subfactor 1.A - Plan A", "target": "Five-Level Adjectival Rating Scale", "keywords": "MEASURED_BY", "description": "Subfactor 1.A is rated using the five-level adjectival scale."}},
     {{"source": "Subfactor 1.B - Plan B", "target": "Acceptable/Unacceptable Pass-Fail Standard", "keywords": "MEASURED_BY", "description": "Subfactor 1.B is rated Acceptable/Unacceptable."}},
     {{"source": "Subfactor 1.C - Plan C", "target": "Acceptable/Unacceptable Pass-Fail Standard", "keywords": "MEASURED_BY", "description": "Subfactor 1.C is rated Acceptable/Unacceptable."}},

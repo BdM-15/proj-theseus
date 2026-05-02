@@ -32,23 +32,29 @@ VALID_ENTITY_TYPES: frozenset[str] = get_default_catalog().entity_type_names
 EntityType = str  # runtime alias; values must satisfy `name in VALID_ENTITY_TYPES`
 
 # Valid relationship types - canonical set matching extraction prompt Part F.1/J
-# These are the ONLY valid values for the relationship_type / keywords field.
-# Organized by functional group for clarity.
+# Organized into extraction-time types (23) and inference-only types (3).
+# 9 types removed from extraction vocab (produce phantom duplicate edges):
+#   CONTAINS, ATTACHMENT_OF, HAS_SUBFACTOR → normalize to CHILD_OF
+#   FUNDS → normalize to PRICED_UNDER
+#   MANDATES → normalize to GOVERNED_BY
+#   RESOLVES, SUPPORTS → normalize to ADDRESSES or RELATED_TO
+#   COORDINATED_WITH → normalize to RELATED_TO
+#   REPORTED_TO → normalize to SUBMITTED_TO
 VALID_RELATIONSHIP_TYPES = {
-    # Structural (Document Hierarchy & Cross-References)
-    "CHILD_OF", "ATTACHMENT_OF", "CONTAINS", "AMENDS", "SUPERSEDED_BY", "REFERENCES",
-    # Evaluation & Proposal (Section L↔M Golden Thread)
-    "GUIDES", "EVALUATED_BY", "HAS_SUBFACTOR", "MEASURED_BY", "EVIDENCES",
-    # Work & Deliverables (Traceability Chain)
+    # Structural (4 extraction-time)
+    "CHILD_OF", "AMENDS", "SUPERSEDED_BY", "REFERENCES",
+    # Evaluation & Proposal (4 extraction-time)
+    "GUIDES", "EVALUATED_BY", "MEASURED_BY", "EVIDENCES",
+    # Work & Deliverables (7 extraction-time)
     "PRODUCES", "SATISFIED_BY", "TRACKED_BY", "SUBMITTED_TO", "STAFFED_BY",
-    "PRICED_UNDER", "FUNDS", "QUANTIFIES",
-    # Authority & Governance
-    "GOVERNED_BY", "MANDATES", "CONSTRAINED_BY", "DEFINES", "APPLIES_TO",
-    # Resource & Operational
-    "HAS_EQUIPMENT", "PROVIDED_BY", "COORDINATED_WITH", "REPORTED_TO",
-    # Strategic & Capture Intelligence
-    "ADDRESSES", "RESOLVES", "SUPPORTS", "RELATED_TO",
-    # Inference-only types (produced by post-processing algo 8: orphan resolution)
+    "PRICED_UNDER", "QUANTIFIES",
+    # Authority & Governance (4 extraction-time)
+    "GOVERNED_BY", "CONSTRAINED_BY", "DEFINES", "APPLIES_TO",
+    # Resource & Operational (2 extraction-time)
+    "HAS_EQUIPMENT", "PROVIDED_BY",
+    # Strategic & Capture Intelligence (2 extraction-time)
+    "ADDRESSES", "RELATED_TO",
+    # Inference-only types (produced by post-processing; not emitted by LLM)
     "REQUIRES", "ENABLED_BY", "RESPONSIBLE_FOR",
 }
 
@@ -71,7 +77,7 @@ def normalize_relationship_type(rel_type: str, fallback: str = "RELATED_TO") -> 
         "PART_OF": "CHILD_OF",
         "BELONGS_TO": "RELATED_TO",
         "CONTAINED_IN": "RELATED_TO",
-        "HAS": "CONTAINS",
+        "HAS": "CHILD_OF",
         "IS_A": "RELATED_TO",
         "TYPE_OF": "RELATED_TO",
         "MEMBER_OF": "CHILD_OF",
@@ -80,12 +86,23 @@ def normalize_relationship_type(rel_type: str, fallback: str = "RELATED_TO") -> 
         "SPECIFIES": "DEFINES",
         "FIELD_IN": "CHILD_OF",
         "INFERRED": "RELATED_TO",
-        # LLM-generated types not yet in canonical set
+        # LLM-generated types not in canonical set
         "IMPLEMENTED_BY": "SATISFIED_BY",    # requirement IMPLEMENTED_BY approach
         "SUBJECT_TO": "GOVERNED_BY",          # entity SUBJECT_TO regulation
         "REFERENCED_BY": "REFERENCES",        # inverse reference (direction approximated)
         "REQUIRES_DELIVERABLE": "REQUIRES",   # more specific form of REQUIRES
-        "USED_FOR": "SUPPORTS",               # resource/tech USED_FOR purpose
+        "USED_FOR": "RELATED_TO",             # resource/tech USED_FOR purpose
+        # Types removed from extraction vocab in Phase 3 first-principles reduction
+        # (they produce phantom duplicate edges — canonical direction is kept)
+        "CONTAINS": "CHILD_OF",              # inverse of CHILD_OF; normalize to CHILD_OF
+        "ATTACHMENT_OF": "CHILD_OF",         # structural synonym of CHILD_OF for docs
+        "HAS_SUBFACTOR": "CHILD_OF",         # eval factor hierarchy is CHILD_OF
+        "FUNDS": "PRICED_UNDER",             # inverse of PRICED_UNDER
+        "MANDATES": "GOVERNED_BY",           # inverse of GOVERNED_BY
+        "RESOLVES": "ADDRESSES",             # semantically identical in this domain
+        "SUPPORTS": "RELATED_TO",            # too vague; use ADDRESSES or RELATED_TO
+        "COORDINATED_WITH": "RELATED_TO",    # no bid-team query needs this direction
+        "REPORTED_TO": "SUBMITTED_TO",       # semantically identical in this domain
     }
     if normalized in _ROGUE_MAPPINGS:
         mapped = _ROGUE_MAPPINGS[normalized]

@@ -42,9 +42,14 @@ def _extract_f1_relationship_types(prompt_text: str) -> set[str]:
 # ---------------------------------------------------------------------------
 
 
-def test_canonical_relationship_count_is_35():
-    assert len(VALID_RELATIONSHIP_TYPES) == 35, (
-        f"Expected 35 canonical relationship types, found {len(VALID_RELATIONSHIP_TYPES)}"
+def test_canonical_relationship_count_is_26():
+    """26 = 23 extraction-time + 3 inference-only.
+    9 types removed in Phase 3 first-principles reduction (produce phantom duplicate edges):
+    CONTAINS, ATTACHMENT_OF, HAS_SUBFACTOR, FUNDS, MANDATES, RESOLVES, SUPPORTS,
+    COORDINATED_WITH, REPORTED_TO — all normalized to canonical equivalents in schema.
+    """
+    assert len(VALID_RELATIONSHIP_TYPES) == 26, (
+        f"Expected 26 canonical relationship types (23 extraction + 3 inference-only), found {len(VALID_RELATIONSHIP_TYPES)}"
     )
 
 
@@ -87,7 +92,7 @@ def test_golden_thread_relationship_primitives_present():
     required = {
         "GUIDES",
         "EVALUATED_BY",
-        "HAS_SUBFACTOR",
+        "CHILD_OF",        # covers HAS_SUBFACTOR (eval factor hierarchy) + ATTACHMENT_OF + CONTAINS
         "PRODUCES",
         "SATISFIED_BY",
         "TRACKED_BY",
@@ -100,19 +105,13 @@ def test_golden_thread_relationship_primitives_present():
 
 def test_authority_and_constraint_relationship_primitives_present():
     required = {
-        "GOVERNED_BY",
-        "MANDATES",
+        "GOVERNED_BY",      # MANDATES normalized to GOVERNED_BY (inverse direction eliminated)
         "CONSTRAINED_BY",
         "DEFINES",
         "APPLIES_TO",
     }
     missing = required - set(VALID_RELATIONSHIP_TYPES)
     assert not missing, f"Missing authority/constraint relationship primitives: {sorted(missing)}"
-
-
-# ---------------------------------------------------------------------------
-# Core entity primitives required for L↔M↔execution traceability
-# ---------------------------------------------------------------------------
 
 
 def test_core_entity_primitives_present():
