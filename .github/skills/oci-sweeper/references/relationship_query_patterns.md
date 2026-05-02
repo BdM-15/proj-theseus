@@ -1,6 +1,6 @@
 # Relationship Query Patterns — OCI Sweep
 
-Cypher / KG query templates the skill uses against the active Theseus workspace to surface candidate OCI parties and the relationships among them. The KG schema follows `src/ontology/schema.py` (33 entity types, 43 relationship types).
+Cypher / KG query templates the skill uses against the active Theseus workspace to surface candidate OCI parties and the relationships among them. The KG schema follows `src/ontology/schema.py` (33 entity types, 35 relationship types).
 
 > All queries assume the runtime's `kg_query` tool runs against the active workspace's Neo4j storage (or NetworkX equivalent). Bind names via `$names` parameter — never inline string-concatenate.
 

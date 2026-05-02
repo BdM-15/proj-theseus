@@ -18,7 +18,7 @@
 
 **Ontology-based RAG system** for federal RFP analysis. Uses **RAG-Anything** (multimodal PDF parsing via MinerU) + **LightRAG** (knowledge graph/queries) with **xAI Grok** cloud processing.
 
-**Core Innovation**: 33 government contracting entity types + 43 canonical relationship types + 8 LLM-powered relationship inference algorithms enable Section L↔M mapping, requirement traceability, and Shipley methodology compliance.
+**Core Innovation**: 33 government contracting entity types + 35 canonical relationship types + 8 LLM-powered relationship inference algorithms enable Section L↔M mapping, requirement traceability, and Shipley methodology compliance.
 
 ### Supporting Documentation
 
@@ -71,7 +71,7 @@ This project has **three independent prompt systems** that MUST stay aligned. Ch
 ### Domain Vocabulary Reference
 
 - **33 entity types**: Defined in `prompts/extraction/govcon_entity_types.yaml` — re-exported as `src/ontology/schema.py` → `VALID_ENTITY_TYPES` and rendered into the extraction prompt as `{entity_types_guidance}`
-- **43 relationship types**: Defined in `src/ontology/schema.py` → `VALID_RELATIONSHIP_TYPES` (32 extraction + 11 inference-only)
+- **35 relationship types**: Defined in `src/ontology/schema.py` → `VALID_RELATIONSHIP_TYPES`
 - **Shipley methodology**: Discriminators, win themes, hot buttons, proof points, FAB chains, ghost language, compliance matrix — defined in extraction prompt Part D (rendered from the entity catalog YAML) and query prompt `rag_response`
 
 ---
@@ -88,7 +88,7 @@ This project wraps **LightRAG** and **RAGAnything** to provide specialized gover
   - `routes.py` - Custom endpoints with batch completion detection
   - `initialization.py` - RAGAnything wrapper initialization, prompt registration (all 3 systems)
 - `src/inference/` - Semantic post-processing (3 inference algorithms: L↔M links, document structure, orphan resolution)
-- `src/ontology/` - Domain schema validation (Pydantic models for 33 entity types, 43 relationship types)
+- `src/ontology/` - Domain schema validation (Pydantic models for 33 entity types, 35 relationship types)
 - `src/extraction/` - Custom entity extraction logic
 
 ### Processing Pipeline
@@ -98,7 +98,7 @@ This project wraps **LightRAG** and **RAGAnything** to provide specialized gover
 3. **Multimodal Analysis** → Tables/images/equations analyzed by VLM using **System 3** prompts (entity-type-aware, Shipley-aligned)
 4. **LightRAG Chunking** → Configurable tokens/chunk (set via CHUNK_SIZE in .env), 15% overlap
 5. **Entity Extraction** → 33 govcon entity types via xAI Grok + Pydantic validation using **System 1** prompts
-6. **Relationship Extraction** → 43 canonical relationship types with typed schema validation
+6. **Relationship Extraction** → 35 canonical relationship types with typed schema validation
 7. **Semantic Post-Processing** → 6-phase pipeline (auto-triggered after batch) using inference prompts
    - Phase 1: Data Loading
    - Phase 2: Entity Normalization

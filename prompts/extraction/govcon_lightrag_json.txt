@@ -21,7 +21,7 @@ Total Size: ~35K tokens (full domain intelligence preserved)
 
 CONTRACT NOTE:
 This prompt drives LightRAG 1.5.0+ JSON extraction (entity_extraction_use_json=true).
-The 33 govcon entity types and 43 canonical relationship types are unchanged.
+The 33 govcon entity types and 35 canonical relationship types are unchanged.
 The canonical relationship type token (e.g. GUIDES, CHILD_OF, MEASURED_BY) is
 emitted as the FIRST comma-separated token of each relationship's `keywords`
 field — this matches LightRAG's storage contract (operate.py stores keywords

@@ -3470,7 +3470,10 @@
                     x-for="d in studioFiltered()"
                     :key="d.skill + '/' + d.run_id + '/' + d.filename"
                   >
-                    <tr class="studio-row" :class="isStudioPinned(d) ? 'studio-row-pinned' : ''">
+                    <tr
+                      class="studio-row"
+                      :class="isStudioPinned(d) ? 'studio-row-pinned' : ''"
+                    >
                       <td>
                         <button
                           type="button"
@@ -5275,9 +5278,13 @@
               class="text-xs text-slate-400 mt-1"
               x-show="studioPreview.deliverable"
             >
-              <span x-text="studioPreview.deliverable && studioPreview.deliverable.skill"></span>
+              <span
+                x-text="studioPreview.deliverable && studioPreview.deliverable.skill"
+              ></span>
               <span class="text-slate-600"> · </span>
-              <span x-text="studioPreview.deliverable && (studioPreview.deliverable.created_at || '').slice(0, 19).replace('T', ' ')"></span>
+              <span
+                x-text="studioPreview.deliverable && (studioPreview.deliverable.created_at || '').slice(0, 19).replace('T', ' ')"
+              ></span>
             </p>
           </div>
           <div class="flex items-center gap-2 shrink-0 mt-0.5">
@@ -5317,7 +5324,9 @@
           ></div>
 
           <!-- PDF -->
-          <template x-if="!studioPreview.loading && !studioPreview.error && studioPreview.kind === 'pdf'">
+          <template
+            x-if="!studioPreview.loading && !studioPreview.error && studioPreview.kind === 'pdf'"
+          >
             <iframe
               :src="studioPreview.href"
               class="w-full h-[75vh] bg-white rounded border border-edge"
@@ -5326,7 +5335,9 @@
           </template>
 
           <!-- Video -->
-          <template x-if="!studioPreview.loading && !studioPreview.error && studioPreview.kind === 'video'">
+          <template
+            x-if="!studioPreview.loading && !studioPreview.error && studioPreview.kind === 'video'"
+          >
             <video
               :src="studioPreview.href"
               controls
@@ -5335,8 +5346,12 @@
           </template>
 
           <!-- Image / GIF -->
-          <template x-if="!studioPreview.loading && !studioPreview.error && studioPreview.kind === 'image'">
-            <div class="flex items-center justify-center bg-ink-800 rounded border border-edge p-4">
+          <template
+            x-if="!studioPreview.loading && !studioPreview.error && studioPreview.kind === 'image'"
+          >
+            <div
+              class="flex items-center justify-center bg-ink-800 rounded border border-edge p-4"
+            >
               <img
                 :src="studioPreview.href"
                 :alt="studioPreview.deliverable && studioPreview.deliverable.filename"
@@ -5346,21 +5361,24 @@
           </template>
 
           <!-- Text-like (MD / TXT / CSV) -->
-          <template x-if="!studioPreview.loading && !studioPreview.error && (studioPreview.kind === 'md' || studioPreview.kind === 'text' || studioPreview.kind === 'csv')">
-            <pre
-              class="studio-preview-pre"
-              x-text="studioPreview.text"
-            ></pre>
+          <template
+            x-if="!studioPreview.loading && !studioPreview.error && (studioPreview.kind === 'md' || studioPreview.kind === 'text' || studioPreview.kind === 'csv')"
+          >
+            <pre class="studio-preview-pre" x-text="studioPreview.text"></pre>
           </template>
 
           <!-- JSON (text + chunk-id back-links) -->
-          <template x-if="!studioPreview.loading && !studioPreview.error && studioPreview.kind === 'json'">
+          <template
+            x-if="!studioPreview.loading && !studioPreview.error && studioPreview.kind === 'json'"
+          >
             <div class="space-y-3">
               <div
                 class="flex items-center gap-2 flex-wrap"
                 x-show="studioPreview.jsonChunks.length"
               >
-                <span class="text-[10px] uppercase tracking-wider text-slate-500">
+                <span
+                  class="text-[10px] uppercase tracking-wider text-slate-500"
+                >
                   KG back-links
                 </span>
                 <template x-for="cid in studioPreview.jsonChunks" :key="cid">
@@ -5380,15 +5398,28 @@
           </template>
 
           <!-- DOCX (Mammoth) -->
-          <template x-if="!studioPreview.loading && !studioPreview.error && studioPreview.kind === 'docx'">
-            <div class="studio-preview-docx" x-html="studioPreview.docxHtml"></div>
+          <template
+            x-if="!studioPreview.loading && !studioPreview.error && studioPreview.kind === 'docx'"
+          >
+            <div
+              class="studio-preview-docx"
+              x-html="studioPreview.docxHtml"
+            ></div>
           </template>
 
           <!-- XLSX (SheetJS, with sheet tabs) -->
-          <template x-if="!studioPreview.loading && !studioPreview.error && studioPreview.kind === 'xlsx'">
+          <template
+            x-if="!studioPreview.loading && !studioPreview.error && studioPreview.kind === 'xlsx'"
+          >
             <div class="space-y-3">
-              <div class="flex items-center gap-1 flex-wrap" x-show="studioPreview.sheets.length > 1">
-                <template x-for="(sh, idx) in studioPreview.sheets" :key="sh.name + idx">
+              <div
+                class="flex items-center gap-1 flex-wrap"
+                x-show="studioPreview.sheets.length > 1"
+              >
+                <template
+                  x-for="(sh, idx) in studioPreview.sheets"
+                  :key="sh.name + idx"
+                >
                   <button
                     type="button"
                     class="studio-sheet-tab"
@@ -5406,11 +5437,20 @@
           </template>
 
           <!-- Unsupported -->
-          <template x-if="!studioPreview.loading && !studioPreview.error && studioPreview.kind === 'unsupported'">
-            <div class="text-sm text-slate-400 border border-edge rounded p-4 text-center">
-              <i data-lucide="file-question" class="w-6 h-6 mx-auto mb-2 text-slate-500"></i>
+          <template
+            x-if="!studioPreview.loading && !studioPreview.error && studioPreview.kind === 'unsupported'"
+          >
+            <div
+              class="text-sm text-slate-400 border border-edge rounded p-4 text-center"
+            >
+              <i
+                data-lucide="file-question"
+                class="w-6 h-6 mx-auto mb-2 text-slate-500"
+              ></i>
               <p>No inline preview available for this format.</p>
-              <p class="text-xs text-slate-500 mt-1">Use the download button above.</p>
+              <p class="text-xs text-slate-500 mt-1">
+                Use the download button above.
+              </p>
             </div>
           </template>
         </div>
@@ -6487,7 +6527,7 @@
             const m = {
               dashboard: "capture command overview",
               documents: "ingest · MinerU · multimodal extraction",
-              graph: "33 entity types · 43 relationship types",
+              graph: "33 entity types · 35 relationship types",
               chat: "shipley mentor · RAG over the workspace",
               intel:
                 "instructions ↔ evaluation · traceability · coverage · gaps",
@@ -6534,7 +6574,7 @@
                 label: "Relationships",
                 value: this.stats.relationships ?? "—",
                 icon: "link",
-                hint: "43 canonical types",
+                hint: "35 canonical types",
                 go: "graph",
                 accent: "lime",
                 color: "text-neon-lime",
@@ -7289,7 +7329,13 @@
           },
           // ===== Phase 6a-2 — Pinned anchors (Theseus mythos) =====
           studioKey(d) {
-            return (d.skill || "") + "/" + (d.run_id || "") + "/" + (d.filename || "");
+            return (
+              (d.skill || "") +
+              "/" +
+              (d.run_id || "") +
+              "/" +
+              (d.filename || "")
+            );
           },
           isStudioPinned(d) {
             return !!(this.studio.pinned || {})[this.studioKey(d)];
@@ -7344,7 +7390,12 @@
             if (ext === "md" || ext === "markdown") return "md";
             if (ext === "json") return "json";
             if (ext === "csv") return "csv";
-            if (ext === "txt" || ext === "log" || ext === "yaml" || ext === "yml")
+            if (
+              ext === "txt" ||
+              ext === "log" ||
+              ext === "yaml" ||
+              ext === "yml"
+            )
               return "text";
             if (ext === "docx") return "docx";
             if (ext === "xlsx" || ext === "xls") return "xlsx";
@@ -7367,7 +7418,12 @@
               if (k === "pdf" || k === "video" || k === "image") {
                 // Native browser handlers — nothing to fetch in JS.
                 this.studioPreview.loading = false;
-              } else if (k === "md" || k === "json" || k === "csv" || k === "text") {
+              } else if (
+                k === "md" ||
+                k === "json" ||
+                k === "csv" ||
+                k === "text"
+              ) {
                 const r = await fetch(this.studioPreview.href);
                 if (!r.ok) throw new Error("HTTP " + r.status);
                 this.studioPreview.text = await r.text();
