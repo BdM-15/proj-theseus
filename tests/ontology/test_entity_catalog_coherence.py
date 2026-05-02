@@ -5,7 +5,7 @@ These guard against drift between:
 
   * `prompts/extraction/govcon_entity_types.yaml` (single source of truth)
   * `src/ontology/schema.py::VALID_ENTITY_TYPES`
-  * The 33-type contract documented in `.github/copilot-instructions.md`.
+    * The canonical type contract documented in `.github/copilot-instructions.md`.
 
 If you add or remove an entity type, you MUST update the YAML *and*
 re-run this test. After Phase 1.1c lands, `VALID_ENTITY_TYPES` will be
@@ -19,10 +19,10 @@ from src.ontology.entity_catalog import get_default_catalog
 from src.ontology.schema import VALID_ENTITY_TYPES
 
 
-def test_yaml_loads_and_has_33_entity_types():
+def test_yaml_loads_and_has_32_entity_types():
     cat = get_default_catalog()
-    assert len(cat.all_entries) == 33, (
-        f"Expected exactly 33 entity types, got {len(cat.all_entries)}. "
+    assert len(cat.all_entries) == 32, (
+        f"Expected exactly 32 entity types, got {len(cat.all_entries)}. "
         "If you intentionally added or removed a type, update the cross-cutting "
         "checklist in .github/copilot-instructions.md."
     )
@@ -42,10 +42,10 @@ def test_yaml_entity_names_match_valid_entity_types():
     )
 
 
-def test_yaml_entity_numbering_is_contiguous_1_to_33():
+def test_yaml_entity_numbering_is_contiguous_1_to_32():
     cat = get_default_catalog()
     numbers = sorted(e.number for e in cat.all_entries)
-    assert numbers == list(range(1, 34)), f"Entity numbering must be 1..33, got {numbers}"
+    assert numbers == list(range(1, 33)), f"Entity numbering must be 1..32, got {numbers}"
 
 
 def test_yaml_categories_match_documented_five():

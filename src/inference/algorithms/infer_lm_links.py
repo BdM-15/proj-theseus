@@ -51,22 +51,17 @@ async def infer_lm_links(
     ]
     
     all_instruction_entities = instructions + deliverables_with_instructions + requirements_with_instructions
-    # Include subfactors as link targets — many RFPs (e.g. afcap6) place evaluation criteria
-    # at the subfactor level (e.g. M.3.3 Management Plans), so omitting them caused
-    # systematic under-linking of L instructions to M criteria.
-    eval_factors = (
-        entities_by_type.get('evaluation_factor', [])
-        + entities_by_type.get('subfactor', [])
-    )
+    # Evaluation criteria are represented as evaluation_factor nodes at all hierarchy levels
+    # (factor/subfactor/element), so target set is a single type.
+    eval_factors = entities_by_type.get('evaluation_factor', [])
     
     if not all_instruction_entities or not eval_factors:
         return []
     
     n_factors = len(entities_by_type.get('evaluation_factor', []))
-    n_sub = len(entities_by_type.get('subfactor', []))
     logger.info(
         f"  [L↔M Links] {len(all_instruction_entities)} instructions × "
-        f"{len(eval_factors)} targets ({n_factors} factors + {n_sub} subfactors)"
+        f"{len(eval_factors)} targets ({n_factors} evaluation criteria nodes)"
     )
     
     prompt_instructions = await load_prompt_template("instruction_evaluation_linking.md")

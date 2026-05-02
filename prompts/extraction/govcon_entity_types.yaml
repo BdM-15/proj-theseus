@@ -2,7 +2,7 @@
 # Govcon Entity Catalog — Single Source of Truth
 # =============================================================================
 #
-# Defines the 33 government-contracting entity types used by Project Theseus.
+# Defines the canonical government-contracting entity types used by Project Theseus.
 # Loaded by `src/ontology/entity_catalog.py` and used to:
 #
 #   1. Derive `VALID_ENTITY_TYPES` (`src/ontology/schema.py`).
@@ -180,18 +180,18 @@ categories:
         example: '"99.9% system uptime", "No more than 2 defects per month", "QASP Standard 3"'
 
       - number: 9
-        name: transition_activity
-        title: "Phase-in, phase-out, turnover, incumbent handoff tasks"
-        required_metadata: ["phase (phase-in/phase-out/overlap)", duration, dependencies]
+        name: contract_vehicle
+        title: "IDIQ/BPA/GWAC/MAC vehicles and ordering frameworks"
+        required_metadata: [vehicle_name, vehicle_type, ceiling_value_if_stated, naics_if_stated, set_aside_if_stated]
         content_signals:
-          - "transition"
-          - "phase-in"
-          - "phase-out"
-          - "turnover"
-          - "mobilization"
-          - "stand-up"
-        distinction: "TRANSITION_ACTIVITY = temporary transition work; WORK_SCOPE_ITEM = steady-state work scope"
-        example: '"30-Day Transition Plan", "Incumbent Knowledge Transfer", "Phase-In Staffing Ramp"'
+          - "IDIQ"
+          - "BPA"
+          - "GWAC"
+          - "MAC"
+          - "ordering period"
+          - "task order under"
+        distinction: "CONTRACT_VEHICLE = ordering framework; PROGRAM = mission initiative; CONTRACT_LINE_ITEM = priced task/order line"
+        example: '"AFCAP V IDIQ", "GSA OASIS+ GWAC", "SeaPort-NxG MAC"'
 
   # ---------------------------------------------------------------------------
   - title: "DOCUMENT STRUCTURE, AUTHORITIES, AND WORK PATTERNS"
@@ -270,9 +270,13 @@ categories:
           - "MIL-STD-###"
           - "NIST SP ###-###"
           - "AFI ##-###"
+        notes:
+          - "Use when cited as policy/compliance authority (e.g., must comply with NIST SP 800-171)."
+          - "If cited as engineering design criteria (ICD, drawing, MIL-DTL/MIL-PRF), use TECHNICAL_SPECIFICATION instead."
         distinction: |-
-          REGULATORY_REFERENCE = external regulation/directive cited by
-             authority; DOCUMENT = RFP attachments and exhibits; CLAUSE = FAR/DFARS entries
+          REGULATORY_REFERENCE = external policy/compliance authority cited by
+             requirement; DOCUMENT = RFP attachments/exhibits; CLAUSE = FAR/DFARS entries;
+             TECHNICAL_SPECIFICATION = engineering design authority
         example: '"DAFI 21-101", "NIST SP 800-171", "AR 735-5", "MIL-STD-882E"'
 
       - number: 15
@@ -286,7 +290,10 @@ categories:
           - "MIL-DTL"
           - "MIL-PRF"
           - "schematic"
-        distinction: "TECHNICAL_SPECIFICATION = engineering/technical design authority; REGULATORY_REFERENCE = policy/regulatory authority"
+        notes:
+          - "Use when the citation governs how a system/component is engineered, built, tested, or interfaced."
+          - "If the citation is a compliance directive/policy obligation, classify as REGULATORY_REFERENCE instead."
+        distinction: "TECHNICAL_SPECIFICATION = engineering design authority; REGULATORY_REFERENCE = policy/compliance authority"
         example: '"MIL-DTL-38999", "Interface Control Document ICD-001", "Drawing 12345 Rev C"'
 
       - number: 16
@@ -294,12 +301,13 @@ categories:
         title: "PWS/SOW/SOO tasks, objectives, service packages, or work elements regardless of location"
         required_metadata: [task_number, scope_description, period_of_performance]
         content_signals:
-          - "task descriptions"
-          - "objectives"
-          - "performance work"
-          - "scope items"
-          - "work packages"
-        distinction: "WORK_SCOPE_ITEM = semantic work package; DOCUMENT_SECTION = structural container; REQUIREMENT = obligation sentence"
+          - "Task/Objective/Work Package labels"
+          - "task descriptions with explicit task identifiers (Task 3.2, Objective 4, Work Package 2)"
+          - "PWS/SOW headings naming a work package"
+        notes:
+          - "Default to DOCUMENT_SECTION for generic headings; promote to WORK_SCOPE_ITEM only when the heading names an executable task/objective/work package."
+          - "Do NOT classify obligation sentences (shall/must/will) as WORK_SCOPE_ITEM; those are REQUIREMENT entities."
+        distinction: "WORK_SCOPE_ITEM = named semantic work package; DOCUMENT_SECTION = structural heading/container; REQUIREMENT = obligation sentence"
         example: '"Task 3.2 Network Operations Support", "Objective 4 Airfield Readiness", "Work Package 2 Depot Maintenance"'
 
   # ---------------------------------------------------------------------------
@@ -308,11 +316,13 @@ categories:
 
       - number: 17
         name: evaluation_factor
-        title: "Top-level scoring criteria that drive proposal structure and page allocation"
-        required_metadata: [weight, importance, subfactors]
+        title: "Scoring criteria at any evaluation hierarchy level (factor/subfactor/element)"
+        required_metadata: [weight_if_stated, importance_if_stated, hierarchy_level, parent_factor_if_stated]
         content_signals:
           - "will be evaluated"
           - "most important"
+          - "subfactor"
+          - "sub-element"
           - "adjectival rating"
           - "approximately equal"
           - "significantly more important"
@@ -320,8 +330,8 @@ categories:
         must_extract:
           - "Weight (40%, 25pts)"
           - "Importance (Most Important)"
-          - "Subfactors"
-        distinction: "EVALUATION_FACTOR = top-level factors; SUBFACTOR = child criteria"
+          - "Hierarchy level (factor/subfactor/element)"
+        distinction: "EVALUATION_FACTOR = scoring criterion node; hierarchy is represented by hierarchy_level + parent_factor_if_stated metadata and CHILD_OF relationships"
         shipley_note: |-
           Factors form the backbone of the Compliance Matrix — each factor maps to
              Section L instructions, Section M criteria, and proposal page budgets. When factor
@@ -329,15 +339,18 @@ categories:
         example: "Factor 1 Technical Approach (40%) - Most Important"
 
       - number: 18
-        name: subfactor
-        title: "Evaluation subfactor hierarchy (children of evaluation_factor)"
-        required_metadata: [parent_factor, subfactor_number, weight_if_stated]
+        name: period_of_performance
+        title: "Base period, option periods, ordering period, and contract time bounds"
+        required_metadata: [base_period_if_stated, option_periods_if_stated, total_ordering_period_if_stated, pop_start_if_stated]
         content_signals:
-          - "Numbered child criteria (1.1, 1.2)"
-          - "subfactor"
-          - "sub-element"
-        distinction: "SUBFACTOR = child of evaluation_factor with own identifier/weight"
-        example: '"Subfactor 1.2 Staffing Approach (15%)", "Element B.2 Integration"'
+          - "base year"
+          - "option year"
+          - "period of performance"
+          - "ordering period"
+          - "effective date"
+          - "exercise of option"
+        distinction: "PERIOD_OF_PERFORMANCE = contract time structure; EVENT = one-time milestone/deadline; CONTRACT_LINE_ITEM = priced line associated with a PoP"
+        example: '"Base Period: 01 Oct 2026 - 30 Sep 2027; Option Year 1: 01 Oct 2027 - 30 Sep 2028; total ordering period 5 years"'
 
       - number: 19
         name: proposal_instruction
@@ -407,11 +420,11 @@ categories:
         required_metadata: [theme_type]
         theme_types: [DISCRIMINATOR, PROOF_POINT, WIN_THEME]
         extraction_rule: |-
-          STRATEGIC_THEME captures insights the PROPOSER synthesizes
-             from reading between the lines. These are NOT explicitly stated by the customer —
-             they are strategic conclusions drawn from patterns, emphasis, requirements structure,
-             and evaluation criteria. If the customer EXPLICITLY states importance, use
-             CUSTOMER_PRIORITY instead.
+           STRATEGIC_THEME captures proposer-side strategic inferences. Keep extraction
+             grounded to in-chunk evidence (especially ghost language, unusual specificity,
+             and weighted evaluation emphasis). Cross-section synthesis and final de-duplication
+             are performed in post-processing phases over the full graph. If the customer
+             EXPLICITLY states importance, use CUSTOMER_PRIORITY instead.
         shipley_definitions:
           - |-
             DISCRIMINATOR: A capability or approach that (1) differs from competitors AND
@@ -560,15 +573,19 @@ categories:
       - number: 29
         name: location
         title: "Performance locations, facilities, bases"
-        required_metadata: [site_name, "region (CONUS/OCONUS/specific)", "classification (base/building/facility)"]
+        required_metadata: [site_name, "region (CONUS/OCONUS/specific)", "classification (base/building/facility)", pop_designation_if_stated]
         content_signals:
           - "Base names"
           - "building numbers"
           - "geographic areas"
+          - "place of performance"
+          - "primary performance location"
         patterns:
           - '"Building ###"'
           - '"NAS [Name]"'
           - '"CONUS/OCONUS"'
+        notes:
+          - "Use pop_designation_if_stated when the location is explicitly tagged as primary/secondary place of performance."
         example: "Naval Air Station Pensacola, Building 2959"
 
       - number: 30
@@ -583,16 +600,6 @@ categories:
         example: "Kickoff Meeting, Contract Award Date"
 
       - number: 31
-        name: person
-        title: "Key personnel, POCs, roles"
-        content_signals:
-          - "Names"
-          - "titles"
-          - "roles"
-          - "contact information"
-        example: "Contracting Officer, Program Manager"
-
-      - number: 32
         name: compliance_artifact
         title: "Certifications, accreditations, authorizations, and maintained compliance objects"
         content_signals:
@@ -603,15 +610,19 @@ categories:
           - "ISO 9001"
           - "CMMI"
           - "license"
-        distinction: "COMPLIANCE_ARTIFACT = maintained evidence/compliance object; DELIVERABLE = one-time submission"
+        notes:
+          - "Use for maintained compliance state/credential (ATO, certification, accreditation), even if evidence packages are submitted as deliverables."
+          - "If text is about a scheduled submission artifact (CDRL/report/package cadence), use DELIVERABLE instead."
+        distinction: "COMPLIANCE_ARTIFACT = maintained compliance object/state; DELIVERABLE = scheduled one-time or recurring submission artifact"
         example: '"ISO 9001:2015 Certification", "Authority to Operate (ATO)"'
+        anti_pattern: '"CDRL A001 Monthly Compliance Report" — this is a DELIVERABLE (submission cadence), not the maintained compliance state itself.'
 
-      - number: 33
+      - number: 32
         name: concept
         title: "Named methodologies, frameworks, and abstract domain processes"
         extraction_rule: |-
           CONCEPT is NOT a catch-all. It captures NAMED methodologies
-             and abstract processes that don't fit the 32 types above. Before using CONCEPT,
+             and abstract processes that don't fit the 31 types above. Before using CONCEPT,
              verify the entity doesn't fit: WORK_SCOPE_ITEM (task/deliverable scope),
              REQUIREMENT (obligation), PERFORMANCE_STANDARD (threshold/SLA), TECHNOLOGY
              (software/platform), REGULATORY_REFERENCE (external standard), or
@@ -660,9 +671,10 @@ disambiguation_rules:
 
   - title: "WORK_SCOPE_ITEM vs REQUIREMENT"
     body: |-
-         "Task 3.2 Network Operations Support" → work_scope_item (work package/title)
+         "Task 3.2 Network Operations Support" → work_scope_item (named work package)
+         "Section C.3.2 Network Operations Support" (generic heading only) → document_section
          "Contractor shall monitor the network 24/7" → requirement (obligation)
-         Work scope item = semantic bucket of work; requirement = directive/action statement
+         Promote DOCUMENT_SECTION to WORK_SCOPE_ITEM only when it names an executable task/objective/work package.
 
   - title: "PROPOSAL_VOLUME vs PROPOSAL_INSTRUCTION"
     body: |-
@@ -670,11 +682,12 @@ disambiguation_rules:
          "Volume I shall not exceed 25 pages" → proposal_instruction
          Volume = container; instruction = rule applied to the container
 
-  - title: "EVALUATION_FACTOR vs SUBFACTOR"
+  - title: "EVALUATION_FACTOR hierarchy (factor/subfactor/element)"
     body: |-
-        "Factor 1 Technical Approach" (top-level) → evaluation_factor
-        "Subfactor 1.2 Staffing Approach" (child) → subfactor
-        Link: subfactor --CHILD_OF--> evaluation_factor
+        "Factor 1 Technical Approach" → evaluation_factor (hierarchy_level=factor)
+        "Subfactor 1.2 Staffing Approach" → evaluation_factor (hierarchy_level=subfactor)
+        "Element 1.2.1 Transition Plan" → evaluation_factor (hierarchy_level=element)
+        Use CHILD_OF between evaluation_factor nodes for hierarchy.
 
   - title: "DOCUMENT_SECTION vs DOCUMENT"
     body: |-
@@ -693,7 +706,14 @@ disambiguation_rules:
     body: |-
          "NIST SP 800-171" → regulatory_reference
          "MIL-DTL-38999" → technical_specification
-         Regulation = policy/standards authority; specification = engineering design authority
+         Regulation = policy/compliance authority; specification = engineering design authority
+
+  - title: "COMPLIANCE_ARTIFACT vs DELIVERABLE"
+    body: |-
+         "Authority to Operate (ATO)" → compliance_artifact (maintained compliance state)
+         "CDRL A001 Monthly Compliance Report" → deliverable (submission artifact/cadence)
+         If the text emphasizes maintain/hold/retain authorization, use compliance_artifact.
+         If the text emphasizes submit/deliver/report cadence, use deliverable.
 
   - title: "CONTRACT_LINE_ITEM vs DELIVERABLE"
     body: |-
@@ -788,7 +808,7 @@ example_classifications:
   - {input: "Program Manager (Key Personnel)",           type: labor_category,        note: "key_personnel_designation='key'; NOT a separate entity type"}
   - {input: "Site Lead listed under L.5.2 Key Personnel", type: labor_category,       note: "key_personnel_designation='key'; pair with MANDATES from L.5.2"}
   - {input: "QASP Standard 3 Aircraft Availability",     type: performance_standard,  note: "NOT 'concept'"}
-  - {input: "Subfactor 1.2 Staffing Approach",           type: subfactor,             note: "NOT 'evaluation_factor'"}
+  - {input: "Subfactor 1.2 Staffing Approach",           type: evaluation_factor,     note: "hierarchy_level=subfactor"}
   - {input: "DAFI 21-101",                               type: regulatory_reference,  note: "NOT 'document'"}
   - {input: "NIST SP 800-171",                           type: regulatory_reference,  note: "NOT 'document'"}
   - {input: "MIL-STD-882E",                              type: regulatory_reference,  note: "NOT 'document'"}

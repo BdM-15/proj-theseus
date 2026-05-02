@@ -116,7 +116,7 @@ def get_multi_schema_guidance(*model_classes: Type[BaseModel]) -> str:
     """
     Combine schema guidance from multiple Pydantic models.
     
-    Useful when an algorithm needs to understand multiple entity types
+    Useful when a post-processing phase needs to understand multiple entity types
     for relationship inference (e.g., linking instructions to factors).
     
     Args:
@@ -163,11 +163,11 @@ def get_entity_type_guidance(include_descriptions: bool = True) -> str:
         'Document Structure': ['document', 'document_section', 'amendment'],
         'Attachments': ['attachment'],  # exhibit, annex handled via entity names
         'Regulatory': ['clause', 'regulatory_reference', 'technical_specification'],
-        'Work Items': ['requirement', 'deliverable', 'work_scope_item', 'transition_activity'],
-        'Evaluation': ['evaluation_factor', 'subfactor', 'proposal_instruction', 'proposal_volume', 'performance_standard'],
+        'Work Items': ['requirement', 'deliverable', 'work_scope_item', 'period_of_performance'],
+        'Evaluation': ['evaluation_factor', 'proposal_instruction', 'proposal_volume', 'performance_standard'],
         'Strategic': ['strategic_theme', 'customer_priority', 'pain_point', 'program'],
         'Commercial': ['contract_line_item', 'pricing_element', 'workload_metric', 'labor_category', 'past_performance_reference'],
-        'Resources': ['organization', 'person', 'equipment', 'technology', 'location'],
+        'Resources': ['organization', 'equipment', 'technology', 'location', 'government_furnished_item'],
         'Other': ['concept', 'event'],
     }
     
@@ -199,7 +199,7 @@ def get_document_hierarchy_guidance() -> str:
     Generate specialized guidance for document hierarchy inference.
     
     Combines entity type information with specific hierarchy patterns
-    for Algorithm 5 (Document Hierarchy) to use instead of hardcoded
+    for document hierarchy post-processing to use instead of hardcoded
     type-based batching.
     
     Returns:
@@ -240,8 +240,8 @@ def get_evaluation_hierarchy_guidance() -> str:
     """
     Generate specialized guidance for evaluation factor hierarchy inference.
     
-    Provides schema-aware guidance for Algorithm 2 to discover factor
-    hierarchies (Factor A → Subfactor A.1) without keyword matching.
+    Provides schema-aware guidance for the evaluation hierarchy phase to discover
+    factor trees (Factor A -> Subfactor A.1 -> Element A.1.1) without keyword matching.
     
     Returns:
         Evaluation hierarchy guidance string
@@ -255,19 +255,19 @@ def get_evaluation_hierarchy_guidance() -> str:
     additional_guidance = """
 EVALUATION HIERARCHY PATTERNS:
 - Main Factors: Factor A, Factor B, Technical Factor, Management Factor
-- Subfactors: Subfactor A.1, Factor A - Technical Approach
+- Child Criteria: Subfactor A.1, Element A.1.1, Factor A - Technical Approach
 - Rating Scales: Outstanding, Good, Acceptable (NOT factors - exclude)
 - Metrics: CEI, SEI, KPI (NOT factors - exclude)
 
 RELATIONSHIP TYPES:
-- HAS_SUBFACTOR: Main factor → subfactor relationship
+- CHILD_OF: Child evaluation criterion -> parent evaluation criterion
 - HAS_RATING_SCALE: Factor → rating scale definition
 - MEASURED_BY: Factor → performance metric
 - HAS_THRESHOLD: Metric → threshold value
 
 DISCOVERY APPROACH:
 - Use weight/importance fields to identify main factors
-- Use subfactors field to identify hierarchies
+- Use hierarchy_level + parent_factor metadata (when present) plus numbering patterns
 - Ignore entity names - focus on structural relationships
 - Include ALL factors regardless of naming (e.g., "Small Business Participation")
 """
@@ -279,7 +279,7 @@ def get_instruction_evaluation_guidance() -> str:
     """
     Generate specialized guidance for instruction-evaluation linking.
     
-    Provides schema-aware guidance for Algorithm 1 to link proposal
+    Provides schema-aware guidance for instruction-evaluation linking phase to link proposal
     instructions to evaluation factors without hardcoded keyword matching.
     
     Returns:

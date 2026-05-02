@@ -117,8 +117,7 @@ _ENTITY_PAIR_REL_MAP = {
     ("evaluation_factor", "deliverable"): "EVALUATED_BY",
     ("work_scope_item", "evaluation_factor"): "EVALUATED_BY",
     ("evaluation_factor", "work_scope_item"): "EVALUATED_BY",
-    ("evaluation_factor", "subfactor"): "HAS_SUBFACTOR",
-    ("subfactor", "evaluation_factor"): "CHILD_OF",
+    ("evaluation_factor", "evaluation_factor"): "CHILD_OF",
     # ─── AUTHORITY & GOVERNANCE ───
     ("requirement", "clause"): "GOVERNED_BY",
     ("clause", "requirement"): "MANDATES",
@@ -212,11 +211,11 @@ def _heuristic_table_type_mapping(entity: Dict) -> str:
     if any(kw in text for kw in ['section', 'paragraph', 'attachment', 'annex', 'exhibit', 'appendix']):
         return 'document_section'
     
-    # Organization/Personnel tables → organization or person
+    # Organization/personnel tables → organization or labor_category
     if any(kw in text for kw in ['organization', 'contractor', 'government', 'agency']):
         return 'organization'
     if any(kw in text for kw in ['personnel', 'staff', 'position', 'role', 'labor category']):
-        return 'person'
+        return 'labor_category'
     
     # Equipment/Material tables → equipment
     if any(kw in text for kw in ['gfe', 'gfp', 'gfi', 'government furnished', 'government-furnished']):

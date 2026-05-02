@@ -20,6 +20,7 @@ from lightrag.operate import chunking_by_token_size  # noqa: F401  # kept for re
 from src.extraction.govcon_chunking import govcon_chunking_func
 
 from src.core.config import get_settings
+from src.ontology.schema import VALID_ENTITY_TYPES
 
 logger = logging.getLogger(__name__)
 
@@ -93,61 +94,9 @@ def configure_raganything_args():
     global_args.embedding_api_key = settings.embedding_binding_api_key
     global_args.embedding_dim = settings.embedding_dim
     
-    # Government contracting entity types (18 specialized types)
-    # LightRAG reads entity_types ONLY from addon_params (operate.py line 2908).
-    # Single source of truth — no dual injection needed.
-    entity_types = [
-        # Core entities
-        "organization",
-        "concept",
-        "event",
-        "technology",
-        "person",
-        "location",
-        
-        # Requirements (semantic detection with metadata: requirement_type, criticality_level)
-        "requirement",
-        
-        # Structural entities
-        "clause",                   # FAR/DFARS/AFFARS patterns, will cluster by parent section
-        "document_section",         # Numbered/heading-based structural units regardless of UCF
-        "document",                 # References: specs, standards, manuals, regulations, attachments, annexes
-        "amendment",                # Solicitation changes, modifications, and updates
-        "deliverable",
-        
-        # Hierarchical program entities
-        "program",                  # Major named programs/initiatives (MCPP II, Navy MBOS, DEIP)
-        
-        # Physical assets and equipment
-        "equipment",                # Physical assets: MHE, generators, batteries, GSE, CESE, watercraft, vehicles
-        
-        # Evaluation entities (semantic detection, may be embedded in non-standard sections)
-        "evaluation_factor",        # Scoring criteria (UCF Section M content or non-UCF equivalent)
-        "proposal_instruction",     # Format/page limits and submission mechanics regardless of section
-        "proposal_volume",          # Volume containers and named proposal parts
-        
-        # Strategic entities (Capture planning patterns)
-        "strategic_theme",          # Win themes, hot buttons, discriminators, proof points
-        "customer_priority",        # Explicit importance signals from government language
-        "pain_point",               # Problems, deficiencies, and issues government wants solved
-        
-        # Work scope (Semantic detection regardless of location)
-        "work_scope_item",          # PWS/SOW/SOO tasks, objectives, and work packages
-        "transition_activity",      # Phase-in / phase-out work items
-        
-        # Performance, pricing, and execution structure
-        "performance_standard",     # KPIs, SLAs, QASP thresholds, acceptance criteria
-        "contract_line_item",       # CLINs/SLINs and priced line items
-        "pricing_element",          # Rates, fees, escalation, indirect pricing logic
-        "workload_metric",          # Quantitative BOE drivers
-        "labor_category",           # Named labor roles when explicitly stated
-        "subfactor",                # Child evaluation criteria
-        "regulatory_reference",     # DAFI, NIST, MIL-STD, AR, etc.
-        "technical_specification",  # ICDs, drawings, MIL-DTL, TDPs, engineering specs
-        "government_furnished_item",# GFE/GFP/GFI/GOTS provided by customer
-        "compliance_artifact",      # Certifications, accreditations, authorizations
-        "past_performance_reference"# Reference contracts, PPQs, CPARS artifacts
-    ]
+    # Government contracting entity types (single source of truth from YAML-derived schema)
+    # LightRAG reads entity_types only from addon_params (operate.py line 2908).
+    entity_types = sorted(VALID_ENTITY_TYPES)
     
     # addon_params is the sole path LightRAG uses for entity_types in extraction
     global_args.addon_params = {

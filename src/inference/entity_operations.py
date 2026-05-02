@@ -119,18 +119,19 @@ TYPING GUIDELINES:
 - technology: Systems, software, platforms, tools
 - equipment: Physical assets, hardware, model numbers
 - organization: Companies, agencies, departments, military units
-- person: Individuals, job titles, roles
 - location: Bases, facilities, geographic locations
 - requirement: Must/should/may obligations from RFP
 - clause: FAR/DFARS/agency supplement clauses
 - document_section: Numbered or titled structural sections, paragraphs, appendices
 - program: Government programs (e.g., MCPP II)
+- contract_vehicle: IDIQ/BPA/GWAC/MAC ordering frameworks
 - event: Milestones, deadlines, reviews
-- evaluation_factor: Section M scoring criteria
+- evaluation_factor: Section M scoring criteria (factor/subfactor/element levels)
 - proposal_instruction: Proposal instructions (page limits, format, submission)
 - strategic_theme: High-level themes, objectives
 - work_scope_item: SOW/PWS/SOO tasks, objectives, work packages
 - performance_standard: QASP thresholds, AQLs, error rates, inspection criteria
+- period_of_performance: Base/option periods and ordering window structure
 
 ENTITIES TO RETYPE:
 """

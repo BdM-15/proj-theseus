@@ -7,7 +7,7 @@ then activated with set_prompt_language("govcon").
 These replace RAGAnything's generic data-analyst prompts with federal acquisition
 expertise across all multimodal content types: tables, images, and equations.
 
-Ontology alignment: Prompts reference the 33 govcon entity types and 43 canonical
+Ontology alignment: Prompts reference the canonical govcon entity types and canonical
 relationship types defined in src/ontology/schema.py and the extraction prompt
 (prompts/extraction/govcon_lightrag_json.txt). This ensures VLM output primes
 downstream entity/relationship extraction with correct vocabulary.
@@ -19,7 +19,7 @@ same Shipley intelligence pipeline as text extraction.
 Key govcon knowledge encoded here:
 - Table analysis: workload drivers, CLINs, deliverables, shall/must/will requirements,
   multi-page continuation detection, Appendix/Section location awareness,
-  evaluation factor/subfactor hierarchy, Shipley strategic signals
+  evaluation hierarchy (factor/subfactor/element metadata), Shipley strategic signals
 - Image analysis: org charts, facility layouts, CDRL hierarchies, evaluation frameworks,
   organizational relationships using canonical relationship types
 - Equation analysis: performance formulas, incentive calculations, AQL thresholds
@@ -37,7 +37,7 @@ Template variable reference:
   QUERY_TABLE_ANALYSIS:       {table_data} {table_caption}
 
 Cross-reference:
-  - Entity types: src/ontology/schema.py → VALID_ENTITY_TYPES (33 types)
+    - Entity types: src/ontology/schema.py → VALID_ENTITY_TYPES (ontology-driven)
   - Relationship types: src/ontology/schema.py → VALID_RELATIONSHIP_TYPES (43 types)
   - Extraction prompt: prompts/extraction/govcon_lightrag_json.txt (Part D entity catalog)
   - Shipley framework: prompts/govcon_prompt.py (v3.0 Mentor Framework)
@@ -57,8 +57,8 @@ TABLE_ANALYSIS_SYSTEM = (
     "BOE construction, and Shipley methodology compliance. "
     "Use precise govcon entity vocabulary: REQUIREMENT (shall statements), CONTRACT_LINE_ITEM "
     "(CLINs/SLINs), WORKLOAD_METRIC (quantities/frequencies), LABOR_CATEGORY (position titles), "
-    "PERFORMANCE_STANDARD (KPIs/AQLs), DELIVERABLE (CDRLs), EVALUATION_FACTOR (scoring criteria), "
-    "SUBFACTOR (child criteria), PRICING_ELEMENT (rates/fees), GOVERNMENT_FURNISHED_ITEM (GFE/GFP). "
+    "PERFORMANCE_STANDARD (KPIs/AQLs), DELIVERABLE (CDRLs), EVALUATION_FACTOR (scoring criteria at any level), "
+    "PRICING_ELEMENT (rates/fees), GOVERNMENT_FURNISHED_ITEM (GFE/GFP). "
     "Return ONLY valid JSON — no markdown fences, no preamble, no explanation."
 )
 
@@ -74,7 +74,7 @@ Analyze this government contracting table and return a JSON object with exactly 
     - LABOR & RESOURCES (→ LABOR_CATEGORY / EQUIPMENT entities): Personnel position titles, skill levels, FTE counts, clearance requirements, equipment nomenclature and counts, facility identifiers
     - DELIVERABLES (→ DELIVERABLE entities): CDRL line item numbers, DD1423 DI numbers, report titles, data item names, submission frequencies and due dates
     - CLINs & PRICING (→ CONTRACT_LINE_ITEM / PRICING_ELEMENT entities): CLIN/SLIN numbers, contract type (FFP/CPFF/T&M), values, labor rates, burden rates, period of performance, fee structures
-    - EVALUATION DATA (→ EVALUATION_FACTOR / SUBFACTOR entities): If this table contains evaluation criteria, weights, point values, or rating scales — extract factor names, weights, importance ordering, and subfactor hierarchy
+    - EVALUATION DATA (→ EVALUATION_FACTOR entities): If this table contains evaluation criteria, weights, point values, or rating scales — extract factor names, weights, hierarchy_level (factor/subfactor/element), and parent linkage
     - STRATEGIC SIGNALS: Note any emphasis language suggesting CUSTOMER_PRIORITY (paramount, critical, essential), unusual specificity suggesting PAIN_POINT (deficiencies, shortfalls), or repeated themes suggesting discriminator opportunities
     Always write specific values — never generalize (write '2,847 labor hours/year', not 'significant labor hours').",
     "entity_info": {{
@@ -109,7 +109,7 @@ its location and purpose. Return a JSON object with exactly this structure:
     - LABOR & RESOURCES (→ LABOR_CATEGORY / EQUIPMENT entities): Personnel position titles, skill levels, FTE counts, clearance requirements, equipment nomenclature and counts, facility identifiers
     - DELIVERABLES (→ DELIVERABLE entities): CDRL line item numbers, DD1423 DI numbers, report titles, data item names, submission frequencies and due dates
     - CLINs & PRICING (→ CONTRACT_LINE_ITEM / PRICING_ELEMENT entities): CLIN/SLIN numbers, contract type (FFP/CPFF/T&M), values, labor rates, burden rates, period of performance, fee structures
-    - EVALUATION DATA (→ EVALUATION_FACTOR / SUBFACTOR entities): If this table contains evaluation criteria, weights, point values, or rating scales — extract factor names, weights, importance ordering, and subfactor hierarchy
+    - EVALUATION DATA (→ EVALUATION_FACTOR entities): If this table contains evaluation criteria, weights, point values, or rating scales — extract factor names, weights, hierarchy_level (factor/subfactor/element), and parent linkage
     - STRATEGIC SIGNALS: Note any emphasis language suggesting CUSTOMER_PRIORITY (paramount, critical, essential), unusual specificity suggesting PAIN_POINT (deficiencies, shortfalls), or repeated themes suggesting discriminator opportunities
     Always write specific values — never generalize (write '2,847 labor hours/year', not 'significant labor hours').",
     "entity_info": {{
@@ -144,8 +144,8 @@ IMAGE_ANALYSIS_SYSTEM = (
     "performance framework diagrams, facility layouts, process flows, CDRL hierarchies, "
     "proposal_instruction ↔ evaluation_factor structures (UCF Sections L/M or non-UCF equivalent), "
     "and technical schematics. "
-    "Use precise govcon entity vocabulary: ORGANIZATION (agencies/units), PERSON (key personnel), "
-    "LABOR_CATEGORY (position titles), EVALUATION_FACTOR/SUBFACTOR (scoring criteria), "
+    "Use precise govcon entity vocabulary: ORGANIZATION (agencies/units), LABOR_CATEGORY (position titles), "
+    "EVALUATION_FACTOR (scoring criteria at any hierarchy level), "
     "DOCUMENT_SECTION (structural units), WORK_SCOPE_ITEM (task packages), LOCATION (facilities). "
     "Use canonical relationship types: REPORTED_TO, CHILD_OF, CONTAINS, EVALUATED_BY, "
     "MEASURED_BY, STAFFED_BY, FUNDS, COORDINATED_WITH, PRODUCES, GOVERNED_BY. "
@@ -169,8 +169,8 @@ exactly this structure:
     "detailed_description": "Comprehensive govcon-focused description covering ALL visible elements:
     - IMAGE TYPE: Organizational chart / Facility layout / Process flow diagram / CDRL hierarchy / Performance evaluation framework / proposal_instruction or evaluation_factor structure (UCF Section L or M, or non-UCF equivalent) / Technical schematic / Contract data table / Other — identify it
     - ALL VISIBLE TEXT: Transcribe every label, title, heading, annotation, and callout exactly as written
-    - ORGANIZATIONAL DATA (→ ORGANIZATION / PERSON / LABOR_CATEGORY entities): Reporting relationships (REPORTED_TO), chain of command, office symbols, position titles, directorate names, PWS paragraph references. State relationships as 'X REPORTED_TO Y' or 'X STAFFED_BY Y'
-    - REQUIREMENTS AND CRITERIA (→ EVALUATION_FACTOR / SUBFACTOR / PERFORMANCE_STANDARD entities): Factor names, weights, point values, rating scales, subfactor hierarchy. State parent-child as 'subfactor CHILD_OF factor'. Include AQLs, measurement methods, compliance checkpoints
+    - ORGANIZATIONAL DATA (→ ORGANIZATION / LABOR_CATEGORY entities): Reporting relationships (REPORTED_TO), chain of command, office symbols, position titles, directorate names, PWS paragraph references. State relationships as 'X REPORTED_TO Y' or 'X STAFFED_BY Y'
+    - REQUIREMENTS AND CRITERIA (→ EVALUATION_FACTOR / PERFORMANCE_STANDARD entities): Factor names, weights, point values, rating scales, hierarchy_level metadata, and parent-child linkage using CHILD_OF between evaluation_factor nodes. Include AQLs, measurement methods, compliance checkpoints
     - FACILITIES AND LOCATIONS (→ LOCATION entities): Building numbers, installation names, base identifiers, geographic references, sq footage labels
     - CONTRACTUAL ELEMENTS (→ CONTRACT_LINE_ITEM / DELIVERABLE / DOCUMENT_SECTION entities): CLIN/SLIN identifiers, CDRL line numbers, DI numbers, SOW/PWS paragraph cross-references. State traceability as 'deliverable PRODUCES requirement' or 'CLIN FUNDS work_scope_item'
     - RELATIONSHIPS: Use canonical types: REPORTED_TO, CHILD_OF, CONTAINS, EVALUATED_BY, MEASURED_BY, STAFFED_BY, FUNDS, COORDINATED_WITH, PRODUCES, GOVERNED_BY, SUPPORTS, REFERENCES
@@ -201,8 +201,8 @@ to establish its location and purpose. Return a JSON object with exactly this st
     - DOCUMENT LOCATION: Section, Appendix, or Attachment this image belongs to — derive from the context
     - IMAGE TYPE: Organizational chart / Facility layout / Process flow diagram / CDRL hierarchy / Performance evaluation framework / proposal_instruction or evaluation_factor structure (UCF Section L or M, or non-UCF equivalent) / Technical schematic / Other — identify it
     - ALL VISIBLE TEXT: Transcribe every label, title, heading, annotation, and callout exactly as written
-    - ORGANIZATIONAL DATA (→ ORGANIZATION / PERSON / LABOR_CATEGORY entities): Reporting relationships (REPORTED_TO), chain of command, office symbols, position titles, directorate names, PWS paragraph references. State relationships as 'X REPORTED_TO Y' or 'X STAFFED_BY Y'
-    - REQUIREMENTS AND CRITERIA (→ EVALUATION_FACTOR / SUBFACTOR / PERFORMANCE_STANDARD entities): Factor names, weights, point values, rating scales, subfactor hierarchy. State parent-child as 'subfactor CHILD_OF factor'. Include AQLs, measurement methods, compliance checkpoints
+    - ORGANIZATIONAL DATA (→ ORGANIZATION / LABOR_CATEGORY entities): Reporting relationships (REPORTED_TO), chain of command, office symbols, position titles, directorate names, PWS paragraph references. State relationships as 'X REPORTED_TO Y' or 'X STAFFED_BY Y'
+    - REQUIREMENTS AND CRITERIA (→ EVALUATION_FACTOR / PERFORMANCE_STANDARD entities): Factor names, weights, point values, rating scales, hierarchy_level metadata, and parent-child linkage using CHILD_OF between evaluation_factor nodes. Include AQLs, measurement methods, compliance checkpoints
     - FACILITIES AND LOCATIONS (→ LOCATION entities): Building numbers, installation names, base identifiers, geographic references, sq footage labels
     - CONTRACTUAL ELEMENTS (→ CONTRACT_LINE_ITEM / DELIVERABLE / DOCUMENT_SECTION entities): CLIN/SLIN identifiers, CDRL line numbers, DI numbers, SOW/PWS paragraph cross-references. State traceability as 'deliverable PRODUCES requirement' or 'CLIN FUNDS work_scope_item'
     - RELATIONSHIPS: Use canonical types: REPORTED_TO, CHILD_OF, CONTAINS, EVALUATED_BY, MEASURED_BY, STAFFED_BY, FUNDS, COORDINATED_WITH, PRODUCES, GOVERNED_BY, SUPPORTS, REFERENCES
