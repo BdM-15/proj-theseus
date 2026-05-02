@@ -2,7 +2,7 @@
 
 Issue: BdM-15/proj-theseus #124
 Epic branch: `149-lightrag-json-extraction-epic`
-Current feature branch: `157-phase2-afcap5-adab-iss-baseline`
+Current feature branch: `161-phase2.5-tuple-vestige-purge`
 
 This roadmap tracks the migration from tuple-based LightRAG extraction to native JSON extraction with xAI/OpenAI-compatible strict `json_schema` enforcement.
 
@@ -14,17 +14,17 @@ Phase 1.3 validated that strict JSON produces a cleaner, lower-noise build and b
 
 ## Phase Status
 
-| Phase | Scope | Status | Notes |
-| --- | --- | --- | --- |
-| 0 | Dependency upgrade baseline | Done | LightRAG/RAG-Anything baseline established on the epic branch. |
-| 1 | Native JSON extraction path | Done | JSON prompt shape matches LightRAG parser keys: `name`, `type`, `description`, `source`, `target`, `keywords`. |
-| 1.1 | Entity catalog YAML parity | Done | Entity types are YAML-backed and rendered into extraction prompts. |
-| 1.2 | JSON prompt conversion | Done | Tuple sanitizer is gated off in JSON mode; prompt emits LightRAG-native JSON arrays. |
-| 1.3 | Strict JSON schema enforcement | Done | Strict `GovConExtractionResult` schema is applied only to LightRAG text extraction; RAG-Anything table/equation analysis uses its own non-strict modal path. |
-| 2 | Multi-workspace baseline lock | Done | non-UCF (afcap5_adab_iss) + UCF (mcpp_drfp) both validated; JSON ≥ tuple on blind judge across both workspace types. afcap6_drfp deferred (no true solicitation). |
-| 2.5 | Tuple vestige purge | Next | Remove tuple-mode compatibility (sanitizer, tuple prompts, ENTITY_EXTRACTION_USE_JSON flag, all delimiter remnants). |
-| 3 | Token reduction / prompt whittling | Planned | Use the stricter schema and validation structure to reduce prompt/token load safely. |
-| 4 | Lock-in | Planned | Multi-workspace validation, tag `v1.4.0`, and fast-forward epic branch to `main`. |
+| Phase | Scope                              | Status  | Notes                                                                                                                                                             |
+| ----- | ---------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Dependency upgrade baseline        | Done    | LightRAG/RAG-Anything baseline established on the epic branch.                                                                                                    |
+| 1     | Native JSON extraction path        | Done    | JSON prompt shape matches LightRAG parser keys: `name`, `type`, `description`, `source`, `target`, `keywords`.                                                    |
+| 1.1   | Entity catalog YAML parity         | Done    | Entity types are YAML-backed and rendered into extraction prompts.                                                                                                |
+| 1.2   | JSON prompt conversion             | Done    | Tuple sanitizer is gated off in JSON mode; prompt emits LightRAG-native JSON arrays.                                                                              |
+| 1.3   | Strict JSON schema enforcement     | Done    | Strict `GovConExtractionResult` schema is applied only to LightRAG text extraction; RAG-Anything table/equation analysis uses its own non-strict modal path.      |
+| 2     | Multi-workspace baseline lock      | Done    | non-UCF (afcap5_adab_iss) + UCF (mcpp_drfp) both validated; JSON ≥ tuple on blind judge across both workspace types. afcap6_drfp deferred (no true solicitation). |
+| 2.5   | Tuple vestige purge                | Done    | Deleted output_sanitizer.py, govcon_lightrag_native.txt, tuple prompt keys, ENTITY_EXTRACTION_USE_JSON flag.                                                      |
+| 3     | Token reduction / prompt whittling | Planned | Use the stricter schema and validation structure to reduce prompt/token load safely.                                                                              |
+| 4     | Lock-in                            | Planned | Multi-workspace validation, tag `v1.4.0`, and fast-forward epic branch to `main`.                                                                                 |
 
 ## Phase 1.3 Validation Snapshot
 
@@ -37,37 +37,37 @@ Artifacts:
 
 Operational noise improved:
 
-| Metric | Original tuple | Strict JSON t4 |
-| --- | ---: | ---: |
-| Processing warnings | 23 | 0 |
-| Processing errors | 0 | 0 |
-| Table parse errors | 0 | 0 |
-| Orphaned entities | 140 | 41 |
-| Orphan rate | 2.80% | 1.55% |
+| Metric              | Original tuple | Strict JSON t4 |
+| ------------------- | -------------: | -------------: |
+| Processing warnings |             23 |              0 |
+| Processing errors   |              0 |              0 |
+| Table parse errors  |              0 |              0 |
+| Orphaned entities   |            140 |             41 |
+| Orphan rate         |          2.80% |          1.55% |
 
 Answer quality improved in the blind judge run:
 
-| Metric | Original tuple | Strict JSON t4 |
-| --- | ---: | ---: |
-| Query wins | 2 | 7 |
-| Ties | 1 | 1 |
-| Grand total | 207/250 | 234/250 |
-| Accuracy average | 4.5 | 4.8 |
-| Completeness average | 3.9 | 4.4 |
-| Specificity average | 4.3 | 4.7 |
-| Structure average | 4.0 | 4.8 |
-| Actionability average | 4.0 | 4.7 |
+| Metric                | Original tuple | Strict JSON t4 |
+| --------------------- | -------------: | -------------: |
+| Query wins            |              2 |              7 |
+| Ties                  |              1 |              1 |
+| Grand total           |        207/250 |        234/250 |
+| Accuracy average      |            4.5 |            4.8 |
+| Completeness average  |            3.9 |            4.4 |
+| Specificity average   |            4.3 |            4.7 |
+| Structure average     |            4.0 |            4.8 |
+| Actionability average |            4.0 |            4.7 |
 
 Raw graph coverage dropped and must be handled in Phase 2:
 
-| Metric | Original tuple | Strict JSON t4 |
-| --- | ---: | ---: |
-| Neo4j entities | 4,994 | 2,649 |
-| Neo4j relationships | 9,679 | 4,536 |
-| VDB entities | 4,994 | 2,649 |
-| VDB relationships | 8,603 | 4,212 |
-| Critical GovCon entities | 3,526 | 1,762 |
-| Critical entity share | 70.60% | 66.52% |
+| Metric                   | Original tuple | Strict JSON t4 |
+| ------------------------ | -------------: | -------------: |
+| Neo4j entities           |          4,994 |          2,649 |
+| Neo4j relationships      |          9,679 |          4,536 |
+| VDB entities             |          4,994 |          2,649 |
+| VDB relationships        |          8,603 |          4,212 |
+| Critical GovCon entities |          3,526 |          1,762 |
+| Critical entity share    |         70.60% |         66.52% |
 
 ## Phase 2 Validation Snapshot
 
@@ -81,18 +81,18 @@ Artifacts:
 
 Answer quality (blind judge):
 
-| Metric | tuple baseline | strict JSON j1 |
-| --- | ---: | ---: |
-| Query wins | 4 | 5 |
-| Ties | 1 | 1 |
-| Grand total | 220/250 | 229/250 |
+| Metric      | tuple baseline | strict JSON j1 |
+| ----------- | -------------: | -------------: |
+| Query wins  |              4 |              5 |
+| Ties        |              1 |              1 |
+| Grand total |        220/250 |        229/250 |
 
 Query timing (warm cache, 10 queries):
 
-| Workspace | Avg (s) | Median (s) |
-| --- | ---: | ---: |
-| afcap5_adab_iss (tuple) | 0.74 | — |
-| afcap5_adab_iss_j1 (JSON) | 0.64 | — |
+| Workspace                 | Avg (s) | Median (s) |
+| ------------------------- | ------: | ---------: |
+| afcap5_adab_iss (tuple)   |    0.74 |          — |
+| afcap5_adab_iss_j1 (JSON) |    0.64 |          — |
 
 **Decision: JSON holds/beats tuple on non-UCF format. Phase 2 exit criterion cleared.**
 

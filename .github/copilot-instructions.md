@@ -46,7 +46,7 @@ This project has **three independent prompt systems** that MUST stay aligned. Ch
 
 | System                         | Purpose                                         | Files                                                                                    | Registration                                                                |
 | ------------------------------ | ----------------------------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| **1. LightRAG Extraction**     | Entity/relationship extraction from text chunks | `prompts/extraction/govcon_lightrag_native.txt` → `prompts/govcon_prompt.py`             | `PROMPTS.update(GOVCON_PROMPTS)` in `src/server/initialization.py`          |
+| **1. LightRAG Extraction**     | Entity/relationship extraction from text chunks | `prompts/extraction/govcon_lightrag_json.txt` → `prompts/govcon_prompt.py`               | `PROMPTS.update(GOVCON_PROMPTS)` in `src/server/initialization.py`          |
 | **2. LightRAG Query/Response** | RAG query answering (Shipley mentor persona)    | `prompts/govcon_prompt.py` (`rag_response`, `naive_rag_response`, `keywords_extraction`) | Same `PROMPTS.update()` call                                                |
 | **3. RAGAnything Multimodal**  | Table/image/equation VLM analysis               | `prompts/multimodal/govcon_multimodal_prompts.py`                                        | `register_prompt_language("govcon", ...)` in `src/server/initialization.py` |
 
@@ -58,7 +58,7 @@ This project has **three independent prompt systems** that MUST stay aligned. Ch
 
 1. **Entity catalog YAML** (`prompts/extraction/govcon_entity_types.yaml`): single source of truth for the 33-type entity ontology. Updated by editing the YAML — schema's `VALID_ENTITY_TYPES` is derived from it at import time and the extraction prompt's Part D is rendered from it via `{entity_types_guidance}`. Run `pytest tests/ontology` to enforce parity.
 2. **Schema** (`src/ontology/schema.py`): `VALID_RELATIONSHIP_TYPES`, Pydantic models. (`VALID_ENTITY_TYPES` is auto-derived from the YAML in #1 — do not hand-edit.)
-3. **Extraction prompt** (`prompts/extraction/govcon_lightrag_native.txt`): Part F relationship rules, Part J output format. (Part D is now a `{entity_types_guidance}` placeholder rendered from the YAML — do not paste a static catalog back in.)
+3. **Extraction prompt** (`prompts/extraction/govcon_lightrag_json.txt`): Part F relationship rules, Part J output format. (Part D is now a `{entity_types_guidance}` placeholder rendered from the YAML — do not paste a static catalog back in.)
 4. **Multimodal prompts** (`prompts/multimodal/govcon_multimodal_prompts.py`): System prompts, processing prompts, query prompts — must reference correct entity type names and canonical relationship types
 5. **Query/response prompts** (`prompts/govcon_prompt.py`): `rag_response`, `naive_rag_response` — Shipley mentor framework must reference current entity vocabulary
 6. **Inference prompts** (`prompts/relationship_inference/*.md`): Algorithm-specific prompts that reference entity/relationship types

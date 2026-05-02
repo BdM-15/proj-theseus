@@ -151,13 +151,6 @@ from pathlib import Path
 GOVCON_PROMPTS: dict[str, Any] = {}
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# DELIMITER CONFIGURATION (LightRAG Standard - Compatible with All LLMs)
-# ═══════════════════════════════════════════════════════════════════════════════
-GOVCON_PROMPTS["DEFAULT_TUPLE_DELIMITER"] = "<|#|>"
-GOVCON_PROMPTS["DEFAULT_COMPLETION_DELIMITER"] = "<|COMPLETE|>"
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
 # LOAD FULL DOMAIN INTELLIGENCE FROM FILE
 # ═══════════════════════════════════════════════════════════════════════════════
 # The extraction prompt is ~35K tokens (1300+ lines) of domain intelligence.
@@ -170,106 +163,23 @@ GOVCON_PROMPTS["DEFAULT_COMPLETION_DELIMITER"] = "<|COMPLETE|>"
 # - 8 annotated examples
 # - Decision trees, metadata requirements, quality checks
 
-def _load_extraction_prompt() -> str:
-    """Load full GovCon extraction prompt (tuple-delimited mode) from file"""
-    # Find the prompts directory (this file is in prompts/)
-    prompts_dir = Path(__file__).parent
-    native_prompt_path = prompts_dir / "extraction" / "govcon_lightrag_native.txt"
-    
-    if not native_prompt_path.exists():
-        raise FileNotFoundError(
-            f"GovCon extraction prompt not found at {native_prompt_path}. "
-            "This file contains ~35K tokens of domain intelligence and is required."
-        )
-    
-    with open(native_prompt_path, "r", encoding="utf-8") as f:
-        return f.read()
-
-
 def _load_extraction_prompt_json() -> str:
-    """Load full GovCon extraction prompt (JSON structured-output mode) from file.
-
-    Phase 1.2 of issue #124. Used when ``entity_extraction_use_json=True`` is
-    passed to LightRAG. The file is materialized by ``tools/_build_json_prompt.py``
-    from the canonical ``govcon_lightrag_native.txt``.
-    """
+    """Load full GovCon extraction prompt (JSON structured-output mode) from file."""
     prompts_dir = Path(__file__).parent
     json_prompt_path = prompts_dir / "extraction" / "govcon_lightrag_json.txt"
 
     if not json_prompt_path.exists():
         raise FileNotFoundError(
             f"GovCon JSON extraction prompt not found at {json_prompt_path}. "
-            "Run `.\\.venv\\Scripts\\python.exe tools\\_build_json_prompt.py` to "
-            "materialize it from govcon_lightrag_native.txt."
+            "Run `.\.venv\\Scripts\\python.exe tools\\_build_json_prompt.py` to regenerate."
         )
 
     with open(json_prompt_path, "r", encoding="utf-8") as f:
         return f.read()
 
-
-# Load the full extraction system prompt (1300+ lines of domain intelligence)
-# TODO(phase-2.5): delete tuple-mode keys after JSON lockin and afcap5_adab_iss reprocess validation.
-GOVCON_PROMPTS["entity_extraction_system_prompt"] = _load_extraction_prompt()
-
 # Phase 1.2 (issue #124): JSON structured-output system prompt.
 # Used when LightRAG is initialized with ``entity_extraction_use_json=True``.
 GOVCON_PROMPTS["entity_extraction_json_system_prompt"] = _load_extraction_prompt_json()
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# ENTITY EXTRACTION USER PROMPT
-# ═══════════════════════════════════════════════════════════════════════════════
-GOVCON_PROMPTS["entity_extraction_user_prompt"] = """---Task---
-Extract entities and relationships from the input text in Data to be Processed below.
-
----Instructions---
-1.  **Strict Adherence to Format:** Follow all format requirements from the system prompt including output order, field delimiters, and proper noun handling.
-2.  **Output Content Only:** Output ONLY the extracted entities and relationships. No introductory or concluding remarks.
-3.  **Completion Signal:** Output `{completion_delimiter}` as the final line.
-4.  **Output Language:** Use {language}. Preserve proper nouns (clause numbers, agency names) exactly as written.
-5.  **Quantitative Preservation:** Preserve ALL numbers, rates, frequencies, dollar amounts, and thresholds exactly as stated.
-6.  **Metadata Completeness:** Ensure all type-specific metadata is populated (criticality for requirements, weights for factors, page limits for instructions, thresholds for metrics).
-
----Data to be Processed---
-<Entity_types>
-{entity_types_guidance}
-
-<Input Text>
-```
-{input_text}
-```
-
-<Output>
-"""
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# ENTITY CONTINUE EXTRACTION USER PROMPT
-# ═══════════════════════════════════════════════════════════════════════════════
-GOVCON_PROMPTS["entity_continue_extraction_user_prompt"] = """---Task---
-Based on the last extraction task, identify and extract any **missed or incorrectly formatted** entities and relationships from the input text.
-
----Instructions---
-1.  **Do NOT** re-output entities and relationships that were correctly extracted.
-2.  If an entity or relationship was **missed**, extract and output it now.
-3.  If an entity or relationship was **truncated or incorrectly formatted**, re-output the corrected version.
-4.  **Output Format - Entities:** 4 fields delimited by `{tuple_delimiter}`. First field = `entity`.
-5.  **Output Format - Relationships:** 5 fields delimited by `{tuple_delimiter}`. First field = `relation`.
-6.  **Completion Signal:** Output `{completion_delimiter}` as the final line.
-7.  **Output Language:** Use {language}. Preserve proper nouns exactly as written.
-
-<Output>
-"""
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# ENTITY EXTRACTION EXAMPLES
-# ═══════════════════════════════════════════════════════════════════════════════
-# The full govcon_lightrag_native.txt contains 12 annotated examples in Part K.
-# We set this to empty list because the examples are embedded in the system prompt.
-# This prevents LightRAG from appending its generic examples.
-# TODO(phase-2.5): delete tuple-mode key after JSON lockin.
-GOVCON_PROMPTS["entity_extraction_examples"] = []
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -954,7 +864,7 @@ def _validate_prompts():
         import warnings
         warnings.warn(
             f"GovCon extraction prompt appears truncated ({len(extraction_prompt):,} chars). "
-            f"Expected at least {MIN_EXPECTED_CHARS:,} chars. Check govcon_lightrag_native.txt."
+            f"Expected at least {MIN_EXPECTED_CHARS:,} chars. Check govcon_lightrag_json.txt."
         )
     
     # Validate critical sections are present.

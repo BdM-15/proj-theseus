@@ -2,7 +2,7 @@
 RAG-Anything Initialization Module
 
 This module handles the initialization of the RAG-Anything instance with:
-- Custom entity extraction prompts (govcon_lightrag_native.txt, Parts A-L)
+- Custom entity extraction prompts (govcon_lightrag_json.txt, Parts A-L)
 - Government contracting ontology (33 entity types, 43 relationship types)
 - Multimodal document processing (MinerU parser)
 - Cloud LLM integration (xAI Grok extraction + fast-reasoning post-processing + grok-4.20 queries + OpenAI embeddings)
@@ -185,11 +185,7 @@ async def initialize_raganything():
     KEYWORD_TIMEOUT = 60
     VLM_TIMEOUT = 300
 
-    use_json_extraction = os.environ.get("ENTITY_EXTRACTION_USE_JSON", "false").strip().lower() in ("1", "true", "yes", "on")
-    use_strict_schema = (
-        use_json_extraction
-        and os.environ.get("ENTITY_EXTRACTION_STRICT_SCHEMA", "false").strip().lower() in ("1", "true", "yes", "on")
-    )
+    use_strict_schema = os.environ.get("ENTITY_EXTRACTION_STRICT_SCHEMA", "false").strip().lower() in ("1", "true", "yes", "on")
     strict_extraction_response_format = None
     if use_strict_schema:
         from src.ontology.extraction_schema import build_response_format
@@ -199,8 +195,7 @@ async def initialize_raganything():
         logger.info("=" * 88)
         logger.info("✅ STRICT JSON SCHEMA STARTUP CHECK: ENABLED")
         logger.info(
-            "   ENTITY_EXTRACTION_USE_JSON=%s | ENTITY_EXTRACTION_STRICT_SCHEMA=%s",
-            os.environ.get("ENTITY_EXTRACTION_USE_JSON"),
+            "   ENTITY_EXTRACTION_STRICT_SCHEMA=%s",
             os.environ.get("ENTITY_EXTRACTION_STRICT_SCHEMA"),
         )
         logger.info(
@@ -219,11 +214,10 @@ async def initialize_raganything():
         logger.warning("=" * 88)
         logger.warning("⚠️  STRICT JSON SCHEMA STARTUP CHECK: DISABLED")
         logger.warning(
-            "   ENTITY_EXTRACTION_USE_JSON=%s | ENTITY_EXTRACTION_STRICT_SCHEMA=%s",
-            os.environ.get("ENTITY_EXTRACTION_USE_JSON"),
+            "   ENTITY_EXTRACTION_STRICT_SCHEMA=%s",
             os.environ.get("ENTITY_EXTRACTION_STRICT_SCHEMA"),
         )
-        logger.warning("   Extraction will run in %s mode", "prompt-only JSON" if use_json_extraction else "tuple")
+        logger.warning("   Extraction will run in prompt-only JSON mode")
         logger.warning("=" * 88)
 
     async def _extract_llm_func(prompt, system_prompt=None, history_messages=[], **kwargs):
@@ -298,21 +292,6 @@ async def initialize_raganything():
             api_key=xai_api_key, base_url=xai_base_url, **kwargs,
         )
 
-    # ═══════════════════════════════════════════════════════════════════════════════
-    # Output sanitization for the EXTRACT role (Issue #56) — TUPLE MODE ONLY
-    # ═══════════════════════════════════════════════════════════════════════════════
-    # The sanitizer fixes tuple-delimited malformations (`#|requirement` → `requirement`,
-    # stray pipes in descriptions). It only applies to the legacy tuple-delimited
-    # extraction path. In JSON mode (Phase 1.2 / issue #124, ENTITY_EXTRACTION_USE_JSON=true),
-    # LightRAG's _process_json_extraction_result uses json_repair.loads() and the
-    # sanitizer is intentionally bypassed — there is no tuple fallback path.
-    # ═══════════════════════════════════════════════════════════════════════════════
-    if use_json_extraction:
-        sanitized_extract_func = _extract_llm_func  # JSON mode: no tuple sanitizer
-    else:
-        from src.extraction.output_sanitizer import create_sanitizing_wrapper
-        sanitized_extract_func = create_sanitizing_wrapper(_extract_llm_func)
-
     # llm_model_func is the LEGACY single-callable RAGAnything still expects at
     # the top level. We point it at the query func — it's the safest fallback for
     # any callsite that bypasses role routing (debug scripts, ad-hoc helpers).
@@ -325,7 +304,7 @@ async def initialize_raganything():
     vision_model_func = _vlm_llm_func
 
     logger.info("✅ Native LightRAG 1.5.0 role_llm_configs routing enabled")
-    _extract_mode_label = "JSON structured output, no sanitizer" if use_json_extraction else "tuple mode, sanitized"
+    _extract_mode_label = "JSON strict schema" if use_strict_schema else "JSON prompt-only"
     logger.info(f"   extract  → {extraction_model:40s}  max_tokens={EXTRACT_MAX_TOKENS:>6}  timeout={EXTRACT_TIMEOUT}s  ({_extract_mode_label})")
     logger.info(f"   query    → {reasoning_model:40s}  max_tokens={QUERY_MAX_TOKENS:>6}  timeout={QUERY_TIMEOUT}s")
     logger.info(f"   keyword  → {extraction_model:40s}  max_tokens={KEYWORD_MAX_TOKENS:>6}  timeout={KEYWORD_TIMEOUT}s")
@@ -356,8 +335,8 @@ async def initialize_raganything():
     # Prompt Configuration (govcon_prompt.py architecture)
     # ═══════════════════════════════════════════════════════════════════════════════
     # All prompts are now centralized in prompts/govcon_prompt.py:
-    # - entity_extraction_system_prompt: GovCon extraction instructions
-    # - entity_extraction_examples: 7 GovCon-specific examples (L↔M, requirements, clauses, etc.)
+    # - entity_extraction_json_system_prompt: GovCon extraction instructions
+    # - entity_extraction_json_examples: 7 GovCon-specific examples (L⇔M, requirements, clauses, etc.)
     # - summarize_entity_descriptions: Preserve quantitative details
     # - rag_response / naive_rag_response: Shipley lifecycle support
     # - keywords_extraction: GovCon query understanding
@@ -397,7 +376,7 @@ async def initialize_raganything():
     # Phase 1.1c (#126) of epic #124: the full Part D markdown is generated from
     # the canonical YAML catalog (single source of truth shared with schema.py's
     # `VALID_ENTITY_TYPES`). The inline Part D copy was deleted from
-    # `prompts/extraction/govcon_lightrag_native.txt` to eliminate drift risk.
+    # `prompts/extraction/govcon_lightrag_json.txt` to eliminate drift risk.
     # ═══════════════════════════════════════════════════════════════════════════════
     from src.ontology.entity_catalog import get_default_catalog
     entity_types_guidance = get_default_catalog().render_part_d()
@@ -417,7 +396,7 @@ async def initialize_raganything():
     if use_strict_schema:
         extract_kwargs["response_format"] = strict_extraction_response_format
         logger.info("✅ Strict JSON schema enforcement ENABLED for `extract` role (xAI json_schema strict=true)")
-    elif use_json_extraction:
+    else:
         logger.info("ℹ️  Strict JSON schema NOT enabled — using prompt-only JSON mode (set ENTITY_EXTRACTION_STRICT_SCHEMA=true to enforce)")
 
     extract_metadata = {"model": extraction_model, "host": xai_base_url, "binding": "openai"}
@@ -431,7 +410,7 @@ async def initialize_raganything():
     # Build per-role LightRAG configs (1.5.0 native role dispatch).
     role_llm_configs = {
         "extract": RoleLLMConfig(
-            func=sanitized_extract_func,
+            func=_extract_llm_func,
             kwargs=extract_kwargs,
             timeout=EXTRACT_TIMEOUT,
             metadata=extract_metadata,
@@ -459,14 +438,14 @@ async def initialize_raganything():
     lightrag_kwargs = {
         "addon_params": {
             "entity_types_guidance": entity_types_guidance,
-            # NOTE: entity_extraction_system_prompt and examples are now handled via 
+            # NOTE: entity_extraction_json_system_prompt and examples are now handled via 
             # PROMPTS.update(GOVCON_PROMPTS) after RAG-Anything initialization
             "language": "English",
         },
         # Phase 1.2 (issue #124): native JSON structured-output extraction.
-        # When True, LightRAG uses entity_extraction_json_* prompt keys and
+        # LightRAG uses entity_extraction_json_* prompt keys and
         # _process_json_extraction_result (json_repair-based parser).
-        "entity_extraction_use_json": use_json_extraction,
+        "entity_extraction_use_json": True,
         # Chunking configuration comes from environment variables:
         # - CHUNK_SIZE controls chunk_token_size (default: 4096)
         # - CHUNK_OVERLAP_SIZE controls chunk_overlap_token_size (default: 600)
@@ -724,8 +703,8 @@ async def initialize_raganything():
     # CRITICAL: REPLACE LightRAG's ENTIRE prompt system with GovCon versions
     # ═══════════════════════════════════════════════════════════════════════════════
     # LightRAG uses multiple prompts that work together:
-    # - entity_extraction_system_prompt: Extract entities/relationships
-    # - entity_extraction_examples: GovCon-specific extraction examples
+    # - entity_extraction_json_system_prompt: Extract entities/relationships
+    # - entity_extraction_json_examples: GovCon-specific extraction examples
     # - summarize_entity_descriptions: Merge duplicate entities
     # - rag_response: Answer queries using KG + documents
     # - naive_rag_response: Answer queries using documents only
@@ -745,13 +724,13 @@ async def initialize_raganything():
     PROMPTS.update(GOVCON_PROMPTS)
     
     # Log full domain intelligence stats
-    extraction_prompt = GOVCON_PROMPTS.get('entity_extraction_system_prompt', '')
+    extraction_prompt = GOVCON_PROMPTS.get('entity_extraction_json_system_prompt', '')
     extraction_chars = len(extraction_prompt)
     extraction_lines = extraction_prompt.count('\n')
     
     logger.info("✅ REPLACED LightRAG prompt system with FULL GovCon domain intelligence")
     logger.info(f"   Extraction prompt: {extraction_chars:,} chars (~{extraction_chars//4:,} tokens), {extraction_lines:,} lines")
-    logger.info(f"   Source: govcon_lightrag_native.txt (Parts A-L)")
+    logger.info(f"   Source: govcon_lightrag_json.txt (Parts A-L)")
     logger.info(f"   Domain Intelligence:")
     metadata_type_count = extraction_prompt.count('Required metadata:')
     logger.info(f"     • 8 Shipley user personas (Capture, Proposal, Cost, Contracts, etc.)")

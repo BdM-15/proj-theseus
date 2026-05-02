@@ -133,7 +133,7 @@ Theseus runs three independently-registered prompt systems that share a single o
 
 | System                         | Purpose                                           | Source                                                                                   |
 | ------------------------------ | ------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| **1. LightRAG Extraction**     | Entity/relationship extraction from text chunks   | `prompts/extraction/govcon_lightrag_native.txt` → `prompts/govcon_prompt.py`             |
+| **1. LightRAG Extraction**     | Entity/relationship extraction from text chunks   | `prompts/extraction/govcon_lightrag_json.txt` → `prompts/govcon_prompt.py`               |
 | **2. LightRAG Query/Response** | Shipley-mentor RAG answering + keyword extraction | `prompts/govcon_prompt.py` (`rag_response`, `naive_rag_response`, `keywords_extraction`) |
 | **3. RAGAnything Multimodal**  | Table / image / equation VLM analysis             | `prompts/multimodal/govcon_multimodal_prompts.py`                                        |
 
@@ -280,20 +280,20 @@ Project Theseus implements the open [Agent Skills specification](https://agentsk
 
 **12 production skills:**
 
-| Skill                       | Stance / Capability                                                       | MCPs                                                          |
-| --------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| `proposal-generator`        | Shipley capture mentor: compliance spine → win themes → FAB → govcon HTML | —                                                             |
-| `compliance-auditor`        | 8-check audit; live FAR/DFARS validation against eCFR                     | `ecfr`                                                        |
-| `competitive-intel`         | Incumbent + competitor research, award history, black-hat brief           | `usaspending`                                                 |
-| `price-to-win`              | PTW + competitor cost-stack (FFP wrap-rate / LH / CR pools / hybrid)      | `bls_oews`, `gsa_calc`, `gsa_perdiem`                         |
-| `oci-sweeper`               | FAR Subpart 9.5 Organizational Conflict of Interest sweep                 | — (KG-only)                                                   |
-| `subcontractor-sow-builder` | Prime-side SOW/PWS for subs (FAR 37.102(d)/37.602/16.601(c)(2)/16.306(d)) | —                                                             |
-| `rfp-reverse-engineer`      | Reverse the CO's hidden 3+6 decision tree from a received RFP             | —                                                             |
-| `ot-prototype-strategist`   | 10 USC 4021 / 4022 / 4022(d) / 4022(f) prototype bid strategist           | `bls_oews`, `gsa_calc`, `gsa_perdiem`                         |
-| `huashu-design`             | HTML → PPTX / PDF / MP4 / GIF design engine (Personal Use License)        | —                                                             |
-| `renderers`                 | Universal artifact renderers (DOCX via Pandoc, XLSX via openpyxl)         | —                                                             |
-| `govcon-ontology`           | Authoritative reference for the 33-entity / 35-relationship schema        | —                                                             |
-| `skill-creator`             | Foundational meta-skill for authoring / refining / evaluating skills      | —                                                             |
+| Skill                       | Stance / Capability                                                       | MCPs                                  |
+| --------------------------- | ------------------------------------------------------------------------- | ------------------------------------- |
+| `proposal-generator`        | Shipley capture mentor: compliance spine → win themes → FAB → govcon HTML | —                                     |
+| `compliance-auditor`        | 8-check audit; live FAR/DFARS validation against eCFR                     | `ecfr`                                |
+| `competitive-intel`         | Incumbent + competitor research, award history, black-hat brief           | `usaspending`                         |
+| `price-to-win`              | PTW + competitor cost-stack (FFP wrap-rate / LH / CR pools / hybrid)      | `bls_oews`, `gsa_calc`, `gsa_perdiem` |
+| `oci-sweeper`               | FAR Subpart 9.5 Organizational Conflict of Interest sweep                 | — (KG-only)                           |
+| `subcontractor-sow-builder` | Prime-side SOW/PWS for subs (FAR 37.102(d)/37.602/16.601(c)(2)/16.306(d)) | —                                     |
+| `rfp-reverse-engineer`      | Reverse the CO's hidden 3+6 decision tree from a received RFP             | —                                     |
+| `ot-prototype-strategist`   | 10 USC 4021 / 4022 / 4022(d) / 4022(f) prototype bid strategist           | `bls_oews`, `gsa_calc`, `gsa_perdiem` |
+| `huashu-design`             | HTML → PPTX / PDF / MP4 / GIF design engine (Personal Use License)        | —                                     |
+| `renderers`                 | Universal artifact renderers (DOCX via Pandoc, XLSX via openpyxl)         | —                                     |
+| `govcon-ontology`           | Authoritative reference for the 33-entity / 35-relationship schema        | —                                     |
+| `skill-creator`             | Foundational meta-skill for authoring / refining / evaluating skills      | —                                     |
 
 **Studio cross-skill artifact library** (`/ui` → Studio tab): single index of every deliverable produced by any skill across all runs. Filters by skill / format / free-text. Per-row actions: anchor pin (sticks to top, persisted to localStorage), inline preview (PDF / DOCX via Mammoth.js / XLSX via SheetJS / video / image / MD / JSON / CSV / TXT), "Why this artifact?" reasoning view (deterministic transcript-to-prose renderer over `transcript.json`), download, open originating run. JSON envelopes are parsed for `chunk-<hex>` ids and rendered as clickable chips that open the chunk-preview modal — closes the **artifact → chunk → entity** audit chain in two clicks. Studio is **read-only by design**: every artifact has full provenance via an audited `SkillManager.invoke(...)` run, so the namespace is append-only. User-uploaded inputs live in a separate (planned) Library lane (#123) to preserve the audit chain.
 
@@ -411,7 +411,7 @@ The full backlog is tracked in [GitHub Issues #87 – #114](https://github.com/B
 
 | Group                          | Examples                                                                                                                                                                                                                                               |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **v1.4.0 — JSON extraction**    | [Issue #124 roadmap](docs/LIGHTRAG_JSON_EXTRACTION_ROADMAP.md): strict LightRAG JSON extraction is the foundation; Phase 2 targets recall recovery for scoring criteria, document hierarchy, strategic signals, workload metrics, and clause breadth. |
+| **v1.4.0 — JSON extraction**   | [Issue #124 roadmap](docs/LIGHTRAG_JSON_EXTRACTION_ROADMAP.md): strict LightRAG JSON extraction is the foundation; Phase 2 targets recall recovery for scoring criteria, document hierarchy, strategic signals, workload metrics, and clause breadth.  |
 | **Tier 1 — graph quality**     | #88 confidence + provenance on edges, #93 orphan candidate links                                                                                                                                                                                       |
 | **Tier 2 — Intel Panels**      | #87 Past Performance, #99 Tech Inventory, #100 Innovation Signals, #96 Glossary, #97 Hot Buttons, #101 Deliverable Catalog                                                                                                                             |
 | **Tier 3 — quality of life**   | #109 "Ask Theseus" pre-filled chat buttons, #103 CSV/XLSX export, #110 diff vs prior run                                                                                                                                                               |
@@ -473,18 +473,18 @@ dependencies = [
 
 ## Documentation
 
-| Document                                                                                                                               | Description                                            |
-| -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)                                                                                           | System architecture, ADRs, performance metrics         |
-| [docs/STYLE_GUIDE.md](docs/STYLE_GUIDE.md)                                                                                             | Capture Workbench UI conventions (read before UI work) |
-| [docs/PROJECT_THESEUS_USE_CASE.md](docs/PROJECT_THESEUS_USE_CASE.md)                                                                   | End-to-end capture-team use case                       |
-| [docs/ENHANCEMENT_FRAMEWORK.md](docs/ENHANCEMENT_FRAMEWORK.md)                                                                         | Upstream library enhancement mapping                   |
-| [docs/MINERU_3X_INTEGRATION_ASSESSMENT.md](docs/MINERU_3X_INTEGRATION_ASSESSMENT.md)                                                   | MinerU 3.0 upgrade notes                               |
-| [docs/Ontology-Based-RAG-for-Government-Contracting-White-Paper.md](docs/Ontology-Based-RAG-for-Government-Contracting-White-Paper.md) | Technical white paper                                  |
-| [docs/Why-General-Purpose-AI-Fails-Specialized-Domains.md](docs/Why-General-Purpose-AI-Fails-Specialized-Domains.md)                   | Domain-specialization argument                         |
+| Document                                                                                                                               | Description                                              |
+| -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)                                                                                           | System architecture, ADRs, performance metrics           |
+| [docs/STYLE_GUIDE.md](docs/STYLE_GUIDE.md)                                                                                             | Capture Workbench UI conventions (read before UI work)   |
+| [docs/PROJECT_THESEUS_USE_CASE.md](docs/PROJECT_THESEUS_USE_CASE.md)                                                                   | End-to-end capture-team use case                         |
+| [docs/ENHANCEMENT_FRAMEWORK.md](docs/ENHANCEMENT_FRAMEWORK.md)                                                                         | Upstream library enhancement mapping                     |
+| [docs/MINERU_3X_INTEGRATION_ASSESSMENT.md](docs/MINERU_3X_INTEGRATION_ASSESSMENT.md)                                                   | MinerU 3.0 upgrade notes                                 |
+| [docs/Ontology-Based-RAG-for-Government-Contracting-White-Paper.md](docs/Ontology-Based-RAG-for-Government-Contracting-White-Paper.md) | Technical white paper                                    |
+| [docs/Why-General-Purpose-AI-Fails-Specialized-Domains.md](docs/Why-General-Purpose-AI-Fails-Specialized-Domains.md)                   | Domain-specialization argument                           |
 | [docs/SKILL_TAXONOMY.md](docs/SKILL_TAXONOMY.md)                                                                                       | Three-axis skill taxonomy (persona / phase / capability) |
-| [docs/SKILL_SPEC_COMPLIANCE.md](docs/SKILL_SPEC_COMPLIANCE.md)                                                                         | Open Agent Skills spec audit + migration plan          |
-| [.github/copilot-instructions.md](.github/copilot-instructions.md)                                                                     | Agent rules + cross-cutting prompt change checklist    |
+| [docs/SKILL_SPEC_COMPLIANCE.md](docs/SKILL_SPEC_COMPLIANCE.md)                                                                         | Open Agent Skills spec audit + migration plan            |
+| [.github/copilot-instructions.md](.github/copilot-instructions.md)                                                                     | Agent rules + cross-cutting prompt change checklist      |
 
 ---
 

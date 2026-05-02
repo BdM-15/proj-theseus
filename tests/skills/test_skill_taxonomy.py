@@ -165,7 +165,7 @@ def test_persona_primary_aligns_with_extraction_prompt() -> None:
     of truth for the persona vocabulary. When that block changes, this test
     will fail until docs/SKILL_TAXONOMY.md and SKILL.md frontmatter are
     re-audited."""
-    prompt = (_REPO_ROOT / "prompts" / "extraction" / "govcon_lightrag_native.txt").read_text(
+    prompt = (_REPO_ROOT / "prompts" / "extraction" / "govcon_lightrag_json.txt").read_text(
         encoding="utf-8"
     )
     expected = {

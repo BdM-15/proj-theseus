@@ -408,7 +408,7 @@ multimodal_rag = RAGAnything(
 
 ### **Government Contracting Entity Types (33 Types)**
 
-**Source**: `prompts/extraction/govcon_lightrag_native.txt` (Part D)
+**Source**: `prompts/extraction/govcon_lightrag_json.txt` (Part D)
 
 Organized into four functional groups to minimize `concept` bucket spillover and maximize typed retrieval precision:
 
