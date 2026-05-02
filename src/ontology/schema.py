@@ -59,6 +59,43 @@ VALID_RELATIONSHIP_TYPES = {
 }
 
 
+def render_relationship_types_guidance() -> str:
+    """Render the canonical relationship set for prompt composition.
+
+    Returns a compact, human-readable reference grouped by whether the type is
+    emitted by extraction or reserved for post-processing.
+    """
+
+    extraction_time_groups = {
+        "Structural": ["CHILD_OF", "AMENDS", "SUPERSEDED_BY", "REFERENCES"],
+        "Evaluation & Proposal": ["GUIDES", "EVALUATED_BY", "MEASURED_BY", "EVIDENCES"],
+        "Work & Deliverables": [
+            "PRODUCES",
+            "SATISFIED_BY",
+            "TRACKED_BY",
+            "SUBMITTED_TO",
+            "STAFFED_BY",
+            "PRICED_UNDER",
+            "QUANTIFIES",
+        ],
+        "Authority & Governance": ["GOVERNED_BY", "CONSTRAINED_BY", "DEFINES", "APPLIES_TO"],
+        "Resource & Operational": ["HAS_EQUIPMENT", "PROVIDED_BY"],
+        "Strategic & Capture Intelligence": ["ADDRESSES", "RELATED_TO"],
+    }
+    inference_only = ["REQUIRES", "ENABLED_BY", "RESPONSIBLE_FOR"]
+
+    lines: list[str] = [
+        "VALID RELATIONSHIP TYPES",
+        "Extraction-time canonical types (23):",
+    ]
+    for group_name, rel_types in extraction_time_groups.items():
+        lines.append(f"- {group_name}: {', '.join(rel_types)}")
+
+    lines.append("Inference-only types (not emitted by the LLM):")
+    lines.append(f"- {', '.join(inference_only)}")
+    return "\n".join(lines)
+
+
 def normalize_relationship_type(rel_type: str, fallback: str = "RELATED_TO") -> str:
     """
     Normalize a relationship type string to a valid canonical type.

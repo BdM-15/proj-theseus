@@ -14,19 +14,19 @@ Phase 1.3 validated that strict JSON produces a cleaner, lower-noise build and b
 
 ## Phase Status
 
-| Phase | Scope                              | Status      | Notes                                                                                                                                                                                              |
-| ----- | ---------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0     | Dependency upgrade baseline        | Done        | LightRAG/RAG-Anything baseline established on the epic branch.                                                                                                                                     |
-| 1     | Native JSON extraction path        | Done        | JSON prompt shape matches LightRAG parser keys: `name`, `type`, `description`, `source`, `target`, `keywords`.                                                                                     |
-| 1.1   | Entity catalog YAML parity         | Done        | Entity types are YAML-backed and rendered into extraction prompts.                                                                                                                                 |
-| 1.2   | JSON prompt conversion             | Done        | Tuple sanitizer is gated off in JSON mode; prompt emits LightRAG-native JSON arrays.                                                                                                              |
-| 1.3   | Strict JSON schema enforcement     | Done        | Strict `GovConExtractionResult` schema is applied only to LightRAG text extraction; RAG-Anything table/equation analysis uses its own non-strict modal path.                                       |
-| 2     | Multi-workspace baseline lock      | Done        | non-UCF (afcap5_adab_iss) + UCF (mcpp_drfp) both validated; JSON ≥ tuple on blind judge across both workspace types. afcap6_drfp deferred (no true solicitation).                                |
-| 2.5   | Tuple vestige purge                | Done        | Deleted output_sanitizer.py, govcon_lightrag_native.txt, tuple prompt keys, ENTITY_EXTRACTION_USE_JSON flag.                                                                                       |
-| 3     | Token reduction / prompt whittling | In Progress | Phase 3 = two-track: (3a) first-principles content hardening (relationship set reduction, entity type hardening); (3b) V8 structural architecture (composable prompt). Branch 163.                 |
-| 3a    | First-principles content hardening | In Progress | Relationship set reduced 35→26 (23 extraction + 3 inference-only). 9 phantom types removed. Entity YAML enrichment complete. govcon_lightrag_json.txt aligned to new canonical set.               |
-| 3b    | V8 composable prompt architecture  | In Progress | Replace 121k-char monolith with compact frame + dynamic injections. Feature flag `USE_V8_PROMPT`. Rendered from `schema.py` + `govcon_entity_types.yaml`. See V8 section below.                   |
-| 4     | Lock-in                            | Planned     | Multi-workspace validation, tag `v1.4.0`, and fast-forward epic branch to `main`. Requires V8 A/B parity check.                                                                                   |
+| Phase | Scope                              | Status      | Notes                                                                                                                                                                               |
+| ----- | ---------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Dependency upgrade baseline        | Done        | LightRAG/RAG-Anything baseline established on the epic branch.                                                                                                                      |
+| 1     | Native JSON extraction path        | Done        | JSON prompt shape matches LightRAG parser keys: `name`, `type`, `description`, `source`, `target`, `keywords`.                                                                      |
+| 1.1   | Entity catalog YAML parity         | Done        | Entity types are YAML-backed and rendered into extraction prompts.                                                                                                                  |
+| 1.2   | JSON prompt conversion             | Done        | Tuple sanitizer is gated off in JSON mode; prompt emits LightRAG-native JSON arrays.                                                                                                |
+| 1.3   | Strict JSON schema enforcement     | Done        | Strict `GovConExtractionResult` schema is applied only to LightRAG text extraction; RAG-Anything table/equation analysis uses its own non-strict modal path.                        |
+| 2     | Multi-workspace baseline lock      | Done        | non-UCF (afcap5_adab_iss) + UCF (mcpp_drfp) both validated; JSON ≥ tuple on blind judge across both workspace types. afcap6_drfp deferred (no true solicitation).                   |
+| 2.5   | Tuple vestige purge                | Done        | Deleted output_sanitizer.py, govcon_lightrag_native.txt, tuple prompt keys, ENTITY_EXTRACTION_USE_JSON flag.                                                                        |
+| 3     | Token reduction / prompt whittling | In Progress | Phase 3 = two-track: (3a) first-principles content hardening (relationship set reduction, entity type hardening); (3b) V8 structural architecture (composable prompt). Branch 163.  |
+| 3a    | First-principles content hardening | In Progress | Relationship set reduced 35→26 (23 extraction + 3 inference-only). 9 phantom types removed. Entity YAML enrichment complete. govcon_lightrag_json.txt aligned to new canonical set. |
+| 3b    | V8 composable prompt architecture  | In Progress | Replace 121k-char monolith with compact frame + dynamic injections. Feature flag `USE_V8_PROMPT`. Rendered from `schema.py` + `govcon_entity_types.yaml`. See V8 section below.     |
+| 4     | Lock-in                            | Planned     | Multi-workspace validation, tag `v1.4.0`, and fast-forward epic branch to `main`. Requires V8 A/B parity check.                                                                     |
 
 ## Phase 3 First-Principles Track (Issue #124)
 
@@ -52,6 +52,7 @@ Status snapshot:
 **Root cause**: The prompt evolved by accretion. Entity types (Part D, ~15k chars) are now injected dynamically via `{entity_types_guidance}` from the YAML catalog, but the relationship rules (Part F, ~10k chars), examples (Part K, ~20k chars), and verbose decision trees (Parts G, H, I, ~6k chars) remain as static monolith content that duplicates information now maintained elsewhere.
 
 **Library capability audit** (LightRAG 1.5.0, RAGAnything 1.2.10):
+
 - `resolve_entity_extraction_prompt_profile()` at `lightrag/prompt.py:847` — merges `addon_params["entity_types_guidance"]` into the prompt profile. Other `addon_params` keys are not substituted into the system prompt via this mechanism.
 - The system prompt is formatted via `PROMPTS["entity_extraction_json_system_prompt"].format(**context_base)` in `operate.py:3370`. `context_base` provides exactly 5 keys: `entity_types_guidance`, `examples`, `language`, `max_total_records`, `max_entity_records`.
 - **Conclusion**: The only runtime-injectable placeholder in the system prompt is `{entity_types_guidance}`. All other dynamic content (relationship types, disambiguation guidance) must be composed into the prompt at import time.
@@ -70,24 +71,24 @@ Token budget per extraction call (at CHUNK_SIZE=4096):
 
 **File responsibility map**:
 
-| Content | Source of truth | Mechanism |
-|---|---|---|
-| Entity type catalog (Part D) | `prompts/extraction/govcon_entity_types.yaml` | `render_part_d()` → `entity_types_guidance` → `{entity_types_guidance}` in system prompt |
-| Disambiguation rules | Same YAML (rendered as part of Part D) | Same injection |
-| Relationship types (Part F.1) | `src/ontology/schema.py` → `render_relationship_types_guidance()` | Composed at import time into V8 system prompt |
-| Compact role + rules (Parts A-C) | `prompts/govcon_prompt.py` → `_build_v8_system_prompt()` | Embedded directly in V8 system prompt |
-| Output contract (Part J) | `prompts/govcon_prompt.py` → `_build_v8_system_prompt()` | Embedded directly in V8 system prompt |
-| Legacy monolith | `prompts/extraction/govcon_lightrag_json.txt` | Retained as fallback (`USE_V8_PROMPT=false`) |
+| Content                          | Source of truth                                                   | Mechanism                                                                                |
+| -------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Entity type catalog (Part D)     | `prompts/extraction/govcon_entity_types.yaml`                     | `render_part_d()` → `entity_types_guidance` → `{entity_types_guidance}` in system prompt |
+| Disambiguation rules             | Same YAML (rendered as part of Part D)                            | Same injection                                                                           |
+| Relationship types (Part F.1)    | `src/ontology/schema.py` → `render_relationship_types_guidance()` | Composed at import time into V8 system prompt                                            |
+| Compact role + rules (Parts A-C) | `prompts/govcon_prompt.py` → `_build_v8_system_prompt()`          | Embedded directly in V8 system prompt                                                    |
+| Output contract (Part J)         | `prompts/govcon_prompt.py` → `_build_v8_system_prompt()`          | Embedded directly in V8 system prompt                                                    |
+| Legacy monolith                  | `prompts/extraction/govcon_lightrag_json.txt`                     | Retained as fallback (`USE_V8_PROMPT=false`)                                             |
 
 **V8 implementation phases**:
 
-| Sub-phase | Scope | Target file(s) |
-|---|---|---|
-| V8-0 | Feature flag (`USE_V8_PROMPT`) | `src/server/initialization.py` |
-| V8-1 | Compact system prompt frame | `prompts/govcon_prompt.py` → `_build_v8_system_prompt()` |
-| V8-2 | Relationship types renderer | `src/ontology/schema.py` → `render_relationship_types_guidance()` |
-| V8-3 | A/B token & quality validation | Rebuild both workspaces, blind judge comparison |
-| V8-4 | Legacy monolith retirement | Remove `govcon_lightrag_json.txt` after V8-3 passes |
+| Sub-phase | Scope                          | Target file(s)                                                    |
+| --------- | ------------------------------ | ----------------------------------------------------------------- |
+| V8-0      | Feature flag (`USE_V8_PROMPT`) | `src/server/initialization.py`                                    |
+| V8-1      | Compact system prompt frame    | `prompts/govcon_prompt.py` → `_build_v8_system_prompt()`          |
+| V8-2      | Relationship types renderer    | `src/ontology/schema.py` → `render_relationship_types_guidance()` |
+| V8-3      | A/B token & quality validation | Rebuild both workspaces, blind judge comparison                   |
+| V8-4      | Legacy monolith retirement     | Remove `govcon_lightrag_json.txt` after V8-3 passes               |
 
 **Feature flag**: `USE_V8_PROMPT=true/false` in `.env`. Default `false` during V8-1/V8-2 to preserve existing behavior. Flip to `true` for V8-3 A/B run.
 

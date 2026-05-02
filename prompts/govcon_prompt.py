@@ -8,9 +8,10 @@ domain-specific government contracting intelligence for RFP analysis.
 
 Architecture:
 -------------
-- FULL domain intelligence loaded from govcon_lightrag_native.txt (~35K tokens, 1300+ lines)
-- Contains: 8 user personas, ontology-driven entity types, 50+ relationship rules, 7 examples
-- LightRAG-compatible format with entity/relation tuple output
+- FULL domain intelligence loaded from govcon_lightrag_json.txt (JSON mode)
+- Entity-type guidance rendered dynamically from the YAML entity catalog
+- Part K examples externalized via LightRAG ENTITY_TYPE_PROMPT_FILE profile
+- LightRAG-compatible format with JSON structured output
 
 Philosophy:
 -----------
@@ -36,14 +37,19 @@ Domain Intelligence Included:
 - Part H: Decision Tree for Ambiguous Cases
 - Part I: Metadata Extraction Requirements
 - Part J: Output Format
-- Part K: 7 Annotated RFP Examples (anonymized, pattern-based)
+- Part K: 7 Annotated RFP Examples injected from prompts/entity_type/govcon.yaml
 - Part L: Quality Checks
 
 Prompt file: prompts/extraction/govcon_lightrag_json.txt
-Version: 7.3.1 (Phase 3c - Strip developer header block, issue #124)
+Example profile: prompts/entity_type/govcon.yaml
+Version: 8.0.0 (Phase 3b V8-0/V8-1 - externalized Part K examples, issue #124)
 
 Prompt Changelog (govcon_lightrag_json.txt):
 --------------------------------------------
+v8.0.0 - Replace static Part K example block with `{examples}` placeholder.
+         All 7 JSON examples now live in prompts/entity_type/govcon.yaml and are
+         loaded via LightRAG ENTITY_TYPE_PROMPT_FILE. Example drift repaired to
+         match the reduced canonical relationship vocabulary.
 v7.3.1 - Anonymize Examples 2, 3, 4 with generic [...] placeholders.
          Removes AFCAP-specific proper nouns so model learns extraction shape,
          not domain-brittle vocabulary. Each example has a Note: listing RFP
@@ -200,8 +206,8 @@ GOVCON_PROMPTS["entity_extraction_json_system_prompt"] = _load_extraction_prompt
 # JSON-MODE ENTITY EXTRACTION PROMPTS (Phase 1.2 — issue #124)
 # ═══════════════════════════════════════════════════════════════════════════════
 # Used when LightRAG runs with ``entity_extraction_use_json=True``. The system
-# prompt embeds the 8 govcon JSON examples inline (Part K of govcon_lightrag_json.txt),
-# so the examples list is intentionally empty to block upstream's generic defaults.
+# prompt now contains a `{examples}` placeholder, and the active example set is
+# resolved from prompts/entity_type/govcon.yaml via ENTITY_TYPE_PROMPT_FILE.
 GOVCON_PROMPTS["entity_extraction_json_user_prompt"] = """---Task---
 Extract entities and relationships from the `---Input Text---` session below.
 
@@ -244,15 +250,12 @@ Based on the last extraction task, identify and extract any **missed or incorrec
 """
 
 
-# Examples are embedded inline in entity_extraction_json_system_prompt (Part K, 8
-# govcon-specific JSON examples). Upstream LightRAG (prompt.py:validate_entity_
-# extraction_prompt_profile_for_mode) requires this list to be non-empty when
-# entity_extraction_use_json=True, so we provide a single one-line back-reference
-# to Part K. The string flows into the user prompt's `{examples}` placeholder.
+# Fallback only. With ENTITY_TYPE_PROMPT_FILE configured, LightRAG resolves the
+# active JSON examples from prompts/entity_type/govcon.yaml. We keep a non-empty
+# built-in list here so JSON extraction still validates if that profile is unset.
 GOVCON_PROMPTS["entity_extraction_json_examples"] = [
-    "(See Part K of the system prompt for 7 govcon-specific JSON examples covering "
-    "L\u2194M mapping, requirements with criticality, workload metrics, equipment tables, "
-    "GFP/CDRL, and an anti-pattern WRONG/CORRECT contrast plus a high-density extraction example.)"
+  "(Configure ENTITY_TYPE_PROMPT_FILE=govcon.yaml to load the 7 govcon JSON "
+  "examples from prompts/entity_type/govcon.yaml.)"
 ]
 
 

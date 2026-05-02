@@ -438,8 +438,9 @@ async def initialize_raganything():
     lightrag_kwargs = {
         "addon_params": {
             "entity_types_guidance": entity_types_guidance,
-            # NOTE: entity_extraction_json_system_prompt and examples are now handled via 
-            # PROMPTS.update(GOVCON_PROMPTS) after RAG-Anything initialization
+            # Prompt text still comes from GOVCON_PROMPTS; JSON examples are loaded
+            # from prompts/entity_type/govcon.yaml via LightRAG's prompt profile.
+            "entity_type_prompt_file": "govcon.yaml",
             "language": "English",
         },
         # Phase 1.2 (issue #124): native JSON structured-output extraction.
