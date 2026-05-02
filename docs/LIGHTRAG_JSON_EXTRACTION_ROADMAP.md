@@ -2,7 +2,7 @@
 
 Issue: BdM-15/proj-theseus #124
 Epic branch: `149-lightrag-json-extraction-epic`
-Current feature branch: `161-phase2.5-tuple-vestige-purge`
+Current feature branch: `163-phase3-first-principles-prompt-audit`
 
 This roadmap tracks the migration from tuple-based LightRAG extraction to native JSON extraction with xAI/OpenAI-compatible strict `json_schema` enforcement.
 
@@ -14,17 +14,35 @@ Phase 1.3 validated that strict JSON produces a cleaner, lower-noise build and b
 
 ## Phase Status
 
-| Phase | Scope                              | Status  | Notes                                                                                                                                                             |
-| ----- | ---------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0     | Dependency upgrade baseline        | Done    | LightRAG/RAG-Anything baseline established on the epic branch.                                                                                                    |
-| 1     | Native JSON extraction path        | Done    | JSON prompt shape matches LightRAG parser keys: `name`, `type`, `description`, `source`, `target`, `keywords`.                                                    |
-| 1.1   | Entity catalog YAML parity         | Done    | Entity types are YAML-backed and rendered into extraction prompts.                                                                                                |
-| 1.2   | JSON prompt conversion             | Done    | Tuple sanitizer is gated off in JSON mode; prompt emits LightRAG-native JSON arrays.                                                                              |
-| 1.3   | Strict JSON schema enforcement     | Done    | Strict `GovConExtractionResult` schema is applied only to LightRAG text extraction; RAG-Anything table/equation analysis uses its own non-strict modal path.      |
-| 2     | Multi-workspace baseline lock      | Done    | non-UCF (afcap5_adab_iss) + UCF (mcpp_drfp) both validated; JSON ≥ tuple on blind judge across both workspace types. afcap6_drfp deferred (no true solicitation). |
-| 2.5   | Tuple vestige purge                | Done    | Deleted output_sanitizer.py, govcon_lightrag_native.txt, tuple prompt keys, ENTITY_EXTRACTION_USE_JSON flag.                                                      |
-| 3     | Token reduction / prompt whittling | Planned | Use the stricter schema and validation structure to reduce prompt/token load safely.                                                                              |
-| 4     | Lock-in                            | Planned | Multi-workspace validation, tag `v1.4.0`, and fast-forward epic branch to `main`.                                                                                 |
+| Phase | Scope                              | Status      | Notes                                                                                                                                                             |
+| ----- | ---------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Dependency upgrade baseline        | Done        | LightRAG/RAG-Anything baseline established on the epic branch.                                                                                                    |
+| 1     | Native JSON extraction path        | Done        | JSON prompt shape matches LightRAG parser keys: `name`, `type`, `description`, `source`, `target`, `keywords`.                                                    |
+| 1.1   | Entity catalog YAML parity         | Done        | Entity types are YAML-backed and rendered into extraction prompts.                                                                                                |
+| 1.2   | JSON prompt conversion             | Done        | Tuple sanitizer is gated off in JSON mode; prompt emits LightRAG-native JSON arrays.                                                                              |
+| 1.3   | Strict JSON schema enforcement     | Done        | Strict `GovConExtractionResult` schema is applied only to LightRAG text extraction; RAG-Anything table/equation analysis uses its own non-strict modal path.      |
+| 2     | Multi-workspace baseline lock      | Done        | non-UCF (afcap5_adab_iss) + UCF (mcpp_drfp) both validated; JSON ≥ tuple on blind judge across both workspace types. afcap6_drfp deferred (no true solicitation). |
+| 2.5   | Tuple vestige purge                | Done        | Deleted output_sanitizer.py, govcon_lightrag_native.txt, tuple prompt keys, ENTITY_EXTRACTION_USE_JSON flag.                                                      |
+| 3     | Token reduction / prompt whittling | In Progress | Phase 3 now includes first-principles ontology hardening before prompt collapse. Type-set restructuring landed on branch 163 (commit `8a96098`).                  |
+| 4     | Lock-in                            | Planned     | Multi-workspace validation, tag `v1.4.0`, and fast-forward epic branch to `main`.                                                                                 |
+
+## Phase 3 First-Principles Track (Issue #124)
+
+Status snapshot:
+
+- Completed:
+  - requirement/workload_metric/labor_category hardening (metadata and distinction upgrades)
+  - Type-set restructuring: remove `person` and `transition_activity`; add `contract_vehicle` and `period_of_performance`
+  - Evaluation hierarchy normalization: `subfactor` merged into `evaluation_factor` hierarchy semantics
+  - Boundary clarifications:
+    - `work_scope_item` vs `document_section`
+    - `compliance_artifact` vs `deliverable`
+    - `regulatory_reference` vs `technical_specification`
+  - `location.pop_designation_if_stated` metadata flag
+- In progress:
+  - Uniform enrichment pass for remaining entity types (content signals, distinction, behavioral notes, anti-patterns)
+- Planned after enrichment:
+  - Prompt first-principles structure pass (collapse Part C redundancy now represented in YAML)
 
 ## Phase 1.3 Validation Snapshot
 

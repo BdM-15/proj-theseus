@@ -21,7 +21,7 @@
 
 version: "1.0"
 
-intro: "You MUST classify every entity into exactly ONE of these 33 types:"
+intro: "You MUST classify every entity into exactly ONE of these 32 types:"
 
 # -----------------------------------------------------------------------------
 # CATEGORIES (ordered — drives Part D presentation)
@@ -58,18 +58,26 @@ categories:
       - number: 2
         name: contract_line_item
         title: "CLINs, SLINs, and priced line items"
+        required_metadata: [line_item_id, line_item_level_if_stated, contract_type_if_stated, pop_if_stated, pricing_basis_if_stated]
         content_signals:
           - "CLIN"
           - "SLIN"
           - "ACRN"
           - "line item numbers (0001, 0002AA)"
+          - "base year/option year line items"
+          - "unit price/total price/estimated quantity"
         must_extract:
           - "CLIN number"
           - "contract type (FFP/CPFF/T&M)"
           - "description"
           - "PoP"
-        distinction: "CONTRACT_LINE_ITEM = priced contract lines; DELIVERABLE = work products"
-        example: '"CLIN 0001 Base Year Operations FFP", "SLIN 0002AA Option Year 1"'
+        notes:
+          - "Extract only priced or pricing-structured line entries (CLIN/SLIN/ACRN context), not narrative task prose."
+          - "line_item_level_if_stated should capture CLIN vs SLIN when explicitly present."
+          - "If text is a cost component (rate/fee/escalation/overhead) without a line-item identifier, classify as PRICING_ELEMENT."
+        distinction: "CONTRACT_LINE_ITEM = priced contract line structure (CLIN/SLIN); DELIVERABLE = submitted work product; PRICING_ELEMENT = rate/fee logic component"
+        example: '"CLIN 0001 Base Year Operations, FFP, PoP 01 Oct 2026 - 30 Sep 2027" / "SLIN 0002AA Option Year 1 surge support"'
+        anti_pattern: '"Overhead rate 18%" — this is PRICING_ELEMENT (rate logic), not a CONTRACT_LINE_ITEM.'
 
       - number: 3
         name: pricing_element
@@ -82,12 +90,20 @@ categories:
           - "escalation"
           - "plug rate"
           - "wrap rate"
-        distinction: "PRICING_ELEMENT = pricing logic component; CONTRACT_LINE_ITEM = priced line"
-        example: '"Award Fee Pool 7%", "Escalation 2.5% annually", "Overhead rate 18%"'
+          - "overhead/G&A/fringe"
+          - "cost-plus-award-fee"
+        notes:
+          - "Use for pricing mechanics and rate components, not CLIN/SLIN line structures."
+          - "pricing_type should be explicit when inferable (rate, fee, escalation, burden)."
+          - "basis_of_application should capture what the rate applies to (direct labor, ODCs, total cost, etc.)."
+        distinction: "PRICING_ELEMENT = pricing logic/rate component; CONTRACT_LINE_ITEM = priced line structure; WORKLOAD_METRIC = quantity/frequency driver"
+        example: '"Overhead rate 18% applied to direct labor" / "Escalation 2.5% annually on labor rates" / "Award fee pool 7%"'
+        anti_pattern: '"CLIN 0001 Base Year Operations" — this is CONTRACT_LINE_ITEM, not a PRICING_ELEMENT.'
 
       - number: 4
         name: government_furnished_item
         title: "Government-provided equipment, facilities, material, systems, or services"
+        required_metadata: [gfi_type_if_stated, ownership_source, availability_timing_if_stated, constraints_if_stated]
         content_signals:
           - "GFE"
           - "GFP"
@@ -95,12 +111,20 @@ categories:
           - "GOTS"
           - "Government Furnished"
           - "Government-provided"
-        distinction: "GOVERNMENT_FURNISHED_ITEM = customer-provided asset; EQUIPMENT = generic physical asset"
-        example: '"Government Furnished Vehicle Fleet", "GFE Test Facility", "GOTS Cyber Tool Suite"'
+          - "provided by the Government"
+          - "will be made available"
+        notes:
+          - "Use when ownership/provisioning is explicitly government-side (provided/furnished by customer)."
+          - "Capture availability timing/constraints when stated (at award, NLT day 30, at designated site)."
+          - "If an asset is listed without government-provision context, classify as EQUIPMENT or TECHNOLOGY instead."
+        distinction: "GOVERNMENT_FURNISHED_ITEM = customer-provided asset/resource; EQUIPMENT = generic physical asset; TECHNOLOGY = software/system platform"
+        example: '"GFE test facility provided at contract start" / "GOTS cyber tool suite furnished by Government"'
+        anti_pattern: '"Forklift Model XYZ" without government-furnished context — classify as EQUIPMENT, not GOVERNMENT_FURNISHED_ITEM.'
 
       - number: 5
         name: deliverable
         title: "CDRLs and contract deliverables"
+        required_metadata: [deliverable_id_if_stated, submission_cadence_if_stated, due_event_if_stated, recipient_if_stated]
         patterns:
           - "CDRL A###"
           - "DD Form 1423 references"
@@ -109,7 +133,16 @@ categories:
           - "Data Item"
           - "shall submit"
           - "shall deliver"
-        example: "CDRL A001 Monthly Status Report"
+          - "due NLT"
+          - "monthly/weekly/quarterly report"
+          - "DD1423/DI number"
+        notes:
+          - "Use when text describes a submission artifact, package, or report cadence (submit/deliver/provide by date)."
+          - "Capture cadence and due trigger verbatim when stated (monthly, within 10 days of award, NLT 15th of month)."
+          - "If text describes maintaining a certification/authorization state, classify as COMPLIANCE_ARTIFACT instead."
+        distinction: "DELIVERABLE = submitted artifact/cadence; COMPLIANCE_ARTIFACT = maintained compliance state; REQUIREMENT = obligation sentence that may mandate a deliverable"
+        example: '"CDRL A001 Monthly Status Report due NLT 15th of each month to COR. Cadence: monthly. Recipient: COR."'
+        anti_pattern: '"Maintain ISO 9001 certification" — this is COMPLIANCE_ARTIFACT (maintained state), not a DELIVERABLE cadence item.'
 
       - number: 6
         name: workload_metric
@@ -176,8 +209,16 @@ categories:
           - "numerical standards"
           - "QASP"
           - "SLA"
-        distinction: "PERFORMANCE_STANDARD = measurable threshold/standard; REQUIREMENT = action to perform"
-        example: '"99.9% system uptime", "No more than 2 defects per month", "QASP Standard 3"'
+          - "response time"
+          - "error rate"
+          - "acceptance criteria"
+        notes:
+          - "Use when text defines pass/fail or thresholded performance outcome (<=, >=, %, max/min, AQL)."
+          - "measurement_method should capture surveillance/inspection method when stated (QASP, sampling, monthly review)."
+          - "When a sentence includes both action and threshold, emit REQUIREMENT + PERFORMANCE_STANDARD and link with MEASURED_BY."
+        distinction: "PERFORMANCE_STANDARD = measurable threshold/acceptance criterion; REQUIREMENT = action obligation; WORKLOAD_METRIC = raw quantity without pass/fail criterion"
+        example: '"System uptime >= 99.9% measured monthly via QASP" / "No more than 2 critical defects per month"'
+        anti_pattern: '"Contractor shall maintain aircraft" — obligation only; this is REQUIREMENT unless a threshold is specified.'
 
       - number: 9
         name: contract_vehicle
@@ -190,8 +231,15 @@ categories:
           - "MAC"
           - "ordering period"
           - "task order under"
-        distinction: "CONTRACT_VEHICLE = ordering framework; PROGRAM = mission initiative; CONTRACT_LINE_ITEM = priced task/order line"
-        example: '"AFCAP V IDIQ", "GSA OASIS+ GWAC", "SeaPort-NxG MAC"'
+          - "vehicle ceiling"
+          - "multiple-award"
+        notes:
+          - "Use for the overarching ordering framework, not for individual CLIN/SLIN lines or specific task deliverables."
+          - "vehicle_type should be explicit when inferable (IDIQ/BPA/GWAC/MAC)."
+          - "Capture NAICS/set-aside and ceiling when explicitly stated; do not infer from unrelated sections."
+        distinction: "CONTRACT_VEHICLE = ordering framework; PROGRAM = mission initiative; CONTRACT_LINE_ITEM = priced line/task order component"
+        example: '"AFCAP V IDIQ (vehicle_type=IDIQ, ceiling_value_if_stated=$X)" / "GSA OASIS+ GWAC"'
+        anti_pattern: '"CLIN 0001 Base Operations" — this is CONTRACT_LINE_ITEM, not CONTRACT_VEHICLE.'
 
   # ---------------------------------------------------------------------------
   - title: "DOCUMENT STRUCTURE, AUTHORITIES, AND WORK PATTERNS"
@@ -200,6 +248,7 @@ categories:
       - number: 10
         name: document_section
         title: "Numbered, titled, or hierarchical structural units in any solicitation/document"
+        required_metadata: [section_identifier_if_stated, section_title_if_stated, parent_section_if_stated]
         content_signals:
           - "section labels"
           - "article/paragraph headers"
@@ -207,12 +256,16 @@ categories:
           - "numbered headings"
         notes:
           - "Extract BOTH structural identifier AND semantic title when available"
-        distinction: "DOCUMENT_SECTION = structural container; DOCUMENT = attachment/exhibit/standalone doc"
+          - "Use for heading/container structure even when no obligations are present."
+          - "Promote to WORK_SCOPE_ITEM only when heading explicitly names an executable task/objective/work package."
+        distinction: "DOCUMENT_SECTION = structural heading/container; DOCUMENT = standalone attachment/exhibit/manual; WORK_SCOPE_ITEM = semantic task/work package"
         example: '"Section C Statement of Work", "Appendix H.2 Appliance Listing", "Paragraph 3.2.1 Maintenance"'
+        anti_pattern: '"Task 3.2 Network Operations Support" with explicit work package semantics — classify as WORK_SCOPE_ITEM, not generic DOCUMENT_SECTION.'
 
       - number: 11
         name: document
         title: "RFP attachments, exhibits, annexes, plans, manuals, referenced standalone documents"
+        required_metadata: [document_id_if_stated, document_role_if_stated, parent_container_if_stated]
         patterns:
           - "Attachment #"
           - "J-######"
@@ -226,12 +279,20 @@ categories:
           - "Appendix"
           - "manual"
           - "plan"
-        distinction: "DOCUMENT = attached/referenced document object; DOCUMENT_SECTION = structural unit inside a doc"
-        example: '"Attachment J-3 Quality Assurance Plan", "Exhibit A Pricing Schedule"'
+          - "enclosure"
+          - "reference document"
+        notes:
+          - "Use for standalone document objects (Attachment/Exhibit/Annex/Appendix/manual/plan), not headings inside them."
+          - "If text is a numbered heading/paragraph within a document, classify as DOCUMENT_SECTION."
+          - "If text is an external authority citation (FAR/DAFI/NIST/MIL-STD), classify as CLAUSE or REGULATORY_REFERENCE, not DOCUMENT."
+        distinction: "DOCUMENT = standalone attachment/exhibit/manual object; DOCUMENT_SECTION = structural unit inside a document; REGULATORY_REFERENCE/CLAUSE = cited authority"
+        example: '"Attachment J-3 Quality Assurance Plan (document_role: compliance plan)", "Exhibit A Pricing Schedule"'
+        anti_pattern: '"Section C.3.2 Maintenance" — this is DOCUMENT_SECTION, not DOCUMENT.'
 
       - number: 12
         name: amendment
         title: "Solicitation changes, modifications, Q&A amendments, updated revisions"
+        required_metadata: [amendment_id_if_stated, effective_date_if_stated, changed_artifacts_if_stated]
         content_signals:
           - "amendment"
           - "modification"
@@ -239,8 +300,15 @@ categories:
           - "supersedes"
           - "replaces"
           - "deleted in amendment"
-        distinction: "AMENDMENT = change vehicle; DOCUMENT = base document or attachment"
-        example: '"Amendment 0003", "Solicitation Revision 2", "Mod 1 Updated PWS"'
+          - "questions and answers"
+          - "conformed copy"
+        notes:
+          - "Use for change vehicles that modify previously issued solicitation content."
+          - "Capture what changed when stated (sections, attachments, due dates, clause updates)."
+          - "If text is the changed document itself (e.g., revised attachment), classify that object as DOCUMENT and link via AMENDS/SUPERSEDED_BY."
+        distinction: "AMENDMENT = formal change vehicle; DOCUMENT = base or revised artifact being changed"
+        example: '"Amendment 0003 revises Section L page limits and Attachment J-2 due date"'
+        anti_pattern: '"Attachment J-3 Quality Assurance Plan" alone — this is DOCUMENT unless it is explicitly identified as an amendment/modification vehicle.'
 
       - number: 13
         name: clause
@@ -254,11 +322,16 @@ categories:
             Agency Supplements: FAR, DFARS, AFFARS, NMCARS, HSAR, DOSAR, GSAM, VAAR,
                DEAR, NFS, AIDAR, CAR, DIAR, DOLAR, EDAR, EPAAR, FEHBAR, HHSAR, HUDAR,
                IAAR, JAR, LIFAR, NRCAR, SOFARS, TAR (26+ recognized)
+          - "Use for acquisition clauses/provisions by formal clause numbering schemes (FAR/DFARS/agency supplements)."
+          - "If citation is a non-acquisition directive/standard (NIST SP, DAFI, AR, MIL-STD), use REGULATORY_REFERENCE."
+        distinction: "CLAUSE = FAR/DFARS/agency acquisition clause/provision; REGULATORY_REFERENCE = external directive/standard authority"
         example: "FAR 52.212-4, DFARS 252.204-7012"
+        anti_pattern: '"NIST SP 800-171" — this is REGULATORY_REFERENCE, not a CLAUSE.'
 
       - number: 14
         name: regulatory_reference
         title: "Incorporated regulations, standards, and directives"
+        required_metadata: [reference_id, authority_family_if_stated, applicability_scope_if_stated]
         content_signals:
           - "IAW"
           - "in accordance with"
@@ -278,10 +351,12 @@ categories:
              requirement; DOCUMENT = RFP attachments/exhibits; CLAUSE = FAR/DFARS entries;
              TECHNICAL_SPECIFICATION = engineering design authority
         example: '"DAFI 21-101", "NIST SP 800-171", "AR 735-5", "MIL-STD-882E"'
+        anti_pattern: '"FAR 52.204-21" — this is a CLAUSE, not a REGULATORY_REFERENCE.'
 
       - number: 15
         name: technical_specification
         title: "ICDs, TDPs, drawings, MIL-DTL/MIL-PRF specs, engineering standards"
+        required_metadata: [spec_identifier, spec_family_if_stated, governed_interface_or_component_if_stated]
         content_signals:
           - "ICD"
           - "interface spec"
@@ -295,6 +370,7 @@ categories:
           - "If the citation is a compliance directive/policy obligation, classify as REGULATORY_REFERENCE instead."
         distinction: "TECHNICAL_SPECIFICATION = engineering design authority; REGULATORY_REFERENCE = policy/compliance authority"
         example: '"MIL-DTL-38999", "Interface Control Document ICD-001", "Drawing 12345 Rev C"'
+        anti_pattern: '"DAFI 21-101" — policy directive; classify as REGULATORY_REFERENCE, not TECHNICAL_SPECIFICATION.'
 
       - number: 16
         name: work_scope_item
@@ -309,6 +385,7 @@ categories:
           - "Do NOT classify obligation sentences (shall/must/will) as WORK_SCOPE_ITEM; those are REQUIREMENT entities."
         distinction: "WORK_SCOPE_ITEM = named semantic work package; DOCUMENT_SECTION = structural heading/container; REQUIREMENT = obligation sentence"
         example: '"Task 3.2 Network Operations Support", "Objective 4 Airfield Readiness", "Work Package 2 Depot Maintenance"'
+        anti_pattern: '"Contractor shall monitor the network 24/7" — obligation sentence; classify as REQUIREMENT, not WORK_SCOPE_ITEM.'
 
   # ---------------------------------------------------------------------------
   - title: "PROPOSAL AND EVALUATION STRUCTURE"
@@ -331,12 +408,17 @@ categories:
           - "Weight (40%, 25pts)"
           - "Importance (Most Important)"
           - "Hierarchy level (factor/subfactor/element)"
+        notes:
+          - "hierarchy_level is REQUIRED when inferable: factor, subfactor, or element."
+          - "Use CHILD_OF between evaluation_factor nodes to encode hierarchy (subfactor -> factor, element -> subfactor)."
+          - "Do not classify rating adjectives alone (Outstanding/Good/Acceptable) as evaluation_factor nodes."
         distinction: "EVALUATION_FACTOR = scoring criterion node; hierarchy is represented by hierarchy_level + parent_factor_if_stated metadata and CHILD_OF relationships"
         shipley_note: |-
           Factors form the backbone of the Compliance Matrix — each factor maps to
              Section L instructions, Section M criteria, and proposal page budgets. When factor
              weights don't match page allocations, flag the mismatch as a compliance risk.
-        example: "Factor 1 Technical Approach (40%) - Most Important"
+        example: '"Factor 1 Technical Approach (40%) - Most Important" / "Subfactor 1.2 Staffing Approach (hierarchy_level=subfactor, parent_factor_if_stated=Factor 1)"'
+        anti_pattern: '"Outstanding/Good/Acceptable" alone — rating scale values are not evaluation_factor entities unless tied to a named criterion node.'
 
       - number: 18
         name: period_of_performance
@@ -349,8 +431,15 @@ categories:
           - "ordering period"
           - "effective date"
           - "exercise of option"
-        distinction: "PERIOD_OF_PERFORMANCE = contract time structure; EVENT = one-time milestone/deadline; CONTRACT_LINE_ITEM = priced line associated with a PoP"
+          - "base plus option years"
+          - "ordering window"
+        notes:
+          - "Use for contractual time structure (base/options/ordering window), not one-off milestones."
+          - "Capture date ranges verbatim when stated; do not normalize or infer missing bounds."
+          - "If text is a discrete event/deadline (kickoff by date, proposal due date), classify as EVENT."
+        distinction: "PERIOD_OF_PERFORMANCE = contract time structure; EVENT = one-time milestone/deadline; CONTRACT_LINE_ITEM = priced line that may reference PoP"
         example: '"Base Period: 01 Oct 2026 - 30 Sep 2027; Option Year 1: 01 Oct 2027 - 30 Sep 2028; total ordering period 5 years"'
+        anti_pattern: '"Kickoff meeting on 15 Oct 2026" — this is EVENT, not PERIOD_OF_PERFORMANCE.'
 
       - number: 19
         name: proposal_instruction
@@ -371,11 +460,17 @@ categories:
           - "formatting (font/margins)"
           - "volume organization"
           - "submission mechanics"
+        notes:
+          - "Use for directive rules about how to prepare/format/submit the proposal response."
+          - "Capture volume mapping and page/format constraints verbatim when stated."
+          - "If text names only the container (Volume I/II/III) without constraints, classify as PROPOSAL_VOLUME."
+        distinction: "PROPOSAL_INSTRUCTION = response rule/constraint; PROPOSAL_VOLUME = named response container; EVALUATION_FACTOR = scoring criterion"
         shipley_note: |-
           Instructions form the L-side of the Compliance Matrix. Each instruction
              maps to evaluation criteria (M-side). Extract response directives ("describe",
              "demonstrate", "provide evidence") — these tell evaluators what to score.
         example: "Technical Volume limited to 25 pages, 12pt Times New Roman"
+        anti_pattern: '"Volume I Technical" alone — container name only; classify as PROPOSAL_VOLUME unless rule/constraint text is present.'
 
       - number: 20
         name: proposal_volume
@@ -386,12 +481,19 @@ categories:
           - "Volume II"
           - "Oral Presentation Volume"
           - "Annex B Response Volume"
-        distinction: "PROPOSAL_VOLUME = container; PROPOSAL_INSTRUCTION = rule/constraint applying to it"
-        example: '"Volume I Technical", "Volume III Past Performance"'
+          - "Volume structure"
+          - "separate volume"
+        notes:
+          - "Use for named response containers; do not include formatting/page constraints unless they are part of a proposal_instruction node."
+          - "associated_factors should capture mapped evaluation criteria when explicitly specified by the solicitation."
+        distinction: "PROPOSAL_VOLUME = response container; PROPOSAL_INSTRUCTION = rules/constraints applied to that container"
+        example: '"Volume I Technical", "Volume III Past Performance", "Oral Presentation Volume"'
+        anti_pattern: '"Volume I shall not exceed 25 pages" — this is PROPOSAL_INSTRUCTION text, not just PROPOSAL_VOLUME.'
 
       - number: 21
         name: past_performance_reference
         title: "Reference contracts, PPQs, CPARS records, relevance examples"
+        required_metadata: [reference_id_if_stated, recency_if_stated, relevancy_basis_if_stated, outcome_signal_if_stated]
         content_signals:
           - "past performance"
           - "PPQ"
@@ -402,13 +504,20 @@ categories:
           - "similar in scope"
           - "relevancy"
           - "recency"
+          - "contract number"
+          - "exceptional/very good/satisfactory"
+        notes:
+          - "Extract the evidence object itself (reference contract/PPQ/CPARS record), not the evaluation criterion language about how it will be judged."
+          - "Capture recency and relevancy basis verbatim when present (size/scope/complexity/dollar value/PoP overlap)."
+          - "If text is purely Section M scoring language, classify as EVALUATION_FACTOR instead."
         distinction: "PAST_PERFORMANCE_REFERENCE = evidence/reference object; EVALUATION_FACTOR = scoring criterion"
         shipley_note: |-
           Past performance references are proof points in the FAB chain (Feature →
              Advantage → Benefit). They prove discriminators are real, not theoretical. Extract
              relevancy criteria (size, scope, complexity, dollar value) — these define what
              "similar" means to this evaluator.
-        example: '"Contract W912-1234 Afghanistan BOS", "CPARS Exceptional Rating 2024"'
+        example: '"Contract W912-1234 Afghanistan BOS (recency_if_stated: performed within last 3 years)", "CPARS Exceptional Rating 2024"'
+        anti_pattern: '"Past Performance is more important than Price" — this is EVALUATION_FACTOR/CUSTOMER_PRIORITY language, not a PAST_PERFORMANCE_REFERENCE object.'
 
   # ---------------------------------------------------------------------------
   - title: "STRATEGIC AND ANALYTICAL SIGNAL"
@@ -448,7 +557,13 @@ categories:
           - "evaluation criteria that favor niche capabilities"
           - "repeated emphasis on a theme across multiple sections"
           - "requirements that align with known incumbent weaknesses"
+        notes:
+          - "Extraction inference must be grounded to in-chunk textual evidence (ghost language/specificity/weighting cues)."
+          - "Cross-section synthesis, de-duplication, and confidence consolidation are performed in post-processing phases."
+          - "If importance is explicitly stated by the customer, use CUSTOMER_PRIORITY instead of STRATEGIC_THEME."
+        distinction: "STRATEGIC_THEME = proposer-inferred strategy signal; CUSTOMER_PRIORITY = explicitly stated customer importance; PAIN_POINT = problem statement"
         example: '"Integrated Logistics Approach (WIN_THEME)", "CMMI Level 3 Maturity (PROOF_POINT)"'
+        anti_pattern: '"Technical Approach is significantly more important than Cost" — explicit customer weighting; classify as CUSTOMER_PRIORITY.'
 
       - number: 23
         name: customer_priority
@@ -485,9 +600,15 @@ categories:
              night. They drive Executive Summary organization and should appear in every
              volume's theme statements. Repeated emphasis across multiple sections signals
              a true hot button vs. boilerplate.
+        notes:
+          - "Use only when the customer explicitly states importance via language, weighting, or ordered precedence."
+          - "priority_signal should be tagged as stated or weighted based on explicit evidence."
+          - "If priority is inferred (not explicitly stated), classify as STRATEGIC_THEME instead."
+        distinction: "CUSTOMER_PRIORITY = explicit stated/weighted importance; STRATEGIC_THEME = inferred strategy signal; EVALUATION_FACTOR = criterion node"
         example: |-
           "Cybersecurity Is Paramount", "Mission Readiness Is the Top Priority",
              "Technical Approach is significantly more important than Cost"
+        anti_pattern: '"Contractors without X may struggle" — inferred ghost-language; classify as STRATEGIC_THEME, not CUSTOMER_PRIORITY.'
 
       - number: 24
         name: pain_point
@@ -503,12 +624,17 @@ categories:
           - '"incumbent failed"'
           - '"historically problematic"'
           - '"area of concern"'
-        distinction: "PAIN_POINT = problem to solve; REQUIREMENT = action/solution expected"
+        notes:
+          - "Use for problem/deficiency language describing current-state gaps, failures, or risk exposure."
+          - "Capture source_evidence verbatim when possible (section language indicating deficiency/challenge)."
+          - "If text prescribes what the contractor shall do, classify that directive as REQUIREMENT."
+        distinction: "PAIN_POINT = problem statement/gap; REQUIREMENT = prescribed action/solution; CUSTOMER_PRIORITY = explicit importance statement"
         shipley_note: |-
           Pain points are Ghost opportunities — you can raise a competitor's likely
              weakness without naming them ("Contractors without X may struggle to..."). Each
              pain point should map to a discriminator that solves it via the FAB chain.
         example: '"Current Turnaround Delays Impact Mission", "Fragmented Asset Visibility Problem"'
+        anti_pattern: '"Contractor shall provide 24/7 support" — this is REQUIREMENT, not a PAIN_POINT.'
 
   # ---------------------------------------------------------------------------
   - title: "STANDARD ENTITIES"
@@ -522,12 +648,21 @@ categories:
           - "Company names"
           - "agency names"
           - "military designations"
+          - "prime contractor"
+          - "subcontractor"
+          - "contracting activity"
         patterns:
           - '"Inc."'
           - '"LLC"'
           - '"Corp."'
           - "acronyms (NAVAIR, GSA)"
-        example: "Naval Air Systems Command, Marine Corps Logistics Command"
+        notes:
+          - "Classify named entities that are organizations (agencies, military units, companies), not role titles."
+          - "Role titles without org identity (Contracting Officer, Program Manager) are not ORGANIZATION nodes by themselves."
+          - "When inferable, populate role metadata as customer/contractor/subcontractor/partner from context."
+        distinction: "ORGANIZATION = legal/government unit entity; LABOR_CATEGORY = role title/personnel classification; CONTRACT_VEHICLE = ordering framework"
+        example: '"Naval Air Systems Command (role=customer, org_type=agency)", "KBR LLC (role=contractor, org_type=company)"'
+        anti_pattern: '"Program Manager" — role title only; use LABOR_CATEGORY unless tied to a named organization node.'
 
       - number: 26
         name: program
@@ -537,8 +672,14 @@ categories:
           - "Program names"
           - "major acquisition titles"
           - "acronyms"
-        distinction: "PROGRAM = services/initiatives; EQUIPMENT = physical items"
+          - "initiative"
+          - "portfolio"
+        notes:
+          - "Use for mission initiatives and acquisition programs, not ordering vehicles or CLIN structures."
+          - "If text identifies IDIQ/BPA/GWAC/MAC framework, classify as CONTRACT_VEHICLE."
+        distinction: "PROGRAM = mission/acquisition initiative; CONTRACT_VEHICLE = ordering framework; EQUIPMENT = physical asset"
         example: "MCPP II, Navy MBOS, F-35 Lightning II Program"
+        anti_pattern: '"AFCAP V IDIQ" — this is CONTRACT_VEHICLE, not PROGRAM.'
 
       - number: 27
         name: equipment
@@ -552,8 +693,14 @@ categories:
           - "Physical descriptions"
           - "quantities"
           - "specifications"
-        distinction: "EQUIPMENT = physical item; TECHNOLOGY = software/system"
+          - "vehicle/platform identifiers"
+        notes:
+          - "Use for tangible physical assets (hardware, machinery, vehicles, materiel)."
+          - "If item is software/platform/service stack, classify as TECHNOLOGY."
+          - "If asset is explicitly government-furnished/provided, classify as GOVERNMENT_FURNISHED_ITEM."
+        distinction: "EQUIPMENT = physical item; TECHNOLOGY = software/system; GOVERNMENT_FURNISHED_ITEM = customer-provided asset"
         example: "Concorde RG-24 Battery, 6200 Tennant Floor Scrubber"
+        anti_pattern: '"ServiceNow ITSM Platform" — software platform; classify as TECHNOLOGY, not EQUIPMENT.'
 
       - number: 28
         name: technology
@@ -567,8 +714,13 @@ categories:
           - '"Windows Server 2022"'
           - '"Python 3.11"'
           - '"AWS GovCloud"'
-        distinction: "TECHNOLOGY = software/logical; EQUIPMENT = hardware/physical"
+        notes:
+          - "Use for software/systems/platforms/logical services, including named enterprise systems."
+          - "Capture version/vendor/purpose when explicitly stated; do not infer vendor if absent."
+          - "If text refers to a physical device/model/NSN, classify as EQUIPMENT."
+        distinction: "TECHNOLOGY = software/logical platform; EQUIPMENT = physical hardware asset"
         example: "AWS GovCloud, ServiceNow, GCSS-MC"
+        anti_pattern: '"M1A1 Tank" — physical platform; classify as EQUIPMENT, not TECHNOLOGY.'
 
       - number: 29
         name: location
@@ -586,7 +738,10 @@ categories:
           - '"CONUS/OCONUS"'
         notes:
           - "Use pop_designation_if_stated when the location is explicitly tagged as primary/secondary place of performance."
+          - "Classify as LOCATION when a geographic/facility place is identified, even if tied to a workload statement."
+        distinction: "LOCATION = place/facility/base entity; PERIOD_OF_PERFORMANCE = time structure; WORKLOAD_METRIC = quantity/frequency data that may reference a location"
         example: "Naval Air Station Pensacola, Building 2959"
+        anti_pattern: '"12,500 sorties/year" — quantity metric only; classify as WORKLOAD_METRIC unless a place is explicitly present.'
 
       - number: 30
         name: event
@@ -596,12 +751,21 @@ categories:
           - "Dates"
           - "deadlines"
           - "scheduled activities"
-        distinction: "EVENT = scheduled/time-bound; CONCEPT = process/methodology"
-        example: "Kickoff Meeting, Contract Award Date"
+          - "kickoff"
+          - "submission due"
+          - "recurring review"
+        notes:
+          - "Use for discrete scheduled occurrences (kickoff, due dates, inspections, recurring meetings)."
+          - "event_type should be milestone, deadline, or recurring when inferable from language."
+          - "If text describes the contract-wide time structure (base/option years), classify as PERIOD_OF_PERFORMANCE."
+        distinction: "EVENT = discrete scheduled occurrence; PERIOD_OF_PERFORMANCE = contract time structure; CONCEPT = methodology/process"
+        example: "Kickoff Meeting, Contract Award Date, Monthly QASP Review"
+        anti_pattern: '"Base Year 01 Oct 2026 - 30 Sep 2027" — contract time structure; classify as PERIOD_OF_PERFORMANCE, not EVENT.'
 
       - number: 31
         name: compliance_artifact
         title: "Certifications, accreditations, authorizations, and maintained compliance objects"
+        required_metadata: [artifact_type_if_stated, issuing_authority_if_stated, status_or_validity_if_stated]
         content_signals:
           - "certification"
           - "accreditation"
@@ -620,6 +784,7 @@ categories:
       - number: 32
         name: concept
         title: "Named methodologies, frameworks, and abstract domain processes"
+        required_metadata: [concept_family_if_stated]
         extraction_rule: |-
           CONCEPT is NOT a catch-all. It captures NAMED methodologies
              and abstract processes that don't fit the 31 types above. Before using CONCEPT,
@@ -650,7 +815,11 @@ categories:
           - '"process"'
           - '"model"'
           - '"strategy" (when describing HOW, not WHAT)'
+        notes:
+          - "Use only after excluding all concrete ontology types (requirement, performance_standard, technology, regulatory_reference, technical_specification, work_scope_item, etc.)."
+          - "Prefer a specific type whenever the text includes actionable obligations, thresholds, or concrete artifact identifiers."
         example: '"Earned Value Management", "Condition-Based Maintenance Plus (CBM+)"'
+        anti_pattern: '"Contractor shall implement Agile methodology" — obligation sentence; classify as REQUIREMENT (with Agile as supporting CONCEPT if separately useful).'
 
 # -----------------------------------------------------------------------------
 # DISAMBIGUATION RULES
@@ -667,13 +836,14 @@ disambiguation_rules:
     body: |-
         "Contractor shall maintain aircraft" → requirement (what to do)
         "98% aircraft availability measured monthly" → performance_standard (pass/fail)
-        Extract BOTH, link: performance_standard --MEASURES--> requirement
+        Extract BOTH, link: requirement --MEASURED_BY--> performance_standard
 
   - title: "WORK_SCOPE_ITEM vs REQUIREMENT"
     body: |-
          "Task 3.2 Network Operations Support" → work_scope_item (named work package)
          "Section C.3.2 Network Operations Support" (generic heading only) → document_section
          "Contractor shall monitor the network 24/7" → requirement (obligation)
+         "Phase-In Plan / Transition to Steady State" → work_scope_item (transition tasks have no separate type; they are work scope items)
          Promote DOCUMENT_SECTION to WORK_SCOPE_ITEM only when it names an executable task/objective/work package.
 
   - title: "PROPOSAL_VOLUME vs PROPOSAL_INSTRUCTION"
@@ -721,11 +891,15 @@ disambiguation_rules:
         "CDRL A001 Monthly Status Report" → deliverable (work product)
         CLINs are pricing structures; deliverables are work products
 
-  - title: "GOVERNMENT_FURNISHED_ITEM vs EQUIPMENT"
+  - title: "GOVERNMENT_FURNISHED_ITEM vs EQUIPMENT vs TECHNOLOGY"
     body: |-
          "Government Furnished Vehicles" → government_furnished_item
-         "Forklift Model XYZ" → equipment
-         GFI is about ownership/responsibility; equipment is generic physical asset
+         "GOTS cyber tool suite furnished by Government" → government_furnished_item (software CAN be GFI)
+         "Forklift Model XYZ" (contractor-side) → equipment
+         "Maximo CMMS" (contractor-operated software) → technology
+         GFI = Government owns and provides it. EQUIPMENT = physical asset without government-provision context.
+         TECHNOLOGY = software/platform without government-provision context.
+         When a system IS government-furnished, use government_furnished_item — NOT technology or equipment.
 
   - title: "LABOR_CATEGORY vs WORKLOAD_METRIC"
     body: |-
@@ -742,7 +916,7 @@ disambiguation_rules:
          key_personnel_designation metadata to "key". Otherwise omit it.
          Always pair a key-designated labor_category with:
            - a MANDATES edge FROM the governing clause / proposal_instruction TO the labor_category
-           - a SATISFIES edge FROM the labor_category TO the resume / staffing requirement
+           - a SATISFIED_BY edge FROM the staffing requirement TO the labor_category
          This makes "show me all key personnel positions" a one-hop graph query.
   - title: "STRATEGIC_THEME vs CUSTOMER_PRIORITY vs PAIN_POINT"
     body: |-
@@ -752,6 +926,81 @@ disambiguation_rules:
          "Integrated logistics approach reduces transition risk" → strategic_theme (INFERRED win theme)
          "Current readiness shortfalls delay sortie generation" → pain_point (problem statement)
          *** KEY RULE: If the CUSTOMER says it → customer_priority. If the PROPOSER infers it → strategic_theme. ***
+
+  - title: "CONTRACT_VEHICLE vs PROGRAM vs CONTRACT_LINE_ITEM"
+    body: |-
+         CONTRACT_VEHICLE = ordering framework (IDIQ/BPA/GWAC/MAC) that issues task orders / calls
+         PROGRAM         = named mission initiative (F-35 program, MCPP II, AFCAP V) — not an ordering vehicle
+         CONTRACT_LINE_ITEM = priced task/delivery line under a vehicle (CLIN 0001, SLIN 0002AA)
+         Rule: if text describes ceilings, ordering periods, pool of awardees → contract_vehicle.
+               If text describes a named government capability/initiative → program.
+               If text has line-item numbers and prices → contract_line_item.
+         Examples:
+           "AFCAP V IDIQ — $10B ceiling, 5-year ordering period" → contract_vehicle
+           "Marine Corps Prepositioning Program" → program
+           "CLIN 0001 Base Year Operations" → contract_line_item
+
+  - title: "PERIOD_OF_PERFORMANCE vs EVENT"
+    body: |-
+         PERIOD_OF_PERFORMANCE = contract time structure (base/options/ordering window — a range)
+         EVENT = single discrete milestone or deadline (one date, not a range)
+         Rule: base/option periods → period_of_performance. Kickoff, proposal due, option exercise date → event.
+         Examples:
+           "Base Period: 01 Oct 2026 – 30 Sep 2027; Option Year 1: 01 Oct 2027 – 30 Sep 2028" → period_of_performance
+           "Proposal due 15 May 2026" → event
+           "Kickoff meeting on 20 Oct 2026" → event
+           "Option exercise NLT 01 Sep 2027" → event (single decision point, not a time range)
+
+  - title: "PROPOSAL_INSTRUCTION vs EVALUATION_FACTOR"
+    body: |-
+         PROPOSAL_INSTRUCTION = L-side: how to prepare/format/submit the response (a directive/constraint)
+         EVALUATION_FACTOR    = M-side: how the Government will score the response (a scoring criterion)
+         Sharing a topic does NOT make them the same entity — one is a response rule, the other is a scoring rule.
+         Rule: "shall address", "describe your approach", "provide evidence", "not exceed N pages" → proposal_instruction.
+               "will be evaluated", "most important", "assigned rating" → evaluation_factor.
+         Link: proposal_instruction --GUIDES--> evaluation_factor (the L↔M golden thread).
+         Examples:
+           "Technical Volume shall not exceed 25 pages" → proposal_instruction
+           "Factor 1 Technical Approach (40%, Most Important)" → evaluation_factor
+           "Demonstrate experience with cleared personnel" → proposal_instruction
+           "Subfactor 1.2 Personnel Qualifications" → evaluation_factor
+
+  - title: "CONCEPT vs REQUIREMENT vs TECHNOLOGY vs PROGRAM"
+    body: |-
+         CONCEPT = named methodology, government process, abstract framework, or government obligation (no contractor action verb)
+         REQUIREMENT = contractor obligation with explicit action verb (shall/must/will + contractor as subject)
+         TECHNOLOGY = software system, IT tool, or digital platform
+         PROGRAM = named government mission initiative or acquisition program
+         "Earned Value Management (EVM)" → concept (named methodology)
+         "Government shall provide GFE within 30 days" → concept (government obligation — NOT a contractor requirement)
+         "Agile / Scrum methodology" → concept (named process)
+         "WAWF invoicing system" → technology (NOT concept — it is a software platform)
+         "MCPP II" → program (NOT concept — it is a named mission initiative)
+         "Contractor shall implement EVM" → requirement (contractor action)
+         Rule: CONCEPT is the residual type for semantically meaningful entities that are not a
+               contractor action, a physical asset, a software platform, or a named program/vehicle.
+
+  - title: "EQUIPMENT vs TECHNOLOGY"
+    body: |-
+         EQUIPMENT = physical, tangible asset (machinery, vehicles, tools, hardware devices)
+         TECHNOLOGY = software, IT system, digital platform, or automated process
+         "M1A1 Abrams Tank" → equipment
+         "RFID scanner (physical device)" → equipment
+         "WAWF invoicing system" → technology (software platform)
+         "Maximo CMMS" → technology (software system)
+         "Server rack hardware" → equipment; "VMware vSphere running on it" → technology
+         Rule: if it is physical and does not run code → equipment. If it runs code → technology.
+
+  - title: "ORGANIZATION vs PROGRAM"
+    body: |-
+         ORGANIZATION = a company, office, unit, or agency entity (has people, structure, reporting chain)
+         PROGRAM = a named government mission initiative, capability, or acquisition program
+         "AFCAP Program Office (PO)" → organization (an office staffed by people)
+         "AFCAP V" → program (the acquisition program / IDIQ vehicle)
+         "355th Wing, Davis-Monthan AFB" → organization
+         "Marine Corps Prepositioning Program (MCPP)" → program
+         "Program Management Office (PMO)" → organization (the management entity, not the work it manages)
+         Rule: ORGANIZATION has people in it and a reporting chain. PROGRAM is what they are working on.
 
 # -----------------------------------------------------------------------------
 # FORBIDDEN TYPES (NEVER USE)
