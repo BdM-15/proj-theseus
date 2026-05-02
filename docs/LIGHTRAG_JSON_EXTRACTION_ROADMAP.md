@@ -2,7 +2,7 @@
 
 Issue: BdM-15/proj-theseus #124
 Epic branch: `149-lightrag-json-extraction-epic`
-Current feature branch: `155-phase1.3-strict-jsonschema`
+Current feature branch: `157-phase2-afcap5-adab-iss-baseline`
 
 This roadmap tracks the migration from tuple-based LightRAG extraction to native JSON extraction with xAI/OpenAI-compatible strict `json_schema` enforcement.
 
@@ -21,8 +21,8 @@ Phase 1.3 validated that strict JSON produces a cleaner, lower-noise build and b
 | 1.1 | Entity catalog YAML parity | Done | Entity types are YAML-backed and rendered into extraction prompts. |
 | 1.2 | JSON prompt conversion | Done | Tuple sanitizer is gated off in JSON mode; prompt emits LightRAG-native JSON arrays. |
 | 1.3 | Strict JSON schema enforcement | Done | Strict `GovConExtractionResult` schema is applied only to LightRAG text extraction; RAG-Anything table/equation analysis uses its own non-strict modal path. |
-| 2 | Quality recovery and baseline lock | Next | Recover targeted recall without reintroducing noisy tuple behavior. |
-| 2.5 | Tuple vestige purge | Planned | Remove tuple-mode compatibility only after Phase 2 quality floor is locked. |
+| 2 | Multi-workspace baseline lock | Done | non-UCF (afcap5_adab_iss) + UCF (mcpp_drfp) both validated; JSON ≥ tuple on blind judge across both workspace types. afcap6_drfp deferred (no true solicitation). |
+| 2.5 | Tuple vestige purge | Next | Remove tuple-mode compatibility (sanitizer, tuple prompts, ENTITY_EXTRACTION_USE_JSON flag, all delimiter remnants). |
 | 3 | Token reduction / prompt whittling | Planned | Use the stricter schema and validation structure to reduce prompt/token load safely. |
 | 4 | Lock-in | Planned | Multi-workspace validation, tag `v1.4.0`, and fast-forward epic branch to `main`. |
 
@@ -68,6 +68,45 @@ Raw graph coverage dropped and must be handled in Phase 2:
 | VDB relationships | 8,603 | 4,212 |
 | Critical GovCon entities | 3,526 | 1,762 |
 | Critical entity share | 70.60% | 66.52% |
+
+## Phase 2 Validation Snapshot
+
+### non-UCF: afcap5_adab_iss (tuple) vs afcap5_adab_iss_j1 (strict JSON)
+
+Artifacts:
+
+- [tools/comparison_report_afcap5_adab_iss_vs_j1.md](../tools/comparison_report_afcap5_adab_iss_vs_j1.md)
+- [tools/comparison_report_afcap5_adab_iss_vs_j1_rerun.md](../tools/comparison_report_afcap5_adab_iss_vs_j1_rerun.md)
+- [tools/quality_evaluation_afcap5_adab_iss_vs_j1.md](../tools/quality_evaluation_afcap5_adab_iss_vs_j1.md)
+
+Answer quality (blind judge):
+
+| Metric | tuple baseline | strict JSON j1 |
+| --- | ---: | ---: |
+| Query wins | 4 | 5 |
+| Ties | 1 | 1 |
+| Grand total | 220/250 | 229/250 |
+
+Query timing (warm cache, 10 queries):
+
+| Workspace | Avg (s) | Median (s) |
+| --- | ---: | ---: |
+| afcap5_adab_iss (tuple) | 0.74 | — |
+| afcap5_adab_iss_j1 (JSON) | 0.64 | — |
+
+**Decision: JSON holds/beats tuple on non-UCF format. Phase 2 exit criterion cleared.**
+
+### UCF: mcpp_drfp (tuple) vs mcpp_drfp_t4 (strict JSON)
+
+Already captured in Phase 1.3 snapshot above. JSON won 7-2 (234/250 vs 207/250).
+
+**Decision: JSON holds/beats tuple on UCF format. Phase 2 exit criterion cleared on both axes.**
+
+### afcap6_drfp
+
+Deferred — no true solicitation yet. Not used as a reference baseline.
+
+---
 
 ## Phase 2 Focus
 
