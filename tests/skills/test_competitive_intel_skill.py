@@ -102,6 +102,8 @@ def test_competitive_intel_body_references_real_mcp_tools_only() -> None:
         "lookup_piid",
         "get_award_detail",
         "get_transactions",
+        "get_idv_children",
+        "get_idv_activity",
         "spending_by_category",
         "autocomplete_naics",
         "autocomplete_psc",

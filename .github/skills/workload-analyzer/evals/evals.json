@@ -1,0 +1,60 @@
+[
+  {
+    "id": "eval-001",
+    "prompt": "I've uploaded the Section J workload attachment for an Air Force base operations contract. The spreadsheet has two tabs: 'Sites' (139 rows, columns: Base Name, State/Country, DODAAC, AOR, CONUS/OCONUS) and 'CM History' (139 rows, columns: Base Name, DODAAC, FY2021 CMs, FY2022 CMs, FY2023 CMs, CM Average, footnote saying '28% of CMs resolved by phone without technician dispatch'). Analyze this workload data and tell me where my biggest pricing risks are.",
+    "expected_behaviors": [
+      "Runs Workflow 0 first — classifies 'Sites' as Geographic Scope and 'CM History' as Demand/Volume History",
+      "Identifies DODAAC or Base Name as the join key between the two sheets",
+      "Extracts the phone-resolution factor (28%) explicitly, applies it to compute field-touch CM volume",
+      "Computes CAGR across FY2021-FY2023 and projects option-year volumes",
+      "Runs Pareto to identify which bases drive the most field-touch CMs",
+      "Flags OCONUS bases in the scope as pricing risk items",
+      "Notes that the phone-resolution factor is a variable assumption and flags it as a risk",
+      "Produces a ranked pricing risk list",
+      "Emits or offers to emit the PTW handoff JSON envelope"
+    ],
+    "should_not": [
+      "Assume specific column names without first reading them from the data",
+      "Skip the adjustment factor extraction",
+      "Present only raw CM totals without applying the phone-resolution adjustment"
+    ]
+  },
+  {
+    "id": "eval-002",
+    "prompt": "Here's the workload data for an IT help desk contract covering 12 regional offices. The data has one sheet called 'Ticket Volume' with columns: Office, Region, Country, Q1-2023, Q2-2023, Q3-2023, Q4-2023, Q1-2024, Q2-2024, YTD_2024_Total. Four offices are in Germany, two in Japan, one in Bahrain. No footnotes. Help me understand what this data means for pricing option years.",
+    "expected_behaviors": [
+      "Runs Workflow 0 — classifies 'Ticket Volume' as Demand/Volume History with a geographic dimension embedded in it",
+      "Recognizes quarterly time series (6 quarters) and aggregates to annual equivalent",
+      "Computes YoY growth rate and flags that 6 quarters of data gives a moderate-confidence trend",
+      "Identifies Germany (4 offices), Japan (2 offices), Bahrain (1 office) as OCONUS and applies OCONUS risk tiering",
+      "Runs Pareto on ticket volume to find which offices drive concentration",
+      "Projects option-year ticket volumes with conservative/base/optimistic scenarios",
+      "Notes absence of adjustment factors (no footnotes) and does not fabricate any",
+      "Flags Bahrain as higher-risk OCONUS tier than Germany or Japan"
+    ],
+    "should_not": [
+      "Invent adjustment factors that aren't in the data",
+      "Treat quarterly data as annual without aggregating",
+      "Ignore the geographic dimension when discussing pricing risks"
+    ]
+  },
+  {
+    "id": "eval-003",
+    "prompt": "I have the Section J pricing attachment for a facilities maintenance contract. There are three tabs: 'Task Orders' (columns: TO Number, Description, Unit, Base Qty, Opt1 Qty, Opt2 Qty, Opt3 Qty, Opt4 Qty), 'Locations' (columns: Site ID, Installation, City, State, Zone), and 'Historical Activity' (columns: Site ID, TO Number, FY2020 Units, FY2021 Units, FY2022 Units, FY2023 Units). The base year quantities in Task Orders are flat across all option years. Historical Activity shows 6-12% growth each year for most task orders. What are the risks?",
+    "expected_behaviors": [
+      "Runs Workflow 0 — classifies 'Task Orders' as CLIN/Task Structure, 'Locations' as Geographic Scope, 'Historical Activity' as Demand/Volume History",
+      "Identifies Site ID and TO Number as the multi-key join between sheets",
+      "Detects the critical mismatch: flat CLIN quantities vs. 6-12% historical growth",
+      "Computes what the gap will be in Option Years 3-4 if growth continues",
+      "Runs CAGR on Historical Activity and projects forward",
+      "Flags the flat-quantity FFP CLIN structure as a pricing trap — contractor bears volume risk",
+      "Produces ranked pricing risks with the quantity-gap as Rank 1",
+      "Includes estimator assumption to validate: 'Confirm with PM whether flat quantities reflect expected demand stabilization or an oversight'"
+    ],
+    "should_not": [
+      "Miss the flat-quantity vs. growing-demand contradiction",
+      "Analyze each sheet in isolation without cross-referencing",
+      "Fail to flag the contract-type risk (FFP with variable demand)"
+    ]
+  }
+]

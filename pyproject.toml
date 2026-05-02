@@ -75,6 +75,7 @@ lightrag-hku = { git = "https://github.com/HKUDS/LightRAG.git", rev = "7ad1e8209
 
 [dependency-groups]
 dev = [
+    "graphifyy>=0.5.7",
     "pytest>=9.0.3",
 ]
 

@@ -222,6 +222,9 @@ credentials/
 docs/Clean_Prompt_Library.xlsx
 tools/_prompt_xlsx_dump.json
 
+# Graphify generated graph/wiki output
+graphify-out/
+
 
 # ============================================================================
 # Node (huashu-design renderer toolchain)

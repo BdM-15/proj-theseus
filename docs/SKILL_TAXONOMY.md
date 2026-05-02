@@ -136,19 +136,37 @@ Notes:
 All 11 in-tree skills (10 pre-existing + new `oci-sweeper`) at branch
 `135-phase-4j-skill-taxonomy`:
 
-| Skill                       | `personas_primary` | `personas_secondary`                  | `shipley_phases`                             | `capability` |
-| --------------------------- | ------------------ | ------------------------------------- | -------------------------------------------- | ------------ |
-| `competitive-intel`         | capture_manager    | [cost_estimator, proposal_manager]    | [pursuit, capture, strategy]                 | research     |
-| `compliance-auditor`        | legal_compliance   | [proposal_manager, contracts_manager] | [proposal_development, negotiation]          | audit        |
-| `govcon-ontology`           | none               | []                                    | []                                           | meta         |
-| `huashu-design`             | none               | []                                    | [proposal_development]                       | render       |
-| `oci-sweeper`               | legal_compliance   | [capture_manager, contracts_manager]  | [pursuit, capture]                           | audit        |
-| `price-to-win`              | cost_estimator     | [capture_manager]                     | [capture, strategy, proposal_development]    | estimate     |
-| `proposal-generator`        | proposal_writer    | [proposal_manager, capture_manager]   | [proposal_development]                       | draft        |
-| `renderers`                 | none               | []                                    | []                                           | render       |
-| `rfp-reverse-engineer`      | capture_manager    | [proposal_manager]                    | [capture, strategy]                          | analyze      |
-| `skill-creator`             | none               | []                                    | []                                           | meta         |
-| `subcontractor-sow-builder` | contracts_manager  | [program_manager, capture_manager]    | [strategy, proposal_development, post_award] | draft        |
+| Skill                       | `personas_primary` | `personas_secondary`                  | `shipley_phases`                                   | `capability` |
+| --------------------------- | ------------------ | ------------------------------------- | -------------------------------------------------- | ------------ |
+| `competitive-intel`         | capture_manager    | [cost_estimator, proposal_manager]    | [pursuit, capture, strategy]                       | research     |
+| `compliance-auditor`        | legal_compliance   | [proposal_manager, contracts_manager] | [proposal_development, negotiation]                | audit        |
+| `govcon-ontology`           | none               | []                                    | []                                                 | meta         |
+| `huashu-design`             | none               | []                                    | [proposal_development]                             | render       |
+| `oci-sweeper`               | legal_compliance   | [capture_manager, contracts_manager]  | [pursuit, capture]                                 | audit        |
+| `price-to-win`              | cost_estimator     | [capture_manager]                     | [capture, strategy, proposal_development]          | estimate     |
+| `proposal-generator`        | proposal_writer    | [proposal_manager, capture_manager]   | [proposal_development]                             | draft        |
+| `data-analyzer`             | none               | []                                    | []                                                 | analyze      |
+| `renderers`                 | none               | []                                    | []                                                 | render       |
+| `grill-me-govcon`           | capture_manager    | [proposal_manager, cost_estimator]    | [pursuit, capture, strategy, proposal_development] | analyze      |
+| `grill-me-bid-strategy`     | capture_manager    | []                                    | [pursuit, capture]                                 | analyze      |
+| `grill-me-capture`          | capture_manager    | [proposal_manager]                    | [capture, strategy]                                | analyze      |
+| `grill-me-proposal`         | proposal_manager   | [proposal_writer, capture_manager]    | [strategy, proposal_development]                   | analyze      |
+| `grill-me-ptw`              | cost_estimator     | [capture_manager]                     | [capture, strategy]                                | analyze      |
+| `workload-analyzer`         | cost_estimator     | [capture_manager]                     | [capture, strategy]                                | analyze      |
+| `rfp-reverse-engineer`      | capture_manager    | [proposal_manager]                    | [capture, strategy]                                | analyze      |
+| `skill-creator`             | none               | []                                    | []                                                 | meta         |
+| `subcontractor-sow-builder` | contracts_manager  | [program_manager, capture_manager]    | [strategy, proposal_development, post_award]       | draft        |
+
+**Developer-tool skills** (not govcon platform skills — not shown in Theseus UI, no KG queries):
+
+| Skill                           | `capability` | Note                                                                                                  |
+| ------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------- |
+| `improve-codebase-architecture` | meta         | Vendored from mattpocock/skills (Apache-2.0); graphify-backed                                         |
+| `caveman`                       | meta         | Vendored from mattpocock/skills (Apache-2.0); communication mode modifier                             |
+| `grill-me`                      | meta         | Vendored from mattpocock/skills (Apache-2.0); developer plan stress-tester; see govcon variants above |
+| `to-prd`                        | meta         | Vendored from mattpocock/skills (Apache-2.0); PRD publisher to GitHub Issues                          |
+| `to-issues`                     | meta         | Vendored from mattpocock/skills (Apache-2.0); vertical-slice issue creator                            |
+| `tdd`                           | meta         | Vendored from mattpocock/skills (Apache-2.0); red-green-refactor loop                                 |
 
 ---
 

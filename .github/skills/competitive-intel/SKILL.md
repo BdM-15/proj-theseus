@@ -1,6 +1,6 @@
 ---
 name: competitive-intel
-description: Federal capture competitor and incumbent intelligence backed by live USAspending.gov data via the vendored `usaspending` MCP. USE WHEN the user asks "who's the incumbent on this contract?", "what was the last award value?", "give me a black-hat read on Bidder X", "who are the top three competitors for this NAICS?", "what's typical pricing for this work?", "pull award history for this agency / NAICS / PSC", or any variant of competitor research, recompete signals, or pricing benchmarks for a federal opportunity. The skill resolves the active workspace's program / agency / NAICS context, queries USAspending for award history, ranks incumbents and likely competitors by obligated dollars, pulls recipient profiles, and emits a structured black-hat brief with chunk + award citations. DO NOT USE FOR proposal drafting (use `proposal-generator`), clause / FAR compliance audit (use `compliance-auditor`), or generic web search about a company (no MCP tool covers that yet).
+description: Federal capture competitor, incumbent, and obligation intelligence backed by live USAspending.gov data via the vendored `usaspending` MCP. USE WHEN the user asks "who's the incumbent on this contract?", "what was the last award value?", "give me a black-hat read on Bidder X", "who are the top three competitors for this NAICS?", "what's typical pricing for this work?", "pull award history for this agency / NAICS / PSC", "analyze burn rate", "obligation trend by year", or "start from this contract number". Supports both black-hat competitor research and contract-number-first obligation analysis, including standalone awards, parent IDIQs, and orders under IDIQs with parent/child rollups. DO NOT USE FOR proposal drafting (use `proposal-generator`), clause / FAR compliance audit (use `compliance-auditor`), or generic web search about a company (no MCP tool covers that yet).
 license: MIT
 metadata:
   # Phase 4j taxonomy — see docs/SKILL_TAXONOMY.md
@@ -9,7 +9,7 @@ metadata:
   shipley_phases: [pursuit, capture, strategy]
   capability: research
   category: intel
-  version: 0.3.0
+  version: 0.6.0
   status: active
   runtime: tools
   # This skill walks 10 numbered steps with 6+ MCP calls and 3+ KG calls
@@ -27,9 +27,14 @@ metadata:
     - usaspending
 ---
 
-# Competitive Intel — Black-Hat Capture Briefer
+# Competitive Intel — Black-Hat + Obligation Intel
 
-You are a **federal capture analyst** working multi-turn against the active Theseus workspace knowledge graph PLUS live USASpending.gov award data (via the `usaspending` MCP). Convert the workspace's RFP context into a defensible black-hat brief on the incumbent and top likely competitors. Every claim must trace either to a `chunk_id` you fetched via `kg_chunks` or to a USAspending award you fetched via an `mcp__usaspending__*` tool.
+You are a **federal capture analyst** working multi-turn against the active Theseus workspace knowledge graph PLUS live USASpending.gov award data (via the `usaspending` MCP). This skill has two modes:
+
+- **Workflow A (Black-Hat)**: Convert workspace RFP context into a defensible black-hat brief on incumbent and likely competitors.
+- **Workflow B (Obligation Intel)**: Start from a contract number and build an obligation rollup, parent/child vehicle context, and competitor set completeness check.
+
+Every claim must trace either to a `chunk_id` you fetched via `kg_chunks` or to a USAspending award you fetched via an `mcp__usaspending__*` tool.
 
 ## When to Use
 
@@ -38,16 +43,34 @@ You are a **federal capture analyst** working multi-turn against the active Thes
 - "Black-hat: what would Lockheed bid here?"
 - "What's the typical price range for this NAICS at this magnitude?"
 - "Top 3 competitors for a 541512 IT modernization recompete with HHS"
+- "Here's a contract number - show burn rate / obligation trend"
+- "Is this contract an IDIQ parent, an order, or standalone?"
+- "Roll up obligations across all child orders"
+- "If this is an order under a multiple-award IDIQ, who are all parent-level competitors?"
 
 ## Operating Discipline
 
 - **Workspace first, web second.** The KG is the source of truth for the opportunity (program, agency, NAICS, PSC, place of performance). USAspending is the source of truth for who has actually won similar work.
 - **Cite everything.** Workspace claims cite `chunk_id` (e.g., `[chunk-xxxxxxxx]`). Award claims cite the USAspending `generated_internal_id` (e.g., `[award:CONT_AWD_…]`).
 - **Rank by obligated dollars, not transaction count.** A vendor with one $400M IDV beats a vendor with 200 $50K POs.
+- **Linkage precedence for vehicle analysis.** For multiple-award IDIQs, resolve relationships in this order: parent IDV linkage, explicit child-order listing, PIID-family context, then solicitation identifier as a fallback signal.
 - **Reject anti-patterns.** Inventing competitors not in award history. Pricing ranges with no underlying award sample. Generic SWOT bullets ("strong past performance"). Unsupported claims about CPARS or protests (no MCP source for those yet — say so).
 - **Fail loudly.** If the workspace is missing NAICS / PSC / agency, halt with a `GAP` rather than guess.
 
-## Workflow Checklist
+## Workflow Selector
+
+Pick exactly one workflow before running tools:
+
+- **Workflow A: Black-Hat Competitor Intel (default)**
+  Trigger: incumbent/competitor/theming/pricing benchmark questions anchored on NAICS/agency/program context.
+- **Workflow B: Contract-Number Obligation Intel**
+  Trigger: user provides a contract number/PIID and asks for burn-rate, obligation trend, IDIQ hierarchy, parent/child rollups, or competitor completeness from vehicle context.
+
+If both are requested, run Workflow B first and feed its `competitor_discovery` result into Workflow A.
+
+---
+
+## Workflow A Checklist (Black-Hat)
 
 Execute in order. Record entity counts, NAICS codes, and award IDs as you go so the final envelope can be audited.
 
@@ -240,6 +263,215 @@ Match the Output Contract below. After `write_file` succeeds, the final assistan
 ## Hand-off to `proposal-generator`
 
 When the cover note is written, suggest the user run `proposal-generator` next so the `predicted_themes` and `ghost_language_hooks` from each competitor flow into the win-themes / FAB-chains step. Do not call `proposal-generator` yourself — that's a Phase 5 capability.
+
+---
+
+## Workflow B Checklist (Contract-Number Obligation Intel)
+
+Execute in order. The output is an obligation-focused envelope that still includes competitor completeness findings.
+
+### 1. Resolve the contract number
+
+Input may be contract/order number only. Normalize and resolve using `mcp__usaspending__lookup_piid`.
+
+Record:
+
+- `input_contract_number`
+- `resolved_award_id`
+- `resolved_award_type`
+- `resolved_piid`
+
+If no match, return `GAP: contract number not found in USAspending lookup_piid`.
+
+### 2. Classify scenario
+
+Call `mcp__usaspending__get_award_detail` for the resolved award and classify into one of:
+
+- `standalone_contract`
+- `parent_idiq`
+- `idiq_order`
+
+Classification must cite the detail fields used. Never infer vehicle class from PIID format alone.
+
+### 3. Build hierarchy and obligation rollup
+
+Apply scenario-specific logic:
+
+- **Standalone contract**:
+  - Call `mcp__usaspending__get_transactions` on the resolved award.
+  - Sum obligations by transaction, period of performance, and fiscal year.
+  - Preserve transaction metadata that helps a human read the burn: `action_date`, modification identifier if present, `action_type`, `action_type_description`, and transaction-level narrative/description if present.
+
+- **Parent IDIQ**:
+  - Pull children via `mcp__usaspending__get_idv_children` and/or `mcp__usaspending__get_idv_activity`.
+  - For each child order, pull transactions and compute per-order totals, period-of-performance view, and annual trend.
+  - Report parent direct obligations separately from child obligations.
+
+- **IDIQ order**:
+  - Pull this order's transactions and totals.
+  - Resolve parent IDIQ from award detail.
+  - Pull sibling orders under the same parent and roll up full vehicle totals.
+  - Use order and parent award detail plus sibling activity to capture the order's current period of performance window and any visible base/current/potential end dates.
+
+For all scenarios:
+
+- Include deobligation periods explicitly; net totals can decrease over time.
+- Prefer **period-of-performance breakdowns over fiscal-year rollups** in the narrative and the artifact. Fiscal years are still required, but POP windows are the primary burn-rate lens.
+- Build `obligations.by_period_of_performance` from award-detail and child-activity dates. Use the strongest available fields such as start date, current end date, and potential end date. If only a single current POP window is available, still emit it.
+- For each item in `obligations.by_transaction`, include human-readable transaction metadata. If the transaction payload does not expose a narrative description, set `modification_description` to `null` and add a warning rather than inventing one.
+
+**Derived fields — compute from fetched data (no additional MCP calls required):**
+
+- Sort `by_transaction` by `action_date` ascending.
+- Compute `cumulative_obligated_usd` as the running total of `amount_usd` through each transaction row (preserving negatives for deobligations).
+- Assign `inferred_pop_segment` using this rule:
+  - Modification `0` (or first transaction) → `"base_year"`
+  - Each action_type `G` ("EXERCISE AN OPTION") transaction → `"option_year_1"`, `"option_year_2"`, etc. in sequence
+  - Action_type `B` ("SUPPLEMENTAL AGREEMENT") or `J` ("FAR 52.232-22 FUNDED") within a segment → `"supplemental"`
+  - Action_type `M` ("OTHER ADMINISTRATIVE ACTION"), `X` (termination), or `R` (rescind/cancel) → `"admin"`
+  - Unknown or null action_type → `"unknown"`
+- Compute `rate_analysis` using `obligations.by_period_of_performance.current_order_pop` (or the strongest available POP window):
+  - `total_pop_days` = `pop_end_current` − `pop_start` in calendar days
+  - `total_pop_months` = round to nearest 0.5
+  - `monthly_burn_usd` = `net_obligated_usd` / `total_pop_months`
+  - `daily_burn_usd` = `net_obligated_usd` / `total_pop_days`
+  - `by_option_year`: group transactions by `inferred_pop_segment`, sum `amount_usd` per segment, estimate the segment's date window as the span between consecutive G-type action dates (use award end date as the final segment's close), and compute `monthly_rate_usd` = segment `obligated_usd` / segment `months`.
+  - Include `derivation_notes` listing assumptions made (e.g., "Option year boundaries estimated from G-type action dates; per-modification POP dates not available in USAspending transaction payload").
+
+### 4. Competitor completeness for multiple-award vehicles
+
+For `parent_idiq` and `idiq_order` scenarios, derive competitor sets in two views:
+
+- **Order-holder view**: distinct recipients with child orders under the parent IDIQ.
+- **Parent-holder view**: parent recipients (normalize subsidiaries where possible).
+
+Use parent/child vehicle linkage as primary. Use solicitation identifier only as a fallback clustering signal when direct linkage is incomplete.
+
+Emit `competitor_discovery.completeness_status` as:
+
+- `high` when parent-child traversal succeeded and sibling coverage is strong,
+- `medium` when partial child coverage exists,
+- `low` when only fallback solicitation clustering was possible.
+
+### 5. Produce PTW seed outputs
+
+Compute and include:
+
+- recent annual run-rate,
+- trailing 3-year weighted run-rate,
+- highest-obligation years,
+- optional-year pattern signal,
+- recommended PTW baseline input.
+
+### 6. Write the obligation envelope (MANDATORY)
+
+Call `write_file` to save `artifacts/competitive_intel_obligation.json` before final summary.
+
+```json
+{
+  "input_contract_number": "<raw user input>",
+  "resolved": {
+    "award_id": "<generated_internal_id>",
+    "piid": "<resolved piid>",
+    "scenario": "standalone_contract|parent_idiq|idiq_order"
+  },
+  "hierarchy": {
+    "parent_award_id": "<id or null>",
+    "child_award_ids": ["<id>"]
+  },
+  "obligations": {
+    "total_obligated_usd": 0,
+    "net_obligated_usd": 0,
+    "by_period_of_performance": [
+      {
+        "label": "current_order_pop",
+        "start_date": "YYYY-MM-DD",
+        "end_date": "YYYY-MM-DD",
+        "obligated_usd": 0,
+        "source": "award_detail|idv_activity|derived"
+      }
+    ],
+    "by_fiscal_year": [{ "fy": "2025", "amount_usd": 0 }],
+    "rate_analysis": {
+      "pop_start": "YYYY-MM-DD",
+      "pop_end_current": "YYYY-MM-DD",
+      "total_pop_months": 0,
+      "total_pop_days": 0,
+      "monthly_burn_usd": 0,
+      "daily_burn_usd": 0,
+      "by_option_year": [
+        {
+          "label": "base_year|option_year_1|option_year_2|...",
+          "estimated_start": "YYYY-MM-DD",
+          "estimated_end": "YYYY-MM-DD",
+          "months": 0,
+          "obligated_usd": 0,
+          "monthly_rate_usd": 0
+        }
+      ],
+      "derivation_notes": [
+        "<e.g. 'Option year boundaries estimated from action dates of G-type mods; actual POP dates not in USAspending transaction payload'>"
+      ]
+    },
+    "by_transaction": [
+      {
+        "transaction_id": "<id>",
+        "action_date": "YYYY-MM-DD",
+        "modification_number": "0|P00001|null",
+        "action_type": "G|B|M|null",
+        "action_type_description": "EXERCISE AN OPTION|SUPPLEMENTAL AGREEMENT FOR WORK WITHIN SCOPE|null",
+        "modification_description": "<transaction narrative if present>|null",
+        "amount_usd": 0,
+        "cumulative_obligated_usd": 0,
+        "inferred_pop_segment": "base_year|option_year_1|option_year_2|supplemental|admin|unknown"
+      }
+    ],
+    "by_child_order": [
+      {
+        "award_id": "<id>",
+        "description": "<child order description if present>|null",
+        "pop_start_date": "YYYY-MM-DD|null",
+        "pop_end_date": "YYYY-MM-DD|null",
+        "amount_usd": 0
+      }
+    ]
+  },
+  "competitor_discovery": {
+    "order_holder_recipients": [{ "name": "<recipient>", "obligated_usd": 0 }],
+    "parent_holder_recipients": [{ "name": "<parent>", "obligated_usd": 0 }],
+    "linkage_method_used": "parent_child|piid_family|solicitation_fallback",
+    "completeness_status": "high|medium|low"
+  },
+  "ptw_seed": {
+    "recent_annual_run_rate_usd": 0,
+    "three_year_weighted_run_rate_usd": 0,
+    "recommended_baseline_usd": 0
+  },
+  "warnings": ["<data caveat or linkage caveat>"],
+  "data_provenance": {
+    "usaspending_award_ids": ["<generated_internal_id>"],
+    "tools_invoked": [
+      "mcp__usaspending__lookup_piid",
+      "mcp__usaspending__get_award_detail",
+      "mcp__usaspending__get_transactions",
+      "mcp__usaspending__get_idv_children"
+    ]
+  }
+}
+```
+
+Do not omit these fields just because they are sparse. A partially populated POP or transaction record is still useful if it clearly shows which values were unavailable from the source.
+
+### 7. Final cover note
+
+Summarize:
+
+- scenario detected,
+- total/net obligations,
+- number of child orders,
+- competitor completeness status,
+- PTW seed recommendation,
+- warnings.
 
 ## References
 

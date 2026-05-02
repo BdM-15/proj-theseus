@@ -1,0 +1,39 @@
+# Graphify should map the source tree, not local runtime corpora or generated outputs.
+
+# Existing graphify outputs
+graphify-out/
+graphify-out/**
+
+# Python/local tooling caches
+.venv/
+__pycache__/
+.pytest_cache/
+.cache/
+*.pyc
+
+# IDE/agent scratch
+.vscode/
+.cursor/
+
+# Secrets and local config
+.env
+.env*
+
+# Theseus runtime data and sensitive solicitation inputs
+inputs/
+rag_storage/
+rag_storage_*/
+logs/
+
+# Local/generated analysis artifacts
+tools/_dep_snapshots/
+tools/_e2e_runs/
+tools/_skill_snapshots/
+tools/comparison_report_*.md
+tools/quality_evaluation.md
+tools/_prompt_xlsx_dump.json
+
+# External/local analysis dumps
+external_analysis/
+navy_mbos_baseline/
+rfp_analysis_*/
