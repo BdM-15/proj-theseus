@@ -1,33 +1,3 @@
-GOVCON ONTOLOGY - LIGHTRAG NATIVE JSON FORMAT
-======================================================================
-Model: xAI Grok (response_format=json_object)
-Output: LightRAG JSON Structured Output (entities[] + relationships[])
-Version: 7.2.1 (Phase 1.2.1 - Recall recovery, issue #124)
-        7.2.1 anonymizes EXAMPLE 9 to use generic placeholders ("Subfactor 1.A",
-        "Plan A", "FAR 52.XXX-XX", "Deliverable Tracking ID X") and adds an
-        explicit anti-parroting note. Prevents the LLM from memorizing the
-        ADAB-specific specimen (TOMP/MEP/CTIP/QCP, FAR 52.222-50, CDRL A002/A014,
-        9 May 2026) and emitting it back on unrelated chunks.
-        7.2 closes Q1/Q5/Q6 recall regressions observed in afcap5_adab_iss_t2
-        vs TUPLE baseline (LLM-judge: TUPLE 227/250, JSON 221/250). Adds
-        (a) Part F.0 L↔M completeness mandate, (b) Part J density floor
-        for enumerated lists, (c) Part K EXAMPLE 9 high-density extraction
-        showing ~15 entities from one PWS paragraph. No gleaning bump.
-        7.1 strengthens Part J keywords rule to forbid space-joined or
-        comma-joined CANONICAL types (e.g. "CONTAINS PHASE_OF") — observed
-        leak in afcap5_adab_iss_t1 reprocess.
-Source: Converted from govcon_lightrag_native.txt v6.5
-Total Size: ~35K tokens (full domain intelligence preserved)
-
-CONTRACT NOTE:
-This prompt drives LightRAG 1.5.0+ JSON extraction (entity_extraction_use_json=true).
-The 33 govcon entity types and 35 canonical relationship types are unchanged.
-The canonical relationship type token (e.g. GUIDES, CHILD_OF, MEASURED_BY) is
-emitted as the FIRST comma-separated token of each relationship's `keywords`
-field — this matches LightRAG's storage contract (operate.py stores keywords
-identically for tuple and JSON paths) and preserves all downstream typed
-inference (vdb_sync.normalize_relationship_type).
-
 ================================================================================
 PART A: ROLE DEFINITION (Shipley Associates Business Development Lifecycle)
 ================================================================================
@@ -86,7 +56,7 @@ CDRLs & DELIVERABLES:
 ❌ BAD:  "Monthly Status Report" (missing CDRL identifier)
 
 REQUIREMENTS:
-✅ GOOD: "F.2.1 CRP Customer Service Coverage Requirement"
+✅ GOOD: "[Section X.Y] [Service Program] Coverage Requirement"
 ✅ GOOD: "C.3.2 Network Operations Support Requirement"
 ❌ BAD:  "Customer Service Requirement" (missing section reference)
 
@@ -107,7 +77,7 @@ A.2.3 THIRD-PERSON OBJECTIVE DESCRIPTIONS
 All entity descriptions must be written in third person. Avoid pronouns that 
 create ambiguity or lose context when the description is read standalone.
 
-✅ GOOD: "The Contractor shall provide 24/7 support for CRP operations."
+✅ GOOD: "The Contractor shall provide 24/7 support for [PROG] operations."
 ✅ GOOD: "Appendix H defines site-specific requirements for Al Dhafra Air Base."
 ❌ BAD:  "This section defines the requirements." (what section?)
 ❌ BAD:  "We shall provide support." (who is we?)
@@ -262,26 +232,26 @@ PART B.2: CRITICAL TABLE EXTRACTION RULES (Equipment & Maintenance Data)
 Tables are NOT just formatting - they contain critical workload drivers for BOE development.
 The LLM must recognize table structures and extract granular data, not summaries.
 
-B.2.1 EQUIPMENT INVENTORY TABLES (e.g., "Table H.2 Appliance Listing")
+B.2.1 EQUIPMENT INVENTORY TABLES (e.g., "Table [X.Y] [Equipment Type] Listing")
 ----------------------------------------------------------------------
 When processing equipment inventory tables:
 
-1. **Extract EACH building as a LOCATION entity** with equipment counts
-   - Entity: "Building 2959 Laundry Facility" (location)
-   - Include counts in description: "69 washers, 69 dryers (138 total units)"
+1. **Extract EACH location as a LOCATION entity** with equipment counts
+   - Entity: "[Facility A] [Equipment Type] Facility" (location)
+   - Include counts in description: "[N] [Equipment Type 1], [N] [Equipment Type 2] ([N] total units)"
 
 2. **Extract equipment aggregates as EQUIPMENT entities** by maintenance schedule
-   - Entity: "Weekly Maintenance Equipment Inventory" (equipment)
-   - Include totals: "370 washers, 399 dryers (769 total units)"
+   - Entity: "[Tier 1] Maintenance Equipment Inventory" (equipment)
+   - Include totals: "[N] [Equipment Type 1], [N] [Equipment Type 2] ([N] total units)"
 
 3. **Create LOCATION→EQUIPMENT relationships** using HAS_EQUIPMENT
-   - Building 2959 --HAS_EQUIPMENT--> Weekly Maintenance Equipment Inventory
+   - [Facility A] --HAS_EQUIPMENT--> [Tier 1] Maintenance Equipment Inventory
 
-4. **Preserve maintenance schedule context** (Weekly, Monthly, On-Call)
+4. **Preserve maintenance schedule context** (Weekly, Monthly, On-Call, or contract-specific tiers)
    - Include schedule in entity description for FTE calculation
 
-5. **Extract ALL rows, not just summaries** - building-level data is critical for workload estimation
-   - Each building = separate LOCATION entity
+5. **Extract ALL rows, not just summaries** - facility-level data is critical for workload estimation
+   - Each facility = separate LOCATION entity
    - Summary totals = EQUIPMENT entity aggregates
 
 B.2.2 MAINTENANCE SCHEDULE TABLES (e.g., "Table H.1 Preventive Maintenance")
@@ -319,13 +289,12 @@ B.2.3 TABLE EXTRACTION PRIORITIES
 - Do NOT merge disparate maintenance schedules into single entities
 
 ANTI-PATTERN (WRONG):
-{{"name": "Laundry Equipment", "type": "concept", "description": "Various laundry equipment across multiple buildings."}}
+{{"name": "[Equipment Type] Equipment", "type": "concept", "description": "Various [equipment] across multiple facilities."}}
 
 CORRECT PATTERN:
-{{"name": "Building 2959 Laundry Facility", "type": "location", "description": "Building 2959. Equipment counts: 69 washers, 69 dryers (138 total units). Maintenance schedule: Weekly."}}
-{{"name": "Building 3880 Laundry Facility", "type": "location", "description": "Building 3880. Equipment counts: 44 washers, 50 dryers (94 total units). Maintenance schedule: Weekly."}}
-{{"name": "Weekly Maintenance Equipment Inventory", "type": "equipment", "description": "Weekly maintenance schedule equipment. Total: 370 washers, 399 dryers (769 total units)."}}
-
+{{"name": "[Facility A] [Equipment Type] Facility", "type": "location", "description": "[Facility A]. Equipment counts: [N] [Equipment Type 1], [N] [Equipment Type 2] ([N] total units). Maintenance schedule: [Tier 1]."}}
+{{"name": "[Facility B] [Equipment Type] Facility", "type": "location", "description": "[Facility B]. Equipment counts: [N] [Equipment Type 1], [N] [Equipment Type 2] ([N] total units). Maintenance schedule: [Tier 1]."}}
+{{"name": "[Tier 1] Maintenance Equipment Inventory", "type": "equipment", "description": "[Tier 1] maintenance schedule equipment. Total: [N] [Equipment Type 1], [N] [Equipment Type 2] ([N] total units)."}}
 B.2.4 TABLE TYPE-SPECIFIC GUIDANCE (MinerU Table Processing)
 ------------------------------------------------------------
 MinerU converts tables to structured text. Use these guidelines for different table types:
@@ -1529,11 +1498,11 @@ CRITICAL OUTPUT RULES:
    NEVER comma-join two canonical types either — emit TWO relationship objects.
 5. RELATIONSHIP description: complete sentence; explains WHY the two entities connect.
 6. Only emit relationships whose `source` AND `target` both appear in `entities` (or are valid cross-chunk references to known canonical entities).
-7. Avoid forced relationships — see Example 8 anti-pattern. RELATED_TO is a last resort.
+7. Avoid forced relationships — see Example 6 anti-pattern. RELATED_TO is a last resort.
 8. NO MARKDOWN, NO COMMENTARY, NO CODE FENCES — JUST THE JSON OBJECT.
 
 ================================================================================
-PART K: ANNOTATED RFP EXAMPLES (Full Domain Intelligence - 9 Examples, JSON form)
+PART K: ANNOTATED RFP EXAMPLES (Full Domain Intelligence - 7 Examples, JSON form)
 ================================================================================
 
 EXAMPLE 1: Section L ↔ Section M Mapping
@@ -1567,183 +1536,121 @@ Output:
 EXAMPLE 2: Requirements with Criticality and Workload Drivers
 
 Input Text:
-F.2. COMMUNITY RECREATIONAL PROGRAM (CRP): The Contractor shall implement and maintain the CRP to support all morale welfare and recreation events and activities described in this section of the PWS. Approximately 1,600 customers visit all CRP locations on a daily basis. The Contractor shall ensure all personnel supporting the CRP are trained and all locations' customer service desks are always covered with no more than two (2) customer service desks coverage discrepancies allowed per month. Unless otherwise stated, the Contractor shall support the CRP 24 hours a day / 7 days a week.
+[Section X.Y]. [SERVICE PROGRAM NAME] ([PROG]): The Contractor shall implement and maintain the [PROG] to support all [mission category] events and activities described in this section of the PWS. Approximately [N] customers visit all [PROG] locations on a daily basis. The Contractor shall ensure all personnel supporting the [PROG] are trained and all locations' [service stations] are always covered with no more than [M] [service station] coverage discrepancies allowed per [period]. Unless otherwise stated, the Contractor shall support the [PROG] 24 hours a day / 7 days a week.
 
-The Government shall provide facilities for CRP operations.
+The Government shall provide facilities for [PROG] operations.
+
+Note: [SERVICE PROGRAM NAME], [N], [M], [period] are RFP-specific. This pattern applies to any 24/7 service program — fitness centers, dining facilities, help desks, motor pools, recreation programs, IT operations, etc. Teaches: parent-requirement decomposition, MEASURED_BY threshold, GFI pattern, schedule-as-workload-driver.
 
 Output:
 {{
   "entities": [
-    {{"name": "F.2 Community Recreational Program Implementation", "type": "requirement", "description": "F.2. COMMUNITY RECREATIONAL PROGRAM (CRP): The Contractor shall implement and maintain the CRP to support all morale welfare and recreation events and activities described in this section of the PWS. Approximately 1,600 customers visit all CRP locations on a daily basis. Criticality: MANDATORY. Modal verb: shall. Labor drivers: 1,600 customers daily, 24/7 operations."}},
-    {{"name": "F.2 CRP Customer Service Desk Coverage", "type": "requirement", "description": "The Contractor shall ensure all personnel supporting the CRP are trained and all locations' customer service desks are always covered. Criticality: MANDATORY. Modal verb: shall. Labor drivers: all locations, always covered."}},
-    {{"name": "F.2 CRP 24/7 Support", "type": "requirement", "description": "Unless otherwise stated, the Contractor shall support the CRP 24 hours a day / 7 days a week. Criticality: MANDATORY. Modal verb: shall. Labor drivers: 24 hours/day, 7 days/week, continuous operations."}},
-    {{"name": "Customer Service Desk Coverage Threshold", "type": "performance_standard", "description": "No more than two (2) customer service desks coverage discrepancies allowed per month. Threshold: no more than 2 discrepancies per month. Measurement: Periodic Inspection (Monthly)."}},
-    {{"name": "Government Furnished Facilities", "type": "government_furnished_item", "description": "The Government shall provide facilities for CRP operations. Customer-provided facilities supporting CRP operations. Government-furnished asset, not contractor obligation."}}
+    {{"name": "[Section X.Y] [Service Program] Implementation", "type": "requirement", "description": "[Section X.Y]. [SERVICE PROGRAM NAME] ([PROG]): The Contractor shall implement and maintain the [PROG] to support all [mission category] events and activities. Approximately [N] customers daily. Criticality: MANDATORY. Modal verb: shall. Labor drivers: [N] customers daily, 24/7 operations."}},
+    {{"name": "[Section X.Y] [Service Station] Coverage", "type": "requirement", "description": "The Contractor shall ensure all personnel supporting the [PROG] are trained and all locations' [service stations] are always covered. Criticality: MANDATORY. Modal verb: shall. Labor drivers: all locations, always covered."}},
+    {{"name": "[Section X.Y] [PROG] 24/7 Support", "type": "requirement", "description": "Unless otherwise stated, the Contractor shall support the [PROG] 24 hours a day / 7 days a week. Criticality: MANDATORY. Modal verb: shall. Labor drivers: 24 hours/day, 7 days/week, continuous operations."}},
+    {{"name": "[Service Station] Coverage Threshold", "type": "performance_standard", "description": "No more than [M] [service station] coverage discrepancies allowed per [period]. Threshold: no more than [M] discrepancies per [period]. Measurement: Periodic Inspection ([period])."}},
+    {{"name": "Government Furnished Facilities", "type": "government_furnished_item", "description": "The Government shall provide facilities for [PROG] operations. Customer-provided facilities supporting [PROG] operations. Government-furnished asset, not contractor obligation."}}
   ],
   "relationships": [
-    {{"source": "F.2 CRP Customer Service Desk Coverage", "target": "Customer Service Desk Coverage Threshold", "keywords": "MEASURED_BY, threshold, monthly inspection", "description": "Coverage requirement is measured by discrepancy threshold."}},
-    {{"source": "F.2 Community Recreational Program Implementation", "target": "F.2 CRP 24/7 Support", "keywords": "CONTAINS", "description": "CRP implementation includes 24/7 support requirement."}},
-    {{"source": "F.2 Community Recreational Program Implementation", "target": "Appendix F Recreational Services", "keywords": "CHILD_OF", "description": "F.2 CRP requirement is contained within Appendix F."}},
-    {{"source": "F.2 CRP Customer Service Desk Coverage", "target": "F.2 Community Recreational Program Implementation", "keywords": "CHILD_OF", "description": "F.2 Customer Service requirement is part of F.2 CRP."}},
-    {{"source": "F.2 CRP 24/7 Support", "target": "F.2 Community Recreational Program Implementation", "keywords": "CHILD_OF", "description": "F.2 24/7 support requirement is part of F.2 CRP."}}
+    {{"source": "[Section X.Y] [Service Station] Coverage", "target": "[Service Station] Coverage Threshold", "keywords": "MEASURED_BY, threshold, periodic inspection", "description": "Coverage requirement is measured by discrepancy threshold."}},
+    {{"source": "[Section X.Y] [Service Program] Implementation", "target": "[Section X.Y] [PROG] 24/7 Support", "keywords": "CONTAINS", "description": "[PROG] implementation includes 24/7 support requirement."}},
+    {{"source": "[Section X.Y] [Service Program] Implementation", "target": "[Parent Section]", "keywords": "CHILD_OF", "description": "[Section X.Y] requirement is contained within [Parent Section]."}},
+    {{"source": "[Section X.Y] [Service Station] Coverage", "target": "[Section X.Y] [Service Program] Implementation", "keywords": "CHILD_OF", "description": "[Service station] coverage requirement is part of [Section X.Y]."}},
+    {{"source": "[Section X.Y] [PROG] 24/7 Support", "target": "[Section X.Y] [Service Program] Implementation", "keywords": "CHILD_OF", "description": "24/7 support requirement is part of [Section X.Y]."}}
   ]
 }}
 
 ---
 
-EXAMPLE 3: FAR and DFARS Clauses
+EXAMPLE 3: Operational Requirements with Workload Metrics (CRITICAL EXAMPLE)
 
 Input Text:
-SECTION I - CONTRACT CLAUSES
+[Section X.Y.Z]. [PRIMARY FACILITY] [Service Counter]: The Contractor shall handle [product/service] sales. The Contractor shall service:
+1) One (1) [primary service counter] with [N] registers located in the [PRIMARY FACILITY].
+2) One (1) additional [overflow counter] with [N] registers during special events.
+3) One (1) additional [service counter] with [N] register located in [SECONDARY FACILITY] during special events and reserved activities.
 
-52.203-3 GRATUITIES (APR 1984)
-52.203-5 COVENANT AGAINST CONTINGENT FEES (MAY 2014)
-52.204-7 System for Award Management (OCT 2018)
-52.212-4 CONTRACT TERMS AND CONDITIONS—COMMERCIAL ITEMS (FEB 2024)
-252.204-7012 SAFEGUARDING COVERED DEFENSE INFORMATION AND CYBER INCIDENT REPORTING (JAN 2023)
-252.225-7001 BUY AMERICAN AND BALANCE OF PAYMENTS PROGRAM (DEC 2017)
+[Staffing constraint applies to designated registers.] The Contractor shall verify all [product] supplies necessary to ensure items are properly stocked at all times. The Contractor shall notify the Government when supply levels are low, and items need to be ordered. The Government will procure the [product] supplies. Contractor personnel shall provide services at minimum rates of [R1] customer per minute during normal operations and [R2] customers per minute during peak times ([Peak Period 1], [Peak Period 2], [Peak Period 3], [Peak Period 4]) or during special events. The Contractor shall open the [overflow counter] for special events as requested by the COR. The Government will send requests in writing a minimum of [L] calendar days prior to the event. This is estimated to occur [F] times per year.
+
+Note: [PRIMARY FACILITY], [R1], [R2], [F], [L], [Peak Periods] are RFP-specific. Pattern applies to any service operation with throughput requirements — food service, retail, ticketing, fitness check-in, IT help desks, vehicle dispatch. The normal/peak rate split and event-frequency driver recur across virtually every base support and facilities contract. Teaches: multi-facility configuration, normal vs. peak workload_metrics, event frequency as workload driver, REFERENCES relationship.
 
 Output:
 {{
   "entities": [
-    {{"name": "Section I Contract Clauses", "type": "document_section", "description": "SECTION I - CONTRACT CLAUSES. Contains incorporated FAR and DFARS clauses."}},
-    {{"name": "FAR 52.203-3 Gratuities", "type": "clause", "description": "52.203-3 GRATUITIES (APR 1984). Clause number: 52.203-3. Regulation: FAR."}},
-    {{"name": "FAR 52.203-5 Contingent Fees", "type": "clause", "description": "52.203-5 COVENANT AGAINST CONTINGENT FEES (MAY 2014). Clause number: 52.203-5. Regulation: FAR."}},
-    {{"name": "FAR 52.204-7 SAM Registration", "type": "clause", "description": "52.204-7 System for Award Management (OCT 2018). Clause number: 52.204-7. Regulation: FAR."}},
-    {{"name": "FAR 52.212-4 Contract Terms Commercial", "type": "clause", "description": "52.212-4 CONTRACT TERMS AND CONDITIONS—COMMERCIAL ITEMS (FEB 2024). Clause number: 52.212-4. Regulation: FAR."}},
-    {{"name": "DFARS 252.204-7012 Cybersecurity", "type": "clause", "description": "252.204-7012 SAFEGUARDING COVERED DEFENSE INFORMATION AND CYBER INCIDENT REPORTING (JAN 2023). Clause number: 252.204-7012. Regulation: DFARS. Cybersecurity compliance requirement."}},
-    {{"name": "DFARS 252.225-7001 Buy American", "type": "clause", "description": "252.225-7001 BUY AMERICAN AND BALANCE OF PAYMENTS PROGRAM (DEC 2017). Clause number: 252.225-7001. Regulation: DFARS."}}
+    {{"name": "[Section X.Y.Z] [Primary Facility] Service Counter", "type": "requirement", "description": "[Section X.Y.Z]. [PRIMARY FACILITY] [Service Counter]: The Contractor shall handle [product/service] sales. Criticality: MANDATORY. Modal verb: shall."}},
+    {{"name": "[Section X.Y.Z] Service Counter Configuration", "type": "requirement", "description": "The Contractor shall service: 1) [primary service counter] with [N] registers in [PRIMARY FACILITY]. 2) [overflow counter] with [N] registers during special events. 3) [service counter] with [N] register in [SECONDARY FACILITY] during special events. Criticality: MANDATORY. Modal verb: shall. Equipment counts: [total counters], [total registers]."}},
+    {{"name": "[Section X.Y.Z] Supply Verification", "type": "requirement", "description": "The Contractor shall verify all [product] supplies are properly stocked at all times and notify the Government when supply levels are low. Criticality: MANDATORY. Modal verb: shall."}},
+    {{"name": "[Section X.Y.Z] Service Rate Standard", "type": "requirement", "description": "Contractor personnel shall provide services at minimum rates of [R1] customer per minute during normal operations and [R2] customers per minute during peak times ([Peak Period 1], [Peak Period 2], [Peak Period 3], [Peak Period 4]) or during special events. Criticality: MANDATORY. Modal verb: shall. Service rates: [R1] customer/minute (normal), [R2] customers/minute (peak)."}},
+    {{"name": "[Section X.Y.Z] [Overflow Counter] Special Events Support", "type": "requirement", "description": "The Contractor shall open the [overflow counter] for special events as requested by the COR. Requests sent in writing [L] calendar days prior. Estimated [F] times per year. Criticality: MANDATORY. Modal verb: shall. Frequency: estimated [F] times per year. Lead time: [L] calendar days."}},
+    {{"name": "Peak Service Periods", "type": "workload_metric", "description": "Peak times: [Peak Period 1], [Peak Period 2], [Peak Period 3], [Peak Period 4]. Service rate increases to [R2] customers per minute during these periods. Quantity: [R2] customers/minute. Period: peak hours."}},
+    {{"name": "Special Events Frequency", "type": "workload_metric", "description": "Special events estimated to occur [F] times per year. Key workload driver for [overflow counter] operations and staffing. Quantity: [F]. Unit: events. Period: per year."}}
   ],
   "relationships": [
-    {{"source": "FAR 52.203-3 Gratuities", "target": "Section I Contract Clauses", "keywords": "CHILD_OF", "description": "Clause incorporated in Section I."}},
-    {{"source": "FAR 52.203-5 Contingent Fees", "target": "Section I Contract Clauses", "keywords": "CHILD_OF", "description": "Clause incorporated in Section I."}},
-    {{"source": "FAR 52.204-7 SAM Registration", "target": "Section I Contract Clauses", "keywords": "CHILD_OF", "description": "Clause incorporated in Section I."}},
-    {{"source": "FAR 52.212-4 Contract Terms Commercial", "target": "Section I Contract Clauses", "keywords": "CHILD_OF", "description": "Clause incorporated in Section I."}},
-    {{"source": "DFARS 252.204-7012 Cybersecurity", "target": "Section I Contract Clauses", "keywords": "CHILD_OF", "description": "Clause incorporated in Section I."}},
-    {{"source": "DFARS 252.225-7001 Buy American", "target": "Section I Contract Clauses", "keywords": "CHILD_OF", "description": "Clause incorporated in Section I."}}
+    {{"source": "[Section X.Y.Z] Service Rate Standard", "target": "Peak Service Periods", "keywords": "REFERENCES", "description": "Service rate requirement references peak service periods."}},
+    {{"source": "[Section X.Y.Z] [Overflow Counter] Special Events Support", "target": "Special Events Frequency", "keywords": "REFERENCES", "description": "Overflow counter support requirement references event frequency."}},
+    {{"source": "[Section X.Y.Z] Service Counter Configuration", "target": "[Section X.Y.Z] [Primary Facility] Service Counter", "keywords": "CHILD_OF", "description": "Counter configuration is part of the primary facility requirement."}},
+    {{"source": "[Section X.Y.Z] Supply Verification", "target": "[Section X.Y.Z] [Primary Facility] Service Counter", "keywords": "CHILD_OF", "description": "Supply verification is part of [Section X.Y.Z]."}},
+    {{"source": "[Section X.Y.Z] Service Rate Standard", "target": "[Section X.Y.Z] [Primary Facility] Service Counter", "keywords": "CHILD_OF", "description": "Service rate standard is part of [Section X.Y.Z]."}},
+    {{"source": "[Section X.Y.Z] [Overflow Counter] Special Events Support", "target": "[Section X.Y.Z] [Primary Facility] Service Counter", "keywords": "CHILD_OF", "description": "Overflow counter support is part of [Section X.Y.Z]."}}
   ]
 }}
 
 ---
 
-EXAMPLE 4: Operational Requirements with Workload Metrics (CRITICAL EXAMPLE)
-
-Input Text:
-F.2.3.1. C.A.C Customer Service Counter and Indoor Bar: The Contractor shall handle resale requirements to include alcohol sales. The Contractor shall service:
-1) One (1) inside bar with two (2) registers located in the C.A.C.
-2) One (1) additional outside bar with two (2) registers during special events.
-3) One (1) additional bar with one (1) register located in Phantom Auditorium during special events and reserved activities.
-
-Cash registers require USN staff personnel only. The Contractor shall verify all resale supplies necessary to ensure items are properly stocked at all times. The Contractor shall notify the Government when resale supply levels are low, and items need to be ordered. The Government will procure the resale supplies. Contractor personnel shall provide retail services at minimum rates of one (1) customer per minute during normal operations and three (3) customers per minute during peak times (0500-0700, 1100-1300, 1900-2100, 2300-0100) or during special events. The Contractor shall open the outside bar for special events as requested by the COR. The Government will send requests to open the outside bar for special events in writing a minimum of seven (7) calendar days prior to the event. This is estimated to occur 100 times per year.
-
-Output:
-{{
-  "entities": [
-    {{"name": "F.2.3.1 C.A.C. Customer Service Counter and Indoor Bar", "type": "requirement", "description": "F.2.3.1. C.A.C Customer Service Counter and Indoor Bar: The Contractor shall handle resale requirements to include alcohol sales. Criticality: MANDATORY. Modal verb: shall."}},
-    {{"name": "F.2.3.1 Bar Service Configuration", "type": "requirement", "description": "The Contractor shall service: 1) One (1) inside bar with two (2) registers located in the C.A.C. 2) One (1) additional outside bar with two (2) registers during special events. 3) One (1) additional bar with one (1) register located in Phantom Auditorium during special events and reserved activities. Criticality: MANDATORY. Modal verb: shall. Equipment counts: 3 bars, 5 total registers."}},
-    {{"name": "F.2.3.1 Resale Supply Verification", "type": "requirement", "description": "The Contractor shall verify all resale supplies necessary to ensure items are properly stocked at all times. The Contractor shall notify the Government when resale supply levels are low, and items need to be ordered. Criticality: MANDATORY. Modal verb: shall."}},
-    {{"name": "F.2.3.1 Retail Service Rate Standard", "type": "requirement", "description": "Contractor personnel shall provide retail services at minimum rates of one (1) customer per minute during normal operations and three (3) customers per minute during peak times (0500-0700, 1100-1300, 1900-2100, 2300-0100) or during special events. Criticality: MANDATORY. Modal verb: shall. Service rates: 1 customer/minute (normal), 3 customers/minute (peak)."}},
-    {{"name": "F.2.3.1 Outside Bar Special Events Support", "type": "requirement", "description": "The Contractor shall open the outside bar for special events as requested by the COR. The Government will send requests to open the outside bar for special events in writing a minimum of seven (7) calendar days prior to the event. This is estimated to occur 100 times per year. Criticality: MANDATORY. Modal verb: shall. Frequency: estimated 100 times per year. Lead time: 7 calendar days advance notice."}},
-    {{"name": "Peak Service Hours", "type": "workload_metric", "description": "Peak times (0500-0700, 1100-1300, 1900-2100, 2300-0100). Service rate increases to 3 customers per minute during these periods. Quantity: 3 customers/minute. Period: peak hours (4 windows daily)."}},
-    {{"name": "Special Events Frequency", "type": "workload_metric", "description": "Special events estimated to occur 100 times per year. Key workload driver for outside bar operations and staffing. Quantity: 100. Unit: events. Period: per year."}}
-  ],
-  "relationships": [
-    {{"source": "F.2.3.1 Retail Service Rate Standard", "target": "Peak Service Hours", "keywords": "REFERENCES", "description": "Service rate requirement references peak service hours."}},
-    {{"source": "F.2.3.1 Outside Bar Special Events Support", "target": "Special Events Frequency", "keywords": "REFERENCES", "description": "Outside bar support requirement references event frequency."}},
-    {{"source": "F.2.3.1 Bar Service Configuration", "target": "F.2.3.1 C.A.C. Customer Service Counter and Indoor Bar", "keywords": "CHILD_OF", "description": "Bar configuration is part of C.A.C. requirement."}},
-    {{"source": "F.2.3.1 Resale Supply Verification", "target": "F.2.3.1 C.A.C. Customer Service Counter and Indoor Bar", "keywords": "CHILD_OF", "description": "Resale supply verification is part of F.2.3.1."}},
-    {{"source": "F.2.3.1 Retail Service Rate Standard", "target": "F.2.3.1 C.A.C. Customer Service Counter and Indoor Bar", "keywords": "CHILD_OF", "description": "Retail service rate is part of F.2.3.1."}},
-    {{"source": "F.2.3.1 Outside Bar Special Events Support", "target": "F.2.3.1 C.A.C. Customer Service Counter and Indoor Bar", "keywords": "CHILD_OF", "description": "Outside bar support is part of F.2.3.1."}}
-  ]
-}}
-
----
-
-EXAMPLE 5: Equipment Inventory Tables with Building-Level Data
+EXAMPLE 4: Equipment Inventory Tables with Location-Level Data
 
 Input Text (TABLE + Narrative):
-H.1.4.6. Preventive Maintenance: The Contractor shall ensure machines are maintained according to the manufacturer's recommendations by performing preventive maintenance tasks. The Contractor shall perform weekly operational/electrical checks to ensure all machines operate safely, are clean, and are free of corrosion.
+[Section X.Y.Z]. Preventive Maintenance: The Contractor shall ensure [equipment] are maintained according to the manufacturer's recommendations by performing preventive maintenance tasks. The Contractor shall perform [frequency] operational checks to ensure all [equipment] operate safely, are clean, and are in good condition.
 
-TABLE H.2. APPLIANCE LISTING, LOCATION, AND REPAIR SCHEDULE:
+TABLE [X.Y]. [EQUIPMENT TYPE] LISTING, LOCATION, AND MAINTENANCE SCHEDULE:
 
-WEEKLY:
-Building 2959: 69 washers, 69 dryers
-Building 3880: 44 washers, 50 dryers
-Building 4505: 49 washers, 61 dryers
-Machine Accountability Totals: 370 washers, 399 dryers (769 total units)
+[TIER 1 — High Frequency, e.g. WEEKLY]:
+[Facility A]: [N] [Equipment Type 1], [N] [Equipment Type 2]
+[Facility B]: [N] [Equipment Type 1], [N] [Equipment Type 2]
+[Facility C]: [N] [Equipment Type 1], [N] [Equipment Type 2]
+[Tier 1] Machine Totals: [N] [Equipment Type 1], [N] [Equipment Type 2] ([N] total units)
 
-MONTHLY:
-Building 4863 A/B: 1 washer, 1 dryer
-Building 4864 C/D: 1 washer, 1 dryer
-Monthly Machine Totals: 4 washers, 4 dryers (8 total units)
+[TIER 2 — Medium Frequency, e.g. MONTHLY]:
+[Facility D]: [N] [Equipment Type 1], [N] [Equipment Type 2]
+[Facility E]: [N] [Equipment Type 1], [N] [Equipment Type 2]
+[Tier 2] Machine Totals: [N] [Equipment Type 1], [N] [Equipment Type 2] ([N] total units)
 
-ON-CALL:
-Building 4860 A/B: 1 washer, 1 dryer
-Building 4861 C/D: 1 washer, 1 dryer
-On-Call Machine Totals: 11 washers, 11 dryers (22 total units)
+[TIER 3 — Low Frequency, e.g. ON-CALL]:
+[Facility F]: [N] [Equipment Type 1], [N] [Equipment Type 2]
+[Facility G]: [N] [Equipment Type 1], [N] [Equipment Type 2]
+[Tier 3] Machine Totals: [N] [Equipment Type 1], [N] [Equipment Type 2] ([N] total units)
+
+Note: [Equipment Type], [Facility] IDs, and counts are RFP-specific. Pattern applies to any equipment-intensive contract — laundry, HVAC, ground vehicles, medical devices, IT hardware, generators, copiers. Three-tier maintenance frequency (high/medium/low or weekly/monthly/on-call) is a recurring government workload structure. Teaches: table-to-KG extraction, HAS_EQUIPMENT, facility-level granularity, APPLIES_TO from requirement to equipment inventory.
 
 Output:
 {{
   "entities": [
-    {{"name": "Table H.2 Appliance Listing", "type": "document", "description": "TABLE H.2. APPLIANCE LISTING, LOCATION, AND REPAIR SCHEDULE. Contains building-level equipment inventory with maintenance schedules."}},
-    {{"name": "H.1.4.6 Preventive Maintenance Requirement", "type": "requirement", "description": "H.1.4.6. Preventive Maintenance: The Contractor shall ensure machines are maintained according to the manufacturer's recommendations by performing preventive maintenance tasks. The Contractor shall perform weekly operational/electrical checks to ensure all machines operate safely, are clean, and are free of corrosion. Criticality: MANDATORY. Modal verb: shall. Labor drivers: weekly operational/electrical checks, 769 units weekly, 8 units monthly, 22 units on-call."}},
-    {{"name": "Building 2959 Laundry Facility", "type": "location", "description": "Building 2959. Equipment counts: 69 washers, 69 dryers (138 total units). Maintenance schedule: Weekly."}},
-    {{"name": "Building 3880 Laundry Facility", "type": "location", "description": "Building 3880. Equipment counts: 44 washers, 50 dryers (94 total units). Maintenance schedule: Weekly."}},
-    {{"name": "Building 4505 Laundry Facility", "type": "location", "description": "Building 4505. Equipment counts: 49 washers, 61 dryers (110 total units). Maintenance schedule: Weekly."}},
-    {{"name": "Building 4863 A/B Laundry Facility", "type": "location", "description": "Building 4863 A/B. Equipment counts: 1 washer, 1 dryer (2 total units). Maintenance schedule: Monthly."}},
-    {{"name": "Building 4864 C/D Laundry Facility", "type": "location", "description": "Building 4864 C/D. Equipment counts: 1 washer, 1 dryer (2 total units). Maintenance schedule: Monthly."}},
-    {{"name": "Building 4860 A/B Laundry Facility", "type": "location", "description": "Building 4860 A/B. Equipment counts: 1 washer, 1 dryer (2 total units). Maintenance schedule: On-Call."}},
-    {{"name": "Building 4861 C/D Laundry Facility", "type": "location", "description": "Building 4861 C/D. Equipment counts: 1 washer, 1 dryer (2 total units). Maintenance schedule: On-Call."}},
-    {{"name": "Weekly Maintenance Equipment Inventory", "type": "equipment", "description": "Weekly maintenance schedule equipment. Total: 370 washers, 399 dryers (769 total units across Buildings 2959, 3880, 4505)."}},
-    {{"name": "Monthly Maintenance Equipment Inventory", "type": "equipment", "description": "Monthly maintenance schedule equipment. Total: 4 washers, 4 dryers (8 total units in Buildings 4863-4864)."}},
-    {{"name": "On-Call Maintenance Equipment Inventory", "type": "equipment", "description": "On-call maintenance schedule equipment. Total: 11 washers, 11 dryers (22 total units in Buildings 4860-4861)."}}
+    {{"name": "Table [X.Y] [Equipment Type] Listing", "type": "document", "description": "TABLE [X.Y]. [EQUIPMENT TYPE] LISTING, LOCATION, AND MAINTENANCE SCHEDULE. Contains facility-level equipment inventory with maintenance schedule tiers."}},
+    {{"name": "[Section X.Y.Z] Preventive Maintenance Requirement", "type": "requirement", "description": "[Section X.Y.Z]. Preventive Maintenance: The Contractor shall ensure [equipment] are maintained per manufacturer's recommendations with [frequency] operational checks. Criticality: MANDATORY. Modal verb: shall. Labor drivers: [frequency] checks, [Tier 1 N] units high-frequency, [Tier 2 N] units medium-frequency, [Tier 3 N] units on-call."}},
+    {{"name": "[Facility A]", "type": "location", "description": "[Facility A]. Equipment counts: [N] [Equipment Type 1], [N] [Equipment Type 2] ([N] total units). Maintenance schedule: [Tier 1]."}},
+    {{"name": "[Facility B]", "type": "location", "description": "[Facility B]. Equipment counts: [N] [Equipment Type 1], [N] [Equipment Type 2] ([N] total units). Maintenance schedule: [Tier 1]."}},
+    {{"name": "[Facility C]", "type": "location", "description": "[Facility C]. Equipment counts: [N] [Equipment Type 1], [N] [Equipment Type 2] ([N] total units). Maintenance schedule: [Tier 1]."}},
+    {{"name": "[Facility D]", "type": "location", "description": "[Facility D]. Equipment counts: [N] [Equipment Type 1], [N] [Equipment Type 2] ([N] total units). Maintenance schedule: [Tier 2]."}},
+    {{"name": "[Facility E]", "type": "location", "description": "[Facility E]. Equipment counts: [N] [Equipment Type 1], [N] [Equipment Type 2] ([N] total units). Maintenance schedule: [Tier 2]."}},
+    {{"name": "[Facility F]", "type": "location", "description": "[Facility F]. Equipment counts: [N] [Equipment Type 1], [N] [Equipment Type 2] ([N] total units). Maintenance schedule: [Tier 3]."}},
+    {{"name": "[Facility G]", "type": "location", "description": "[Facility G]. Equipment counts: [N] [Equipment Type 1], [N] [Equipment Type 2] ([N] total units). Maintenance schedule: [Tier 3]."}},
+    {{"name": "[Tier 1] Maintenance Equipment Inventory", "type": "equipment", "description": "[Tier 1] maintenance schedule equipment. Total: [N] [Equipment Type 1], [N] [Equipment Type 2] ([N] total units) across [Facilities A, B, C]."}},
+    {{"name": "[Tier 2] Maintenance Equipment Inventory", "type": "equipment", "description": "[Tier 2] maintenance schedule equipment. Total: [N] [Equipment Type 1], [N] [Equipment Type 2] ([N] total units) in [Facilities D, E]."}},
+    {{"name": "[Tier 3] Maintenance Equipment Inventory", "type": "equipment", "description": "[Tier 3] maintenance schedule equipment. Total: [N] [Equipment Type 1], [N] [Equipment Type 2] ([N] total units) in [Facilities F, G]."}}
   ],
   "relationships": [
-    {{"source": "Building 2959 Laundry Facility", "target": "Weekly Maintenance Equipment Inventory", "keywords": "HAS_EQUIPMENT", "description": "Building location has weekly maintenance equipment."}},
-    {{"source": "Building 3880 Laundry Facility", "target": "Weekly Maintenance Equipment Inventory", "keywords": "HAS_EQUIPMENT", "description": "Building location has weekly maintenance equipment."}},
-    {{"source": "Building 4505 Laundry Facility", "target": "Weekly Maintenance Equipment Inventory", "keywords": "HAS_EQUIPMENT", "description": "Building location has weekly maintenance equipment."}},
-    {{"source": "H.1.4.6 Preventive Maintenance Requirement", "target": "Weekly Maintenance Equipment Inventory", "keywords": "APPLIES_TO", "description": "Maintenance requirement applies to weekly equipment."}},
-    {{"source": "Table H.2 Appliance Listing", "target": "Appendix H Equipment Maintenance", "keywords": "CHILD_OF", "description": "Table is part of Appendix H."}},
-    {{"source": "H.1.4.6 Preventive Maintenance Requirement", "target": "Appendix H Equipment Maintenance", "keywords": "CHILD_OF", "description": "H.1.4.6 requirement is contained within Appendix H."}}
+    {{"source": "[Facility A]", "target": "[Tier 1] Maintenance Equipment Inventory", "keywords": "HAS_EQUIPMENT", "description": "Facility has [Tier 1] maintenance equipment."}},
+    {{"source": "[Facility B]", "target": "[Tier 1] Maintenance Equipment Inventory", "keywords": "HAS_EQUIPMENT", "description": "Facility has [Tier 1] maintenance equipment."}},
+    {{"source": "[Facility C]", "target": "[Tier 1] Maintenance Equipment Inventory", "keywords": "HAS_EQUIPMENT", "description": "Facility has [Tier 1] maintenance equipment."}},
+    {{"source": "[Section X.Y.Z] Preventive Maintenance Requirement", "target": "[Tier 1] Maintenance Equipment Inventory", "keywords": "APPLIES_TO", "description": "Maintenance requirement applies to [Tier 1] equipment."}},
+    {{"source": "Table [X.Y] [Equipment Type] Listing", "target": "[Parent Section]", "keywords": "CHILD_OF", "description": "Table is part of [Parent Section]."}},
+    {{"source": "[Section X.Y.Z] Preventive Maintenance Requirement", "target": "[Parent Section]", "keywords": "CHILD_OF", "description": "[Section X.Y.Z] requirement is contained within [Parent Section]."}}
   ]
 }}
 
 ---
 
-EXAMPLE 6: Special Events and Training Requirements
-
-Input Text:
-F.2.4. Special Events: The Contractor shall arrange special events including live bands, shows, Armed Forces Entertainment, game shows, theme nights, and other similar events. Special events may require coordination through the 380 AEW. The COR must be notified of special events at least two (2) weeks prior to each planned event to ensure proper coordination.
-
-F.2.3.2. Alcohol Management: All Contractor personnel must complete DRAM shop training prior to serving/selling alcohol and have proper training documentation on file with the Community Services Flight Chief. The Contractor shall use the approved Alcohol Management System provided by the Government. The Contractor shall track alcohol sales and strictly enforce alcohol limitations IAW AFCENT and 380 AEW alcohol policies with no violations allowed.
-
-Output:
-{{
-  "entities": [
-    {{"name": "F.2.4 Special Events Arrangement", "type": "requirement", "description": "F.2.4. Special Events: The Contractor shall arrange special events including live bands, shows, Armed Forces Entertainment, game shows, theme nights, and other similar events. Criticality: MANDATORY. Modal verb: shall."}},
-    {{"name": "F.2.4 Special Events Notification", "type": "requirement", "description": "The COR must be notified of special events at least two (2) weeks prior to each planned event to ensure proper coordination. Criticality: MANDATORY. Modal verb: must. Lead time: 2 weeks advance notice."}},
-    {{"name": "F.2.3.2 DRAM Shop Training Requirement", "type": "requirement", "description": "All Contractor personnel must complete DRAM shop training prior to serving/selling alcohol and have proper training documentation on file with the Community Services Flight Chief. Criticality: MANDATORY. Modal verb: must. Applies to: all personnel serving/selling alcohol."}},
-    {{"name": "F.2.3.2 Alcohol Management System Usage", "type": "requirement", "description": "The Contractor shall use the approved Alcohol Management System provided by the Government. Criticality: MANDATORY. Modal verb: shall. System: Government-provided Alcohol Management System."}},
-    {{"name": "F.2.3.2 Alcohol Policy Compliance", "type": "requirement", "description": "The Contractor shall track alcohol sales and strictly enforce alcohol limitations IAW AFCENT and 380 AEW alcohol policies with no violations allowed. Criticality: MANDATORY. Modal verb: shall. Performance standard: zero violations."}},
-    {{"name": "380 AEW", "type": "organization", "description": "380th Air Expeditionary Wing (380 AEW). Coordination point for special events. Source of alcohol policies."}},
-    {{"name": "Community Services Flight Chief", "type": "organization", "description": "Community Services Flight Chief. Maintains training documentation files for contractor personnel."}},
-    {{"name": "AFCENT Alcohol Policy", "type": "document", "description": "Air Forces Central Command (AFCENT) alcohol policies. Governs alcohol limitations and enforcement."}}
-  ],
-  "relationships": [
-    {{"source": "F.2.4 Special Events Arrangement", "target": "380 AEW", "keywords": "COORDINATED_WITH", "description": "Special events may require coordination through 380 AEW."}},
-    {{"source": "F.2.3.2 DRAM Shop Training Requirement", "target": "Community Services Flight Chief", "keywords": "REPORTED_TO", "description": "Training documentation filed with Community Services Flight Chief."}},
-    {{"source": "F.2.3.2 Alcohol Policy Compliance", "target": "AFCENT Alcohol Policy", "keywords": "GOVERNED_BY", "description": "Compliance requirement governed by AFCENT policy."}},
-    {{"source": "F.2.4 Special Events Arrangement", "target": "Appendix F Recreational Services", "keywords": "CHILD_OF", "description": "F.2.4 requirement is contained within Appendix F."}},
-    {{"source": "F.2.4 Special Events Notification", "target": "F.2.4 Special Events Arrangement", "keywords": "CHILD_OF", "description": "Notification requirement is part of F.2.4 Special Events."}},
-    {{"source": "F.2.3.2 DRAM Shop Training Requirement", "target": "Appendix F Recreational Services", "keywords": "CHILD_OF", "description": "F.2.3.2 requirement is contained within Appendix F."}},
-    {{"source": "F.2.3.2 Alcohol Management System Usage", "target": "F.2.3.2 DRAM Shop Training Requirement", "keywords": "CHILD_OF", "description": "System usage is part of F.2.3.2 Alcohol Management."}},
-    {{"source": "F.2.3.2 Alcohol Policy Compliance", "target": "F.2.3.2 DRAM Shop Training Requirement", "keywords": "CHILD_OF", "description": "Policy compliance is part of F.2.3.2 Alcohol Management."}}
-  ]
-}}
-
----
-
-EXAMPLE 7: GFP and CDRL Requirements
+EXAMPLE 5: GFP and CDRL Requirements
 
 Input Text:
 Government Furnished Property Reporting – The Contractor shall report GFP to the Contracting Officer within the task order specific time limits and using the current version of Government-furnished forms. [CDRL A016]. The Contractor shall report GFP: within 30 calendar days after the start of the period of performance, not later than 30 calendar days prior to the end of the period of performance, and at a minimum annually. The Contractor shall base reports on physical inventories.
@@ -1770,7 +1677,7 @@ Output:
 
 ---
 
-EXAMPLE 8: ANTI-PATTERN — NOT Extracting Forced Relationships
+EXAMPLE 6: ANTI-PATTERN — NOT Extracting Forced Relationships
 
 When entities have NO semantic connection, do NOT create relationships just to connect them.
 
@@ -1811,7 +1718,7 @@ ANTI-PATTERN SIGNALS (DO NOT create relationships when):
 - No logical business or technical dependency
 - Just trying to "connect everything" without semantic justification
 
-EXAMPLE 9: HIGH-DENSITY EXTRACTION (Section L↔M chunk with full traceability)
+EXAMPLE 7: HIGH-DENSITY EXTRACTION (Section L↔M chunk with full traceability)
 
 This example exists to counter under-extraction on enumerated chunks.
 It uses generic placeholder names ("Factor 1", "Subfactor 1.A", "Plan A",

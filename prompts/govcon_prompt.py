@@ -9,7 +9,7 @@ domain-specific government contracting intelligence for RFP analysis.
 Architecture:
 -------------
 - FULL domain intelligence loaded from govcon_lightrag_native.txt (~35K tokens, 1300+ lines)
-- Contains: 8 user personas, 33 entity types, 50+ relationship rules, 8 examples
+- Contains: 8 user personas, 33 entity types, 50+ relationship rules, 7 examples
 - LightRAG-compatible format with entity/relation tuple output
 
 Philosophy:
@@ -36,12 +36,26 @@ Domain Intelligence Included:
 - Part H: Decision Tree for Ambiguous Cases
 - Part I: Metadata Extraction Requirements
 - Part J: Output Format
-- Part K: 8 Annotated RFP Examples
+- Part K: 7 Annotated RFP Examples (anonymized, pattern-based)
 - Part L: Quality Checks
 
-Version: 3.4.0 (JSON Structured-Output Extraction Mode — issue #124, Phase 1.2)
-Last Updated: April 2026
-Source: govcon_lightrag_native.txt (tuple mode) + govcon_lightrag_json.txt (JSON mode, ~35K tokens each)
+Prompt file: prompts/extraction/govcon_lightrag_json.txt
+Version: 7.3.1 (Phase 3c - Strip developer header block, issue #124)
+
+Prompt Changelog (govcon_lightrag_json.txt):
+--------------------------------------------
+v7.3.1 - Anonymize Examples 2, 3, 4 with generic [...] placeholders.
+         Removes AFCAP-specific proper nouns so model learns extraction shape,
+         not domain-brittle vocabulary. Each example has a Note: listing RFP
+         contexts it applies to. Strip entire dev metadata header block from
+         prompt (~340 tokens saved — zero extraction value).
+v7.3.0 - Remove Examples 3 (FAR/DFARS clause list) and 6 (special events/training)
+         from Part K. Both redundant with Part C/F/G rules. 9 → 7 examples.
+v7.2.1 - Anonymize Example 9 (was ADAB-specific TOMP/MEP/CTIP/QCP specimen).
+v7.2   - Close Q1/Q5/Q6 recall regressions vs TUPLE baseline. Add Part F.0
+         L↔M completeness mandate, Part J density floor, Example 9 high-density.
+v7.1   - Forbid space/comma-joined canonical types in keywords field.
+         Net Phase 3 token savings: ~1,670 tokens (5.7%), 29,322 → 27,652.
 
 Changelog:
 ----------
@@ -153,14 +167,14 @@ GOVCON_PROMPTS: dict[str, Any] = {}
 # ═══════════════════════════════════════════════════════════════════════════════
 # LOAD FULL DOMAIN INTELLIGENCE FROM FILE
 # ═══════════════════════════════════════════════════════════════════════════════
-# The extraction prompt is ~35K tokens (1300+ lines) of domain intelligence.
+# The extraction prompt is ~27K tokens (1900+ lines) of domain intelligence.
 # We load it from file rather than embedding a truncated version.
 # This preserves ALL:
 # - 8 user personas (Capture Managers, Proposal Writers, Cost Estimators, etc.)
 # - 50+ quantitative preservation rules
 # - 26+ agency clause supplements (FAR, DFARS, AFFARS, NMCARS, etc.)
 # - 50+ relationship inference patterns
-# - 8 annotated examples
+# - 7 annotated examples
 # - Decision trees, metadata requirements, quality checks
 
 def _load_extraction_prompt_json() -> str:
@@ -236,9 +250,9 @@ Based on the last extraction task, identify and extract any **missed or incorrec
 # entity_extraction_use_json=True, so we provide a single one-line back-reference
 # to Part K. The string flows into the user prompt's `{examples}` placeholder.
 GOVCON_PROMPTS["entity_extraction_json_examples"] = [
-    "(See Part K of the system prompt for 8 govcon-specific JSON examples covering "
-    "L↔M mapping, requirements, clauses, workload metrics, equipment tables, "
-    "special events, GFP/CDRL, and an anti-pattern WRONG/CORRECT contrast.)"
+    "(See Part K of the system prompt for 7 govcon-specific JSON examples covering "
+    "L\u2194M mapping, requirements with criticality, workload metrics, equipment tables, "
+    "GFP/CDRL, and an anti-pattern WRONG/CORRECT contrast plus a high-density extraction example.)"
 ]
 
 

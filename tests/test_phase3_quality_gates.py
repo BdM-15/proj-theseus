@@ -49,11 +49,18 @@ def test_canonical_relationship_count_is_35():
 
 
 def test_prompt_contract_note_uses_35_relationship_count():
+    """
+    The old header CONTRACT NOTE was developer metadata with zero extraction value —
+    it was removed in v7.3.1 (Phase 3c). Cardinality is enforced by the stronger
+    test_prompt_f1_relationship_types_match_schema_exactly below.
+    This test now verifies the entity types guidance placeholder is present (rendered
+    from the YAML catalog at load time) and that Part F relationship rules exist.
+    """
     prompt_text = _read_prompt()
-    expected = "The 33 govcon entity types and 35 canonical relationship types are unchanged."
-    assert expected in prompt_text, (
-        "Prompt contract note must state the active 33/35 ontology cardinality."
+    assert "entity_types_guidance" in prompt_text or "PART C.4" in prompt_text, (
+        "Entity types guidance block must be present (placeholder or rendered)."
     )
+    assert "PART F" in prompt_text, "Part F relationship rules must be present."
 
 
 def test_prompt_f1_relationship_types_match_schema_exactly():
