@@ -8,7 +8,8 @@ domain-specific government contracting intelligence for RFP analysis.
 
 Architecture:
 -------------
-- FULL domain intelligence loaded from govcon_lightrag_json.txt (JSON mode)
+- Legacy monolith loaded from govcon_lightrag_json.txt when USE_V8_PROMPT=false
+- V8 compact frame composed in govcon_prompt.py when USE_V8_PROMPT=true
 - Entity-type guidance rendered dynamically from the YAML entity catalog
 - Part K examples externalized via LightRAG ENTITY_TYPE_PROMPT_FILE profile
 - LightRAG-compatible format with JSON structured output
@@ -42,10 +43,14 @@ Domain Intelligence Included:
 
 Prompt file: prompts/extraction/govcon_lightrag_json.txt
 Example profile: prompts/entity_type/govcon.yaml
-Version: 8.0.0 (Phase 3b V8-0/V8-1 - externalized Part K examples, issue #124)
+Version: 8.1.0 (Phase 3b V8 compact frame + feature flag, issue #124)
 
 Prompt Changelog (govcon_lightrag_json.txt):
 --------------------------------------------
+v8.1.0 - Add USE_V8_PROMPT compact-frame path in govcon_prompt.py.
+         Legacy monolith remains available behind feature flag for A/B validation.
+         Compact frame composes relationship guidance from schema.py and keeps
+         entity guidance/examples as dynamic injections.
 v8.0.0 - Replace static Part K example block with `{examples}` placeholder.
          All 7 JSON examples now live in prompts/entity_type/govcon.yaml and are
          loaded via LightRAG ENTITY_TYPE_PROMPT_FILE. Example drift repaired to
@@ -167,8 +172,12 @@ from typing import Any
 import os
 from pathlib import Path
 
+from src.ontology.schema import render_relationship_types_guidance
+
 
 GOVCON_PROMPTS: dict[str, Any] = {}
+
+USE_V8_PROMPT = os.getenv("USE_V8_PROMPT", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # LOAD FULL DOMAIN INTELLIGENCE FROM FILE
@@ -183,23 +192,181 @@ GOVCON_PROMPTS: dict[str, Any] = {}
 # - 7 annotated examples
 # - Decision trees, metadata requirements, quality checks
 
-def _load_extraction_prompt_json() -> str:
-    """Load full GovCon extraction prompt (JSON structured-output mode) from file."""
+def _load_legacy_extraction_prompt_json() -> str:
+    """Load the legacy GovCon extraction prompt (JSON structured-output mode) from file."""
     prompts_dir = Path(__file__).parent
     json_prompt_path = prompts_dir / "extraction" / "govcon_lightrag_json.txt"
 
     if not json_prompt_path.exists():
         raise FileNotFoundError(
             f"GovCon JSON extraction prompt not found at {json_prompt_path}. "
-            "Run `.\.venv\\Scripts\\python.exe tools\\_build_json_prompt.py` to regenerate."
+          "Run `.\\.venv\\Scripts\\python.exe tools\\_build_json_prompt.py` to regenerate."
         )
 
     with open(json_prompt_path, "r", encoding="utf-8") as f:
         return f.read()
 
+
+def _build_v8_system_prompt() -> str:
+    """Build the V8 compact extraction prompt frame.
+
+    V8 keeps dynamic entity guidance (`{entity_types_guidance}`) and examples
+    (`{examples}`), while compressing the static instruction frame into a
+    smaller, schema-driven prompt.
+    """
+
+    relationship_guidance = render_relationship_types_guidance()
+    return f"""================================================================================
+PART A: ROLE DEFINITION (V8 COMPACT FRAME)
+================================================================================
+
+---Role---
+You are a Federal Government Contracting Intelligence Specialist extracting a
+knowledge graph from solicitations, amendments, attachments, and proposal-
+relevant artifacts. Extract for the full Theseus user set: capture managers,
+proposal managers, proposal writers, cost estimators, contracts managers,
+technical SMEs, legal/compliance staff, and program managers.
+
+MISSION:
+1. Build a reusable graph for downstream reasoning, not a shallow summary.
+2. Preserve quantitative facts exactly: counts, rates, thresholds, dates,
+   page limits, dollar values, frequencies, periods of performance, and IDs.
+3. Prefer graph objects that support proposal, compliance, pricing, and
+   traceability workflows over generic labels.
+
+================================================================================
+PART B: CORE EXTRACTION RULES
+================================================================================
+
+1. CONTENT OVER LABELS
+   - Classify by semantic role, not section heading alone.
+   - A requirement is a contractor obligation. A performance standard is the
+     measurable threshold attached to an obligation. A workload metric is a raw
+     quantity/volume/frequency driver without pass/fail semantics.
+   - "Government shall..." is NOT a contractor requirement. Classify it as
+     concept or government_furnished_item depending on meaning.
+
+2. DENSITY EXPECTATION
+   - Dense Section L↔M chunks, CLIN tables, workload annexes, and CDRL blocks
+     should produce dense output. Do not collapse a rich chunk into one umbrella
+     entity when the text clearly contains multiple reusable graph objects.
+
+3. NAMING AND DESCRIPTION DISCIPLINE
+   - Use consistent canonical names across chunks.
+   - Entity descriptions must stand alone in third person and include required
+     metadata inside `description`.
+   - Preserve identifiers verbatim: section numbers, clause numbers, CDRL IDs,
+     CLIN/SLIN IDs, amendment numbers, building/site IDs, and dates.
+
+4. SPLIT RULE
+   - If one sentence contains both an action obligation and a measurable
+     threshold, emit TWO entities: requirement + performance_standard, linked by
+     MEASURED_BY.
+
+5. HIERARCHY RULE
+   - Use CHILD_OF for structural or semantic containment.
+   - Sibling sections are siblings, not a parent-child chain.
+   - Use AMENDS or SUPERSEDED_BY for revision lineage when the text indicates a
+     change vehicle.
+
+6. RELATIONSHIP HYGIENE
+   - Only emit a relationship when both entities are present in the current
+     output and a real semantic connection exists.
+   - RELATED_TO is a last resort. Do not connect co-located but unrelated
+     entities just to make the graph denser.
+
+================================================================================
+PART C: QUANTITATIVE PRESERVATION
+================================================================================
+
+ALWAYS preserve verbatim:
+- service rates, throughput, inspection thresholds, response times, SLAs
+- event frequency, workload counts, unit quantities, operating windows
+- page limits, font rules, due dates, POP dates, revision dates
+- CLIN/SLIN identifiers, contract type, option-year structure, pricing basis
+- exact clause/regulatory citations and referenced subsection numbers
+
+================================================================================
+PART D: ENTITY CATALOG
+================================================================================
+
+{{entity_types_guidance}}
+
+================================================================================
+PART E: RELATIONSHIP GUIDANCE
+================================================================================
+
+{relationship_guidance}
+
+High-value relationship patterns:
+- proposal_instruction GUIDES evaluation_factor when Section L content maps to
+  what the Government scores in Section M or an equivalent format.
+- requirement EVALUATED_BY evaluation_factor when the RFP states or clearly
+  implies the requirement is evaluated.
+- requirement SATISFIED_BY deliverable when a submitted artifact fulfills the
+  requirement.
+- deliverable TRACKED_BY a CDRL-like deliverable identifier.
+- requirement or evaluation artifact GOVERNED_BY a clause or regulatory source.
+- requirement or standard APPLIES_TO equipment, technology, location, or work
+  package when the text scopes the obligation to that object.
+- pricing/commercial structures should use PRICED_UNDER and QUANTIFIES rather
+  than vague RELATED_TO links.
+
+================================================================================
+PART F: OUTPUT CONTRACT
+================================================================================
+
+Output a single JSON object only:
+{{{{"entities": [ ... ], "relationships": [ ... ]}}}}
+
+ENTITY FIELDS:
+- `name`
+- `type`
+- `description`
+
+RELATIONSHIP FIELDS:
+- `source`
+- `target`
+- `keywords`
+- `description`
+
+RULES:
+1. `keywords` MUST begin with the canonical UPPERCASE relationship type as the
+   first comma-separated token.
+2. Every object field must be present and non-empty.
+3. No markdown, no commentary, no code fences.
+4. Use {{language}} and preserve proper nouns exactly as written.
+
+================================================================================
+PART G: ANNOTATED RFP EXAMPLES
+================================================================================
+
+{{examples}}
+
+================================================================================
+PART H: QUALITY CHECKS BEFORE OUTPUT
+================================================================================
+
+Before emitting JSON, verify:
+1. No obvious orphaning caused by under-extraction when a meaningful link is present.
+2. Canonical naming is consistent across entities and relationships.
+3. Required metadata is embedded in descriptions for the chosen entity type.
+4. The first `keywords` token is one of the 23 extraction-time canonical types.
+5. All quantities, dates, thresholds, and identifiers remain verbatim.
+6. No forced relationships exist between unrelated topics.
+"""
+
+
+def _get_extraction_prompt_json() -> str:
+    """Resolve the active extraction prompt based on the V8 feature flag."""
+
+    if USE_V8_PROMPT:
+        return _build_v8_system_prompt()
+    return _load_legacy_extraction_prompt_json()
+
 # Phase 1.2 (issue #124): JSON structured-output system prompt.
 # Used when LightRAG is initialized with ``entity_extraction_use_json=True``.
-GOVCON_PROMPTS["entity_extraction_json_system_prompt"] = _load_extraction_prompt_json()
+GOVCON_PROMPTS["entity_extraction_json_system_prompt"] = _get_extraction_prompt_json()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -872,33 +1039,42 @@ Reference Document List (Each entry starts with a [reference_id] that correspond
 
 def _validate_prompts():
     """Validate that full domain intelligence was loaded"""
-    extraction_prompt = GOVCON_PROMPTS.get("entity_extraction_system_prompt", "")
-    
-    # Minimum expected size for full intelligence (~35K tokens = ~140K chars)
-    MIN_EXPECTED_CHARS = 40000  # Conservative minimum
-    
+    extraction_prompt = GOVCON_PROMPTS.get("entity_extraction_json_system_prompt", "")
+
+    # Legacy monolith should be large. V8 should be substantially smaller.
+    MIN_EXPECTED_CHARS = 5000 if USE_V8_PROMPT else 40000
+
     if len(extraction_prompt) < MIN_EXPECTED_CHARS:
         import warnings
         warnings.warn(
             f"GovCon extraction prompt appears truncated ({len(extraction_prompt):,} chars). "
             f"Expected at least {MIN_EXPECTED_CHARS:,} chars. Check govcon_lightrag_json.txt."
         )
-    
+
     # Validate critical sections are present.
     # Note: Part D is no longer a literal section in the .txt template — it is rendered
     # at runtime from prompts/extraction/govcon_entity_types.yaml via the
     # `{entity_types_guidance}` placeholder (Phase 1.1c of epic #124). We verify the
     # placeholder exists instead of looking for the rendered header.
-    required_sections = [
-        "PART A: ROLE DEFINITION",
-        "PART B: QUANTITATIVE DETAIL PRESERVATION",
-        "PART C: CRITICAL DISTINCTIONS",
-        "{entity_types_guidance}",  # Part D placeholder — rendered from YAML at init time
-        "PART E: COMMON SOLICITATION STRUCTURE PATTERNS",
-        "PART F: RELATIONSHIP PATTERNS",
-        "PART K: ANNOTATED RFP EXAMPLES",
-    ]
-    
+    if USE_V8_PROMPT:
+        required_sections = [
+            "PART A: ROLE DEFINITION (V8 COMPACT FRAME)",
+            "PART B: CORE EXTRACTION RULES",
+            "{entity_types_guidance}",
+            "PART E: RELATIONSHIP GUIDANCE",
+            "PART G: ANNOTATED RFP EXAMPLES",
+        ]
+    else:
+        required_sections = [
+            "PART A: ROLE DEFINITION",
+            "PART B: QUANTITATIVE DETAIL PRESERVATION",
+            "PART C: CRITICAL DISTINCTIONS",
+            "{entity_types_guidance}",  # Part D placeholder — rendered from YAML at init time
+            "PART E: COMMON SOLICITATION STRUCTURE PATTERNS",
+            "PART F: RELATIONSHIP PATTERNS",
+            "PART K: ANNOTATED RFP EXAMPLES",
+        ]
+
     missing = [s for s in required_sections if s not in extraction_prompt]
     if missing:
         import warnings
