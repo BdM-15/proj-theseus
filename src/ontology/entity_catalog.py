@@ -119,6 +119,14 @@ class EntityTypeDef(BaseModel):
     valid_examples: list[str] | None = None
     invalid_examples: list[str] | None = None
     government_obligation_pattern: str | None = None
+    req_type_enum: list[str] | None = Field(
+        default=None,
+        description="Closed vocabulary of req_type values for this entity type (drives Phase 2/3 JSON schema).",
+    )
+    anti_pattern: str | None = Field(
+        default=None,
+        description="One-line counter-example showing a BAD extraction and why it fails.",
+    )
 
     # Required: at least one example.
     example: str = Field(..., description="One-line example (or quoted comma-list).")
@@ -302,7 +310,11 @@ class EntityCatalog(BaseModel):
         if entry.government_obligation_pattern:
             out.append(f"{indent}Government obligation pattern:")
             out.append(f"{indent}- {entry.government_obligation_pattern}")
+        if entry.req_type_enum:
+            out.append(f"{indent}req_type values: {', '.join(entry.req_type_enum)}")
         out.append(f"{indent}Example: {entry.example}")
+        if entry.anti_pattern:
+            out.append(f"{indent}Anti-pattern: {entry.anti_pattern}")
         return out
 
 

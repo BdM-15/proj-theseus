@@ -35,14 +35,25 @@ categories:
       - number: 1
         name: requirement
         title: "Contractor obligations (shall/should/may statements)"
+        distinction: |-
+          REQUIREMENT = contractor action obligation (what to DO);
+          PERFORMANCE_STANDARD = measurable threshold/SLA (how well, pass/fail);
+          WORK_SCOPE_ITEM = semantic work package title (what work exists, not a directive);
+          CONCEPT = government obligation ("Government shall...") or named methodology
         required_metadata: [criticality, modal_verb, req_type, labor_drivers]
+        req_type_enum: [FUNCTIONAL, PERFORMANCE, SECURITY, TECHNICAL, INTERFACE, MANAGEMENT, DESIGN]
         content_signals:
-          - "Contractor shall"
-          - "Offeror must"
-          - "action verbs"
+          - "Contractor shall / Contractor must / Contractor will"
+          - "Offeror shall / Personnel shall / The awardee shall"
+          - "Action verbs with contractor as subject: provide, maintain, perform, deliver, ensure, implement, support, conduct"
+          - "Modal verbs: shall (MANDATORY), should (IMPORTANT), may (OPTIONAL), must (MANDATORY), will (MANDATORY)"
         notes:
-          - "Criticality: MANDATORY (shall/must), IMPORTANT (should), OPTIONAL (may)"
-        example: '"Contractor shall provide 24/7 help desk support for 500 users"'
+          - "Criticality: MANDATORY (shall/must/will), IMPORTANT (should), OPTIONAL (may), INFORMATIONAL (Government shall = NOT a requirement)"
+          - "Subject check: verify the subject is the contractor/offeror/personnel — not the Government. 'Government shall provide...' = CONCEPT, not REQUIREMENT."
+          - "Split rule: when one sentence contains both an action AND a measurable threshold, emit TWO entities — one requirement + one performance_standard — linked by MEASURED_BY."
+          - "req_type is REQUIRED in description — classify every requirement by functional nature using req_type_enum above."
+        example: '"Contractor shall provide 24/7 help desk support for 500 users. Criticality: MANDATORY. Modal verb: shall. Req type: FUNCTIONAL. Labor drivers: 500 users, 24/7 coverage."'
+        anti_pattern: '"Maintain ISO certification" — missing criticality, modal verb, req_type, and subject context. Rejects silently downstream.'
 
       - number: 2
         name: contract_line_item
