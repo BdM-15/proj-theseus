@@ -116,11 +116,23 @@ categories:
         title: "Quantitative BOE drivers (volumes, counts, frequencies)"
         required_metadata: [quantity, unit, period, location_if_stated]
         content_signals:
-          - "Numbers + unit of measure + time period"
+          - "Numbers + unit of measure + time period: 12,500 sorties/year, 500 users, 1,600 customers/day"
+          - "Workload tables, BOE annexes, Appendix H / Attachment J-X workload data sections"
+          - "Volume phrases: average daily X, peak X, annual X, total X across Y locations"
+          - "Rate phrases: X per day/week/month/year, X events/period, X transactions/hour"
+          - "Count phrases: up to X, approximately X, not to exceed X, estimated X"
         distinction: |-
-          WORKLOAD_METRIC = quantitative data that drives staffing/cost;
-             REQUIREMENT = obligation statement; CONCEPT = abstract process
-        example: '"12,500 sorties/year", "1,600 customers daily", "100 events/year"'
+          WORKLOAD_METRIC = raw quantitative fact that drives staffing/cost estimates (no pass/fail threshold);
+          PERFORMANCE_STANDARD = measurable threshold with pass/fail criterion (response time ≤ 2 hrs, uptime ≥ 99.9%);
+          REQUIREMENT = contractor obligation statement (action, not a datum);
+          CONCEPT = abstract methodology or government process (no quantity)
+        notes:
+          - "ALL FOUR metadata fields are required when inferable — do not omit period or location_if_stated."
+          - "period: capture the measurement window exactly as stated (per day, annually, FY25, surge period) — do not normalize."
+          - "location_if_stated: if the number is scoped to a base, AOR, or theater, capture it verbatim (e.g., 'OCONUS', 'SWA AOR', 'Incirlik AB')."
+          - "Threshold test: if the number has a pass/fail criterion attached (≤, ≥, %, SLA), emit PERFORMANCE_STANDARD instead."
+        example: '"12,500 sorties/year at Incirlik AB. Quantity: 12500. Unit: sorties. Period: year. Location: Incirlik AB."'
+        anti_pattern: '"500 users" — missing unit (users), period (daily/annual?), and location. Omitting any inferable field is a metadata gap.'
 
       - number: 7
         name: labor_category
