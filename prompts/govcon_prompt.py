@@ -171,6 +171,12 @@ from __future__ import annotations
 from typing import Any
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# CRITICAL: load .env before reading USE_V8_PROMPT — this module may be imported
+# before the server entry-point's load_dotenv() has run (e.g. during tests or
+# when govcon_prompt.py is evaluated inside initialize_raganything()).
+load_dotenv(override=True)
 
 from src.ontology.schema import render_relationship_types_guidance
 

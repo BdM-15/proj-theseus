@@ -83,8 +83,8 @@ Token budget per extraction call (at CHUNK_SIZE=4096):
 **V8 implementation phases**:
 
 | Sub-phase | Scope                          | Target file(s)                                                    |
-| --------- | ------------------------------ | ----------------------------------------------------------------- |
-| V8-0      | Feature flag (`USE_V8_PROMPT`) | `src/server/initialization.py`, `prompts/govcon_prompt.py`       | ✅ Done |
+| --------- | ------------------------------ | ----------------------------------------------------------------- | ------- |
+| V8-0      | Feature flag (`USE_V8_PROMPT`) | `src/server/initialization.py`, `prompts/govcon_prompt.py`        | ✅ Done |
 | V8-1      | Compact system prompt frame    | `prompts/govcon_prompt.py` → `_build_v8_system_prompt()`          | ✅ Done |
 | V8-2      | Relationship types renderer    | `src/ontology/schema.py` → `render_relationship_types_guidance()` | ✅ Done |
 | V8-3      | A/B token & quality validation | Rebuild both workspaces, blind judge comparison                   | 🔄 Next |

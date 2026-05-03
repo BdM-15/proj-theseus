@@ -11,7 +11,7 @@ Configuration is loaded from src/core/config.py (centralized Settings class).
 # LightRAG's chunk_token_size default: int(os.getenv("CHUNK_SIZE", 1200))
 # Must set environment variables before LightRAG classes are defined
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(override=True)
 
 # Now safe to import LightRAG and our config
 import logging

@@ -23,7 +23,7 @@ Workflow:
 import os
 import sys
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(override=True)
 
 # Windows MAX_PATH mitigation for MinerU document processing
 # MinerU CLI creates mineru-api-client-{random} temp dirs under the system temp
@@ -117,6 +117,11 @@ async def main():
                         "LightRAG (workspace=%s)",
                         kwargs.get("workspace", "?"),
                     )
+                # LightRAG._normalize_addon_params injects ENTITY_TYPE_PROMPT_FILE from env into
+                # every LightRAG instance. The govcon.yaml profile only defines
+                # entity_extraction_json_examples (JSON mode); if entity_extraction_use_json
+                # defaults to False the text-mode validator raises ValueError.
+                kwargs.setdefault("entity_extraction_use_json", True)
                 super().__init__(*args, **kwargs)
 
         _lr_api_mod.LightRAG = _LightRAGWithLocalRerank

@@ -13,7 +13,7 @@ This module handles the initialization of the RAG-Anything instance with:
 # But we import it here too for safety if this module is used standalone
 import os
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(override=True)
 
 # Apply compatibility patches BEFORE raganything imports
 from tools.patches.raganything_libreoffice_windows import apply_patch as _apply_lo_patch
