@@ -53,6 +53,12 @@ from src.core import get_settings
 from prompts.govcon_prompt import GOVCON_PROMPTS
 PROMPTS.update(GOVCON_PROMPTS)
 
+
+def load_json_file(path: Path):
+    """Load JSON files that may be encoded with UTF-8 BOM."""
+    with open(path, encoding="utf-8-sig") as f:
+        return json.load(f)
+
 def create_sanitizing_wrapper(llm_func):
     """No-op wrapper — output_sanitizer module removed."""
     return llm_func
@@ -235,8 +241,7 @@ def analyze_workspace_stats(ws_path: Path) -> dict:
     # Check full_relations for belongs_to count
     full_relations_path = ws_path / "kv_store_full_relations.json"
     if full_relations_path.exists():
-        with open(full_relations_path, encoding="utf-8") as f:
-            full_rels = json.load(f)
+        full_rels = load_json_file(full_relations_path)
         total_rel_count = 0
         for doc_id, doc_data in full_rels.items():
             if isinstance(doc_data, dict):
@@ -247,17 +252,14 @@ def analyze_workspace_stats(ws_path: Path) -> dict:
     # LLM cache entries
     cache_path = ws_path / "kv_store_llm_response_cache.json"
     if cache_path.exists():
-        with open(cache_path, encoding="utf-8") as f:
-            cache = json.load(f)
+        cache = load_json_file(cache_path)
         stats["llm_cache_entries"] = len(cache)
 
     # Detect orphaned entities
     # An entity is orphaned if it appears in vdb_entities but not in vdb_relationships
     if stats["total_entities"] > 0 and rels_vdb_path.exists() and entities_vdb_path.exists():
-        with open(entities_vdb_path, encoding="utf-8") as f:
-            ents_vdb = json.load(f).get("data", [])
-        with open(rels_vdb_path, encoding="utf-8") as f:
-            rels_vdb = json.load(f).get("data", [])
+        ents_vdb = load_json_file(entities_vdb_path).get("data", [])
+        rels_vdb = load_json_file(rels_vdb_path).get("data", [])
 
         ents_list = ents_vdb if isinstance(ents_vdb, list) else list(ents_vdb.values())
         rels_list = rels_vdb if isinstance(rels_vdb, list) else list(rels_vdb.values())
