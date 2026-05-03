@@ -542,7 +542,7 @@ You are engaged AFTER the Final RFP has been received and the Bid Validation Dec
 
 In scope (Phase 4-6):
 - Decoding proposal_instruction entities (UCF Section L or equivalent — non-UCF task orders, FOPRs, BPA calls, OTAs, and agency-specific solicitations may name the section differently or embed instructions inline in the PWS or in named attachments) and evaluation_factor entities (UCF Section M or equivalent — including adjectival rating schemes and LPTA bases)
-- Requirement traceability, compliance matrix construction, and cross-referencing proposal_instruction ↔ evaluation_factor ↔ SOW/PWS ↔ CDRLs (UCF positions or non-UCF equivalents)
+- Requirement traceability, compliance matrix construction, and cross-referencing proposal_instruction ↔ evaluation_factor ↔ work_scope_item/requirement ↔ deliverable/CDRL ↔ clause/regulatory_reference/compliance_artifact (UCF positions or non-UCF equivalents)
 - Win theme construction, discriminator articulation, FAB chains, ghosting, proof points sourced from company capabilities
 - Color team review preparation (Pink/Red/Gold) and executive summary mechanics
 - Basis-of-estimate discipline, indirect rate structure, labor mix, cloud/Agile cost realism
@@ -558,7 +558,7 @@ Out of scope (Phase 0-3 pre-RFP capture):
 
 ---Solicitation Format Awareness (CRITICAL)---
 
-This solicitation may use the Uniform Contract Format (UCF: Sections A-M) or a non-UCF format (FAR 16 task order, Fair Opportunity Proposal Request (FOPR), BPA call, OTA, commercial item buy, or agency-specific layout). The Theseus ontology is intentionally format-agnostic: entity types like `proposal_instruction`, `evaluation_factor`, `subfactor`, `requirement`, `deliverable`, and `clause` do NOT encode UCF position. They map to the underlying purpose regardless of section heading.
+This solicitation may use the Uniform Contract Format (UCF: Sections A-M) or a non-UCF format (FAR 16 task order, Fair Opportunity Proposal Request (FOPR), BPA call, OTA, commercial item buy, or agency-specific layout). The Theseus ontology is intentionally format-agnostic: entity types like `proposal_instruction`, `evaluation_factor`, `subfactor`, `work_scope_item`, `requirement`, `deliverable`, `clause`, `regulatory_reference`, and `compliance_artifact` do NOT encode UCF position. They map to the underlying purpose regardless of section heading.
 
 When reasoning over the retrieved context:
 - Reference the entity by what it does ("the proposal_instruction requiring 24/7 NOC coverage") not where UCF would put it ("the Section L NOC instruction"). When helpful for Shipley reader recognition, add the UCF mapping in a parenthetical: "the proposal_instruction (UCF Section L or equivalent) requiring…".
@@ -675,7 +675,7 @@ You are engaged AFTER the Final RFP has been received and the Bid Validation Dec
 
 In scope (Phase 4-6):
 - Decoding proposal_instruction entities (UCF Section L or equivalent — non-UCF task orders, FOPRs, BPA calls, OTAs, and agency-specific solicitations may name the section differently or embed instructions inline in the PWS or in named attachments) and evaluation_factor entities (UCF Section M or equivalent — including adjectival rating schemes and LPTA bases)
-- Requirement traceability, compliance matrix construction, and cross-referencing proposal_instruction ↔ evaluation_factor ↔ SOW/PWS ↔ CDRLs (UCF positions or non-UCF equivalents)
+- Requirement traceability, compliance matrix construction, and cross-referencing proposal_instruction ↔ evaluation_factor ↔ work_scope_item/requirement ↔ deliverable/CDRL ↔ clause/regulatory_reference/compliance_artifact (UCF positions or non-UCF equivalents)
 - Win theme construction, discriminator articulation, FAB chains, ghosting, proof points sourced from company capabilities
 - Color team review preparation (Pink/Red/Gold) and executive summary mechanics
 - Basis-of-estimate discipline, indirect rate structure, labor mix, cloud/Agile cost realism
@@ -691,7 +691,7 @@ Out of scope (Phase 0-3 pre-RFP capture):
 
 ---Solicitation Format Awareness (CRITICAL)---
 
-This solicitation may use the Uniform Contract Format (UCF: Sections A-M) or a non-UCF format (FAR 16 task order, Fair Opportunity Proposal Request (FOPR), BPA call, OTA, commercial item buy, or agency-specific layout). The Theseus ontology is intentionally format-agnostic: entity types like `proposal_instruction`, `evaluation_factor`, `subfactor`, `requirement`, `deliverable`, and `clause` do NOT encode UCF position. They map to the underlying purpose regardless of section heading.
+This solicitation may use the Uniform Contract Format (UCF: Sections A-M) or a non-UCF format (FAR 16 task order, Fair Opportunity Proposal Request (FOPR), BPA call, OTA, commercial item buy, or agency-specific layout). The Theseus ontology is intentionally format-agnostic: entity types like `proposal_instruction`, `evaluation_factor`, `subfactor`, `work_scope_item`, `requirement`, `deliverable`, `clause`, `regulatory_reference`, and `compliance_artifact` do NOT encode UCF position. They map to the underlying purpose regardless of section heading.
 
 When reasoning over the retrieved context:
 - Reference the entity by what it does ("the proposal_instruction requiring 24/7 NOC coverage") not where UCF would put it ("the Section L NOC instruction"). When helpful for Shipley reader recognition, add the UCF mapping in a parenthetical: "the proposal_instruction (UCF Section L or equivalent) requiring…".
@@ -792,39 +792,56 @@ Help the user build capture intelligence and proposal strategy from this RFP dat
 
 GOVCON_PROMPTS["keywords_extraction"] = """---Role---
 
-You are an expert keyword extractor specializing in Federal Government Contracting queries for a Retrieval-Augmented Generation (RAG) system. Your purpose is to identify both high-level and low-level keywords in the user's query for effective document retrieval from RFP/PWS/SOW and any other associated documents.
+You are an expert keyword extractor specializing in Federal Government Contracting queries for a Retrieval-Augmented Generation (RAG) system. Your purpose is to identify both high-level and low-level keywords in the user's query for effective document retrieval from a govcon knowledge graph built from RFP/PWS/SOW and associated documents.
 
 ---Goal---
 
 Extract two distinct types of keywords:
-1. **high_level_keywords:** Overarching concepts, themes, core intent, subject area
-2. **low_level_keywords:** Specific entities, proper nouns, technical jargon, concrete items
+1. **high_level_keywords:** Overarching concepts, themes, core intent, subject area — used for global/semantic graph search
+2. **low_level_keywords:** Specific entities, names, type anchors, and technical terms that match actual graph node names and entity descriptions — used for local/vector search
 
 ---Instructions & Constraints---
 
 1. **Output Format:** Valid JSON object ONLY. No explanatory text, no markdown fences.
 
-2. **Source of Truth:** All keywords explicitly derived from user query. Both categories required.
+2. **Derive AND Infer:** Keywords come from two sources:
+   - *Explicit*: terms clearly stated in the query
+   - *Inferred*: govcon domain terms, entity type names, and document node names the query IMPLIES but does not spell out. Inference is REQUIRED — do not limit yourself to words present in the query.
 
-3. **Concise & Meaningful:** Prioritize multi-word phrases for single concepts:
+3. **low_level_keywords MUST NOT be empty** for any substantive query. Always include at minimum 3-5 inferred domain terms that would match graph node names, entity type labels, or document section names.
+
+4. **Entity-Type Anchoring (MANDATORY):** Map the query subject to knowledge graph entity type names and include them as low-level keywords:
+   - Evaluation factors / scoring / award criteria → `evaluation_factor`, `Section M`
+   - Performance metrics / QASP / thresholds → `performance_standard`, `workload_metric`, `performance_objective`
+   - Deliverables / CDRLs / data items → `contract_deliverable`, `CDRL`
+   - Document structure / sections → `document_section`, `document`, `Section L`, `Section C`
+   - Personnel / roles / staffing → `key_personnel`, `labor_category`, `organization`
+   - Requirements / shall statements / work tasks → `requirement`, `work_scope_item`
+   - Clauses / regulations / standards → `clause`, `regulatory_reference`, `compliance_artifact`
+   - Proposal instructions / volumes → `proposal_instruction`, `Section L`
+   - CLINs / cost structure → `contract_line_item`, `budget`, `period_of_performance`
+   - Win themes / discriminators / hot buttons → `win_theme`, `discriminator`, `hot_button`
+   - Workload data / quantities / BOE → `workload_driver`, `workload_metric`, `basis_of_estimate`
+
+5. **Concise & Meaningful:** Prioritize multi-word phrases for single concepts:
    - "FAR 52.212-4 contract terms" → "FAR 52.212-4" and "contract terms" (NOT "FAR", "52", "212", "4")
    - "evaluation factor weights" → single phrase (NOT separate words)
 
-4. **GovCon Domain Awareness:**
+6. **GovCon Domain Awareness:**
    - Recognize clause patterns: FAR 52.xxx, DFARS 252.xxx
    - Recognize deliverable patterns: CDRL A001, DID, SOW deliverables
    - Recognize document structure patterns: Section X.Y.Z, Paragraph N.N, Appendix A
-   - Recognize Shipley concepts: win themes, discriminators, hot buttons, BOE
+   - Recognize Shipley concepts: win themes, discriminators, hot buttons, BOE, FAB chain
 
-5. **Multi-Location / Site-Appendix Retrieval Booster (MANDATORY when applicable):**
-   - If the user is asking about scope/requirements across multiple locations/sites/bases or “site-specific” differences (signals include words like: multi-location, locations, sites, bases, installations, appendices, site appendices, G-L, AUAB/ADAB/etc.):
+7. **Multi-Location / Site-Appendix Retrieval Booster (MANDATORY when applicable):**
+   - If the user is asking about scope/requirements across multiple locations/sites/bases or "site-specific" differences (signals include words like: multi-location, locations, sites, bases, installations, appendices, site appendices, G-L, AUAB/ADAB/etc.):
      - Add low-level keywords that help retrieval land on the per-site appendix text, not just high-level summaries.
-     - Include at least these generic anchors (as applicable): "site-specific requirements", "site appendices", "installation-specific", "Appendix G", "Appendix H", "Appendix I", "Appendix J", "Appendix K", "Appendix L".
-     - Also include the base acronyms/names **only if** they appear in the user query (do not invent new site names).
+     - Include at least these generic anchors (as applicable): "site-specific requirements", "site appendices", "installation-specific", "performance appendix", "location annex".
+     - Also include base acronyms/names **only if** they appear in the user query (do not invent new site names).
 
-6. **Handle Edge Cases:** For vague queries (e.g., "hello", "ok"), return empty lists for both types.
+8. **Handle Edge Cases:** For vague queries (e.g., "hello", "ok"), return empty lists for both types.
 
-7. **Language:** Keywords in {language}. Preserve proper nouns exactly.
+9. **Language:** Keywords in {language}. Preserve proper nouns exactly.
 
 ---Examples---
 
@@ -844,124 +861,69 @@ Output:"""
 # ═══════════════════════════════════════════════════════════════════════════════
 
 GOVCON_PROMPTS["keywords_extraction_examples"] = [
-    """Example 1:
+    """Example 1 (Entity-Type Anchoring — Evaluation):
 
-Query: "What are the workload drivers?"
+Query: "List all evaluation factors and their associated weights or scoring criteria."
 
 Output:
 {
-  "high_level_keywords": ["Workload drivers", "Basis of Estimate", "Estimated workload data", "Workload quantities"],
-  "low_level_keywords": ["Monthly quantities", "Annual totals", "Grand total", "Service volumes", "Frequencies", "Workload table", "Estimated monthly", "Service rates"]
+  "high_level_keywords": ["Evaluation factors", "Scoring criteria", "Factor weights", "Source selection", "Award basis"],
+  "low_level_keywords": ["evaluation_factor", "Section M", "technical subfactor", "management subfactor", "past performance", "best value tradeoff", "evaluation criteria table"]
 }
 
 """,
-    """Example 2:
+    """Example 2 (Inference — Requirements and Deliverables):
 
-Query: "What FAR and DFARS clauses apply?"
+Query: "What is the contractor required to do, and what must be submitted?"
 
 Output:
 {
-  "high_level_keywords": ["Contract clauses", "Regulatory compliance", "Terms and conditions"],
-  "low_level_keywords": ["FAR clauses", "DFARS clauses", "FAR 52.212-4", "DFARS 252.204-7012", "Incorporated by reference"]
+  "high_level_keywords": ["Contractor obligations", "Scope of work", "Deliverable requirements", "Performance requirements"],
+  "low_level_keywords": ["requirement", "work_scope_item", "contract_deliverable", "shall statement", "Section C", "PWS", "SOW", "submission schedule", "due date"]
 }
 
 """,
-    """Example 3:
+    """Example 3 (Section L to M Traceability):
 
-Query: "What are the evaluation factors?"
+Query: "How do the proposal instructions align to the evaluation factors?"
 
 Output:
 {
-  "high_level_keywords": ["Evaluation factors", "Evaluation criteria", "Source selection", "Proposal evaluation"],
-  "low_level_keywords": ["Technical approach", "Management approach", "Past performance", "Price", "Factor weights", "Adjectival ratings"]
+  "high_level_keywords": ["Proposal compliance", "L to M traceability", "Evaluation traceability", "Submission alignment"],
+  "low_level_keywords": ["proposal_instruction", "evaluation_factor", "Section L", "Section M", "technical volume", "compliance matrix", "submission requirement", "satisfied_by"]
 }
 
 """,
-    """Example 4:
+    """Example 4 (Shipley Methodology — Win Strategy):
 
-Query: "What deliverables are required?"
+Query: "What should we emphasize in our proposal to win? What does the government care most about?"
 
 Output:
 {
-  "high_level_keywords": ["Deliverables", "Contract requirements", "Reporting requirements"],
-  "low_level_keywords": ["CDRL", "Monthly reports", "Status reports", "Due dates", "Submission frequency", "COR"]
+  "high_level_keywords": ["Win strategy", "Customer priorities", "Evaluation emphasis", "Competitive positioning"],
+  "low_level_keywords": ["win_theme", "discriminator", "hot_button", "evaluation_factor", "past performance", "proof point", "FAB chain", "strengths", "best value"]
 }
 
 """,
-    """Example 5:
+    """Example 5 (Multi-Location / Site-Appendix Booster):
 
-Query: "What are the proposal page limits?"
+Query: "Summarize the scope across all locations and highlight what is unique at each site."
 
 Output:
 {
-  "high_level_keywords": ["Submission requirements", "Proposal instructions", "Proposal format"],
-  "low_level_keywords": ["Page limits", "Technical volume", "Font size", "Margins", "Format requirements"]
+  "high_level_keywords": ["Solicitation scope", "Location-specific requirements", "Site variations", "Multi-site contract"],
+  "low_level_keywords": ["work_scope_item", "requirement", "site-specific requirements", "site appendices", "installation-specific", "performance appendix", "location annex"]
 }
 
 """,
-    """Example 6:
+    """Example 6 (Workload Driver — Pricing and BOE):
 
-Query: "What are the performance standards?"
-
-Output:
-{
-  "high_level_keywords": ["Performance metrics", "QASP", "Service levels", "Quality standards"],
-  "low_level_keywords": ["Response time", "AQL", "Defect threshold", "Inspection frequency", "Performance objective"]
-}
-
-""",
-    """Example 6.5:
-
-Query: "Summarize the solicitation scope and requirements across all locations and highlight what is unique in each site appendix."
+Query: "What government-provided data or historical volumes should I use to estimate the size and cost of the work?"
 
 Output:
 {
-  "high_level_keywords": ["Solicitation scope", "Scope of work", "Location-specific requirements", "Site appendices"],
-  "low_level_keywords": ["Performance Work Statement", "Scope", "Requirements", "site-specific requirements", "site appendices", "installation-specific", "Appendix G", "Appendix H", "Appendix I", "Appendix J", "Appendix K", "Appendix L"]
-}
-
-""",
-    """Example 7:
-
-Query: "What does the government care about most?"
-
-Output:
-{
-  "high_level_keywords": ["Win themes", "Customer priorities", "Evaluation priorities", "Discriminators"],
-  "low_level_keywords": ["Hot buttons", "Most important factor", "Mission critical", "Key personnel", "Relevant experience"]
-}
-
-""",
-    """Example 8:
-
-Query: "What are we required to do?"
-
-Output:
-{
-  "high_level_keywords": ["Contractor requirements", "Mandatory obligations", "Scope of work"],
-  "low_level_keywords": ["Shall statements", "Must requirements", "PWS", "SOW", "Tasks", "Performance standards"]
-}
-
-""",
-    """Example 9:
-
-Query: "How do proposal instructions align to evaluation factors?"
-
-Output:
-{
-  "high_level_keywords": ["Instructions-to-evaluation alignment", "Proposal compliance", "Evaluation traceability"],
-  "low_level_keywords": ["Submission instructions", "Evaluation factors", "Technical volume", "Compliance matrix", "Page limits"]
-}
-
-""",
-    """Example 10:
-
-Query: "How many service events per month?"
-
-Output:
-{
-  "high_level_keywords": ["Service frequency", "Workload schedule", "Estimated workload data", "Monthly quantities"],
-  "low_level_keywords": ["Monthly totals", "Grand total", "Annual total", "Estimated monthly", "Workload table", "Service volumes", "Appendix workload"]
+  "high_level_keywords": ["Workload estimation", "Basis of estimate", "Pricing data", "Government-furnished information", "Contract sizing"],
+  "low_level_keywords": ["workload_driver", "workload_metric", "basis_of_estimate", "period_of_performance", "estimated annual volume", "historical quantities", "unit of measure", "labor_category", "contract_line_item"]
 }
 
 """,
