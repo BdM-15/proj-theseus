@@ -2,7 +2,7 @@
 Server module for RAG-Anything + LightRAG integration
 
 This module provides:
-- Configuration (config.py): 33 entity types, API credentials, chunking settings
+- Configuration (config.py): ontology-backed entity catalog, API credentials, chunking settings
 - Initialization (initialization.py): RAGAnything instance with custom prompts
 - Routes (routes.py): FastAPI endpoints + semantic post-processing
 

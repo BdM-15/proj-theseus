@@ -45,7 +45,7 @@ GovCon Capture Vibe is an **ontology-modified RAG system** for federal RFP analy
   - `src/server/` - FastAPI routing, configuration, initialization
   - `src/extraction/` - Custom entity extraction (Instructor + Pydantic)
   - `src/inference/` - Semantic post-processing algorithms
-  - `src/ontology/` - Pydantic schema validation (33 entity types)
+    - `src/ontology/` - Pydantic schema validation (catalog-driven entity types)
 
 **External Dependencies**:
 
@@ -92,7 +92,7 @@ Cloud Processing (xAI Grok-4.1)
     ├─ Concurrency: 16 workers (MAX_ASYNC, prevents rate limit errors)
     └─ Temperature: 0.1 (deterministic extraction)
          ↓
-Custom Ontology Extraction (33 entity types)
+Custom Ontology Extraction (catalog-driven entity types)
     ├─ Contract/Commercial: requirement, contract_line_item, pricing_element, government_furnished_item, deliverable, workload_metric, labor_category, performance_standard, transition_activity
     ├─ Document/Authorities: document_section, document, amendment, clause, regulatory_reference, technical_specification, work_scope_item
     ├─ Proposal/Evaluation: evaluation_factor, subfactor, proposal_instruction, proposal_volume, past_performance_reference
@@ -318,7 +318,7 @@ result = client.chat.completions.create(
 
 **Rationale**:
 
-- ✅ **Preserve ontology**: 33 entity types remain intact
+- ✅ **Preserve ontology**: catalog-driven entity types remain intact
 - ✅ **Multimodal capabilities**: MinerU parsing for tables/images
 - ✅ **Non-invasive**: Pass LightRAG instance via `lightrag=govcon_rag` parameter
 - ✅ **Maintainable**: `pip install --upgrade` gets updates without merge conflicts
@@ -539,7 +539,7 @@ VALID_RELATIONSHIPS = {
 - ✅ OpenAI embeddings (text-embedding-3-large, 3072-dim)
 - ✅ Neo4j primary storage with workspace isolation
 - ✅ Pydantic schema enforcement (Instructor library)
-- ✅ 33 entity types with semantic detection
+- ✅ Catalog-driven entity types with semantic detection
 - ✅ 8 semantic post-processing algorithms
 - ✅ Custom agents framework (.github/agents/)
 
@@ -606,7 +606,7 @@ VALID_RELATIONSHIPS = {
 
 **Entity Extraction**:
 
-- ✅ 33 entity types properly classified
+- ✅ Catalog-driven entity types properly classified
 - ✅ Pydantic validation enforced (Instructor library)
 - ✅ 5x retry with exponential backoff
 - ✅ Failed chunk tracking for post-mortem analysis

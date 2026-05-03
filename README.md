@@ -143,7 +143,7 @@ Algorithm-specific inference prompts live under `prompts/relationship_inference/
 
 ## Government Contracting Ontology
 
-### 33 Entity Types
+### Entity Types (Catalog-Driven)
 
 The ontology is organized into four functional groups for maximum extraction precision:
 
@@ -205,7 +205,7 @@ The ontology is organized into four functional groups for maximum extraction pre
 | `compliance_artifact` | Certifications, ATOs, accreditations        | "ISO 9001:2015 Certification" |
 | `concept`             | Residual abstract ideas and processes       | "CONUS operations"            |
 
-### 35 Relationship Types
+### Relationship Types (Canonical Set)
 
 Defined in `src/ontology/schema.py` → `VALID_RELATIONSHIP_TYPES`, organized by functional group:
 
@@ -254,7 +254,7 @@ proj-theseus/
 │   │   ├── workload_enrichment.py       # BOE category tagging (opt-in)
 │   │   └── vdb_sync.py                  # Vector DB resync after retyping
 │   ├── ontology/
-│   │   └── schema.py             # 33 entity types + 35 relationship types (canonical)
+│   │   └── schema.py             # Catalog-driven entity types + canonical relationship types
 │   ├── core/                     # Shared config helpers
 │   └── utils/                    # Logging, time helpers (America/Chicago)
 ├── prompts/

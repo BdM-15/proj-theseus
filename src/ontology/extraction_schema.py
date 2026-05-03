@@ -12,7 +12,7 @@ parser (in `lightrag.operate`) reads from each object:
 
 By passing this schema to xAI with `strict: true`, the model is forced to:
   - Produce the exact field names the parser expects (no `entity` / `subject` drift).
-  - Pick `type` from the 33-entity-type enum (no invented types).
+    - Pick `type` from the catalog-backed entity-type enum (no invented types).
   - Always include all required fields (no missing `description`, no missing `keywords`).
 
 NOTE on `keywords`: xAI strict-mode validation rejects JSON-Schema `pattern`
@@ -92,7 +92,7 @@ def build_extraction_json_schema() -> dict[str, Any]:
                         "type": {
                             "type": "string",
                             "enum": entity_type_enum,
-                            "description": "Entity type from the 33-type govcon ontology.",
+                            "description": "Entity type from the catalog-backed govcon ontology.",
                         },
                         "description": {
                             "type": "string",

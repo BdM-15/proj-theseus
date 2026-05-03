@@ -3,7 +3,7 @@ RAG-Anything Server with LightRAG WebUI
 Multimodal RAG system for government contracting documents
 
 Architecture:
-- src/server/config.py: Configuration (33 entity types, API credentials, chunking)
+- src/server/config.py: Configuration (ontology-backed entity catalog, API credentials, chunking)
 - src/server/initialization.py: RAGAnything initialization (tri-LLM, custom prompts)
 - src/server/routes.py: FastAPI endpoints + semantic post-processing
 - This file: Main entry point + server orchestration
@@ -11,7 +11,7 @@ Architecture:
 Workflow:
 1. Document Upload → /insert endpoint → UCF detection
 2. Dual-Path Processing → Section-aware OR standard extraction
-3. Entity Extraction → 33 custom types (extraction LLM: non-reasoning)
+3. Entity Extraction → catalog-driven custom types (extraction LLM: non-reasoning)
 4. Semantic Post-Processing → 8 LLM inference algorithms (reasoning LLM)
 5. Knowledge Graph Storage → Neo4j or local GraphML
 """

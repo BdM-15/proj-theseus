@@ -54,6 +54,7 @@ QueryDataFunc = Callable[
 ]
 
 from src.core import get_settings, reset_settings
+from src.ontology.schema import VALID_ENTITY_TYPES, VALID_RELATIONSHIP_TYPES
 
 logger = logging.getLogger(__name__)
 
@@ -809,6 +810,7 @@ def _ui_chat_history_pairs() -> int:
 def _gather_stats() -> dict[str, Any]:
     settings = get_settings()
     ws = _workspace_dir()
+    inference_only_relationship_types = {"REQUIRES", "ENABLED_BY", "RESPONSIBLE_FOR"}
     return {
         "workspace": settings.workspace,
         "graph_storage": getattr(global_args, "graph_storage", "NetworkXStorage"),
@@ -823,6 +825,13 @@ def _gather_stats() -> dict[str, Any]:
             # Mirrored from UI_CHAT_HISTORY_TURNS so the chat header can render
             # an accurate "N turns in context" indicator.
             "history_pairs_cap": _ui_chat_history_pairs(),
+        },
+        "ontology": {
+            "entity_type_count": len(VALID_ENTITY_TYPES),
+            "relationship_type_count": len(VALID_RELATIONSHIP_TYPES),
+            "extraction_relationship_type_count": len(
+                VALID_RELATIONSHIP_TYPES - inference_only_relationship_types
+            ),
         },
         "models": {
             "extraction": settings.extraction_llm_name,

@@ -19,7 +19,7 @@ Priority order used for decisions:
 
 Internal sources reviewed:
 
-- prompts/extraction/govcon_entity_types.yaml (33 entity types)
+- prompts/extraction/govcon_entity_types.yaml (catalog-driven entity types)
 - src/ontology/schema.py (current canonical relationships)
 - prompts/extraction/govcon_lightrag_json.txt (mandatory extraction relationship list)
 - docs/.shipley_extracted.json term-mining summary (capture/proposal concept frequency)
@@ -34,7 +34,7 @@ External references reviewed:
 
 ## High-Confidence Findings
 
-1. The current 33 entity types are structurally sound for federal proposal intelligence extraction.
+1. The current catalog-driven entity types are structurally sound for federal proposal intelligence extraction.
 2. The highest value improvements are not type-count changes, but stronger constraints and role semantics.
 3. A terminology drift exists: multiple files still claim 43 canonical relationship types, but active extraction/schema lists are 35.
 4. The ontology already aligns with external best practice patterns:

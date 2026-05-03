@@ -1,6 +1,6 @@
 ---
 name: govcon-ontology
-description: Authoritative, agent-readable specification of Project Theseus's 33-entity / 35-relationship federal-contracting ontology. USE WHEN extracting entities or relationships from any federal solicitation text — RFP, SOW, PWS, proposal instructions / evaluation criteria / attachments (UCF Section L/M/J or equivalent), FAR 16 task orders, FOPRs, BPA calls, OTAs, agency-specific formats; validating extraction output; extending the ontology with a new entity type or relationship; debugging "why didn't it tag this as a CLIN?"; or when any agent (Copilot, sub-agent, Theseus runtime) needs to produce or consume Theseus-graph-compatible structured output. The ontology is intentionally format-agnostic — entity types map to purpose, not UCF position. DO NOT USE FOR generic NER, non-federal contracting (state/local/commercial), or open-domain knowledge graphs. Acts as living documentation and a guardrail so agents extend the ontology consistently.
+description: Authoritative, agent-readable specification of Project Theseus's 32-entity / 26-relationship federal-contracting ontology. USE WHEN extracting entities or relationships from any federal solicitation text — RFP, SOW, PWS, proposal instructions / evaluation criteria / attachments (UCF Section L/M/J or equivalent), FAR 16 task orders, FOPRs, BPA calls, OTAs, agency-specific formats; validating extraction output; extending the ontology with a new entity type or relationship; debugging "why didn't it tag this as a CLIN?"; or when any agent (Copilot, sub-agent, Theseus runtime) needs to produce or consume Theseus-graph-compatible structured output. The ontology is intentionally format-agnostic — entity types map to purpose, not UCF position. DO NOT USE FOR generic NER, non-federal contracting (state/local/commercial), or open-domain knowledge graphs. Acts as living documentation and a guardrail so agents extend the ontology consistently.
 license: MIT
 metadata:
   # Phase 4j taxonomy — see docs/SKILL_TAXONOMY.md
@@ -9,7 +9,7 @@ metadata:
   shipley_phases: []
   capability: meta
   category: ontology
-  version: 1.3.1
+  version: 1.3.2
   status: active
   runtime: legacy
   authoritative_source: src/ontology/schema.py
@@ -29,7 +29,7 @@ This skill is the **portable, machine-and-human-readable** version of the ontolo
 - Adding a new entity type or relationship type (extension workflow below)
 - Explaining ontology choices to a teammate or evaluator
 
-## The 33 Entity Types
+## The 32 Entity Types
 
 Always emit `type` as **lowercase snake_case**. Entity `name` should be a canonical, deduplicable surface form (CLIN numbers, clause IDs, factor titles).
 
@@ -45,7 +45,7 @@ Always emit `type` as **lowercase snake_case**. Entity `name` should be a canoni
 | `workload_metric`           | Numeric volume drivers (sorties, tickets, sq ft) | `12,500 sorties/year`            |
 | `labor_category`            | Named LCATs in staffing tables                   | `Systems Engineer III`           |
 | `performance_standard`      | KPIs, SLAs, AQLs, QASP rows                      | `99.9% Uptime`                   |
-| `transition_activity`       | Phase-in/out, mobilization tasks                 | `30-Day Phase-In Plan`           |
+| `period_of_performance`     | Base/option windows, start/end periods           | `01 Oct 2026 - 30 Sep 2027`      |
 
 ### Group B — Document Structure, Authorities & Work Patterns (7)
 
@@ -59,12 +59,11 @@ Always emit `type` as **lowercase snake_case**. Entity `name` should be a canoni
 | `technical_specification` | ICDs, TDPs, MIL-DTL/MIL-PRF                     | `MIL-DTL-38999`        |
 | `work_scope_item`         | PWS/SOW/SOO numbered tasks/objectives           | `Task 3.2 Network Ops` |
 
-### Group C — Proposal & Evaluation Structure (5)
+### Group C — Proposal & Evaluation Structure (4)
 
 | Type                         | Detect on                                                                                                                 | Example name                           |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
 | `evaluation_factor`          | Factor headings + weights (UCF Section M or equivalent — incl. adjectival / LPTA)                                         | `Technical Approach (40%)`             |
-| `subfactor`                  | Factor children (UCF Section M or equivalent)                                                                             | `Subfactor 1.2 Staffing (15%)`         |
 | `proposal_instruction`       | "shall submit", page limits, format rules (UCF Section L or equivalent — may live inline in PWS or in a named attachment) | `L.3.4 Submit Past Performance Volume` |
 | `proposal_volume`            | Volume I/II/III containers                                                                                                | `Volume I — Technical`                 |
 | `past_performance_reference` | Reference contract tables, CPARS rows                                                                                     | `Contract W912-1234`                   |
@@ -79,35 +78,35 @@ Always emit `type` as **lowercase snake_case**. Entity `name` should be a canoni
 
 ### Group E — Standard Entities (9)
 
-`organization`, `program`, `equipment`, `technology`, `location`, `event`, `person`, `compliance_artifact`, `concept`. Use these only when no Group A–D type fits.
+`organization`, `program`, `equipment`, `technology`, `location`, `event`, `contract_vehicle`, `compliance_artifact`, `concept`. Use these only when no Group A–D type fits.
 
-## The 35 Relationship Types
+## The 26 Relationship Types
 
 Always emit `relationship_type` as **UPPERCASE_SNAKE**. Subject is the **source** entity, object is the **target**.
 
-### Structural (6)
+### Structural (4)
 
-`CHILD_OF`, `ATTACHMENT_OF`, `CONTAINS`, `AMENDS`, `SUPERSEDED_BY`, `REFERENCES`
+`CHILD_OF`, `AMENDS`, `SUPERSEDED_BY`, `REFERENCES`
 
-### Evaluation & Proposal — the proposal_instruction ↔ evaluation_factor Golden Thread (5)
+### Evaluation & Proposal — the proposal_instruction ↔ evaluation_factor Golden Thread (4)
 
-`GUIDES` (instruction → factor), `EVALUATED_BY` (factor → instruction or evidence), `HAS_SUBFACTOR`, `MEASURED_BY`, `EVIDENCES`
+`GUIDES` (instruction → factor), `EVALUATED_BY` (factor → instruction or evidence), `MEASURED_BY`, `EVIDENCES`
 
-### Work & Deliverables — Traceability Chain (8)
+### Work & Deliverables — Traceability Chain (7)
 
-`PRODUCES`, `SATISFIED_BY`, `TRACKED_BY`, `SUBMITTED_TO`, `STAFFED_BY`, `PRICED_UNDER`, `FUNDS`, `QUANTIFIES`
+`PRODUCES`, `SATISFIED_BY`, `TRACKED_BY`, `SUBMITTED_TO`, `STAFFED_BY`, `PRICED_UNDER`, `QUANTIFIES`
 
-### Authority & Governance (5)
+### Authority & Governance (4)
 
-`GOVERNED_BY`, `MANDATES`, `CONSTRAINED_BY`, `DEFINES`, `APPLIES_TO`
+`GOVERNED_BY`, `CONSTRAINED_BY`, `DEFINES`, `APPLIES_TO`
 
-### Resource & Operational (4)
+### Resource & Operational (2)
 
-`HAS_EQUIPMENT`, `PROVIDED_BY`, `COORDINATED_WITH`, `REPORTED_TO`
+`HAS_EQUIPMENT`, `PROVIDED_BY`
 
-### Strategic & Capture Intelligence (4)
+### Strategic & Capture Intelligence (2)
 
-`ADDRESSES`, `RESOLVES`, `SUPPORTS`, `RELATED_TO`
+`ADDRESSES`, `RELATED_TO`
 
 ### Inference-Only — added by post-processing, do not emit during extraction (3)
 

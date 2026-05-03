@@ -6524,10 +6524,12 @@
           },
 
           navSubtitle() {
+            const entityTypeCount = this.stats.ontology?.entity_type_count ?? 32;
+            const relationshipTypeCount = this.stats.ontology?.relationship_type_count ?? 26;
             const m = {
               dashboard: "capture command overview",
               documents: "ingest · MinerU · multimodal extraction",
-              graph: "33 entity types · 35 relationship types",
+              graph: `${entityTypeCount} entity types · ${relationshipTypeCount} relationship types`,
               chat: "shipley mentor · RAG over the workspace",
               intel:
                 "instructions ↔ evaluation · traceability · coverage · gaps",
@@ -6565,7 +6567,7 @@
                 label: "Entities",
                 value: this.stats.entities ?? "—",
                 icon: "sparkles",
-                hint: "33 govcon types",
+                hint: `${this.stats.ontology?.entity_type_count ?? 32} govcon types`,
                 go: "graph",
                 accent: "magenta",
                 color: "text-neon-magenta",
@@ -6574,7 +6576,7 @@
                 label: "Relationships",
                 value: this.stats.relationships ?? "—",
                 icon: "link",
-                hint: "35 canonical types",
+                hint: `${this.stats.ontology?.relationship_type_count ?? 26} canonical types`,
                 go: "graph",
                 accent: "lime",
                 color: "text-neon-lime",

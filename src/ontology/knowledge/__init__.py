@@ -15,7 +15,7 @@ Module Categories:
 - lessons_learned.py: 20+ years domain expertise
 - company_capabilities.py: Company-specific service lines, platforms, past performance, discriminators
 
-Entity types align with schema.py (33 govcon types) for seamless merging.
+Entity types align with schema.py (catalog-driven govcon types) for seamless merging.
 """
 
 from src.ontology.knowledge.shipley import ENTITIES as SHIPLEY_ENTITIES

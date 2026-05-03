@@ -1,7 +1,7 @@
 {
   "skill": "govcon-ontology",
-  "version": "1.2.1",
-  "notes": "Pure-reference skill — evals verify the agent answers in Theseus ontology vocabulary using only the bundled references and refuses non-Theseus / non-federal scope.",
+  "version": "1.3.2",
+  "notes": "Pure-reference skill — evals verify the agent answers in Theseus ontology vocabulary using only the bundled references and refuses non-Theseus / non-federal scope. Updated for the 32-entity / 26-relationship canonical ontology.",
   "evals": [
     {
       "id": "eval-001-entity-classification",
@@ -26,6 +26,16 @@
       "prompt": "Use the Theseus ontology to model a Shopify e-commerce product catalog with customers and orders.",
       "expectations": [
         {"kind": "response_contains_any", "value": ["federal", "not applicable", "out of scope", "DO NOT USE", "non-federal"]}
+      ]
+    },
+    {
+      "id": "eval-004-counts-current",
+      "prompt": "What are the current Theseus ontology cardinalities for entity types and relationship types?",
+      "expectations": [
+        {"kind": "response_contains", "value": "32"},
+        {"kind": "response_contains", "value": "26"},
+        {"kind": "response_contains_any", "value": ["entity", "entities"]},
+        {"kind": "response_contains_any", "value": ["relationship", "relationships"]}
       ]
     }
   ]

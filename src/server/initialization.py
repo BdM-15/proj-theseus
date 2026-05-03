@@ -3,7 +3,7 @@ RAG-Anything Initialization Module
 
 This module handles the initialization of the RAG-Anything instance with:
 - Custom entity extraction prompts (govcon_lightrag_json.txt, Parts A-L)
-- Government contracting ontology (catalog-driven entity types, 35 relationship types)
+- Government contracting ontology (catalog-driven entity types, canonical relationship set)
 - Multimodal document processing (MinerU parser)
 - Cloud LLM integration (xAI Grok extraction + fast-reasoning post-processing + grok-4.20 queries + OpenAI embeddings)
 """

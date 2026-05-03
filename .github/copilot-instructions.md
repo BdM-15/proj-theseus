@@ -70,8 +70,8 @@ This project has **three independent prompt systems** that MUST stay aligned. Ch
 
 ### Domain Vocabulary Reference
 
-- **33 entity types**: Defined in `prompts/extraction/govcon_entity_types.yaml` — re-exported as `src/ontology/schema.py` → `VALID_ENTITY_TYPES` and rendered into the extraction prompt as `{entity_types_guidance}`
-- **35 relationship types**: Defined in `src/ontology/schema.py` → `VALID_RELATIONSHIP_TYPES`
+- **Entity types (catalog-driven)**: Defined in `prompts/extraction/govcon_entity_types.yaml` — re-exported as `src/ontology/schema.py` → `VALID_ENTITY_TYPES` and rendered into the extraction prompt as `{entity_types_guidance}`
+- **Relationship types (canonical)**: Defined in `src/ontology/schema.py` → `VALID_RELATIONSHIP_TYPES`
 - **Shipley methodology**: Discriminators, win themes, hot buttons, proof points, FAB chains, ghost language, compliance matrix — defined in extraction prompt Part D (rendered from the entity catalog YAML) and query prompt `rag_response`
 
 ---
@@ -88,7 +88,7 @@ This project wraps **LightRAG** and **RAGAnything** to provide specialized gover
   - `routes.py` - Custom endpoints with batch completion detection
   - `initialization.py` - RAGAnything wrapper initialization, prompt registration (all 3 systems)
 - `src/inference/` - Semantic post-processing (3 inference algorithms: L↔M links, document structure, orphan resolution)
-- `src/ontology/` - Domain schema validation (Pydantic models for 33 entity types, 35 relationship types)
+- `src/ontology/` - Domain schema validation (Pydantic models for catalog-driven entity types and canonical relationship types)
 - `src/extraction/` - Custom entity extraction logic
 
 ### Processing Pipeline
