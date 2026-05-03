@@ -14,19 +14,19 @@ Phase 1.3 validated that strict JSON produces a cleaner, lower-noise build and b
 
 ## Phase Status
 
-| Phase | Scope                              | Status      | Notes                                                                                                                                                                               |
-| ----- | ---------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0     | Dependency upgrade baseline        | Done        | LightRAG/RAG-Anything baseline established on the epic branch.                                                                                                                      |
-| 1     | Native JSON extraction path        | Done        | JSON prompt shape matches LightRAG parser keys: `name`, `type`, `description`, `source`, `target`, `keywords`.                                                                      |
-| 1.1   | Entity catalog YAML parity         | Done        | Entity types are YAML-backed and rendered into extraction prompts.                                                                                                                  |
-| 1.2   | JSON prompt conversion             | Done        | Tuple sanitizer is gated off in JSON mode; prompt emits LightRAG-native JSON arrays.                                                                                                |
-| 1.3   | Strict JSON schema enforcement     | Done        | Strict `GovConExtractionResult` schema is applied only to LightRAG text extraction; RAG-Anything table/equation analysis uses its own non-strict modal path.                        |
-| 2     | Multi-workspace baseline lock      | Done        | non-UCF (afcap5_adab_iss) + UCF (mcpp_drfp) both validated; JSON ≥ tuple on blind judge across both workspace types. afcap6_drfp deferred (no true solicitation).                   |
-| 2.5   | Tuple vestige purge                | Done        | Deleted output_sanitizer.py, govcon_lightrag_native.txt, tuple prompt keys, ENTITY_EXTRACTION_USE_JSON flag.                                                                        |
-| 3     | Token reduction / prompt whittling | In Progress | Phase 3 = two-track: (3a) first-principles content hardening (relationship set reduction, entity type hardening); (3b) V8 structural architecture (composable prompt). Branch 163.  |
-| 3a    | First-principles content hardening | In Progress | Relationship set reduced 35→26 (23 extraction + 3 inference-only). 9 phantom types removed. Entity YAML enrichment complete. govcon_lightrag_json.txt aligned to new canonical set. |
-| 3b    | V8 composable prompt architecture  | In Progress | V8-0/V8-1/V8-2 implemented: examples externalized, compact frame built, feature flag `USE_V8_PROMPT` added. Remaining work: A/B quality validation and retirement decision.         |
-| 4     | Lock-in                            | Planned     | Multi-workspace validation, tag `v1.4.0`, and fast-forward epic branch to `main`. Requires V8 A/B parity check.                                                                     |
+| Phase | Scope                              | Status  | Notes                                                                                                                                                                               |
+| ----- | ---------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Dependency upgrade baseline        | Done    | LightRAG/RAG-Anything baseline established on the epic branch.                                                                                                                      |
+| 1     | Native JSON extraction path        | Done    | JSON prompt shape matches LightRAG parser keys: `name`, `type`, `description`, `source`, `target`, `keywords`.                                                                      |
+| 1.1   | Entity catalog YAML parity         | Done    | Entity types are YAML-backed and rendered into extraction prompts.                                                                                                                  |
+| 1.2   | JSON prompt conversion             | Done    | Tuple sanitizer is gated off in JSON mode; prompt emits LightRAG-native JSON arrays.                                                                                                |
+| 1.3   | Strict JSON schema enforcement     | Done    | Strict `GovConExtractionResult` schema is applied only to LightRAG text extraction; RAG-Anything table/equation analysis uses its own non-strict modal path.                        |
+| 2     | Multi-workspace baseline lock      | Done    | non-UCF (afcap5_adab_iss) + UCF (mcpp_drfp) both validated; JSON ≥ tuple on blind judge across both workspace types. afcap6_drfp deferred (no true solicitation).                   |
+| 2.5   | Tuple vestige purge                | Done    | Deleted output_sanitizer.py, govcon_lightrag_native.txt, tuple prompt keys, ENTITY_EXTRACTION_USE_JSON flag.                                                                        |
+| 3     | Token reduction / prompt whittling | ✅ Done | Phase 3 = two-track: (3a) first-principles content hardening (relationship set reduction, entity type hardening); (3b) V8 structural architecture (composable prompt). Branch 163.  |
+| 3a    | First-principles content hardening | ✅ Done | Relationship set reduced 35→26 (23 extraction + 3 inference-only). 9 phantom types removed. Entity YAML enrichment complete. govcon_lightrag_json.txt aligned to new canonical set. |
+| 3b    | V8 composable prompt architecture  | ✅ Done | V8-0/V8-1/V8-2/V8-3/V8-4 complete: compact frame built, A/B validated, legacy monolith retired. `USE_V8_PROMPT` flag removed.                                                       |
+| 4     | Lock-in                            | Planned | Multi-workspace validation, tag `v1.4.0`, and fast-forward epic branch to `main`. Requires V8 A/B parity check.                                                                     |
 
 ## Phase 3 First-Principles Track (Issue #124)
 
@@ -78,7 +78,7 @@ Token budget per extraction call (at CHUNK_SIZE=4096):
 | Relationship types (Part F.1)    | `src/ontology/schema.py` → `render_relationship_types_guidance()` | Composed at import time into V8 system prompt                                            |
 | Compact role + rules (Parts A-C) | `prompts/govcon_prompt.py` → `_build_v8_system_prompt()`          | Embedded directly in V8 system prompt                                                    |
 | Output contract (Part J)         | `prompts/govcon_prompt.py` → `_build_v8_system_prompt()`          | Embedded directly in V8 system prompt                                                    |
-| Legacy monolith                  | `prompts/extraction/govcon_lightrag_json.txt`                     | Retained as fallback (`USE_V8_PROMPT=false`)                                             |
+| Legacy monolith                  | `prompts/extraction/govcon_lightrag_json.txt`                     | Retired (V8-4, issue #124)                                                               |
 
 **V8 implementation phases**:
 
@@ -88,18 +88,19 @@ Token budget per extraction call (at CHUNK_SIZE=4096):
 | V8-1      | Compact system prompt frame    | `prompts/govcon_prompt.py` → `_build_v8_system_prompt()`          | ✅ Done |
 | V8-2      | Relationship types renderer    | `src/ontology/schema.py` → `render_relationship_types_guidance()` | ✅ Done |
 | V8-3      | A/B token & quality validation | Rebuild both workspaces, blind judge comparison                   | ✅ Done |
-| V8-4      | Legacy monolith retirement     | Remove `govcon_lightrag_json.txt` after V8-3 passes               | 🔄 Next |
+| V8-4      | Legacy monolith retirement     | Remove `govcon_lightrag_json.txt` after V8-3 passes               | ✅ Done |
 
-**Feature flag**: `USE_V8_PROMPT=true/false` in `.env`. Default `false` during V8-1/V8-2 to preserve existing behavior. Flip to `true` for V8-3 A/B run.
+**Feature flag**: `USE_V8_PROMPT` removed in V8-4 — V8 compact frame is the only extraction path.
 
-**V8-3 validation decision: PASS — proceed to V8-4 legacy monolith retirement.**
+**V8-3 validation decision: PASS — V8-4 retirement complete.**
 
 **Current implementation status**:
 
 - `prompts/entity_type/govcon.yaml` now owns all 7 Part K examples via LightRAG `ENTITY_TYPE_PROMPT_FILE`
-- `prompts/govcon_prompt.py` now supports both legacy and V8 compact extraction prompt paths
+- `prompts/govcon_prompt.py` → `_build_v8_system_prompt()` is the sole extraction system prompt (V8-4 retired legacy monolith)
 - `src/ontology/schema.py` renders canonical relationship guidance for prompt composition
-- Full test suite passes with `USE_V8_PROMPT=true` (`172 passed, 25 skipped`)
+- `USE_V8_PROMPT` feature flag removed; V8 always active
+- Full test suite passes (`172 passed, 25 skipped`)
 - **V8-3 A/B validation complete**: v8_t1 passes parity on both workspace formats (see snapshot below)
 
 ## Phase 3b V8-3 Validation Snapshot

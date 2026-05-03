@@ -133,7 +133,7 @@ Theseus runs three independently-registered prompt systems that share a single o
 
 | System                         | Purpose                                           | Source                                                                                   |
 | ------------------------------ | ------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| **1. LightRAG Extraction**     | Entity/relationship extraction from text chunks   | `prompts/extraction/govcon_lightrag_json.txt` → `prompts/govcon_prompt.py`               |
+| **1. LightRAG Extraction**     | Entity/relationship extraction from text chunks   | `prompts/govcon_prompt.py` → `_build_v8_system_prompt()`                                 |
 | **2. LightRAG Query/Response** | Shipley-mentor RAG answering + keyword extraction | `prompts/govcon_prompt.py` (`rag_response`, `naive_rag_response`, `keywords_extraction`) |
 | **3. RAGAnything Multimodal**  | Table / image / equation VLM analysis             | `prompts/multimodal/govcon_multimodal_prompts.py`                                        |
 

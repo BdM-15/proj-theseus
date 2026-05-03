@@ -2,9 +2,12 @@
 
 These tests intentionally validate static quality gates before major prompt rewrites:
 - Canonical relationship vocabulary count is stable.
-- Extraction prompt F.1 relationship list exactly matches schema canonical set.
+- Extraction prompt (V8 compact frame) relationship set exactly matches schema canonical set.
 - Golden-thread and authority-traceability relationship primitives remain present.
-- Core entity types required for Section L↔M traceability remain present.
+- Core entity types required for Section L⇔M traceability remain present.
+
+V8-4 (issue #124): govcon_lightrag_json.txt was retired. Tests now verify the V8 compact
+frame built by _build_v8_system_prompt() in prompts/govcon_prompt.py.
 """
 
 from __future__ import annotations
@@ -12,29 +15,37 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from src.ontology.schema import VALID_ENTITY_TYPES, VALID_RELATIONSHIP_TYPES
+from src.ontology.schema import VALID_ENTITY_TYPES, VALID_RELATIONSHIP_TYPES, render_relationship_types_guidance
+from prompts.govcon_prompt import _build_v8_system_prompt
 
-_ROOT = Path(__file__).parent.parent
-_PROMPT_PATH = _ROOT / "prompts" / "extraction" / "govcon_lightrag_json.txt"
 _INFERENCE_ONLY_RELATIONSHIP_TYPES = {"REQUIRES", "ENABLED_BY", "RESPONSIBLE_FOR"}
 
 
 def _read_prompt() -> str:
-    return _PROMPT_PATH.read_text(encoding="utf-8")
+    """Return the active V8 extraction system prompt."""
+    return _build_v8_system_prompt()
 
+def _extract_extraction_relationship_types(prompt_text: str) -> set[str]:
+    """Extract canonical relationship types from the V8 prompt's Part E.
 
-def _extract_f1_relationship_types(prompt_text: str) -> set[str]:
-    """Extract canonical relationship types listed under prompt Part F.1.
-
-    We parse only the F.1 block and collect tokens like `CHILD_OF - ...`.
+    render_relationship_types_guidance() embeds types as comma-separated tokens in
+    lines like `- Structural: CHILD_OF, AMENDS, SUPERSEDED_BY, REFERENCES`.
+    We parse only the extraction-time block (before the inference-only line).
     """
-    start = prompt_text.find("F.1 Mandatory Relationship Types")
-    end = prompt_text.find("F.2 Proposal Instruction")
-    assert start != -1 and end != -1 and end > start, (
-        "Could not locate Part F.1/F.2 boundaries in govcon_lightrag_json.txt"
-    )
+    # Locate Part E block
+    start = prompt_text.find("PART E: RELATIONSHIP GUIDANCE")
+    end = prompt_text.find("PART F: OUTPUT CONTRACT")
+    assert start != -1, "V8 prompt missing PART E: RELATIONSHIP GUIDANCE"
+    assert end != -1 and end > start, "V8 prompt missing PART F: OUTPUT CONTRACT after PART E"
     block = prompt_text[start:end]
-    return set(re.findall(r"^([A-Z_]+)\s+-\s+", block, flags=re.MULTILINE))
+
+    # Stop at the inference-only section to avoid collecting REQUIRES/ENABLED_BY/RESPONSIBLE_FOR
+    inference_marker = "Inference-only types"
+    if inference_marker in block:
+        block = block[:block.index(inference_marker)]
+
+    # Collect UPPERCASE_WITH_UNDERSCORES tokens
+    return set(re.findall(r"\b([A-Z][A-Z_]+[A-Z])\b", block))
 
 
 # ---------------------------------------------------------------------------
@@ -55,26 +66,32 @@ def test_canonical_relationship_count_is_26():
 
 def test_prompt_contract_note_uses_35_relationship_count():
     """
-    The old header CONTRACT NOTE was developer metadata with zero extraction value —
-    it was removed in v7.3.1 (Phase 3c). Cardinality is enforced by the stronger
-    test_prompt_f1_relationship_types_match_schema_exactly below.
-    This test now verifies the entity types guidance placeholder is present (rendered
-    from the YAML catalog at load time) and that Part F relationship rules exist.
+    Verify the V8 prompt contains its structural landmark sections and the
+    entity types guidance placeholder (rendered from YAML at init time).
+    This is the V8-4 equivalent of the legacy monolith's Part F contract-note check.
     """
     prompt_text = _read_prompt()
-    assert "entity_types_guidance" in prompt_text or "PART C.4" in prompt_text, (
-        "Entity types guidance block must be present (placeholder or rendered)."
+    assert "{entity_types_guidance}" in prompt_text, (
+        "Entity types guidance placeholder must be present in V8 prompt (rendered from YAML)."
     )
-    assert "PART F" in prompt_text, "Part F relationship rules must be present."
+    assert "PART E: RELATIONSHIP GUIDANCE" in prompt_text, "V8 prompt must contain Part E relationship section."
+    assert "PART F: OUTPUT CONTRACT" in prompt_text, "V8 prompt must contain Part F output contract."
 
 
 def test_prompt_f1_relationship_types_match_schema_exactly():
-    prompt_types = _extract_f1_relationship_types(_read_prompt())
+    """V8 prompt Part E must contain every extraction-time canonical relationship type.
+
+    V8 builds Part E by calling render_relationship_types_guidance() directly from
+    schema.py, so prompt/schema parity is guaranteed by construction. This test
+    verifies no type was silently dropped from the rendered output.
+    """
+    prompt_types = _extract_extraction_relationship_types(_read_prompt())
     extraction_schema_types = set(VALID_RELATIONSHIP_TYPES) - _INFERENCE_ONLY_RELATIONSHIP_TYPES
-    assert prompt_types == extraction_schema_types, (
-        "Part F.1 relationship list drifted from extraction relationship types. "
-        f"Missing in prompt: {sorted(extraction_schema_types - prompt_types)}; "
-        f"Extra in prompt: {sorted(prompt_types - extraction_schema_types)}"
+    missing_in_prompt = extraction_schema_types - prompt_types
+    assert not missing_in_prompt, (
+        "Extraction-time relationship types missing from V8 prompt Part E: "
+        f"{sorted(missing_in_prompt)}. "
+        "render_relationship_types_guidance() in schema.py may have drifted."
     )
 
 

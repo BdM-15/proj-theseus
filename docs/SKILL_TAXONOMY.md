@@ -31,7 +31,7 @@ extraction prompt (for personas), and any UI filter chips in the same PR.
 ## 2. Persona vocabulary (8 IDs + `none`)
 
 Mirrors the persona list in
-[prompts/extraction/govcon_lightrag_json.txt](../prompts/extraction/govcon_lightrag_json.txt)
+`prompts/govcon_prompt.py` → `_build_v8_system_prompt()` Part A
 verbatim. **If a persona is added/removed there, update both files in the
 same commit.** Cross-Cutting Change Checklist item 7 enforces this.
 
@@ -191,7 +191,7 @@ Updating any vocabulary in this doc requires (per Cross-Cutting Change
 Checklist item 7 in [.github/copilot-instructions.md](../.github/copilot-instructions.md)):
 
 1. Update this doc's vocabulary table(s).
-2. Update `prompts/extraction/govcon_lightrag_json.txt` Part B persona
+2. Update `prompts/govcon_prompt.py` → `_build_v8_system_prompt()` Part A persona
    list (for `personas_*` changes only).
 3. Bump every affected SKILL.md frontmatter in the same commit.
 4. Update [tests/skills/test_skill_taxonomy.py](../tests/skills/test_skill_taxonomy.py)

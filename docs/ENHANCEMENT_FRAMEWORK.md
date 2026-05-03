@@ -340,6 +340,6 @@ Some custom code serves govcon-specific purposes that no upstream library will e
 2. **Algorithms 1-4** — Section L↔M mapping, requirement traceability — pure govcon logic
 3. **Shipley Methodology Integration** — Capture intelligence domain knowledge
 4. **GovconMultimodalProcessor** — Govcon-specific table mapping, section awareness
-5. **Extraction Prompts** (`prompts/extraction/govcon_lightrag_json.txt`) — Domain-tuned extraction
+5. **Extraction Prompts** (`prompts/govcon_prompt.py` → `_build_v8_system_prompt()`) — Domain-tuned extraction (V8 compact frame, retired `govcon_lightrag_json.txt` monolith in V8-4)
 
 These represent the core value proposition and should be maintained/enhanced, not replaced.

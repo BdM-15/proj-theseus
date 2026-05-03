@@ -161,13 +161,15 @@ def test_every_skill_has_valid_capability(all_skills) -> None:
 
 
 def test_persona_primary_aligns_with_extraction_prompt() -> None:
-    """The extraction prompt's USER PERSONAS YOU SUPPORT block is the source
-    of truth for the persona vocabulary. When that block changes, this test
-    will fail until docs/SKILL_TAXONOMY.md and SKILL.md frontmatter are
-    re-audited."""
-    prompt = (_REPO_ROOT / "prompts" / "extraction" / "govcon_lightrag_json.txt").read_text(
-        encoding="utf-8"
-    )
+    """The V8 extraction prompt Part A is the source of truth for the persona vocabulary.
+
+    V8-4 (issue #124): govcon_lightrag_json.txt was retired. The prompt is now built
+    in-module by _build_v8_system_prompt(). When the persona list in Part A changes,
+    this test will fail until docs/SKILL_TAXONOMY.md and SKILL.md frontmatter are
+    re-audited.
+    """
+    from prompts.govcon_prompt import _build_v8_system_prompt
+    prompt = _build_v8_system_prompt()
     expected = {
         "Capture Managers",
         "Proposal Managers",

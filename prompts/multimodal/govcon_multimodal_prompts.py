@@ -9,7 +9,7 @@ expertise across all multimodal content types: tables, images, and equations.
 
 Ontology alignment: Prompts reference the canonical govcon entity types and canonical
 relationship types defined in src/ontology/schema.py and the extraction prompt
-(prompts/extraction/govcon_lightrag_json.txt). This ensures VLM output primes
+(prompts/govcon_prompt.py). This ensures VLM output primes
 downstream entity/relationship extraction with correct vocabulary.
 
 Shipley methodology: Prompts surface strategic signals (discriminators, hot buttons,
@@ -39,7 +39,7 @@ Template variable reference:
 Cross-reference:
     - Entity types: src/ontology/schema.py → VALID_ENTITY_TYPES (ontology-driven)
   - Relationship types: src/ontology/schema.py → VALID_RELATIONSHIP_TYPES (43 types)
-  - Extraction prompt: prompts/extraction/govcon_lightrag_json.txt (Part D entity catalog)
+  - Extraction prompt: prompts/govcon_prompt.py (_build_v8_system_prompt(), Part D via {entity_types_guidance})
   - Shipley framework: prompts/govcon_prompt.py (v3.0 Mentor Framework)
 """
 

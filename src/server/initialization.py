@@ -728,26 +728,16 @@ async def initialize_raganything():
     extraction_prompt = GOVCON_PROMPTS.get('entity_extraction_json_system_prompt', '')
     extraction_chars = len(extraction_prompt)
     extraction_lines = extraction_prompt.count('\n')
-    
-    use_v8_prompt = os.getenv("USE_V8_PROMPT", "false").strip().lower() in ("1", "true", "yes", "on")
-    prompt_source = "V8 compact frame (govcon_prompt.py builder)" if use_v8_prompt else "govcon_lightrag_json.txt (Parts A-L)"
 
     logger.info("✅ REPLACED LightRAG prompt system with GovCon prompt overrides")
     logger.info(f"   Extraction prompt: {extraction_chars:,} chars (~{extraction_chars//4:,} tokens), {extraction_lines:,} lines")
-    logger.info(f"   Source: {prompt_source}")
+    logger.info(f"   Source: V8 compact frame (govcon_prompt.py builder)")
     logger.info(f"   Domain Intelligence:")
-    metadata_type_count = extraction_prompt.count('Required metadata:')
-    logger.info(f"     • 8 Shipley user personas (Capture, Proposal, Cost, Contracts, etc.)")
-    if use_v8_prompt:
-        logger.info("     • Entity catalog rendered dynamically from govcon_entity_types.yaml")
-        logger.info("     • Relationship guidance rendered from schema.py canonical set")
-        logger.info("     • 7 annotated RFP examples injected from prompts/entity_type/govcon.yaml")
-    else:
-        logger.info(f"     • {metadata_type_count} GovCon entity types with metadata requirements")
-        logger.info(f"     • 50+ relationship inference rules (L↔M, clause clustering, etc.)")
-        logger.info(f"     • 7 annotated RFP examples via govcon.yaml profile")
+    logger.info("     • Entity catalog rendered dynamically from govcon_entity_types.yaml")
+    logger.info("     • Relationship guidance rendered from schema.py 26-type canonical set")
+    logger.info("     • 7 annotated RFP examples injected from prompts/entity_type/govcon.yaml")
     logger.info(f"     • Quantitative preservation rules for BOE development")
-    logger.info(f"     • {'Compact frame + quality checks' if use_v8_prompt else 'Decision tree for ambiguous cases'}")
+    logger.info(f"     • Compact frame + quality checks (Parts A-H)")
     logger.info(f"   Keywords examples: {len(GOVCON_PROMPTS.get('keywords_extraction_examples', []))} GovCon-specific")
     
     # ═══════════════════════════════════════════════════════════════════════════════

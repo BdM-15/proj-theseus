@@ -8,10 +8,10 @@ domain-specific government contracting intelligence for RFP analysis.
 
 Architecture:
 -------------
-- Legacy monolith loaded from govcon_lightrag_json.txt when USE_V8_PROMPT=false
-- V8 compact frame composed in govcon_prompt.py when USE_V8_PROMPT=true
+- V8 compact frame composed in-module by _build_v8_system_prompt()
 - Entity-type guidance rendered dynamically from the YAML entity catalog
-- Part K examples externalized via LightRAG ENTITY_TYPE_PROMPT_FILE profile
+- Relationship guidance rendered dynamically from src/ontology/schema.py
+- Part G examples externalized via LightRAG ENTITY_TYPE_PROMPT_FILE profile
 - LightRAG-compatible format with JSON structured output
 
 Philosophy:
@@ -26,31 +26,27 @@ Usage:
     from lightrag.prompt import PROMPTS
     PROMPTS.update(GOVCON_PROMPTS)
 
-Domain Intelligence Included:
------------------------------
+Domain Intelligence Included (V8 compact frame — 8 sections):
+-------------------------------------------------------------
 - Part A: Role Definition (8 Shipley user personas)
-- Part B: Quantitative Detail Preservation (BOE development)
-- Part C: Critical Distinctions (requirement vs metric, strategic themes)
-- Part D: Ontology entity types with metadata requirements
-- Part E: UCF Reference (Sections A-M guidance)
-- Part F: 50+ Relationship Inference Rules (L↔M mapping, clause clustering)
-- Part G: Entity Naming Normalization
-- Part H: Decision Tree for Ambiguous Cases
-- Part I: Metadata Extraction Requirements
-- Part J: Output Format
-- Part K: 7 Annotated RFP Examples injected from prompts/entity_type/govcon.yaml
-- Part L: Quality Checks
+- Part B: Core Extraction Rules (content/density/naming/split/hierarchy/hygiene)
+- Part C: Quantitative Preservation (verbatim numbers, rates, IDs, dates)
+- Part D: Entity Catalog ({entity_types_guidance} — rendered from YAML at init)
+- Part E: Relationship Guidance (rendered from schema.py canonical 26-type set)
+- Part F: Output Contract (JSON shape, field rules)
+- Part G: Annotated RFP Examples ({examples} — from prompts/entity_type/govcon.yaml)
+- Part H: Quality Checks Before Output
 
-Prompt file: prompts/extraction/govcon_lightrag_json.txt
-Example profile: prompts/entity_type/govcon.yaml
-Version: 8.1.0 (Phase 3b V8 compact frame + feature flag, issue #124)
+Version: 8.4.0 (V8-4 legacy monolith retired, V8 is sole extraction system prompt, issue #124)
 
-Prompt Changelog (govcon_lightrag_json.txt):
---------------------------------------------
-v8.1.0 - Add USE_V8_PROMPT compact-frame path in govcon_prompt.py.
-         Legacy monolith remains available behind feature flag for A/B validation.
-         Compact frame composes relationship guidance from schema.py and keeps
-         entity guidance/examples as dynamic injections.
+Prompt Changelog:
+-----------------
+v8.4.0 - V8-4: Delete govcon_lightrag_json.txt legacy monolith. Remove USE_V8_PROMPT
+         feature flag. _build_v8_system_prompt() is now the sole extraction system prompt.
+         Validated across ADAB (non-UCF, 7/11 win) and MCPP (UCF, parity) before retirement.
+v8.1.0 - Add USE_V8_PROMPT compact-frame path. Compact frame composes relationship
+         guidance from schema.py and keeps entity guidance/examples as dynamic injections.
+         Legacy monolith retained as fallback for A/B validation (now retired in v8.4.0).
 v8.0.0 - Replace static Part K example block with `{examples}` placeholder.
          All 7 JSON examples now live in prompts/entity_type/govcon.yaml and are
          loaded via LightRAG ENTITY_TYPE_PROMPT_FILE. Example drift repaired to
@@ -183,34 +179,16 @@ from src.ontology.schema import render_relationship_types_guidance
 
 GOVCON_PROMPTS: dict[str, Any] = {}
 
-USE_V8_PROMPT = os.getenv("USE_V8_PROMPT", "false").strip().lower() in {"1", "true", "yes", "on"}
-
 # ═══════════════════════════════════════════════════════════════════════════════
-# LOAD FULL DOMAIN INTELLIGENCE FROM FILE
+# V8 COMPACT EXTRACTION SYSTEM PROMPT
 # ═══════════════════════════════════════════════════════════════════════════════
-# The extraction prompt is ~27K tokens (1900+ lines) of domain intelligence.
-# We load it from file rather than embedding a truncated version.
-# This preserves ALL:
-# - 8 user personas (Capture Managers, Proposal Writers, Cost Estimators, etc.)
-# - 50+ quantitative preservation rules
-# - 26+ agency clause supplements (FAR, DFARS, AFFARS, NMCARS, etc.)
-# - 50+ relationship inference patterns
-# - 7 annotated examples
-# - Decision trees, metadata requirements, quality checks
-
-def _load_legacy_extraction_prompt_json() -> str:
-    """Load the legacy GovCon extraction prompt (JSON structured-output mode) from file."""
-    prompts_dir = Path(__file__).parent
-    json_prompt_path = prompts_dir / "extraction" / "govcon_lightrag_json.txt"
-
-    if not json_prompt_path.exists():
-        raise FileNotFoundError(
-            f"GovCon JSON extraction prompt not found at {json_prompt_path}. "
-          "Run `.\\.venv\\Scripts\\python.exe tools\\_build_json_prompt.py` to regenerate."
-        )
-
-    with open(json_prompt_path, "r", encoding="utf-8") as f:
-        return f.read()
+# govcon_lightrag_json.txt was retired in V8-4 (Phase 3b, issue #124).
+# The V8 compact frame is now the sole extraction system prompt, built in-module
+# from dynamic components:
+#   - Relationship guidance: rendered from src/ontology/schema.py canonical set
+#   - Entity guidance: {entity_types_guidance} placeholder → rendered from
+#     prompts/extraction/govcon_entity_types.yaml at LightRAG init time
+#   - Examples: {examples} placeholder → resolved from prompts/entity_type/govcon.yaml
 
 
 def _build_v8_system_prompt() -> str:
@@ -229,9 +207,17 @@ PART A: ROLE DEFINITION (V8 COMPACT FRAME)
 ---Role---
 You are a Federal Government Contracting Intelligence Specialist extracting a
 knowledge graph from solicitations, amendments, attachments, and proposal-
-relevant artifacts. Extract for the full Theseus user set: capture managers,
-proposal managers, proposal writers, cost estimators, contracts managers,
-technical SMEs, legal/compliance staff, and program managers.
+relevant artifacts.
+
+Extract for all 8 Shipley user personas:
+- Capture Managers — shaping win strategy pre-RFP
+- Proposal Managers — orchestrating compliant, on-time response
+- Proposal Writers — authoring volumes and sections
+- Cost Estimators — building BOE and pricing strategy
+- Contracts Managers — managing compliance and modifications
+- Technical SMEs — designing technical approach
+- Legal/Compliance — ensuring regulatory compliance
+- Program Managers — planning delivery and transition
 
 MISSION:
 1. Build a reusable graph for downstream reasoning, not a shallow summary.
@@ -363,16 +349,9 @@ Before emitting JSON, verify:
 """
 
 
-def _get_extraction_prompt_json() -> str:
-    """Resolve the active extraction prompt based on the V8 feature flag."""
-
-    if USE_V8_PROMPT:
-        return _build_v8_system_prompt()
-    return _load_legacy_extraction_prompt_json()
-
-# Phase 1.2 (issue #124): JSON structured-output system prompt.
+# Phase 3b V8-4 (issue #124): V8 compact frame is the sole extraction system prompt.
 # Used when LightRAG is initialized with ``entity_extraction_use_json=True``.
-GOVCON_PROMPTS["entity_extraction_json_system_prompt"] = _get_extraction_prompt_json()
+GOVCON_PROMPTS["entity_extraction_json_system_prompt"] = _build_v8_system_prompt()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1009,39 +988,26 @@ def _validate_prompts():
     """Validate that full domain intelligence was loaded"""
     extraction_prompt = GOVCON_PROMPTS.get("entity_extraction_json_system_prompt", "")
 
-    # Legacy monolith should be large. V8 should be substantially smaller.
-    MIN_EXPECTED_CHARS = 5000 if USE_V8_PROMPT else 40000
+    # V8 compact frame: ~5K–8K chars (well under the legacy ~121K-char monolith).
+    MIN_EXPECTED_CHARS = 5000
 
     if len(extraction_prompt) < MIN_EXPECTED_CHARS:
         import warnings
         warnings.warn(
             f"GovCon extraction prompt appears truncated ({len(extraction_prompt):,} chars). "
-            f"Expected at least {MIN_EXPECTED_CHARS:,} chars. Check govcon_lightrag_json.txt."
+            f"Expected at least {MIN_EXPECTED_CHARS:,} chars."
         )
 
-    # Validate critical sections are present.
-    # Note: Part D is no longer a literal section in the .txt template — it is rendered
-    # at runtime from prompts/extraction/govcon_entity_types.yaml via the
-    # `{entity_types_guidance}` placeholder (Phase 1.1c of epic #124). We verify the
-    # placeholder exists instead of looking for the rendered header.
-    if USE_V8_PROMPT:
-        required_sections = [
-            "PART A: ROLE DEFINITION (V8 COMPACT FRAME)",
-            "PART B: CORE EXTRACTION RULES",
-            "{entity_types_guidance}",
-            "PART E: RELATIONSHIP GUIDANCE",
-            "PART G: ANNOTATED RFP EXAMPLES",
-        ]
-    else:
-        required_sections = [
-            "PART A: ROLE DEFINITION",
-            "PART B: QUANTITATIVE DETAIL PRESERVATION",
-            "PART C: CRITICAL DISTINCTIONS",
-            "{entity_types_guidance}",  # Part D placeholder — rendered from YAML at init time
-            "PART E: COMMON SOLICITATION STRUCTURE PATTERNS",
-            "PART F: RELATIONSHIP PATTERNS",
-            "PART K: ANNOTATED RFP EXAMPLES",
-        ]
+    # Validate that all V8 structural sections are present.
+    # Part D is a {entity_types_guidance} placeholder — rendered from YAML at LightRAG init.
+    # Part G is an {examples} placeholder — resolved from prompts/entity_type/govcon.yaml.
+    required_sections = [
+        "PART A: ROLE DEFINITION (V8 COMPACT FRAME)",
+        "PART B: CORE EXTRACTION RULES",
+        "{entity_types_guidance}",
+        "PART E: RELATIONSHIP GUIDANCE",
+        "PART G: ANNOTATED RFP EXAMPLES",
+    ]
 
     missing = [s for s in required_sections if s not in extraction_prompt]
     if missing:
