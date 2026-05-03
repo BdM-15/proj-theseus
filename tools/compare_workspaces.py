@@ -44,9 +44,18 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from lightrag import LightRAG, QueryParam
 from lightrag.llm.openai import openai_complete_if_cache, openai_embed
 from lightrag.utils import EmbeddingFunc
+from lightrag.prompt import PROMPTS
 
 from src.core import get_settings
-from src.extraction.output_sanitizer import create_sanitizing_wrapper
+
+# Register govcon prompt overrides (keyword extraction, RAG response, etc.)
+# MUST happen before any LightRAG instance is created so aquery() uses our prompts.
+from prompts.govcon_prompt import GOVCON_PROMPTS
+PROMPTS.update(GOVCON_PROMPTS)
+
+def create_sanitizing_wrapper(llm_func):
+    """No-op wrapper — output_sanitizer module removed."""
+    return llm_func
 
 logging.basicConfig(
     level=logging.WARNING,
@@ -117,6 +126,12 @@ TEST_QUERIES = [
         "category": "Compliance",
         "mode": "local",
         "query": "What mandatory clauses, regulations, or standards must the contractor comply with?",
+    },
+    {
+        "id": "Q11",
+        "category": "Mixed Retrieval",
+        "mode": "mix",
+        "query": "For the top evaluation factors, map each to the most relevant PWS requirements, required proposal volume/instruction, and any cited compliance clauses or standards.",
     },
 ]
 
@@ -412,6 +427,9 @@ async def create_lightrag_instance(workspace_name: str) -> LightRAG:
             use_graph_storage = "NetworkXStorage"
     lightrag_kwargs["graph_storage"] = use_graph_storage
 
+    # govcon.yaml is JSON-only; must set entity_extraction_use_json=True or
+    # LightRAG raises "must define entity_extraction_examples in text mode".
+    lightrag_kwargs.setdefault("entity_extraction_use_json", True)
     rag = LightRAG(**lightrag_kwargs)
     await rag.initialize_storages()
     return rag, use_graph_storage
@@ -604,7 +622,7 @@ async def main():
     parser.add_argument(
         "--mode",
         default="hybrid",
-        choices=["hybrid", "global", "local", "naive"],
+        choices=["hybrid", "global", "local", "naive", "mix"],
         help="Query mode when using --query (default: hybrid)",
     )
     parser.add_argument(
