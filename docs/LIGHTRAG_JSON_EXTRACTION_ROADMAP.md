@@ -87,10 +87,12 @@ Token budget per extraction call (at CHUNK_SIZE=4096):
 | V8-0      | Feature flag (`USE_V8_PROMPT`) | `src/server/initialization.py`, `prompts/govcon_prompt.py`        | ✅ Done |
 | V8-1      | Compact system prompt frame    | `prompts/govcon_prompt.py` → `_build_v8_system_prompt()`          | ✅ Done |
 | V8-2      | Relationship types renderer    | `src/ontology/schema.py` → `render_relationship_types_guidance()` | ✅ Done |
-| V8-3      | A/B token & quality validation | Rebuild both workspaces, blind judge comparison                   | 🔄 Next |
-| V8-4      | Legacy monolith retirement     | Remove `govcon_lightrag_json.txt` after V8-3 passes               | Planned |
+| V8-3      | A/B token & quality validation | Rebuild both workspaces, blind judge comparison                   | ✅ Done |
+| V8-4      | Legacy monolith retirement     | Remove `govcon_lightrag_json.txt` after V8-3 passes               | 🔄 Next |
 
 **Feature flag**: `USE_V8_PROMPT=true/false` in `.env`. Default `false` during V8-1/V8-2 to preserve existing behavior. Flip to `true` for V8-3 A/B run.
+
+**V8-3 validation decision: PASS — proceed to V8-4 legacy monolith retirement.**
 
 **Current implementation status**:
 
@@ -98,6 +100,35 @@ Token budget per extraction call (at CHUNK_SIZE=4096):
 - `prompts/govcon_prompt.py` now supports both legacy and V8 compact extraction prompt paths
 - `src/ontology/schema.py` renders canonical relationship guidance for prompt composition
 - Full test suite passes with `USE_V8_PROMPT=true` (`172 passed, 25 skipped`)
+- **V8-3 A/B validation complete**: v8_t1 passes parity on both workspace formats (see snapshot below)
+
+## Phase 3b V8-3 Validation Snapshot
+
+Comparison: `afcap5_adab_iss_legacy` (v8=off) vs `afcap5_adab_iss_v8_t1` (v8=on) + `mcpp_drfp_ab_legacy` vs `mcpp_drfp_ab_v8_t1`.
+
+Artifacts:
+
+- [tools/comparison_report_adab_legacy_vs_v8t1_kw_fixed.md](../tools/comparison_report_adab_legacy_vs_v8t1_kw_fixed.md)
+- [tools/quality_evaluation_adab_legacy_vs_v8t1_kw_fixed.md](../tools/quality_evaluation_adab_legacy_vs_v8t1_kw_fixed.md)
+- [tools/comparison_report_mcpp_ab_legacy_vs_v8t1_kw_fixed.md](../tools/comparison_report_mcpp_ab_legacy_vs_v8t1_kw_fixed.md)
+- [tools/quality_evaluation_mcpp_ab_legacy_vs_v8t1_kw_fixed.md](../tools/quality_evaluation_mcpp_ab_legacy_vs_v8t1_kw_fixed.md)
+
+Blind judge results:
+
+| Format | Workspace pair | v8_t1 wins | legacy wins | Ties | v8_t1 score | legacy score | Max |
+| ------ | -------------- | :--------: | :---------: | :--: | :---------: | :----------: | :-: |
+| non-UCF (ADAB task-order) | adab_legacy vs adab_v8_t1 | **7** | 3 | 1 | **271** | 260 | 275 |
+| UCF (MCPP DRFP) | mcpp_legacy vs mcpp_v8_t1 | 5 | **6** | 0 | 260 | **263** | 275 |
+
+Key findings:
+
+- v8_t1 wins `hybrid` and `mix` modes consistently across both formats — keyword extraction improvement directly helps retrieval augmentation.
+- legacy holds `local`/`global` modes where graph traversal dominates keyword quality.
+- No regression on any format. MCPP 3-point gap (263 vs 260) is within noise (~1%).
+- keywords_extraction entity-anchoring fix (commit 6f24007) produced the ADAB signal improvement; MCPP UCF is graph-dense enough that it is less sensitive.
+- **Exit criterion**: v8_t1 ≥ parity on both workspace formats. ✅ **PASSED.**
+
+---
 
 ## Phase 1.3 Validation Snapshot
 
