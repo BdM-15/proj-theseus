@@ -44,8 +44,9 @@ async def infer_lm_links(
     
     requirements_with_instructions = [
         e for e in entities_by_type.get('requirement', [])
-        if e.get('modal_verb') in ['shall', 'must'] and 
-           any(term in str(e.get('entity_name', '')).lower() 
+        if any(term in (str(e.get('description', '')) + " " + str(e.get('entity_name', ''))).lower()
+               for term in ['shall', 'must']) and
+           any(term in (str(e.get('description', '')) + " " + str(e.get('entity_name', ''))).lower()
                for term in ['submit', 'provide', 'proposal', 'response', 'volume', 
                            'page limit', 'format', 'electronic', 'hard copy'])
     ]

@@ -115,10 +115,10 @@ Artifacts:
 
 Blind judge results:
 
-| Format | Workspace pair | v8_t1 wins | legacy wins | Ties | v8_t1 score | legacy score | Max |
-| ------ | -------------- | :--------: | :---------: | :--: | :---------: | :----------: | :-: |
-| non-UCF (ADAB task-order) | adab_legacy vs adab_v8_t1 | **7** | 3 | 1 | **271** | 260 | 275 |
-| UCF (MCPP DRFP) | mcpp_legacy vs mcpp_v8_t1 | 5 | **6** | 0 | 260 | **263** | 275 |
+| Format                    | Workspace pair            | v8_t1 wins | legacy wins | Ties | v8_t1 score | legacy score | Max |
+| ------------------------- | ------------------------- | :--------: | :---------: | :--: | :---------: | :----------: | :-: |
+| non-UCF (ADAB task-order) | adab_legacy vs adab_v8_t1 |   **7**    |      3      |  1   |   **271**   |     260      | 275 |
+| UCF (MCPP DRFP)           | mcpp_legacy vs mcpp_v8_t1 |     5      |    **6**    |  0   |     260     |   **263**    | 275 |
 
 Key findings:
 

@@ -11,14 +11,14 @@
 ---
 
 **Purpose**: Link proposal instructions to their corresponding evaluation factors/criteria  
-**Entity Types**: PROPOSAL_INSTRUCTION --GUIDES--> EVALUATION_FACTOR *or* SUBFACTOR  
+**Entity Types**: PROPOSAL_INSTRUCTION --GUIDES--> EVALUATION_FACTOR (all hierarchy levels)  
 **Why This Matters**: Proposal teams need to know which format requirements (page limits, volumes, fonts)
 apply to which evaluation factors (or subfactors) to optimize compliance and scoring.
 
-**Note on targets**: The TARGETS list below contains entities of type `evaluation_factor` AND `subfactor`.
-Treat both as valid GUIDES targets. Many RFPs (e.g. AFCAP-style) place evaluation criteria primarily at
-the subfactor level (M.3.3, M.3.4 …) — link instructions directly to the most specific matching subfactor
-when one exists, otherwise link to the parent factor.
+**Note on targets**: The TARGETS list contains `evaluation_factor` entities across hierarchy levels
+(factor/subfactor/element/area via metadata). Many RFPs (e.g. AFCAP-style) place evaluation criteria
+primarily at the subfactor level (M.3.3, M.3.4 …) — link instructions directly to the most specific
+matching evaluation criterion when one exists, otherwise link to the parent factor.
 
 **Common Locations**:
 

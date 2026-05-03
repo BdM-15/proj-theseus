@@ -12,11 +12,11 @@ Active algorithms after Issue #85 cleanup:
 - resolve_orphans: Orphan resolution (13% orphan rate justifies rescue pass)
 
 Dropped (extraction prompt + specialized entities now cover these):
-- Algo 2: Eval hierarchy (HAS_SUBFACTOR, MEASURED_BY, EVALUATED_BY from extraction)
+- Algo 2: Eval hierarchy (captured via evaluation_factor hierarchy + CHILD_OF/MEASURED_BY/EVALUATED_BY)
 - Algo 3: Req-eval mapping (EVALUATED_BY from extraction Part F.3)
 - Algo 4: Deliverable traceability (98% connected via SATISFIED_BY/PRODUCES from extraction)
 - Algo 5: Doc hierarchy (637 CHILD_OF from extraction + heuristic)
-- Algo 6: Concept linking (87% connected via ADDRESSES/RESOLVES/SUPPORTS)
+- Algo 6: Concept linking (87% connected via ADDRESSES/RELATED_TO)
 
 Usage:
     from src.inference.algorithms import run_all_algorithms_parallel

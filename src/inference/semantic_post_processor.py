@@ -105,9 +105,9 @@ _ENTITY_PAIR_REL_MAP = {
     ("requirement", "workload_metric"): "QUANTIFIES",
     ("workload_metric", "requirement"): "QUANTIFIES",
     ("deliverable", "contract_line_item"): "PRICED_UNDER",
-    ("contract_line_item", "deliverable"): "FUNDS",
+    ("contract_line_item", "deliverable"): "PRICED_UNDER",
     ("requirement", "contract_line_item"): "PRICED_UNDER",
-    ("contract_line_item", "requirement"): "FUNDS",
+    ("contract_line_item", "requirement"): "PRICED_UNDER",
     ("deliverable", "organization"): "SUBMITTED_TO",
     ("organization", "deliverable"): "SUBMITTED_TO",
     # ─── EVALUATION ───
@@ -120,9 +120,9 @@ _ENTITY_PAIR_REL_MAP = {
     ("evaluation_factor", "evaluation_factor"): "CHILD_OF",
     # ─── AUTHORITY & GOVERNANCE ───
     ("requirement", "clause"): "GOVERNED_BY",
-    ("clause", "requirement"): "MANDATES",
+    ("clause", "requirement"): "GOVERNED_BY",
     ("requirement", "regulatory_reference"): "GOVERNED_BY",
-    ("regulatory_reference", "requirement"): "MANDATES",
+    ("regulatory_reference", "requirement"): "GOVERNED_BY",
     # ─── RESOURCE ───
     ("requirement", "labor_category"): "STAFFED_BY",
     ("labor_category", "requirement"): "STAFFED_BY",
@@ -135,8 +135,8 @@ _ENTITY_PAIR_REL_MAP = {
     # ─── STRATEGIC ───
     ("requirement", "customer_priority"): "ADDRESSES",
     ("customer_priority", "requirement"): "ADDRESSES",
-    ("requirement", "pain_point"): "RESOLVES",
-    ("pain_point", "requirement"): "RESOLVES",
+    ("requirement", "pain_point"): "ADDRESSES",
+    ("pain_point", "requirement"): "ADDRESSES",
 }
 
 # Relationship types that indicate the LLM used a generic fallback

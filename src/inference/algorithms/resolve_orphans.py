@@ -126,11 +126,11 @@ TARGET ENTITIES (potential relationship targets):
 {targets_json}
 
 RELATIONSHIP PATTERNS TO CONSIDER:
-- Requirements → Sections they belong to (PART_OF)
-- Requirements → Deliverables they mandate (REQUIRES_DELIVERABLE)
-- Documents → Sections that reference them (REFERENCED_BY)
-- Concepts → Requirements that implement them (IMPLEMENTED_BY)
-- Organizations → Requirements that govern them (SUBJECT_TO)
+- Requirements → Sections they belong to (CHILD_OF)
+- Requirements → Deliverables they mandate (SATISFIED_BY or REQUIRES when dependency is explicit)
+- Documents/sections → referenced documents (REFERENCES)
+- Concepts → Requirements they constrain or relate to (CONSTRAINED_BY or RELATED_TO)
+- Organizations → Requirements or deliverables they support (STAFFED_BY, SUBMITTED_TO, or RELATED_TO)
 - Locations → Requirements specific to that location (APPLIES_TO)
 
 Return ONLY valid JSON array with relationships for AS MANY orphans as possible:
