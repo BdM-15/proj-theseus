@@ -1,8 +1,8 @@
 ﻿# LightRAG JSON Extraction Roadmap
 
-Issue: BdM-15/proj-theseus #124
-Epic branch: `149-lightrag-json-extraction-epic`
-Current feature branch: `163-phase3-first-principles-prompt-audit`
+Issue: BdM-15/proj-theseus #124 — **CLOSED 2026-05-03**
+Epic branch: `149-lightrag-json-extraction-epic` — merged to `main` as `v1.4.0`
+Final feature branch: `163-phase3-first-principles-prompt-audit`
 
 This roadmap tracks the migration from tuple-based LightRAG extraction to native JSON extraction with xAI/OpenAI-compatible strict `json_schema` enforcement.
 
@@ -26,7 +26,7 @@ Phase 1.3 validated that strict JSON produces a cleaner, lower-noise build and b
 | 3     | Token reduction / prompt whittling | ✅ Done | Phase 3 = two-track: (3a) first-principles content hardening (relationship set reduction, entity type hardening); (3b) V8 structural architecture (composable prompt). Branch 163.  |
 | 3a    | First-principles content hardening | ✅ Done | Relationship set reduced 35→26 (23 extraction + 3 inference-only). 9 phantom types removed. Entity YAML enrichment complete. govcon_lightrag_json.txt aligned to new canonical set. |
 | 3b    | V8 composable prompt architecture  | ✅ Done | V8-0/V8-1/V8-2/V8-3/V8-4 complete: compact frame built, A/B validated, legacy monolith retired. `USE_V8_PROMPT` flag removed.                                                       |
-| 4     | Lock-in                            | Planned | Multi-workspace validation, tag `v1.4.0`, and fast-forward epic branch to `main`. Requires V8 A/B parity check.                                                                     |
+| 4     | Lock-in                            | ✅ Done | Full test suite green (172 passed, 25 skipped). `adab_iss_freshv8` clean boot validated. `v1.4.0` tagged on epic branch. 149 merged to `main`. Issue #124 closed (2026-05-03).      |
 
 ## Phase 3 First-Principles Track (Issue #124)
 

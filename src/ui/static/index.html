@@ -6524,8 +6524,10 @@
           },
 
           navSubtitle() {
-            const entityTypeCount = this.stats.ontology?.entity_type_count ?? 32;
-            const relationshipTypeCount = this.stats.ontology?.relationship_type_count ?? 26;
+            const entityTypeCount =
+              this.stats.ontology?.entity_type_count ?? 32;
+            const relationshipTypeCount =
+              this.stats.ontology?.relationship_type_count ?? 26;
             const m = {
               dashboard: "capture command overview",
               documents: "ingest · MinerU · multimodal extraction",
