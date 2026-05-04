@@ -60,6 +60,7 @@ from src.server.query_settings import (
     QuerySettingsStore,
     register_query_settings_routes,
 )
+from src.server.reasoning_filter import ThinkStripper, strip_think
 from src.server.skill_ui_routes import register_skill_ui_routes
 
 logger = logging.getLogger(__name__)
@@ -71,83 +72,6 @@ logger = logging.getLogger(__name__)
 
 _THIS_DIR = Path(__file__).resolve().parent
 _STATIC_DIR = (_THIS_DIR.parent / "ui" / "static").resolve()
-
-
-# ---------------------------------------------------------------------------
-# Reasoning-trace stripping (<think>...</think>)
-# ---------------------------------------------------------------------------
-# Reasoning-capable LLMs (e.g. xAI Grok 4 reasoning) emit their chain-of-thought
-# inline as <think>...</think> blocks within `delta.content`. LightRAG's own
-# webui parses these out and shows them in a collapsible panel; our UI just
-# wants the polished answer. We strip them here so the persisted chat content
-# and the streamed SSE tokens never include the scratchpad.
-_THINK_BLOCK = re.compile(r"<think>.*?</think>\s*", re.DOTALL | re.IGNORECASE)
-_UNCLOSED_THINK = re.compile(r"<think>.*$", re.DOTALL | re.IGNORECASE)
-
-
-def _strip_think(text: str) -> str:
-    """Remove <think>...</think> blocks from a complete string."""
-    if not text or "<think>" not in text.lower():
-        return text
-    cleaned = _THINK_BLOCK.sub("", text)
-    # Drop any unclosed trailing think block (model truncated mid-reasoning)
-    cleaned = _UNCLOSED_THINK.sub("", cleaned)
-    return cleaned.lstrip()
-
-
-class _ThinkStripper:
-    """Stateful streaming filter that strips <think>...</think> blocks.
-
-    Handles tags split across chunk boundaries by holding back up to
-    ``_HOLD`` trailing bytes that could be the prefix of an open or close tag.
-    """
-
-    OPEN = "<think>"
-    CLOSE = "</think>"
-    _HOLD = len(CLOSE)  # 8 — enough to hold any partial tag
-
-    def __init__(self) -> None:
-        self._buf = ""
-        self._in_think = False
-
-    def feed(self, chunk: str) -> str:
-        """Consume an incoming chunk; return safe-to-emit text outside <think>."""
-        if not chunk:
-            return ""
-        self._buf += chunk
-        out: list[str] = []
-        while True:
-            if self._in_think:
-                idx = self._buf.find(self.CLOSE)
-                if idx == -1:
-                    # Whole buffer is inside think; keep tail in case of split close tag
-                    if len(self._buf) > self._HOLD:
-                        self._buf = self._buf[-self._HOLD:]
-                    return "".join(out)
-                self._buf = self._buf[idx + len(self.CLOSE):].lstrip()
-                self._in_think = False
-            else:
-                idx = self._buf.find(self.OPEN)
-                if idx == -1:
-                    # No open tag in buffer — emit safe portion, hold tail.
-                    if len(self._buf) > self._HOLD:
-                        out.append(self._buf[:-self._HOLD])
-                        self._buf = self._buf[-self._HOLD:]
-                    return "".join(out)
-                if idx > 0:
-                    out.append(self._buf[:idx])
-                self._buf = self._buf[idx + len(self.OPEN):]
-                self._in_think = True
-
-    def flush(self) -> str:
-        """Drain remaining buffered text at end of stream."""
-        if self._in_think:
-            # Stream ended mid-think — discard the unclosed reasoning trace.
-            self._buf = ""
-            return ""
-        out = self._buf
-        self._buf = ""
-        return out
 
 
 def _workspace_dir() -> Path:
@@ -1140,7 +1064,7 @@ def register_ui(
 
         assistant_msg = {
             "role": "assistant",
-            "content": _strip_think(str(answer)),
+            "content": strip_think(str(answer)),
             "ts": _now_iso(),
             "mode": chat.get("mode", "mix"),
         }
@@ -1204,7 +1128,7 @@ def register_ui(
                 + "\n\n"
             )
             collected: list[str] = []
-            stripper = _ThinkStripper()
+            stripper = ThinkStripper()
             t_start = time.perf_counter()
             t_first_token: float | None = None
             token_count = 0
@@ -1264,7 +1188,7 @@ def register_ui(
                         token_count += 1
                         yield f"event: token\ndata: {json.dumps({'text': tail})}\n\n"
                 else:
-                    text = _strip_think(str(result))
+                    text = strip_think(str(result))
                     collected.append(text)
                     token_count = 1
                     t_first_token = time.perf_counter()
