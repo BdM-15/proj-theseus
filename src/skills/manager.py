@@ -41,7 +41,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import mimetypes
 import os
 import re
 import shutil
@@ -50,6 +49,14 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Optional
+
+from src.skills.runs import (
+    STUDIO_EXTRA_MIME as _STUDIO_EXTRA_MIME,
+    SkillRunStore,
+    parse_run_envelope as _parse_run_envelope,
+    resolve_artifact_mime,
+    slugify_for_filename as _slugify_for_filename,
+)
 
 
 def _env_int(name: str, default: int) -> int:
@@ -75,35 +82,6 @@ def _env_int(name: str, default: int) -> int:
 DEFAULT_SKILL_MAX_PAYLOAD_CHARS = _env_int("SKILL_MAX_PAYLOAD_CHARS", 200_000)
 
 logger = logging.getLogger(__name__)
-
-
-# Mimetypes the stdlib ``mimetypes`` module misses on Windows / fresh installs.
-# Used by ``SkillManager.list_deliverables`` to label rows for the Studio UI.
-_STUDIO_EXTRA_MIME: dict[str, str] = {
-    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    "md": "text/markdown",
-    "json": "application/json",
-    "gif": "image/gif",
-    "mp4": "video/mp4",
-    "pdf": "application/pdf",
-}
-
-
-def resolve_artifact_mime(filename: str) -> str:
-    """Resolve a stable mime type for a skill artifact filename.
-
-    Precedence: explicit ``_STUDIO_EXTRA_MIME`` map > ``mimetypes.guess_type``
-    > ``application/octet-stream``. The explicit map wins because Windows'
-    registry mislabels common office / markdown formats (e.g. ``.md`` ->
-    ``application/text``) and we want listing + download responses to agree.
-    """
-    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-    if ext in _STUDIO_EXTRA_MIME:
-        return _STUDIO_EXTRA_MIME[ext]
-    guessed, _ = mimetypes.guess_type(filename)
-    return guessed or "application/octet-stream"
 
 
 # ---------------------------------------------------------------------------
@@ -497,6 +475,7 @@ class SkillManager:
         self._skills: dict[str, Skill] = {}
         self._lock = asyncio.Lock()
         self._ledger: dict[str, dict[str, Any]] = {}
+        self._run_store = SkillRunStore()
         # Phase 4a: MCP client subsystem. Lazy-imported so legacy-mode
         # deployments without any MCPs installed pay zero cost.
         from src.skills.mcp_client import MCPRegistry
@@ -854,13 +833,13 @@ class SkillManager:
 
         warnings: list[str] = []
         started = datetime.now(timezone.utc)
-        ts = started.strftime("%Y%m%d_%H%M%S")
-        slug = _slugify_for_filename(user_prompt) or "run"
-        run_id = f"{ts}_{slug}"
-        run_dir = self._runs_root(workspace_root, skill.name) / run_id
-        run_dir.mkdir(parents=True, exist_ok=True)
-        (run_dir / "artifacts").mkdir(exist_ok=True)
-        (run_dir / "tool_outputs").mkdir(exist_ok=True)
+        run_id, run_dir = self._run_store.create_run_dir(
+            workspace_root=workspace_root,
+            skill_name=skill.name,
+            user_prompt=user_prompt,
+            started_at=started,
+            create_tool_outputs=True,
+        )
 
         # Honour an env-tunable turn cap so operators can throttle cost.
         # A skill MAY also declare ``metadata.max_turns`` to claim a larger
@@ -974,7 +953,7 @@ class SkillManager:
         # incrementally by the runtime; we just stamp the human-readable
         # summary here.
         try:
-            self._persist_tools_run(
+            self._run_store.persist_tools_run(
                 run_dir=run_dir,
                 run_id=run_id,
                 skill_name=skill.name,
@@ -1094,58 +1073,6 @@ class SkillManager:
             logger.warning("_auto_emit_artifacts error: %s", exc)
 
     @staticmethod
-    def _persist_tools_run(
-        *,
-        run_dir: Path,
-        run_id: str,
-        skill_name: str,
-        workspace: str,
-        user_prompt: str,
-        response: str,
-        turns: int,
-        tool_calls: int,
-        finish_reason: str,
-        usage_total: dict[str, int],
-        warnings: list[str],
-        elapsed_ms: int,
-        started_at: datetime,
-    ) -> None:
-        """Write run.md + response.md for a tools-mode invocation.
-
-        ``transcript.json`` is owned by the runtime (so it survives crashes),
-        but we cross-reference it from the envelope for the UI.
-        """
-        envelope = (
-            "---\n"
-            f"run_id: {run_id}\n"
-            f"skill: {skill_name}\n"
-            f"workspace: {workspace}\n"
-            f"runtime: tools\n"
-            f"created_at: {started_at.isoformat()}\n"
-            f"elapsed_ms: {elapsed_ms}\n"
-            f"turns: {turns}\n"
-            f"tool_calls: {tool_calls}\n"
-            f"finish_reason: {finish_reason}\n"
-            f"prompt_tokens: {usage_total.get('prompt_tokens', 0)}\n"
-            f"completion_tokens: {usage_total.get('completion_tokens', 0)}\n"
-            f"total_tokens: {usage_total.get('total_tokens', 0)}\n"
-            f"response_chars: {len(response)}\n"
-            "---\n\n"
-            "# Skill Run (tools mode)\n\n"
-            "## User Prompt\n\n"
-            f"{user_prompt.strip() or '(skill defaults)'}\n\n"
-            "## Warnings\n\n"
-            + ("\n".join(f"- {w}" for w in warnings) if warnings else "- (none)")
-            + "\n\n## See also\n\n"
-            "- `response.md` — final assistant message\n"
-            "- `transcript.json` — full turn-by-turn record (tool calls + results)\n"
-            "- `tool_outputs/` — raw stdout/stderr from `run_script` calls\n"
-            "- `artifacts/` — files the skill wrote with `write_file`\n"
-        )
-        (run_dir / "run.md").write_text(envelope, encoding="utf-8")
-        (run_dir / "response.md").write_text(response or "", encoding="utf-8")
-
-    @staticmethod
     def _compose_prompt(
         skill: Skill, workspace: str, user_prompt: str, payload_json: str
     ) -> str:
@@ -1239,11 +1166,11 @@ class SkillManager:
 
     @staticmethod
     def _runs_root(workspace_root: Path, skill_name: str) -> Path:
-        return workspace_root / "skill_runs" / skill_name
+        return SkillRunStore.runs_root(workspace_root, skill_name)
 
     @staticmethod
     def _is_safe_run_id(run_id: str) -> bool:
-        return bool(re.match(r"^[0-9]{8}_[0-9]{6}_[a-z0-9_-]+$", run_id))
+        return SkillRunStore.is_safe_run_id(run_id)
 
     def _persist_run(
         self,
@@ -1259,241 +1186,42 @@ class SkillManager:
         elapsed_ms: int,
         started_at: datetime,
     ) -> tuple[str, str]:
-        """Write run.md (envelope) + response.md (raw output) + prompt.md (composed prompt).
-
-        Layout:
-            <workspace_root>/skill_runs/<skill_name>/<YYYYMMDD_HHMMSS_slug>/
-                ├── run.md       — frontmatter + metadata + user prompt + warnings
-                ├── response.md  — raw LLM response (the "product")
-                ├── prompt.md    — full composed prompt (debug/repro)
-                └── artifacts/   — reserved for future renderers (XLSX, PPTX, …)
-        """
-        ts = started_at.strftime("%Y%m%d_%H%M%S")
-        slug = _slugify_for_filename(user_prompt) or "run"
-        run_id = f"{ts}_{slug}"
-        run_dir = self._runs_root(workspace_root, skill_name) / run_id
-        run_dir.mkdir(parents=True, exist_ok=True)
-        (run_dir / "artifacts").mkdir(exist_ok=True)
-
-        envelope = (
-            "---\n"
-            f"run_id: {run_id}\n"
-            f"skill: {skill_name}\n"
-            f"workspace: {workspace}\n"
-            f"created_at: {started_at.isoformat()}\n"
-            f"elapsed_ms: {elapsed_ms}\n"
-            f"entities_used: [{', '.join(entities_used)}]\n"
-            f"response_chars: {len(response)}\n"
-            "---\n\n"
-            "# Skill Run\n\n"
-            "## User Prompt\n\n"
-            f"{user_prompt.strip() or '(skill defaults)'}\n\n"
-            "## Warnings\n\n"
-            + ("\n".join(f"- {w}" for w in warnings) if warnings else "- (none)")
-            + "\n\n## See also\n\n"
-            "- `response.md` — raw LLM response\n"
-            "- `prompt.md` — full composed prompt sent to the model\n"
-            "- `artifacts/` — rendered files (when renderers are wired)\n"
+        return self._run_store.persist_legacy_run(
+            workspace_root=workspace_root,
+            skill_name=skill_name,
+            workspace=workspace,
+            user_prompt=user_prompt,
+            composed_prompt=composed_prompt,
+            response=response,
+            entities_used=entities_used,
+            warnings=warnings,
+            elapsed_ms=elapsed_ms,
+            started_at=started_at,
         )
-        (run_dir / "run.md").write_text(envelope, encoding="utf-8")
-        (run_dir / "response.md").write_text(response, encoding="utf-8")
-        (run_dir / "prompt.md").write_text(composed_prompt, encoding="utf-8")
-        return run_id, str(run_dir.resolve())
 
     def list_runs(
         self, workspace_root: Path, skill_name: Optional[str] = None, limit: int = 50
     ) -> list[dict[str, Any]]:
-        """List persisted skill runs, newest first.
-
-        If ``skill_name`` is None, walks every skill under
-        ``<workspace_root>/skill_runs/``.
-        """
-        base = workspace_root / "skill_runs"
-        if not base.is_dir():
-            return []
-        targets = (
-            [base / skill_name] if skill_name else [p for p in base.iterdir() if p.is_dir()]
+        return self._run_store.list_runs(
+            workspace_root,
+            skill_name=skill_name,
+            limit=limit,
         )
-        runs: list[dict[str, Any]] = []
-        for skill_root in targets:
-            if not skill_root.is_dir():
-                continue
-            for run_dir in skill_root.iterdir():
-                if not run_dir.is_dir():
-                    continue
-                envelope = run_dir / "run.md"
-                response_path = run_dir / "response.md"
-                if not envelope.exists():
-                    continue
-                meta = _parse_run_envelope(envelope.read_text(encoding="utf-8"))
-                meta["run_id"] = meta.get("run_id") or run_dir.name
-                meta["skill"] = meta.get("skill") or skill_root.name
-                if response_path.exists():
-                    try:
-                        meta["response_chars"] = response_path.stat().st_size
-                    except OSError:
-                        pass
-                runs.append(meta)
-        runs.sort(key=lambda r: r.get("created_at", ""), reverse=True)
-        return runs[:limit]
 
     def get_run(
         self, workspace_root: Path, skill_name: str, run_id: str
     ) -> Optional[dict[str, Any]]:
-        """Return the full content of a single persisted run, or None."""
-        if not self._is_safe_run_id(run_id):
-            return None
-        run_dir = self._runs_root(workspace_root, skill_name) / run_id
-        if not run_dir.is_dir():
-            return None
-        envelope_path = run_dir / "run.md"
-        response_path = run_dir / "response.md"
-        prompt_path = run_dir / "prompt.md"
-        meta = (
-            _parse_run_envelope(envelope_path.read_text(encoding="utf-8"))
-            if envelope_path.exists()
-            else {}
-        )
-        artifacts: list[dict[str, str]] = []
-        artifacts_dir = run_dir / "artifacts"
-        if artifacts_dir.is_dir():
-            for p in sorted(artifacts_dir.iterdir()):
-                if p.is_file():
-                    artifacts.append({
-                        "name": p.name,
-                        "size": str(p.stat().st_size),
-                        "mime": resolve_artifact_mime(p.name),
-                    })
-        # Tools-mode runs persist a structured transcript (assistant turns +
-        # tool calls + tool results) and may write tool_outputs/* sidecar files.
-        # Surface both so the UI drawer can replay the run for grounding audit.
-        transcript: list[dict[str, Any]] = []
-        transcript_path = run_dir / "transcript.json"
-        if transcript_path.exists():
-            try:
-                loaded = json.loads(transcript_path.read_text(encoding="utf-8"))
-                if isinstance(loaded, list):
-                    transcript = loaded
-            except (OSError, json.JSONDecodeError) as exc:
-                logger.warning("Unreadable transcript at %s: %s", transcript_path, exc)
-        tool_outputs: list[dict[str, str]] = []
-        tool_outputs_dir = run_dir / "tool_outputs"
-        if tool_outputs_dir.is_dir():
-            for p in sorted(tool_outputs_dir.iterdir()):
-                if p.is_file():
-                    tool_outputs.append({"name": p.name, "size": str(p.stat().st_size)})
-        return {
-            "run_id": run_id,
-            "skill": skill_name,
-            "run_dir": str(run_dir.resolve()),
-            "metadata": meta,
-            "response": response_path.read_text(encoding="utf-8")
-            if response_path.exists()
-            else "",
-            "prompt": prompt_path.read_text(encoding="utf-8")
-            if prompt_path.exists()
-            else "",
-            "artifacts": artifacts,
-            "transcript": transcript,
-            "tool_outputs": tool_outputs,
-        }
+        return self._run_store.get_run(workspace_root, skill_name, run_id)
 
     def delete_run(
         self, workspace_root: Path, skill_name: str, run_id: str
     ) -> bool:
-        if not self._is_safe_run_id(run_id):
-            return False
-        run_dir = self._runs_root(workspace_root, skill_name) / run_id
-        if not run_dir.is_dir():
-            return False
-        shutil.rmtree(run_dir, ignore_errors=True)
-        return not run_dir.exists()
+        return self._run_store.delete_run(workspace_root, skill_name, run_id)
 
     def list_deliverables(
         self, workspace_root: Path, limit: int = 500
     ) -> list[dict[str, Any]]:
-        """Flatten every artifact across every skill run into one feed.
-
-        Walks ``<workspace_root>/skill_runs/<skill>/<run_id>/artifacts/*`` and
-        emits one row per file. Pure index over the Phase 3 layout — no new
-        on-disk schema. Powers the Studio sidebar entry (Phase 6a).
-
-        Each row carries enough to render a table row + deep-link back to the
-        originating run drawer:
-
-            {
-                "skill":      <skill name>,
-                "run_id":     <YYYYMMDD_HHMMSS_slug>,
-                "filename":   <basename>,
-                "mime":       <mimetype or None>,
-                "size":       <bytes>,
-                "created_at": <ISO timestamp from run envelope, or file mtime>,
-                "title":      <run envelope title, or None>,
-                "ext":        <lowercase extension without dot, or "">,
-            }
-
-        Sorted newest-first by ``created_at``. Capped at ``limit`` rows.
-        """
-        import mimetypes as _mt
-        from datetime import datetime as _dt, timezone as _tz
-
-        base = workspace_root / "skill_runs"
-        if not base.is_dir():
-            return []
-
-        rows: list[dict[str, Any]] = []
-        for skill_root in base.iterdir():
-            if not skill_root.is_dir():
-                continue
-            skill_name = skill_root.name
-            for run_dir in skill_root.iterdir():
-                if not run_dir.is_dir() or not self._is_safe_run_id(run_dir.name):
-                    continue
-                run_id = run_dir.name
-                artifacts_dir = run_dir / "artifacts"
-                if not artifacts_dir.is_dir():
-                    continue
-
-                # Pull created_at + title from the run envelope (cheap parse).
-                envelope_path = run_dir / "run.md"
-                meta: dict[str, Any] = {}
-                if envelope_path.exists():
-                    try:
-                        meta = _parse_run_envelope(
-                            envelope_path.read_text(encoding="utf-8")
-                        )
-                    except Exception:  # noqa: BLE001
-                        meta = {}
-                created_at = meta.get("created_at") or ""
-                title = meta.get("title")  # optional; envelope may not carry one
-
-                for artifact in sorted(artifacts_dir.iterdir()):
-                    if not artifact.is_file():
-                        continue
-                    try:
-                        stat = artifact.stat()
-                    except OSError:
-                        continue
-                    mime = resolve_artifact_mime(artifact.name)
-                    ext = artifact.suffix.lstrip(".").lower()
-                    rows.append(
-                        {
-                            "skill": skill_name,
-                            "run_id": run_id,
-                            "filename": artifact.name,
-                            "mime": mime,
-                            "size": stat.st_size,
-                            "created_at": created_at
-                            or _dt.fromtimestamp(
-                                stat.st_mtime, tz=_tz.utc
-                            ).isoformat(),
-                            "title": title,
-                            "ext": ext,
-                        }
-                    )
-
-        rows.sort(key=lambda r: r.get("created_at", ""), reverse=True)
-        return rows[:limit]
+        return self._run_store.list_deliverables(workspace_root, limit=limit)
 
     def get_artifact_path(
         self,
@@ -1502,30 +1230,12 @@ class SkillManager:
         run_id: str,
         filename: str,
     ) -> Optional[Path]:
-        """Resolve an artifact filename inside a run's artifacts/ folder.
-
-        Defends against path traversal: rejects unsafe run IDs, rejects
-        filenames containing path separators or '..', and verifies the
-        resolved path is still under the artifacts directory. Returns None
-        if any check fails or the file does not exist.
-        """
-        if not self._is_safe_run_id(run_id):
-            return None
-        if not filename or "/" in filename or "\\" in filename or filename in (".", ".."):
-            return None
-        artifacts_dir = (
-            self._runs_root(workspace_root, skill_name) / run_id / "artifacts"
-        ).resolve()
-        if not artifacts_dir.is_dir():
-            return None
-        candidate = (artifacts_dir / filename).resolve()
-        try:
-            candidate.relative_to(artifacts_dir)
-        except ValueError:
-            return None
-        if not candidate.is_file():
-            return None
-        return candidate
+        return self._run_store.get_artifact_path(
+            workspace_root,
+            skill_name,
+            run_id,
+            filename,
+        )
 
     # ---- Ledger persistence -------------------------------------------
 
@@ -1571,50 +1281,6 @@ class SkillManager:
 # ---------------------------------------------------------------------------
 
 _SAFE_SLUG = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
-
-
-def _slugify_for_filename(text: str, max_len: int = 32) -> str:
-    """Lowercase + non-alnum→underscore + length cap. Empty input → empty string."""
-    if not text:
-        return ""
-    cleaned = re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")
-    return cleaned[:max_len].rstrip("_")
-
-
-def _parse_run_envelope(text: str) -> dict[str, Any]:
-    """Extract the YAML-ish frontmatter from a run.md envelope."""
-    lines = text.splitlines()
-    if not lines or lines[0].strip() != "---":
-        return {}
-    out: dict[str, Any] = {}
-    for raw in lines[1:]:
-        if raw.strip() == "---":
-            break
-        m = re.match(r"^([A-Za-z_][A-Za-z0-9_-]*)\s*:\s*(.*)$", raw)
-        if not m:
-            continue
-        key, val = m.group(1), m.group(2).strip()
-        if key == "elapsed_ms" or key == "response_chars":
-            try:
-                out[key] = int(val)
-                continue
-            except ValueError:
-                pass
-        if key == "entities_used" and val.startswith("[") and val.endswith("]"):
-            inner = val[1:-1].strip()
-            out[key] = [t.strip() for t in inner.split(",") if t.strip()] if inner else []
-            continue
-        out[key] = val
-    # Pull a short prompt preview from the body.
-    try:
-        body_start = text.find("\n## User Prompt\n")
-        if body_start >= 0:
-            tail = text[body_start + len("\n## User Prompt\n") :].strip()
-            preview = tail.split("\n## ", 1)[0].strip()
-            out["prompt_preview"] = (preview[:160] + "…") if len(preview) > 160 else preview
-    except Exception:  # noqa: BLE001
-        pass
-    return out
 
 
 def _slug_from_github_url(url: str) -> str:
