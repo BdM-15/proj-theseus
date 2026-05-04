@@ -55,6 +55,7 @@ QueryDataFunc = Callable[
 from src.core import get_settings, reset_settings
 from src.ontology.schema import VALID_ENTITY_TYPES, VALID_RELATIONSHIP_TYPES
 from src.server.chat_store import ChatStore
+from src.server.graph_snapshot import register_graph_routes
 from src.server.mcp_ui_routes import register_mcp_ui_routes
 from src.server.prompt_library import PROMPT_LIBRARY
 from src.server.query_settings import (
@@ -315,186 +316,6 @@ def _gather_stats() -> dict[str, Any]:
         },
         "stack": _stack_versions(),
         "timestamp": _now_iso(),
-    }
-
-
-# ---------------------------------------------------------------------------
-# Knowledge graph snapshot (workspace-scoped, backend-agnostic)
-# ---------------------------------------------------------------------------
-
-# Cap at 5000 nodes — beyond this Cytoscape/fcose becomes unusably slow in
-# the browser even with WebGL. Bumped well above LightRAG's default 1000.
-_GRAPH_HARD_CAP = 5000
-_GRAPH_DEFAULT = 2000
-
-
-def _json_safe(value: Any) -> Any:
-    """Coerce neo4j/numpy/datetime values into JSON-serializable scalars."""
-    if value is None or isinstance(value, (str, int, float, bool)):
-        return value
-    if isinstance(value, datetime):
-        return value.isoformat()
-    if isinstance(value, (list, tuple, set)):
-        return [_json_safe(v) for v in value]
-    if isinstance(value, dict):
-        return {str(k): _json_safe(v) for k, v in value.items()}
-    # neo4j.time.DateTime / Date / Time / Duration, numpy scalars, etc.
-    for attr in ("isoformat", "iso_format", "to_native"):
-        if hasattr(value, attr):
-            try:
-                v = getattr(value, attr)()
-                if isinstance(v, datetime):
-                    return v.isoformat()
-                return _json_safe(v)
-            except Exception:  # noqa: BLE001
-                pass
-    try:
-        return str(value)
-    except Exception:  # noqa: BLE001
-        return None
-
-
-async def _load_graph_neo4j(workspace: str, max_nodes: int, entity_type: Optional[str]) -> dict[str, Any]:
-    """Pull a Cytoscape-friendly subgraph from Neo4j, top-degree nodes first."""
-    from neo4j import AsyncGraphDatabase  # local import — neo4j is an optional dep
-
-    uri = os.getenv("NEO4J_URI", "neo4j://localhost:7687")
-    user = os.getenv("NEO4J_USERNAME", "neo4j")
-    password = os.getenv("NEO4J_PASSWORD", "")
-    database = os.getenv("NEO4J_DATABASE", "neo4j")
-    label = workspace  # workspace is also the Neo4j label
-
-    type_filter = ""
-    params: dict[str, Any] = {"max_nodes": int(max_nodes)}
-    if entity_type:
-        type_filter = "WHERE toLower(n.entity_type) = toLower($etype)"
-        params["etype"] = entity_type
-
-    nodes_q = f"""
-        MATCH (n:`{label}`)
-        {type_filter}
-        WITH n, COUNT {{ (n)--() }} AS degree
-        ORDER BY degree DESC
-        LIMIT $max_nodes
-        RETURN elementId(n) AS nid, n AS node, degree
-    """
-    total_q = f"MATCH (n:`{label}`) {type_filter} RETURN count(n) AS total"
-    edges_q = f"""
-        MATCH (a:`{label}`)-[r]->(b:`{label}`)
-        WHERE elementId(a) IN $ids AND elementId(b) IN $ids
-        RETURN elementId(r) AS rid, elementId(a) AS src, elementId(b) AS tgt, type(r) AS rtype, properties(r) AS props
-    """
-
-    driver = AsyncGraphDatabase.driver(uri, auth=(user, password))
-    try:
-        async with driver.session(database=database, default_access_mode="READ") as session:
-            total_res = await session.run(total_q, **({"etype": entity_type} if entity_type else {}))
-            total = (await total_res.single())["total"]
-            await total_res.consume()
-
-            nodes_res = await session.run(nodes_q, **params)
-            nodes_payload: list[dict[str, Any]] = []
-            ids: list[str] = []
-            async for rec in nodes_res:
-                nid = rec["nid"]
-                node = rec["node"]
-                props = _json_safe(dict(node))
-                ids.append(nid)
-                nodes_payload.append({
-                    "id": str(nid),
-                    "labels": [str(props.get("entity_id", nid))],
-                    "properties": {**props, "_degree": int(rec["degree"] or 0)},
-                })
-            await nodes_res.consume()
-
-            edges_payload: list[dict[str, Any]] = []
-            if ids:
-                edges_res = await session.run(edges_q, ids=ids)
-                async for rec in edges_res:
-                    edges_payload.append({
-                        "id": str(rec["rid"]),
-                        "source": str(rec["src"]),
-                        "target": str(rec["tgt"]),
-                        "type": rec["rtype"],
-                        "properties": _json_safe(dict(rec["props"] or {})),
-                    })
-                await edges_res.consume()
-    finally:
-        await driver.close()
-
-    return {
-        "backend": "neo4j",
-        "workspace": workspace,
-        "nodes": nodes_payload,
-        "edges": edges_payload,
-        "total_nodes": int(total),
-        "returned_nodes": len(nodes_payload),
-        "returned_edges": len(edges_payload),
-        "is_truncated": int(total) > len(nodes_payload),
-    }
-
-
-def _load_graph_networkx(workspace: str, max_nodes: int, entity_type: Optional[str]) -> dict[str, Any]:
-    """Read graph_chunk_entity_relation.graphml directly and build a payload."""
-    import networkx as nx  # already a transitive dep of LightRAG
-
-    ws_dir = Path(global_args.working_dir) / workspace
-    graphml = ws_dir / "graph_chunk_entity_relation.graphml"
-    if not graphml.exists():
-        return {
-            "backend": "networkx",
-            "workspace": workspace,
-            "nodes": [],
-            "edges": [],
-            "total_nodes": 0,
-            "returned_nodes": 0,
-            "returned_edges": 0,
-            "is_truncated": False,
-        }
-
-    g = nx.read_graphml(str(graphml))
-    if entity_type:
-        keep = [
-            n for n, d in g.nodes(data=True)
-            if str(d.get("entity_type", "")).lower() == entity_type.lower()
-        ]
-        g = g.subgraph(keep).copy()
-
-    total = g.number_of_nodes()
-    if total > max_nodes:
-        # Top-degree subgraph
-        top = sorted(g.degree(), key=lambda kv: kv[1], reverse=True)[:max_nodes]
-        keep = [n for n, _ in top]
-        g = g.subgraph(keep).copy()
-
-    nodes_payload: list[dict[str, Any]] = []
-    for n, d in g.nodes(data=True):
-        props = _json_safe(dict(d))
-        nodes_payload.append({
-            "id": str(n),
-            "labels": [str(props.get("entity_id", n))],
-            "properties": {**props, "_degree": int(g.degree(n))},
-        })
-    edges_payload: list[dict[str, Any]] = []
-    for i, (u, v, d) in enumerate(g.edges(data=True)):
-        props = _json_safe(dict(d))
-        rtype = props.pop("relationship_type", None) or props.get("keywords") or "RELATED_TO"
-        edges_payload.append({
-            "id": str(i),
-            "source": str(u),
-            "target": str(v),
-            "type": str(rtype),
-            "properties": props,
-        })
-    return {
-        "backend": "networkx",
-        "workspace": workspace,
-        "nodes": nodes_payload,
-        "edges": edges_payload,
-        "total_nodes": int(total),
-        "returned_nodes": len(nodes_payload),
-        "returned_edges": len(edges_payload),
-        "is_truncated": total > len(nodes_payload),
     }
 
 
@@ -1186,37 +1007,12 @@ def register_ui(
         """Compute L↔M matrix, traceability chains, factor coverage, and gaps."""
         return JSONResponse(_compute_intel())
 
-    # ---- Knowledge graph snapshot (workspace-scoped, sanitized) ----------
-    @app.get("/api/ui/graph", tags=["theseus-ui"])
-    async def ui_graph(
-        max_nodes: int = _GRAPH_DEFAULT,
-        entity_type: Optional[str] = None,
-    ) -> JSONResponse:
-        """Return a Cytoscape-friendly subgraph for the active workspace.
-
-        Bypasses LightRAG's `/graphs` (which hard-caps at 1000 and is prone
-        to serialization errors with non-JSON Neo4j property types). Reads
-        directly from Neo4j or NetworkX based on GRAPH_STORAGE.
-
-        Args:
-            max_nodes: 1..5000 (default 2000). Top-degree nodes are kept.
-            entity_type: Optional case-insensitive filter (e.g. "requirement").
-        """
-        try:
-            cap = max(1, min(int(max_nodes), _GRAPH_HARD_CAP))
-        except (TypeError, ValueError):
-            cap = _GRAPH_DEFAULT
-        ws = get_settings().workspace
-        backend = (getattr(global_args, "graph_storage", "") or "").lower()
-        try:
-            if "neo4j" in backend:
-                payload = await _load_graph_neo4j(ws, cap, entity_type)
-            else:
-                payload = _load_graph_networkx(ws, cap, entity_type)
-            return JSONResponse(payload)
-        except Exception as exc:  # noqa: BLE001
-            logger.exception("Graph snapshot failed for workspace=%s: %s", ws, exc)
-            raise HTTPException(500, f"Graph snapshot failed: {exc}") from exc
+    register_graph_routes(
+        app,
+        workspace_name=lambda: get_settings().workspace,
+        graph_storage=lambda: getattr(global_args, "graph_storage", "") or "",
+        working_dir=lambda: Path(global_args.working_dir),
+    )
 
     # ---- Workspaces (list / switch / restart) ------------------------------
     @app.get("/api/ui/workspaces", tags=["theseus-ui"])
