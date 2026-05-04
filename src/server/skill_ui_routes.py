@@ -5,9 +5,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Optional
+from typing import Awaitable, Callable, Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
@@ -20,6 +19,11 @@ from src.skills.context import (
     retrieve_relevant_entities_for_skill,
 )
 from src.skills.runs import resolve_artifact_mime
+from src.skills.settings import (
+    SkillSettingsStore,
+    VALID_SKILL_RETRIEVAL_MODES,
+    resolve_skill_runtime_mode,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -28,9 +32,6 @@ QueryDataFunc = Callable[
     Awaitable[dict],
 ]
 LlmFunc = Callable[[str], Awaitable[str]]
-
-_VALID_SKILL_MODES = {"hybrid", "local", "global", "naive", "mix", "off"}
-
 
 class SkillInstallPayload(BaseModel):
     """Body for POST /api/ui/skills/install."""
@@ -47,68 +48,6 @@ class SkillSettingsUpdate(BaseModel):
     max_relationships_per_entity: Optional[int] = Field(default=None, ge=0, le=50)
     retrieval_mode: Optional[str] = Field(default=None, max_length=20)
     retrieval_top_k: Optional[int] = Field(default=None, ge=5, le=500)
-
-
-class SkillSettingsStore:
-    """Per-workspace skill invocation settings backed by JSON files."""
-
-    def __init__(self, workspace_dir: Callable[[], Path]) -> None:
-        self._workspace_dir = workspace_dir
-
-    @staticmethod
-    def _env_int(key: str, default: int, lo: int, hi: int) -> int:
-        raw = os.getenv(key)
-        if not raw:
-            return default
-        try:
-            return max(lo, min(hi, int(raw)))
-        except (TypeError, ValueError):
-            return default
-
-    @staticmethod
-    def _env_skill_mode() -> str:
-        raw = (os.getenv("SKILL_RETRIEVAL_MODE") or "mix").strip().lower()
-        return raw if raw in _VALID_SKILL_MODES else "mix"
-
-    def path(self) -> Path:
-        return self._workspace_dir() / "ui_skill_settings.json"
-
-    def defaults(self) -> dict[str, Any]:
-        return {
-            "max_entities_per_type": self._env_int(
-                "SKILL_MAX_ENTITIES_PER_TYPE", 40, 1, 500
-            ),
-            "max_chunks_per_entity": self._env_int(
-                "SKILL_MAX_CHUNKS_PER_ENTITY", 2, 0, 10
-            ),
-            "max_relationships_per_entity": self._env_int(
-                "SKILL_MAX_RELATIONSHIPS_PER_ENTITY", 5, 0, 50
-            ),
-            "retrieval_mode": self._env_skill_mode(),
-            "retrieval_top_k": self._env_int("SKILL_RETRIEVAL_TOP_K", 60, 5, 500),
-        }
-
-    def read(self) -> dict[str, Any]:
-        merged = self.defaults()
-        path = self.path()
-        if not path.exists():
-            return merged
-        try:
-            loaded = json.loads(path.read_text(encoding="utf-8"))
-            if isinstance(loaded, dict):
-                for key in list(merged.keys()):
-                    if key in loaded:
-                        merged[key] = loaded[key]
-        except (OSError, json.JSONDecodeError) as exc:
-            logger.warning("Failed reading %s, using defaults: %s", path, exc)
-        return merged
-
-    def write(self, data: dict[str, Any]) -> None:
-        path = self.path()
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-        tmp.replace(path)
 
 
 def register_skill_ui_routes(
@@ -228,7 +167,7 @@ def register_skill_ui_routes(
         updates = payload.model_dump(exclude_none=True)
         if "retrieval_mode" in updates:
             mode = (updates["retrieval_mode"] or "").strip().lower()
-            if mode not in _VALID_SKILL_MODES:
+            if mode not in VALID_SKILL_RETRIEVAL_MODES:
                 raise HTTPException(400, f"Unsupported retrieval_mode: {mode}")
             updates["retrieval_mode"] = mode
         current.update(updates)
@@ -302,13 +241,10 @@ def register_skill_ui_routes(
         mgr = get_skill_manager()
         skill = mgr.get_skill(name)
         skill_desc = skill.frontmatter.description if skill is not None else ""
-        env_mode = os.getenv("SKILL_RUNTIME_MODE", "").strip().lower()
-        if env_mode in {"tools", "legacy"}:
-            effective_mode = env_mode
-        elif skill is not None:
-            effective_mode = skill.frontmatter.runtime_mode
-        else:
-            effective_mode = "legacy"
+        frontmatter_mode = (
+            skill.frontmatter.runtime_mode if skill is not None else "legacy"
+        )
+        effective_mode = resolve_skill_runtime_mode(frontmatter_mode)
 
         if effective_mode == "tools":
             try:

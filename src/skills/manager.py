@@ -41,7 +41,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import re
 import shutil
 import subprocess
@@ -57,29 +56,11 @@ from src.skills.runs import (
     resolve_artifact_mime,
     slugify_for_filename as _slugify_for_filename,
 )
-
-
-def _env_int(name: str, default: int) -> int:
-    """Read an int from the environment with a safe fallback."""
-    raw = os.getenv(name)
-    if not raw:
-        return default
-    try:
-        return int(raw)
-    except (TypeError, ValueError):
-        logger_ = logging.getLogger(__name__)
-        logger_.warning(
-            "Invalid %s=%r; using default %d", name, raw, default
-        )
-        return default
-
-
-# Default char-budget for the JSON-serialized entity_payload block injected
-# into the skill prompt. xAI Grok and most modern frontier models comfortably
-# handle 200k+ chars; tune via SKILL_MAX_PAYLOAD_CHARS in .env if you switch
-# models or hit token-cost concerns. The cap protects against an unbounded KG
-# slice exploding the request payload, not against model context limits.
-DEFAULT_SKILL_MAX_PAYLOAD_CHARS = _env_int("SKILL_MAX_PAYLOAD_CHARS", 200_000)
+from src.skills.settings import (
+    DEFAULT_SKILL_MAX_PAYLOAD_CHARS,
+    resolve_skill_runtime_mode,
+    skill_tools_max_turns,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -695,13 +676,10 @@ class SkillManager:
             raise KeyError(f"Unknown skill: {name}")
 
         # Resolve runtime mode: explicit override > env var > frontmatter > default.
-        env_override = os.getenv("SKILL_RUNTIME_MODE", "").strip().lower()
-        if runtime_mode_override in {"tools", "legacy"}:
-            mode = runtime_mode_override
-        elif env_override in {"tools", "legacy"}:
-            mode = env_override
-        else:
-            mode = skill.frontmatter.runtime_mode
+        mode = resolve_skill_runtime_mode(
+            skill.frontmatter.runtime_mode,
+            runtime_mode_override=runtime_mode_override,
+        )
 
         if mode == "tools":
             return await self._invoke_tools_mode(
@@ -849,11 +827,7 @@ class SkillManager:
         # exceeds the env baseline; otherwise the env value is used. This
         # keeps the global throttle as a floor, not a ceiling, so operators
         # can still raise it across the board without editing every skill.
-        env_max_turns = _env_int("SKILL_TOOLS_MAX_TURNS", 12)
-        max_turns = env_max_turns
-        skill_max_turns_raw = skill.frontmatter.metadata.get("max_turns")
-        if isinstance(skill_max_turns_raw, int) and skill_max_turns_raw > max_turns:
-            max_turns = skill_max_turns_raw
+        max_turns = skill_tools_max_turns(skill.frontmatter.metadata)
 
         # Phase 3b: opt-in cross-skill script roots. The skill declares
         # ``metadata.script_paths`` as a list of directories (relative to its
