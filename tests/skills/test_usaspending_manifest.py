@@ -89,11 +89,12 @@ def test_usaspending_live_handshake_and_tools_list() -> None:
 
     async def _go():
         registry = MCPRegistry.from_root(_MCPS_ROOT)
-        sessions = await registry.start_run_sessions(
+        startup = await registry.start_run_sessions(
             run_id="phase4c-smoke",
             requested=["usaspending"],
         )
         try:
+            sessions = startup.sessions
             assert "usaspending" in sessions, (
                 "registry failed to start the usaspending session "
                 "(check `mcp.usaspending` log child for upstream stderr)"

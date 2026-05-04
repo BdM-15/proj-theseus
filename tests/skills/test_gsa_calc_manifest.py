@@ -93,11 +93,12 @@ def test_gsa_calc_live_handshake_and_tools_list() -> None:
 
     async def _go():
         registry = MCPRegistry.from_root(_MCPS_ROOT)
-        sessions = await registry.start_run_sessions(
+        startup = await registry.start_run_sessions(
             run_id="phase4f3-smoke",
             requested=["gsa_calc"],
         )
         try:
+            sessions = startup.sessions
             assert "gsa_calc" in sessions, (
                 "registry failed to start the gsa_calc session "
                 "(check `mcp.gsa_calc` log child for upstream stderr)"

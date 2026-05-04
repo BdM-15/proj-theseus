@@ -876,15 +876,12 @@ class SkillManager:
         requested_mcps = skill.frontmatter.required_mcps
         if requested_mcps:
             try:
-                ctx.mcp_sessions = await self._mcp_registry.start_run_sessions(
+                startup = await self._mcp_registry.start_run_sessions(
                     run_id=run_id, requested=requested_mcps
                 )
-                started_names = sorted(ctx.mcp_sessions)
-                missing = [m for m in requested_mcps if m not in ctx.mcp_sessions]
-                if missing:
-                    warnings.append(
-                        f"MCP servers requested but not started: {missing}"
-                    )
+                ctx.mcp_sessions = startup.sessions
+                warnings.extend(startup.warning_messages())
+                started_names = startup.started_names
                 if started_names:
                     logger.info(
                         "skill %s run %s: MCP sessions live: %s",

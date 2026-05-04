@@ -176,6 +176,27 @@ class MCPError(Exception):
     """
 
 
+@dataclass
+class MCPStartupResult:
+    """Outcome of starting all MCP sessions requested by one skill run."""
+
+    sessions: dict[str, "MCPSession"] = field(default_factory=dict)
+    missing: list[str] = field(default_factory=list)
+    failed: dict[str, str] = field(default_factory=dict)
+
+    @property
+    def started_names(self) -> list[str]:
+        return sorted(self.sessions)
+
+    def warning_messages(self) -> list[str]:
+        messages: list[str] = []
+        if self.missing:
+            messages.append(f"MCP servers requested but not installed: {self.missing}")
+        if self.failed:
+            messages.append(f"MCP servers failed to start: {self.failed}")
+        return messages
+
+
 # ---------------------------------------------------------------------------
 # Session — one subprocess + JSON-RPC plumbing
 # ---------------------------------------------------------------------------
@@ -568,8 +589,9 @@ class MCPRegistry:
 
     1. Caller asks :meth:`start_run_sessions` for the MCPs the skill
        declared in its frontmatter.
-    2. Caller passes the returned ``dict[str, MCPSession]`` into the
-       runtime via :class:`ToolContext`.
+    2. Caller passes ``MCPStartupResult.sessions`` into the runtime via
+       :class:`ToolContext`, and can surface ``missing`` / ``failed`` as
+       user-facing warnings.
     3. Caller (the runtime, via its ``finally`` block) calls
        :meth:`shutdown_run` to reap subprocesses.
     """
@@ -616,17 +638,15 @@ class MCPRegistry:
         run_id: str,
         requested: list[str],
         env_extra: Optional[dict[str, str]] = None,
-    ) -> dict[str, MCPSession]:
+    ) -> MCPStartupResult:
         """Spawn one session per requested MCP for this run.
 
-        Returns a ``{server_name: session}`` dict. Unknown / failed MCPs are
-        logged and omitted; the caller can surface them as warnings to the
-        user (e.g., "this skill declared MCP 'foo' but it isn't installed").
-        Partial failures do not abort the run.
+        Unknown / failed MCPs are logged and recorded in the result; partial
+        failures do not abort the run.
         """
-        sessions: dict[str, MCPSession] = {}
+        result = MCPStartupResult()
         if not requested:
-            return sessions
+            return result
         bucket = self._run_sessions.setdefault(run_id, [])
         for name in requested:
             manifest = self._manifests.get(name)
@@ -634,6 +654,7 @@ class MCPRegistry:
                 logger.warning(
                     "Skill requested MCP %r but no manifest is installed", name
                 )
+                result.missing.append(name)
                 continue
             session = MCPSession(manifest)
             try:
@@ -641,10 +662,11 @@ class MCPRegistry:
             except MCPError as exc:
                 logger.warning("MCP %s failed to start: %s", name, exc)
                 # session.start already shut itself down on failure.
+                result.failed[name] = str(exc)
                 continue
-            sessions[name] = session
+            result.sessions[name] = session
             bucket.append(session)
-        return sessions
+        return result
 
     async def shutdown_run(self, run_id: str) -> None:
         """Reap all sessions associated with ``run_id``. Idempotent."""

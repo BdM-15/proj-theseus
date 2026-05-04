@@ -113,11 +113,12 @@ def test_sam_gov_live_handshake_and_tools_list() -> None:
 
     async def _go():
         registry = MCPRegistry.from_root(_MCPS_ROOT)
-        sessions = await registry.start_run_sessions(
+        startup = await registry.start_run_sessions(
             run_id="phase4f6-smoke",
             requested=["sam_gov"],
         )
         try:
+            sessions = startup.sessions
             assert "sam_gov" in sessions, (
                 "registry failed to start the sam_gov session "
                 "(check `mcp.sam_gov` log child for upstream stderr)"

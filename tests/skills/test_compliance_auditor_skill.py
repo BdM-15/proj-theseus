@@ -160,11 +160,11 @@ def test_skill_body_tool_refs_match_live_ecfr_mcp() -> None:
 
     async def _go():
         registry = MCPRegistry.from_root(_MCPS_ROOT)
-        sessions = await registry.start_run_sessions(
+        startup = await registry.start_run_sessions(
             run_id="phase4f2-skill-contract", requested=["ecfr"]
         )
         try:
-            session = sessions["ecfr"]
+            session = startup.sessions["ecfr"]
             advertised = {t.name for t in session.tools}
             missing = referenced - advertised
             assert not missing, (

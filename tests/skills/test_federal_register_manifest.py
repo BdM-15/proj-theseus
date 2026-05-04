@@ -91,11 +91,12 @@ def test_federal_register_live_handshake_and_tools_list() -> None:
 
     async def _go():
         registry = MCPRegistry.from_root(_MCPS_ROOT)
-        sessions = await registry.start_run_sessions(
+        startup = await registry.start_run_sessions(
             run_id="phase4f5-smoke",
             requested=["federal_register"],
         )
         try:
+            sessions = startup.sessions
             assert "federal_register" in sessions, (
                 "registry failed to start the federal_register session "
                 "(check `mcp.federal_register` log child for upstream stderr)"

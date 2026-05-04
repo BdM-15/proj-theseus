@@ -89,11 +89,12 @@ def test_ecfr_live_handshake_and_tools_list() -> None:
 
     async def _go():
         registry = MCPRegistry.from_root(_MCPS_ROOT)
-        sessions = await registry.start_run_sessions(
+        startup = await registry.start_run_sessions(
             run_id="phase4f-smoke",
             requested=["ecfr"],
         )
         try:
+            sessions = startup.sessions
             assert "ecfr" in sessions, (
                 "registry failed to start the ecfr session "
                 "(check `mcp.ecfr` log child for upstream stderr)"

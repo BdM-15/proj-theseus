@@ -14,6 +14,7 @@ from src.skills.mcp_client import (
     MCPError,
     MCPManifest,
     MCPRegistry,
+    MCPStartupResult,
     MCPSession,
     discover_manifests,
     load_manifest,
@@ -218,12 +219,15 @@ def test_registry_starts_only_requested(tmp_path: Path) -> None:
         _write_manifest(tmp_path / "beta")
         registry = MCPRegistry.from_root(tmp_path)
         assert set(registry.known_mcps) == {"alpha", "beta"}
-        sessions = await registry.start_run_sessions(
+        result = await registry.start_run_sessions(
             run_id="run-1", requested=["alpha"]
         )
         try:
-            assert set(sessions) == {"alpha"}
-            assert sessions["alpha"].tools[0].name == "echo"
+            assert set(result.sessions) == {"alpha"}
+            assert result.missing == []
+            assert result.failed == {}
+            assert result.started_names == ["alpha"]
+            assert result.sessions["alpha"].tools[0].name == "echo"
         finally:
             await registry.shutdown_run("run-1")
 
@@ -234,11 +238,13 @@ def test_registry_skips_unknown_mcp(tmp_path: Path) -> None:
     async def _go():
         _write_manifest(tmp_path / "alpha")
         registry = MCPRegistry.from_root(tmp_path)
-        sessions = await registry.start_run_sessions(
+        result = await registry.start_run_sessions(
             run_id="run-x", requested=["alpha", "does-not-exist"]
         )
         try:
-            assert set(sessions) == {"alpha"}
+            assert set(result.sessions) == {"alpha"}
+            assert result.missing == ["does-not-exist"]
+            assert result.failed == {}
         finally:
             await registry.shutdown_run("run-x")
 
@@ -248,10 +254,40 @@ def test_registry_skips_unknown_mcp(tmp_path: Path) -> None:
 def test_registry_empty_request(tmp_path: Path) -> None:
     async def _go():
         registry = MCPRegistry.from_root(tmp_path)
-        sessions = await registry.start_run_sessions(run_id="r", requested=[])
-        assert sessions == {}
+        result = await registry.start_run_sessions(run_id="r", requested=[])
+        assert result.sessions == {}
+        assert result.missing == []
+        assert result.failed == {}
 
     _run(_go())
+
+
+def test_registry_records_startup_failure(tmp_path: Path) -> None:
+    async def _go():
+        _write_manifest(tmp_path / "needkey", env_required=["MUST_BE_SET"])
+        registry = MCPRegistry.from_root(tmp_path)
+        os.environ.pop("MUST_BE_SET", None)
+        result = await registry.start_run_sessions(
+            run_id="r", requested=["needkey"]
+        )
+        assert result.sessions == {}
+        assert result.missing == []
+        assert set(result.failed) == {"needkey"}
+        assert "missing required env" in result.failed["needkey"]
+
+    _run(_go())
+
+
+def test_startup_result_warning_messages() -> None:
+    result = MCPStartupResult(
+        missing=["unknown"],
+        failed={"bad": "boom"},
+    )
+
+    assert result.warning_messages() == [
+        "MCP servers requested but not installed: ['unknown']",
+        "MCP servers failed to start: {'bad': 'boom'}",
+    ]
 
 
 def test_registry_shutdown_run_idempotent(tmp_path: Path) -> None:
@@ -275,9 +311,9 @@ def test_build_mcp_tool_specs_round_trip(tmp_path: Path) -> None:
     async def _go():
         _write_manifest(tmp_path / "alpha")
         registry = MCPRegistry.from_root(tmp_path)
-        sessions = await registry.start_run_sessions(run_id="r", requested=["alpha"])
+        result = await registry.start_run_sessions(run_id="r", requested=["alpha"])
         try:
-            specs = build_mcp_tool_specs(sessions)
+            specs = build_mcp_tool_specs(result.sessions)
             names = [s.name for s in specs]
             assert names == ["mcp__alpha__echo"]
 

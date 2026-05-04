@@ -234,10 +234,11 @@ def test_skill_body_tool_refs_match_live_mcps() -> None:
 
     async def _go():
         registry = MCPRegistry.from_root(_MCPS_ROOT)
-        sessions = await registry.start_run_sessions(
+        startup = await registry.start_run_sessions(
             run_id="phase4g-skill-contract", requested=_REQUIRED_MCPS
         )
         try:
+            sessions = startup.sessions
             for server, referenced in referenced_by_server.items():
                 if not referenced:
                     continue

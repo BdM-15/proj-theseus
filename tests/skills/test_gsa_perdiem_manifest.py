@@ -94,11 +94,12 @@ def test_gsa_perdiem_live_handshake_and_tools_list() -> None:
 
     async def _go():
         registry = MCPRegistry.from_root(_MCPS_ROOT)
-        sessions = await registry.start_run_sessions(
+        startup = await registry.start_run_sessions(
             run_id="phase4f4-smoke",
             requested=["gsa_perdiem"],
         )
         try:
+            sessions = startup.sessions
             assert "gsa_perdiem" in sessions, (
                 "registry failed to start the gsa_perdiem session "
                 "(check `mcp.gsa_perdiem` log child for upstream stderr)"
