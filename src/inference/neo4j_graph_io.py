@@ -11,6 +11,10 @@ from typing import List, Dict, Tuple
 from neo4j import GraphDatabase
 
 from src.core import get_settings
+from src.inference.relationship_payloads import (
+    group_retype_updates,
+    partition_relationships_by_type,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -197,15 +201,9 @@ class Neo4jGraphIO:
         """
         # Filter out relationships with missing/null/empty relationship_type
         # (prevents Neo4j ClientError: cannot merge relationship with null type)
-        valid_relationships = []
-        rejected_relationships = []
-        
-        for rel in new_relationships:
-            rel_type = rel.get('relationship_type')
-            if not rel_type or (isinstance(rel_type, str) and not rel_type.strip()):
-                rejected_relationships.append(rel)
-                continue
-            valid_relationships.append(rel)
+        valid_relationships, rejected_relationships = partition_relationships_by_type(
+            new_relationships
+        )
         
         # CRITICAL: Log rejected relationships for data loss visibility
         if rejected_relationships:
@@ -278,11 +276,7 @@ class Neo4jGraphIO:
             return 0
         
         # Group by (old_type, new_type) for batch processing
-        from collections import defaultdict
-        batches = defaultdict(list)
-        for update in retype_updates:
-            key = (update['old_type'], update['new_type'])
-            batches[key].append(update)
+        batches = group_retype_updates(retype_updates)
         
         total_retyped = 0
         for (old_type, new_type), updates in batches.items():
