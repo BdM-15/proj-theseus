@@ -57,6 +57,7 @@ from src.ontology.schema import VALID_ENTITY_TYPES, VALID_RELATIONSHIP_TYPES
 from src.server.chat_store import ChatStore
 from src.server.graph_snapshot import register_graph_routes
 from src.server.mcp_ui_routes import register_mcp_ui_routes
+from src.server.processing_log_routes import register_processing_log_routes
 from src.server.prompt_library import PROMPT_LIBRARY
 from src.server.rfp_intelligence import register_intelligence_routes
 from src.server.query_settings import (
@@ -414,15 +415,6 @@ def register_ui(
         logger.warning("UI static dir missing: %s — UI will not be mounted", _STATIC_DIR)
         return
 
-    # The Documents tab tails the active workspace's processing log file
-    # (``rag_storage/<workspace>/<workspace>_processing.log``) — that file is
-    # the long-lived audit trail and is workspace-scoped by design, which is
-    # exactly the per-workspace activity view the UI wants.
-    from src.server.workspace_log_tailer import (
-        read_snapshot as _read_log_snapshot,
-        stream_events as _stream_log_events,
-    )
-
     query_settings = QuerySettingsStore(
         workspace_dir=_workspace_dir,
         settings_provider=get_settings,
@@ -446,59 +438,7 @@ def register_ui(
         """Return dashboard rollup metrics for the active workspace."""
         return JSONResponse(_gather_stats())
 
-    # ---- Processing log: snapshot + live stream --------------------------
-    @app.get("/api/ui/processing-log", tags=["theseus-ui"])
-    async def ui_processing_log_snapshot(limit: int = 500) -> JSONResponse:
-        """Return the most-recent events from the workspace activity log.
-
-        Reads from ``rag_storage/<workspace>/<workspace>_processing.log`` —
-        the same log file that survives server restarts and is the canonical
-        per-workspace audit trail. ``limit`` is clamped to [1, 2000].
-        """
-        snapshot = _read_log_snapshot(limit=limit)
-        return JSONResponse(snapshot)
-
-    @app.get("/api/ui/processing-log/stream", tags=["theseus-ui"])
-    async def ui_processing_log_stream(limit: int = 200):
-        """Stream new workspace-log events to the Documents tab via SSE.
-
-        Sends an initial ``snapshot`` event with the recent entries, then one
-        ``event`` per newly-appended entry as it's tailed off disk (~1.5s
-        polling). 15s heartbeat comments keep idle proxies from disconnecting.
-        """
-
-        async def event_stream():
-            try:
-                yield "event: open\ndata: {}\n\n"
-                async for item in _stream_log_events(initial_limit=limit):
-                    if item["type"] == "snapshot":
-                        yield (
-                            "event: snapshot\ndata: "
-                            + json.dumps(
-                                {"events": item["events"], "path": item.get("path")}
-                            )
-                            + "\n\n"
-                        )
-                    elif item["type"] == "event":
-                        yield (
-                            "event: event\ndata: "
-                            + json.dumps(item["event"])
-                            + "\n\n"
-                        )
-                    else:  # ping
-                        yield ": ping\n\n"
-            except asyncio.CancelledError:
-                # Client disconnected — let the generator unwind cleanly.
-                raise
-
-        return StreamingResponse(
-            event_stream(),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache, no-transform",
-                "X-Accel-Buffering": "no",
-            },
-        )
+    register_processing_log_routes(app)
 
 
     # ---- Prompt library ---------------------------------------------------
