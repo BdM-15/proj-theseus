@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any, Callable, Optional
 
@@ -10,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
 from src.core import get_settings
+from src.core.env import env_int
 from src.ontology.schema import VALID_ENTITY_TYPES, VALID_RELATIONSHIP_TYPES
 from src.server.storage_counts import safe_count_json_keys
 from src.utils.time_utils import now_local_iso
@@ -44,10 +44,7 @@ def stack_versions() -> dict[str, Optional[str]]:
 
 def ui_chat_history_pairs() -> int:
     """Resolve the per-query conversation-history cap in user+assistant pairs."""
-    try:
-        return max(0, int(os.getenv("UI_CHAT_HISTORY_TURNS", "20")))
-    except ValueError:
-        return 20
+    return env_int("UI_CHAT_HISTORY_TURNS", 20, 0)
 
 
 def _now_iso() -> str:

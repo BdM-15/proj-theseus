@@ -45,6 +45,20 @@ def test_query_settings_store_defaults_use_env_and_settings(
     assert defaults["min_rerank_score"] == 0.2
 
 
+def test_query_settings_store_defaults_fallback_for_invalid_env(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("TOP_K", "not-a-number")
+    monkeypatch.setenv("CHUNK_TOP_K", "9999")
+    store = _store(tmp_path)
+
+    defaults = store.defaults()
+
+    assert defaults["top_k"] == 40
+    assert defaults["chunk_top_k"] == 500
+
+
 def test_query_settings_store_merges_known_overrides_only(tmp_path: Path) -> None:
     store = _store(tmp_path)
     store.path().write_text(

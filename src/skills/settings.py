@@ -8,54 +8,12 @@ import os
 from pathlib import Path
 from typing import Any, Callable, Mapping, Optional
 
+from src.core.env import env_float, env_int
+
 logger = logging.getLogger(__name__)
 
 VALID_SKILL_RUNTIME_MODES = {"tools", "legacy"}
 VALID_SKILL_RETRIEVAL_MODES = {"hybrid", "local", "global", "naive", "mix", "off"}
-
-
-def env_int(
-    name: str,
-    default: int,
-    lo: Optional[int] = None,
-    hi: Optional[int] = None,
-) -> int:
-    """Read an integer environment variable with optional clamping."""
-    raw = os.getenv(name)
-    if not raw:
-        return default
-    try:
-        value = int(raw)
-    except (TypeError, ValueError):
-        logger.warning("Invalid %s=%r; using default %d", name, raw, default)
-        return default
-    if lo is not None:
-        value = max(lo, value)
-    if hi is not None:
-        value = min(hi, value)
-    return value
-
-
-def env_float(
-    name: str,
-    default: float,
-    lo: Optional[float] = None,
-    hi: Optional[float] = None,
-) -> float:
-    """Read a float environment variable with optional clamping."""
-    raw = os.getenv(name)
-    if not raw:
-        return default
-    try:
-        value = float(raw)
-    except (TypeError, ValueError):
-        logger.warning("Invalid %s=%r; using default %s", name, raw, default)
-        return default
-    if lo is not None:
-        value = max(lo, value)
-    if hi is not None:
-        value = min(hi, value)
-    return value
 
 
 DEFAULT_SKILL_MAX_PAYLOAD_CHARS = env_int("SKILL_MAX_PAYLOAD_CHARS", 200_000)

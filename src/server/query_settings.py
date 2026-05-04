@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from pathlib import Path
 from typing import Any, Callable
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+
+from src.core.env import env_int
 
 logger = logging.getLogger(__name__)
 
@@ -67,11 +68,11 @@ class QuerySettingsStore:
         settings = self._settings_provider()
         return {
             "mode": "mix",
-            "top_k": int(os.getenv("TOP_K", "40")),
-            "chunk_top_k": int(os.getenv("CHUNK_TOP_K", "20")),
-            "max_entity_tokens": int(os.getenv("MAX_ENTITY_TOKENS", "6000")),
-            "max_relation_tokens": int(os.getenv("MAX_RELATION_TOKENS", "8000")),
-            "max_total_tokens": int(os.getenv("MAX_TOTAL_TOKENS", "60000")),
+            "top_k": env_int("TOP_K", 40, 1, 500),
+            "chunk_top_k": env_int("CHUNK_TOP_K", 20, 1, 500),
+            "max_entity_tokens": env_int("MAX_ENTITY_TOKENS", 6000, 100, 200000),
+            "max_relation_tokens": env_int("MAX_RELATION_TOKENS", 8000, 100, 200000),
+            "max_total_tokens": env_int("MAX_TOTAL_TOKENS", 60000, 100, 500000),
             "enable_rerank": bool(settings.enable_rerank),
             "min_rerank_score": float(settings.min_rerank_score),
             "only_need_context": False,
