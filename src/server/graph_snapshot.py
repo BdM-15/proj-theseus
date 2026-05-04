@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import logging
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
+
+from src.core.neo4j_config import get_neo4j_connection_config
 
 logger = logging.getLogger(__name__)
 
@@ -51,10 +52,7 @@ async def load_graph_neo4j(
     """Pull a Cytoscape-friendly subgraph from Neo4j, top-degree nodes first."""
     from neo4j import AsyncGraphDatabase
 
-    uri = os.getenv("NEO4J_URI", "neo4j://localhost:7687")
-    user = os.getenv("NEO4J_USERNAME", "neo4j")
-    password = os.getenv("NEO4J_PASSWORD", "")
-    database = os.getenv("NEO4J_DATABASE", "neo4j")
+    config = get_neo4j_connection_config()
     label = workspace
 
     type_filter = ""
@@ -79,9 +77,9 @@ async def load_graph_neo4j(
                type(r) AS rtype, properties(r) AS props
     """
 
-    driver = AsyncGraphDatabase.driver(uri, auth=(user, password))
+    driver = AsyncGraphDatabase.driver(config.uri, auth=config.auth)
     try:
-        async with driver.session(database=database, default_access_mode="READ") as session:
+        async with driver.session(database=config.database, default_access_mode="READ") as session:
             total_res = await session.run(
                 total_query,
                 **({"etype": entity_type} if entity_type else {}),

@@ -25,12 +25,13 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import re
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Optional
+
+from src.core.neo4j_config import get_neo4j_connection_config
 
 logger = logging.getLogger(__name__)
 
@@ -408,13 +409,13 @@ async def tool_kg_query(ctx: ToolContext, cypher: str) -> ToolResult:
             "cypher must start with MATCH/OPTIONAL MATCH/WITH/UNWIND/CALL/RETURN"
         )
 
-    graph_storage = os.getenv("GRAPH_STORAGE", "").strip()
-    if graph_storage != "Neo4JStorage":
+    config = get_neo4j_connection_config(database_fallback=ctx.workspace_name)
+    if not config.enabled:
         return ToolResult(
             payload={
                 "available": False,
                 "reason": (
-                    f"GRAPH_STORAGE={graph_storage or 'NetworkXStorage'}; "
+                    f"GRAPH_STORAGE={config.graph_storage or 'NetworkXStorage'}; "
                     "kg_query requires Neo4JStorage. Use kg_entities or kg_chunks instead."
                 ),
                 "rows": [],
@@ -426,15 +427,10 @@ async def tool_kg_query(ctx: ToolContext, cypher: str) -> ToolResult:
     except ImportError as exc:  # pragma: no cover
         raise ToolError("neo4j driver not installed") from exc
 
-    uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-    user = os.getenv("NEO4J_USERNAME", "neo4j")
-    password = os.getenv("NEO4J_PASSWORD", "")
-    database = os.getenv("NEO4J_DATABASE", ctx.workspace_name) or "neo4j"
-
-    driver = AsyncGraphDatabase.driver(uri, auth=(user, password))
+    driver = AsyncGraphDatabase.driver(config.uri, auth=config.auth)
     rows: list[dict[str, Any]] = []
     try:
-        async with driver.session(database=database) as session:
+        async with driver.session(database=config.database) as session:
             result = await session.run(cypher)
             async for record in result:
                 rows.append({k: _jsonable(v) for k, v in record.items()})

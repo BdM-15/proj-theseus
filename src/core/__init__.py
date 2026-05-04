@@ -5,6 +5,7 @@ Provides centralized configuration, shared utilities, and custom exceptions.
 """
 
 from src.core.config import get_settings, reset_settings, Settings
+from src.core.neo4j_config import Neo4jConnectionConfig, get_neo4j_connection_config
 from src.core.exceptions import (
     GovConError,
     ConfigurationError,
@@ -21,6 +22,8 @@ __all__ = [
     "get_settings", 
     "reset_settings", 
     "Settings",
+    "Neo4jConnectionConfig",
+    "get_neo4j_connection_config",
     # Exceptions
     "GovConError",
     "ConfigurationError",
