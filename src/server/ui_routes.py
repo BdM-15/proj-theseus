@@ -56,6 +56,10 @@ QueryDataFunc = Callable[
 from src.core import get_settings, reset_settings
 from src.ontology.schema import VALID_ENTITY_TYPES, VALID_RELATIONSHIP_TYPES
 from src.server.mcp_ui_routes import register_mcp_ui_routes
+from src.server.query_settings import (
+    QuerySettingsStore,
+    register_query_settings_routes,
+)
 from src.server.skill_ui_routes import register_skill_ui_routes
 
 logger = logging.getLogger(__name__)
@@ -160,88 +164,6 @@ def _chats_dir() -> Path:
 
 
 # ---------------------------------------------------------------------------
-# Per-workspace query parameter settings (mirrors LightRAG WebUI panel)
-# ---------------------------------------------------------------------------
-
-# QueryParam fields we forward (excludes `min_rerank_score` which is applied
-# directly to the LightRAG instance, and `mode`/`stream` which are per-chat).
-# `response_type` is intentionally omitted — upstream LightRAG WebUI dropped
-# the picker and just uses the QueryParam default ("Multiple Paragraphs").
-_QUERY_PARAM_FIELDS = (
-    "top_k",
-    "chunk_top_k",
-    "max_entity_tokens",
-    "max_relation_tokens",
-    "max_total_tokens",
-    "enable_rerank",
-    "only_need_context",
-    "only_need_prompt",
-    "user_prompt",
-)
-
-
-def _default_query_settings() -> dict[str, Any]:
-    """Build the default settings dict from env-driven `Settings` + LightRAG
-    QueryParam defaults. Called fresh each request so .env edits take effect
-    after a server restart without touching this module.
-    """
-    s = get_settings()
-    return {
-        "mode": "mix",
-        "top_k": int(os.getenv("TOP_K", "40")),
-        "chunk_top_k": int(os.getenv("CHUNK_TOP_K", "20")),
-        "max_entity_tokens": int(os.getenv("MAX_ENTITY_TOKENS", "6000")),
-        "max_relation_tokens": int(os.getenv("MAX_RELATION_TOKENS", "8000")),
-        "max_total_tokens": int(os.getenv("MAX_TOTAL_TOKENS", "60000")),
-        "enable_rerank": bool(s.enable_rerank),
-        "min_rerank_score": float(s.min_rerank_score),
-        "only_need_context": False,
-        "only_need_prompt": False,
-        "stream": True,
-        "user_prompt": "",
-    }
-
-
-def _query_settings_path() -> Path:
-    """Path to per-workspace query parameter overrides."""
-    return _workspace_dir() / "ui_query_settings.json"
-
-
-def _read_query_settings() -> dict[str, Any]:
-    """Return the active query settings, merged over env-driven defaults."""
-    path = _query_settings_path()
-    merged = _default_query_settings()
-    if not path.exists():
-        return merged
-    try:
-        loaded = json.loads(path.read_text(encoding="utf-8"))
-        if isinstance(loaded, dict):
-            for key in list(merged.keys()):
-                if key in loaded:
-                    merged[key] = loaded[key]
-    except (OSError, json.JSONDecodeError) as exc:
-        logger.warning("Failed reading %s, using defaults: %s", path, exc)
-    return merged
-
-
-def _write_query_settings(data: dict[str, Any]) -> None:
-    """Persist query settings atomically."""
-    path = _query_settings_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    tmp.replace(path)
-
-
-def _build_query_overrides() -> dict[str, Any]:
-    """Build the dict passed to the bridge: QueryParam fields + min_rerank_score."""
-    s = _read_query_settings()
-    overrides: dict[str, Any] = {k: s[k] for k in _QUERY_PARAM_FIELDS if k in s}
-    overrides["min_rerank_score"] = s.get("min_rerank_score", 0.0)
-    return overrides
-
-
-# ---------------------------------------------------------------------------
 # Pydantic models
 # ---------------------------------------------------------------------------
 
@@ -281,23 +203,6 @@ class WipeAllScope(BaseModel):
     rag_storage: bool = Field(default=False)
     inputs: bool = Field(default=False)
     confirm: str = Field(..., description="Must equal 'DELETE ALL'.")
-
-
-class QuerySettingsUpdate(BaseModel):
-    """Per-workspace LightRAG query parameter overrides. All fields optional."""
-
-    mode: Optional[str] = Field(default=None, max_length=20)
-    top_k: Optional[int] = Field(default=None, ge=1, le=500)
-    chunk_top_k: Optional[int] = Field(default=None, ge=1, le=500)
-    max_entity_tokens: Optional[int] = Field(default=None, ge=100, le=200000)
-    max_relation_tokens: Optional[int] = Field(default=None, ge=100, le=200000)
-    max_total_tokens: Optional[int] = Field(default=None, ge=100, le=500000)
-    enable_rerank: Optional[bool] = None
-    min_rerank_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
-    only_need_context: Optional[bool] = None
-    only_need_prompt: Optional[bool] = None
-    stream: Optional[bool] = None
-    user_prompt: Optional[str] = Field(default=None, max_length=20000)
 
 
 # ---------------------------------------------------------------------------
@@ -1124,6 +1029,11 @@ def register_ui(
         stream_events as _stream_log_events,
     )
 
+    query_settings = QuerySettingsStore(
+        workspace_dir=_workspace_dir,
+        settings_provider=get_settings,
+    )
+
     # ---- Static SPA at /ui ------------------------------------------------
     app.mount(
         "/ui",
@@ -1297,7 +1207,7 @@ def register_ui(
         chat["messages"].append(user_msg)
 
         history = _build_history(chat, exclude_last=True)
-        overrides = _build_query_overrides()
+        overrides = query_settings.build_overrides()
         try:
             answer = await query_func(
                 payload.content, chat.get("mode", "mix"), history, False, overrides
@@ -1355,7 +1265,7 @@ def register_ui(
 
         history = _build_history(chat, exclude_last=True)
         mode = chat.get("mode", "mix")
-        overrides = _build_query_overrides()
+        overrides = query_settings.build_overrides()
 
         async def event_stream():
             # SSE preamble keeps proxies from buffering and signals the client
@@ -1836,43 +1746,11 @@ def register_ui(
             "message": "Server is restarting. The UI will reconnect automatically.",
         })
 
-    # ---- Query parameter settings (per-workspace LightRAG tunables) -------
-    @app.get("/api/ui/settings/query", tags=["theseus-ui"])
-    async def get_query_settings() -> JSONResponse:
-        """Return the active per-workspace query settings + the built-in defaults."""
-        return JSONResponse({
-            "workspace": get_settings().workspace,
-            "settings": _read_query_settings(),
-            "defaults": _default_query_settings(),
-        })
-
-    @app.put("/api/ui/settings/query", tags=["theseus-ui"])
-    async def update_query_settings(payload: QuerySettingsUpdate) -> JSONResponse:
-        """Patch one or more query settings. Unspecified fields keep current value."""
-        current = _read_query_settings()
-        updates = payload.model_dump(exclude_none=True)
-        # Validate mode against LightRAG-supported values
-        if "mode" in updates and updates["mode"] not in {
-            "local", "global", "hybrid", "naive", "mix", "bypass"
-        }:
-            raise HTTPException(400, f"Unsupported mode: {updates['mode']}")
-        current.update(updates)
-        try:
-            _write_query_settings(current)
-        except OSError as exc:
-            raise HTTPException(500, f"Failed writing settings: {exc}") from exc
-        return JSONResponse({"settings": current})
-
-    @app.post("/api/ui/settings/query/reset", tags=["theseus-ui"])
-    async def reset_query_settings() -> JSONResponse:
-        """Restore defaults by removing the per-workspace overrides file."""
-        path = _query_settings_path()
-        try:
-            if path.exists():
-                path.unlink()
-        except OSError as exc:
-            raise HTTPException(500, f"Failed resetting settings: {exc}") from exc
-        return JSONResponse({"settings": _default_query_settings()})
+    register_query_settings_routes(
+        app,
+        workspace_name=lambda: get_settings().workspace,
+        store=query_settings,
+    )
 
     register_skill_ui_routes(
         app,
