@@ -29,7 +29,6 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from lightrag.api.config import global_args
-from pydantic import BaseModel, Field
 
 # query_func signature: (text, mode, history, stream, overrides) -> str | AsyncIterator[str]
 # - history: list of {"role": "user"|"assistant", "content": str}
@@ -52,6 +51,7 @@ QueryDataFunc = Callable[
 from src.core import get_settings
 from src.ontology.schema import VALID_ENTITY_TYPES, VALID_RELATIONSHIP_TYPES
 from src.server.chat_store import ChatStore
+from src.server.chat_ui_routes import register_chat_ui_routes
 from src.server.graph_snapshot import register_graph_routes
 from src.server.mcp_ui_routes import register_mcp_ui_routes
 from src.server.processing_log_routes import register_processing_log_routes
@@ -61,7 +61,6 @@ from src.server.query_settings import (
     QuerySettingsStore,
     register_query_settings_routes,
 )
-from src.server.reasoning_filter import ThinkStripper, strip_think
 from src.server.skill_ui_routes import register_skill_ui_routes
 from src.server.workspace_ui_routes import (
     register_workspace_ui_routes,
@@ -95,26 +94,6 @@ def _chats_dir() -> Path:
 
 
 # ---------------------------------------------------------------------------
-# Pydantic models
-# ---------------------------------------------------------------------------
-
-class ChatCreate(BaseModel):
-    title: str = Field(default="New chat", max_length=120)
-    mode: str = Field(default="mix")
-    rfp_context: Optional[str] = Field(default=None, max_length=200)
-
-
-class ChatUpdate(BaseModel):
-    title: Optional[str] = Field(default=None, max_length=120)
-    mode: Optional[str] = Field(default=None)
-    rfp_context: Optional[str] = Field(default=None, max_length=200)
-
-
-class ChatMessageCreate(BaseModel):
-    content: str = Field(..., min_length=1, max_length=20000)
-
-
-# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -124,62 +103,6 @@ from src.utils.time_utils import now_local_iso as _now_local_iso
 def _now_iso() -> str:
     """ISO timestamp in America/Chicago (CST/CDT)."""
     return _now_local_iso(timespec="seconds")
-
-
-# Maximum characters per chunk preview shipped to the UI. Keeps the SSE event
-# small and the chat-file footprint reasonable on long conversations.
-_SOURCE_PREVIEW_CHARS = 800
-
-
-def _trim_sources(data: dict) -> dict:
-    """Project LightRAG aquery_data['data'] into a compact UI payload.
-
-    Keeps only the fields the Sources panel needs and truncates chunk text to
-    `_SOURCE_PREVIEW_CHARS`. The full chunk content already lives in LightRAG
-    storage; the UI only needs enough to preview and link back.
-    """
-    chunks_in = data.get("chunks") or []
-    refs_in = data.get("references") or []
-    ents_in = data.get("entities") or []
-    rels_in = data.get("relationships") or []
-
-    chunks_out = []
-    for c in chunks_in:
-        if not isinstance(c, dict):
-            continue
-        content = str(c.get("content") or "")
-        truncated = len(content) > _SOURCE_PREVIEW_CHARS
-        preview = content[:_SOURCE_PREVIEW_CHARS] + ("\u2026" if truncated else "")
-        chunks_out.append(
-            {
-                "reference_id": str(c.get("reference_id") or ""),
-                "chunk_id": str(c.get("chunk_id") or ""),
-                "file_path": str(c.get("file_path") or ""),
-                "preview": preview,
-                "char_count": len(content),
-                "truncated": truncated,
-            }
-        )
-
-    refs_out = [
-        {
-            "reference_id": str(r.get("reference_id") or ""),
-            "file_path": str(r.get("file_path") or ""),
-        }
-        for r in refs_in
-        if isinstance(r, dict)
-    ]
-
-    return {
-        "chunks": chunks_out,
-        "references": refs_out,
-        "counts": {
-            "chunks": len(chunks_out),
-            "entities": len(ents_in),
-            "relationships": len(rels_in),
-            "references": len(refs_out),
-        },
-    }
 
 
 # ---------------------------------------------------------------------------
@@ -324,276 +247,14 @@ def register_ui(
         """Return the curated Shipley phase 4-6 suggested-prompt catalog."""
         return JSONResponse({"prompts": PROMPT_LIBRARY})
 
-    # ---- Chats: list/create ----------------------------------------------
-    @app.get("/api/ui/chats", tags=["theseus-ui"])
-    async def list_chats() -> JSONResponse:
-        """List all saved chats for the active workspace, newest first."""
-        return JSONResponse({"chats": chat_store.list_summaries()})
-
-    @app.post("/api/ui/chats", tags=["theseus-ui"])
-    async def create_chat(payload: ChatCreate) -> JSONResponse:
-        """Create a new persistent chat session."""
-        chat = chat_store.create(
-            title=payload.title,
-            mode=payload.mode,
-            rfp_context=payload.rfp_context,
-        )
-        return JSONResponse(chat_store.summary(chat), status_code=201)
-
-    # ---- Chats: read/update/delete ---------------------------------------
-    @app.get("/api/ui/chats/{chat_id}", tags=["theseus-ui"])
-    async def get_chat(chat_id: str) -> JSONResponse:
-        """Return full chat including all messages."""
-        return JSONResponse(chat_store.read(chat_id))
-
-    @app.patch("/api/ui/chats/{chat_id}", tags=["theseus-ui"])
-    async def update_chat(chat_id: str, payload: ChatUpdate) -> JSONResponse:
-        """Rename a chat or update its mode / RFP context."""
-        chat = chat_store.update(
-            chat_id,
-            title=payload.title,
-            mode=payload.mode,
-            rfp_context=payload.rfp_context,
-        )
-        return JSONResponse(chat_store.summary(chat))
-
-    @app.delete("/api/ui/chats/{chat_id}", tags=["theseus-ui"])
-    async def delete_chat(chat_id: str) -> JSONResponse:
-        """Permanently delete a chat."""
-        chat_store.delete(chat_id)
-        return JSONResponse({"status": "deleted", "id": chat_id})
-
-    # ---- Chats: send message (calls LightRAG /query under the hood) ------
-    # LightRAG itself does NOT trim conversation_history (operate.py forwards
-    # it raw to the LLM), so we cap here. The cap lives in
-    # ``_ui_chat_history_pairs`` and is also surfaced via /api/ui/stats so the
-    # chat header can render an accurate "N turns in context" indicator.
-
-    @app.post("/api/ui/chats/{chat_id}/messages", tags=["theseus-ui"])
-    async def post_message(chat_id: str, payload: ChatMessageCreate) -> JSONResponse:
-        """Append a user message, invoke RAG query, persist the assistant reply."""
-        chat = chat_store.read(chat_id)
-        user_msg = {
-            "role": "user",
-            "content": payload.content,
-            "ts": _now_iso(),
-        }
-        chat["messages"].append(user_msg)
-
-        history = chat_store.build_history(chat, exclude_last=True)
-        overrides = query_settings.build_overrides()
-        try:
-            answer = await query_func(
-                payload.content, chat.get("mode", "mix"), history, False, overrides
-            )
-        except Exception as exc:
-            logger.exception("Query failed for chat %s: %s", chat_id, exc)
-            answer = f"⚠️ Query failed: {exc}"
-
-        assistant_msg = {
-            "role": "assistant",
-            "content": strip_think(str(answer)),
-            "ts": _now_iso(),
-            "mode": chat.get("mode", "mix"),
-        }
-        chat["messages"].append(assistant_msg)
-        chat["updated_at"] = _now_iso()
-
-        # Auto-title the chat from the first user prompt.
-        if chat.get("title") in (None, "", "New chat") and len(chat["messages"]) <= 2:
-            chat_store.maybe_autotitle(chat, payload.content)
-
-        chat_store.write(chat)
-        return JSONResponse({
-            "user": user_msg,
-            "assistant": assistant_msg,
-            "chat": chat_store.summary(chat),
-        })
-
-    # ---- Chats: streaming variant (Server-Sent Events) -------------------
-    @app.post("/api/ui/chats/{chat_id}/messages/stream", tags=["theseus-ui"])
-    async def post_message_stream(chat_id: str, payload: ChatMessageCreate):
-        """Stream the assistant reply token-by-token via SSE.
-
-        Event format (one SSE event per chunk):
-            event: token
-            data: {"text": "..."}
-
-        Final event when complete:
-            event: done
-            data: {"assistant": {...full message...}, "chat": {...summary...}}
-
-        Error event (terminal):
-            event: error
-            data: {"message": "..."}
-        """
-        chat = chat_store.read(chat_id)
-        user_msg = {
-            "role": "user",
-            "content": payload.content,
-            "ts": _now_iso(),
-        }
-        chat["messages"].append(user_msg)
-        # Persist the user turn immediately so a dropped connection doesn't lose it.
-        if chat.get("title") in (None, "", "New chat") and len(chat["messages"]) <= 1:
-            chat_store.maybe_autotitle(chat, payload.content)
-        chat_store.write(chat)
-
-        history = chat_store.build_history(chat, exclude_last=True)
-        mode = chat.get("mode", "mix")
-        overrides = query_settings.build_overrides()
-
-        async def event_stream():
-            # SSE preamble keeps proxies from buffering and signals the client
-            # that the stream is alive even before the first model token.
-            yield "event: open\ndata: {}\n\n"
-            # Tell the UI we're working on retrieval/rerank. LightRAG's aquery
-            # does retrieval + rerank + first-token-prefill *before* it returns
-            # the iterator, so this status covers that whole prep window.
-            yield (
-                "event: status\ndata: "
-                + json.dumps({"phase": "retrieving", "label": "Retrieving context\u2026"})
-                + "\n\n"
-            )
-            collected: list[str] = []
-            stripper = ThinkStripper()
-            t_start = time.perf_counter()
-            t_first_token: float | None = None
-            token_count = 0
-            error_message: str | None = None
-            sources_payload: dict | None = None
-            try:
-                # Pre-flight: fetch retrieved chunks/entities/relationships so
-                # the UI can render a Sources panel and wire the inline citation
-                # chips to actual source content. Failures here are non-fatal —
-                # the answer still streams normally.
-                if data_func is not None and mode != "bypass":
-                    try:
-                        data_result = await data_func(payload.content, mode, history, overrides)
-                        if isinstance(data_result, dict) and data_result.get("status") == "success":
-                            sources_payload = _trim_sources(data_result.get("data", {}))
-                            yield (
-                                "event: sources\ndata: "
-                                + json.dumps(sources_payload)
-                                + "\n\n"
-                            )
-                    except Exception as exc:  # noqa: BLE001
-                        logger.warning(
-                            "Sources pre-flight failed for chat %s: %s", chat_id, exc
-                        )
-                result = await query_func(payload.content, mode, history, True, overrides)
-                retrieve_ms = int((time.perf_counter() - t_start) * 1000)
-                # Iterator is in hand \u2014 LLM has started generating.
-                yield (
-                    "event: status\ndata: "
-                    + json.dumps(
-                        {
-                            "phase": "generating",
-                            "label": "Generating response\u2026",
-                            "retrieve_ms": retrieve_ms,
-                        }
-                    )
-                    + "\n\n"
-                )
-                if hasattr(result, "__aiter__"):
-                    async for chunk in result:
-                        if not chunk:
-                            continue
-                        text = stripper.feed(str(chunk))
-                        if not text:
-                            continue
-                        if t_first_token is None:
-                            t_first_token = time.perf_counter()
-                        collected.append(text)
-                        token_count += 1
-                        yield f"event: token\ndata: {json.dumps({'text': text})}\n\n"
-                    # Emit any trailing buffered text (e.g. final close tag absent).
-                    tail = stripper.flush()
-                    if tail:
-                        if t_first_token is None:
-                            t_first_token = time.perf_counter()
-                        collected.append(tail)
-                        token_count += 1
-                        yield f"event: token\ndata: {json.dumps({'text': tail})}\n\n"
-                else:
-                    text = strip_think(str(result))
-                    collected.append(text)
-                    token_count = 1
-                    t_first_token = time.perf_counter()
-                    yield f"event: token\ndata: {json.dumps({'text': text})}\n\n"
-            except Exception as exc:
-                logger.exception("Streaming query failed for chat %s", chat_id)
-                error_message = str(exc)
-                yield f"event: error\ndata: {json.dumps({'message': error_message})}\n\n"
-                # Persist the error so the chat reflects what the user saw.
-                collected.append(f"\u26a0\ufe0f Query failed: {exc}")
-
-            t_end = time.perf_counter()
-            total_ms = int((t_end - t_start) * 1000)
-            ttft_ms = (
-                int((t_first_token - t_start) * 1000) if t_first_token else None
-            )
-            generate_ms = (
-                int((t_end - t_first_token) * 1000) if t_first_token else None
-            )
-
-            full_text = "".join(collected)
-            timing = {
-                "total_ms": total_ms,
-                "ttft_ms": ttft_ms,
-                "generate_ms": generate_ms,
-                "chunk_count": token_count,
-                "char_count": len(full_text),
-            }
-            assistant_msg = {
-                "role": "assistant",
-                "content": full_text,
-                "ts": _now_iso(),
-                "mode": mode,
-                "timing": timing,
-            }
-            if sources_payload is not None:
-                assistant_msg["sources"] = sources_payload
-            # Re-read so we don't clobber concurrent edits to the same chat file.
-            try:
-                latest = chat_store.read(chat_id)
-            except HTTPException:
-                latest = chat
-            latest["messages"].append(assistant_msg)
-            latest["updated_at"] = _now_iso()
-            chat_store.write(latest)
-
-            logger.info(
-                "[chat] mode=%s ttft=%sms total=%sms chunks=%s chars=%s%s",
-                mode,
-                ttft_ms if ttft_ms is not None else "-",
-                total_ms,
-                token_count,
-                len(full_text),
-                f" error={error_message!r}" if error_message else "",
-            )
-
-            yield (
-                "event: done\ndata: "
-                + json.dumps(
-                    {
-                        "assistant": assistant_msg,
-                        "chat": chat_store.summary(latest),
-                        "timing": timing,
-                    }
-                )
-                + "\n\n"
-            )
-
-        return StreamingResponse(
-            event_stream(),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache, no-transform",
-                "X-Accel-Buffering": "no",  # disable nginx buffering if proxied
-                "Connection": "keep-alive",
-            },
-        )
+    register_chat_ui_routes(
+        app,
+        chat_store=chat_store,
+        query_settings=query_settings,
+        query_func=query_func,
+        data_func=data_func,
+        now=_now_iso,
+    )
 
     # ---- Entity → source chunks (for KG explorer click-through) ----------
     @app.get("/api/ui/entity/{name}/chunks", tags=["theseus-ui"])
