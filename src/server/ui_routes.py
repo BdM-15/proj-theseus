@@ -58,6 +58,7 @@ from src.server.chat_store import ChatStore
 from src.server.graph_snapshot import register_graph_routes
 from src.server.mcp_ui_routes import register_mcp_ui_routes
 from src.server.prompt_library import PROMPT_LIBRARY
+from src.server.rfp_intelligence import register_intelligence_routes
 from src.server.query_settings import (
     QuerySettingsStore,
     register_query_settings_routes,
@@ -379,193 +380,6 @@ def _self_restart() -> None:
     except Exception as exc:  # pragma: no cover
         logger.exception("Self-restart failed: %s", exc)
         os._exit(1)
-
-
-# ---------------------------------------------------------------------------
-# RFP Intelligence — L↔M matrix, traceability, coverage, gaps
-# ---------------------------------------------------------------------------
-
-def _load_vdb(name: str) -> list[dict[str, Any]]:
-    """Load a vdb_*.json file's `data` array. Returns [] on any failure."""
-    path = _workspace_dir() / name
-    try:
-        if not path.exists():
-            return []
-        raw = json.loads(path.read_text(encoding="utf-8"))
-        return raw.get("data") or []
-    except Exception as exc:
-        logger.warning("Failed reading %s: %s", path, exc)
-        return []
-
-
-def _split_keywords(value: Any) -> list[str]:
-    """Relationship `keywords` is sometimes a comma/space-joined string."""
-    if not value:
-        return []
-    if isinstance(value, list):
-        return [str(v).strip().upper() for v in value if v]
-    return [tok.strip().upper() for tok in re.split(r"[,\s]+", str(value)) if tok.strip()]
-
-
-def _compute_intel() -> dict[str, Any]:
-    """
-    Build the RFP Intelligence rollup from the workspace's VDB JSON stores.
-
-    Returns:
-        {
-            "lm_matrix":     [{instruction, evaluator, factor_id, ...}],
-            "traceability":  [{requirement, deliverable, standard, metric}],
-            "coverage":      [{factor, subfactors, instructions, deliverables, score}],
-            "gaps":          {requirements_no_satisfaction: [...], factors_no_instruction: [...], deliverables_no_measure: [...]},
-            "totals":        {entities, relationships, by_type: {...}},
-        }
-    """
-    entities = _load_vdb("vdb_entities.json")
-    relations = _load_vdb("vdb_relationships.json")
-
-    # name → entity record (entity_id stored in `entity_name` or top-level keys)
-    by_name: dict[str, dict[str, Any]] = {}
-    for e in entities:
-        name = e.get("entity_name") or e.get("entity_id") or e.get("__id__")
-        if not name:
-            continue
-        by_name[str(name).strip()] = e
-
-    # type buckets (lowercased entity_type)
-    buckets: dict[str, list[str]] = {}
-    for name, ent in by_name.items():
-        t = (ent.get("entity_type") or "concept").lower()
-        buckets.setdefault(t, []).append(name)
-
-    # adjacency keyed by (src, tgt) → set of canonical relation types
-    out_edges: dict[str, list[tuple[str, str, dict[str, Any]]]] = {}
-    in_edges: dict[str, list[tuple[str, str, dict[str, Any]]]] = {}
-    for r in relations:
-        s, t = r.get("src_id"), r.get("tgt_id")
-        if not s or not t:
-            continue
-        types = _split_keywords(r.get("keywords") or r.get("relationship_type"))
-        for rt in types:
-            out_edges.setdefault(s, []).append((rt, t, r))
-            in_edges.setdefault(t, []).append((rt, s, r))
-
-    def _outgoing(name: str, rel: str) -> list[str]:
-        return [t for (rt, t, _) in out_edges.get(name, []) if rt == rel]
-
-    def _incoming(name: str, rel: str) -> list[str]:
-        return [s for (rt, s, _) in in_edges.get(name, []) if rt == rel]
-
-    def _summarize(name: str, n: int = 110) -> dict[str, Any]:
-        ent = by_name.get(name) or {}
-        desc = (ent.get("description") or ent.get("content") or "").strip().replace("\n", " ")
-        return {
-            "id": name,
-            "type": (ent.get("entity_type") or "concept").lower(),
-            "description": (desc[:n] + "…") if len(desc) > n else desc,
-        }
-
-    # --- L ↔ M matrix ----------------------------------------------------
-    # Instructions GUIDES factors; factors EVALUATED_BY their evidence.
-    # We surface: instruction → linked factor (or factor → guiding instruction).
-    lm_rows: list[dict[str, Any]] = []
-    instructions = sorted(buckets.get("proposal_instruction", []))
-    for instr in instructions:
-        guided = sorted(set(_outgoing(instr, "GUIDES") + _outgoing(instr, "EVALUATED_BY")))
-        lm_rows.append({
-            "instruction": _summarize(instr),
-            "factors": [_summarize(f) for f in guided],
-            "covered": bool(guided),
-        })
-    # Also surface factors with NO inbound instruction (gap signal)
-    factor_names = sorted(set(buckets.get("evaluation_factor", []) + buckets.get("subfactor", [])))
-    factor_rows: list[dict[str, Any]] = []
-    for f in factor_names:
-        guides = sorted(set(_incoming(f, "GUIDES") + _incoming(f, "EVALUATED_BY")))
-        factor_rows.append({
-            "factor": _summarize(f),
-            "instructions": [_summarize(i) for i in guides],
-            "covered": bool(guides),
-        })
-
-    # --- Traceability: requirement → deliverable → standard / metric -----
-    trace_rows: list[dict[str, Any]] = []
-    for req in sorted(buckets.get("requirement", [])):
-        delivs = sorted(set(_outgoing(req, "SATISFIED_BY")))
-        if not delivs:
-            trace_rows.append({
-                "requirement": _summarize(req),
-                "deliverables": [],
-                "standards": [],
-                "metrics": [],
-                "complete": False,
-            })
-            continue
-        for d in delivs:
-            stds = sorted(set(_outgoing(d, "MEASURED_BY")))
-            mets = sorted(set(_outgoing(d, "TRACKED_BY") + _outgoing(d, "QUANTIFIES")))
-            trace_rows.append({
-                "requirement": _summarize(req),
-                "deliverables": [_summarize(d)],
-                "standards": [_summarize(s) for s in stds],
-                "metrics": [_summarize(m) for m in mets],
-                "complete": bool(stds or mets),
-            })
-
-    # --- Coverage heatmap by evaluation factor ---------------------------
-    coverage_rows: list[dict[str, Any]] = []
-    for f in sorted(buckets.get("evaluation_factor", [])):
-        subs = sorted(set(_outgoing(f, "HAS_SUBFACTOR") + _outgoing(f, "CHILD_OF")))
-        instrs = sorted(set(_incoming(f, "GUIDES")))
-        # walk: factor → instruction → SATISFIED_BY deliverable
-        delivs: set[str] = set()
-        for i in instrs:
-            for r in (by_name.get(i, {}),):  # placeholder
-                pass
-        # broader: any deliverable mentioning the factor via SUPPORTS / EVIDENCES / ADDRESSES
-        for rel in ("SUPPORTS", "EVIDENCES", "ADDRESSES"):
-            delivs.update(_incoming(f, rel))
-        score = (1 if instrs else 0) + (1 if subs else 0) + (1 if delivs else 0)  # 0..3
-        coverage_rows.append({
-            "factor": _summarize(f),
-            "subfactor_count": len(subs),
-            "instruction_count": len(instrs),
-            "evidence_count": len(delivs),
-            "score": score,  # 0=red, 1=amber, 2=cyan, 3=lime
-        })
-
-    # --- Gaps -------------------------------------------------------------
-    gaps_req: list[dict[str, Any]] = [
-        _summarize(r) for r in sorted(buckets.get("requirement", []))
-        if not _outgoing(r, "SATISFIED_BY")
-    ]
-    gaps_factor: list[dict[str, Any]] = [
-        _summarize(f) for f in factor_names
-        if not (_incoming(f, "GUIDES") or _incoming(f, "EVALUATED_BY"))
-    ]
-    gaps_deliv: list[dict[str, Any]] = [
-        _summarize(d) for d in sorted(buckets.get("deliverable", []))
-        if not (_outgoing(d, "MEASURED_BY") or _outgoing(d, "TRACKED_BY"))
-    ]
-
-    return {
-        "generated_at": _now_iso(),
-        "totals": {
-            "entities": len(by_name),
-            "relationships": len(relations),
-            "by_type": {k: len(v) for k, v in sorted(buckets.items(), key=lambda kv: -len(kv[1]))},
-        },
-        "lm_matrix": {
-            "instructions": lm_rows,
-            "factors": factor_rows,
-        },
-        "traceability": trace_rows,
-        "coverage": coverage_rows,
-        "gaps": {
-            "requirements_no_satisfaction": gaps_req,
-            "factors_no_instruction": gaps_factor,
-            "deliverables_no_measure": gaps_deliv,
-        },
-    }
 
 
 # ---------------------------------------------------------------------------
@@ -1001,11 +815,7 @@ def register_ui(
             })
         return JSONResponse({"entity": name, "chunks": out})
 
-    # ---- RFP Intelligence (L↔M matrix, traceability, coverage, gaps) -----
-    @app.get("/api/ui/intel/summary", tags=["theseus-ui"])
-    async def intel_summary() -> JSONResponse:
-        """Compute L↔M matrix, traceability chains, factor coverage, and gaps."""
-        return JSONResponse(_compute_intel())
+    register_intelligence_routes(app, workspace_dir=_workspace_dir)
 
     register_graph_routes(
         app,
