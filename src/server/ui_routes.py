@@ -55,6 +55,7 @@ QueryDataFunc = Callable[
 
 from src.core import get_settings, reset_settings
 from src.ontology.schema import VALID_ENTITY_TYPES, VALID_RELATIONSHIP_TYPES
+from src.server.mcp_ui_routes import register_mcp_ui_routes
 from src.server.skill_ui_routes import register_skill_ui_routes
 
 logger = logging.getLogger(__name__)
@@ -298,25 +299,6 @@ class QuerySettingsUpdate(BaseModel):
     stream: Optional[bool] = None
     user_prompt: Optional[str] = Field(default=None, max_length=20000)
 
-
-class McpKeyUpdate(BaseModel):
-    """Body for POST /api/ui/mcps/{name}/keys.
-
-    Only env vars declared in the MCP's manifest (env_required +
-    env_optional) are writable through this endpoint — it cannot be used
-    as a generic .env writer. Empty string clears the variable's value
-    while keeping the line in .env so users see it was intentionally
-    blanked.
-    """
-
-    keys: dict[str, str] = Field(
-        default_factory=dict,
-        description="env-var name → value pairs (must be declared by the MCP)",
-    )
-    restart: bool = Field(
-        default=True,
-        description="Schedule a graceful self-restart so subprocess env updates",
-    )
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -1899,153 +1881,12 @@ def register_ui(
         llm_func=llm_func,
     )
 
-    # ------------------------------------------------------------------
-    # Phase 4e — MCP Servers Settings panel
-    # ------------------------------------------------------------------
-    # Surfaces the vendored MCP inventory under tools/mcps/ to the
-    # Settings UI: what is installed, which env vars each one wants,
-    # whether those env vars are currently set, and a "Test connection"
-    # path that does a real handshake + tools/list against the upstream
-    # subprocess. Saving keys persists to .env (atomic, same pattern as
-    # the workspace switch flow) and triggers a graceful self-restart so
-    # the new env reaches every subsystem.
-
-    _SAFE_MCP_NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
-    _SAFE_ENV_KEY = re.compile(r"^[A-Z][A-Z0-9_]{0,63}$")
-
-    def _mcps_root() -> Path:
-        return Path.cwd() / "tools" / "mcps"
-
-    def _mask_secret(value: str) -> str:
-        """Show first 4 + last 2, never the middle. Empty stays empty."""
-        if not value:
-            return ""
-        if len(value) <= 8:
-            return value[0] + "***"
-        return f"{value[:4]}***{value[-2:]}"
-
-    def _env_status(name: str) -> dict[str, Any]:
-        v = os.environ.get(name, "")
-        return {"name": name, "set": bool(v), "masked": _mask_secret(v)}
-
-    @app.get("/api/ui/mcps", tags=["theseus-ui"])
-    async def list_mcps_route() -> JSONResponse:
-        """List vendored MCP servers + their env-var status.
-
-        Drives the Settings → MCP Servers panel. No subprocess is spawned;
-        this is metadata-only.
-        """
-        from src.skills.mcp_client import discover_manifests
-
-        manifests = discover_manifests(_mcps_root())
-        items: list[dict[str, Any]] = []
-        for name in sorted(manifests):
-            m = manifests[name]
-            items.append({
-                "name": m.name,
-                "description": m.description,
-                "command": m.command,
-                "env_required": [_env_status(k) for k in m.env_required],
-                "env_optional": [_env_status(k) for k in m.env_optional],
-                "missing_env": m.missing_env(),
-                "vendored_from": m.vendored_from,
-                "vendored_commit": m.vendored_commit,
-                "vendored_at": m.vendored_at,
-                "license": m.license,
-            })
-        return JSONResponse({"mcps": items})
-
-    @app.post("/api/ui/mcps/{name}/keys", tags=["theseus-ui"])
-    async def update_mcp_keys_route(name: str, payload: McpKeyUpdate) -> JSONResponse:
-        """Persist env vars for one MCP into .env, then schedule restart.
-
-        Restricts the writable key set to the manifest's env_required +
-        env_optional list — this endpoint cannot be used as a generic
-        .env writer.
-        """
-        from src.skills.mcp_client import discover_manifests
-
-        if not _SAFE_MCP_NAME.match(name):
-            raise HTTPException(400, "Invalid MCP name")
-        manifests = discover_manifests(_mcps_root())
-        if name not in manifests:
-            raise HTTPException(404, f"Unknown MCP: {name}")
-        m = manifests[name]
-        allowed = set(m.env_required) | set(m.env_optional)
-        if not allowed:
-            raise HTTPException(400, f"MCP {name!r} declares no env vars")
-        bad = [k for k in payload.keys if k not in allowed]
-        if bad:
-            raise HTTPException(
-                400,
-                f"Keys not declared by MCP {name!r}: {bad}. "
-                f"Allowed: {sorted(allowed)}",
-            )
-        invalid = [k for k in payload.keys if not _SAFE_ENV_KEY.match(k)]
-        if invalid:
-            raise HTTPException(400, f"Malformed env-var names: {invalid}")
-        written: list[str] = []
-        for key, val in payload.keys.items():
-            try:
-                _set_env_var(key, val)
-                written.append(key)
-            except Exception as exc:
-                raise HTTPException(
-                    500, f"Failed updating .env for {key}: {exc}"
-                ) from exc
-        if payload.restart and written:
-            asyncio.get_event_loop().call_later(0.75, _self_restart)
-            logger.warning(
-                "🔄 MCP %s keys updated (%s) - restarting…", name, written
-            )
-            return JSONResponse({
-                "status": "restarting",
-                "written": written,
-                "mcp": name,
-                "message": "Keys saved. Server is restarting; UI will reconnect.",
-            })
-        return JSONResponse({
-            "status": "saved",
-            "written": written,
-            "mcp": name,
-        })
-
-    @app.post("/api/ui/mcps/{name}/test", tags=["theseus-ui"])
-    async def test_mcp_route(name: str) -> JSONResponse:
-        """Spawn the MCP, complete handshake, return advertised tool inventory.
-
-        Uses the same MCPSession the live runtime uses, so a green test
-        here proves real production health. Subprocess is reaped before
-        the response returns. Returns ``ok: false`` (HTTP 200) on any
-        MCP-side failure so the UI can render the error string instead
-        of a generic 500.
-        """
-        from src.skills.mcp_client import MCPError, MCPSession, discover_manifests
-
-        if not _SAFE_MCP_NAME.match(name):
-            raise HTTPException(400, "Invalid MCP name")
-        manifests = discover_manifests(_mcps_root())
-        if name not in manifests:
-            raise HTTPException(404, f"Unknown MCP: {name}")
-        session = MCPSession(manifests[name])
-        try:
-            try:
-                await session.start()
-            except MCPError as exc:
-                return JSONResponse(
-                    {"ok": False, "mcp": name, "error": str(exc)}
-                )
-            tools = list(session._tools)  # filled by start()
-            return JSONResponse({
-                "ok": True,
-                "mcp": name,
-                "tool_count": len(tools),
-                "sample_tools": [t.name for t in tools[:8]],
-            })
-        finally:
-            try:
-                await session.shutdown()
-            except Exception:  # noqa: BLE001 — best-effort reap
-                logger.debug("MCP %s test shutdown raised", name, exc_info=True)
+    register_mcp_ui_routes(
+        app,
+        set_env_var=lambda key, value: _set_env_var(key, value),
+        schedule_restart=lambda delay: asyncio.get_event_loop().call_later(
+            delay, _self_restart
+        ),
+    )
 
     logger.info("✅ Project Theseus UI mounted at /ui (static: %s)", _STATIC_DIR)
