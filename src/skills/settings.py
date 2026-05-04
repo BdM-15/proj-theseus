@@ -36,6 +36,28 @@ def env_int(
     return value
 
 
+def env_float(
+    name: str,
+    default: float,
+    lo: Optional[float] = None,
+    hi: Optional[float] = None,
+) -> float:
+    """Read a float environment variable with optional clamping."""
+    raw = os.getenv(name)
+    if not raw:
+        return default
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        logger.warning("Invalid %s=%r; using default %s", name, raw, default)
+        return default
+    if lo is not None:
+        value = max(lo, value)
+    if hi is not None:
+        value = min(hi, value)
+    return value
+
+
 DEFAULT_SKILL_MAX_PAYLOAD_CHARS = env_int("SKILL_MAX_PAYLOAD_CHARS", 200_000)
 
 
@@ -62,6 +84,21 @@ def skill_tools_max_turns(metadata: Mapping[str, Any]) -> int:
     if isinstance(raw, int) and raw > env_max_turns:
         return raw
     return env_max_turns
+
+
+def mcp_handshake_timeout() -> float:
+    """Timeout in seconds for MCP handshake and tool listing."""
+    return env_float("MCP_HANDSHAKE_TIMEOUT", 10.0, 0.1)
+
+
+def mcp_tool_call_timeout() -> float:
+    """Timeout in seconds for one MCP tool call."""
+    return env_float("MCP_TOOL_CALL_TIMEOUT", 30.0, 0.1)
+
+
+def mcp_shutdown_timeout() -> float:
+    """Timeout in seconds for graceful MCP subprocess shutdown."""
+    return env_float("MCP_SHUTDOWN_TIMEOUT", 3.0, 0.1)
 
 
 class SkillSettingsStore:

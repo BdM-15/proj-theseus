@@ -42,17 +42,18 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
+from src.skills.settings import (
+    mcp_handshake_timeout,
+    mcp_shutdown_timeout,
+    mcp_tool_call_timeout,
+)
+
 logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-
-# Default timeouts (seconds). Operators can tune via env vars.
-_HANDSHAKE_TIMEOUT = float(os.getenv("MCP_HANDSHAKE_TIMEOUT", "10"))
-_TOOL_CALL_TIMEOUT = float(os.getenv("MCP_TOOL_CALL_TIMEOUT", "30"))
-_SHUTDOWN_TIMEOUT = float(os.getenv("MCP_SHUTDOWN_TIMEOUT", "3"))
 
 # OpenAI tool-name limit. ``mcp__<server>__<tool>`` must fit.
 _TOOL_NAME_MAX = 64
@@ -293,16 +294,17 @@ class MCPSession:
             name=f"mcp-{self.manifest.name}-stderr",
         )
 
+        handshake_timeout = mcp_handshake_timeout()
         try:
-            await asyncio.wait_for(self._handshake(), timeout=_HANDSHAKE_TIMEOUT)
+            await asyncio.wait_for(self._handshake(), timeout=handshake_timeout)
             self._tools = await asyncio.wait_for(
-                self._fetch_tools(), timeout=_HANDSHAKE_TIMEOUT
+                self._fetch_tools(), timeout=handshake_timeout
             )
         except asyncio.TimeoutError as exc:
             await self.shutdown()
             raise MCPError(
                 f"MCP {self.manifest.name!r}: handshake/tool-list timed out "
-                f"after {_HANDSHAKE_TIMEOUT}s"
+                f"after {handshake_timeout}s"
             ) from exc
         except MCPError:
             await self.shutdown()
@@ -328,7 +330,7 @@ class MCPSession:
             except Exception:  # noqa: BLE001 — best-effort polite close
                 pass
             try:
-                await asyncio.wait_for(proc.wait(), timeout=_SHUTDOWN_TIMEOUT)
+                await asyncio.wait_for(proc.wait(), timeout=mcp_shutdown_timeout())
             except asyncio.TimeoutError:
                 logger.info("MCP %s did not exit cleanly; terminating", self.manifest.name)
                 try:
@@ -372,15 +374,16 @@ class MCPSession:
         """
         if self._closed:
             raise MCPError(f"MCP {self.manifest.name!r}: session is closed")
+        timeout = mcp_tool_call_timeout()
         try:
             response = await asyncio.wait_for(
                 self._request("tools/call", {"name": tool_name, "arguments": arguments}),
-                timeout=_TOOL_CALL_TIMEOUT,
+                timeout=timeout,
             )
         except asyncio.TimeoutError as exc:
             raise MCPError(
                 f"MCP {self.manifest.name!r}: tool {tool_name!r} timed out "
-                f"after {_TOOL_CALL_TIMEOUT}s"
+                f"after {timeout}s"
             ) from exc
 
         result = response.get("result") or {}

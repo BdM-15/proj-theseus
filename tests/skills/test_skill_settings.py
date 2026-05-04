@@ -3,7 +3,11 @@ from pathlib import Path
 
 from src.skills.settings import (
     SkillSettingsStore,
+    env_float,
     env_int,
+    mcp_handshake_timeout,
+    mcp_shutdown_timeout,
+    mcp_tool_call_timeout,
     resolve_skill_runtime_mode,
     skill_tools_max_turns,
 )
@@ -15,6 +19,27 @@ def test_env_int_clamps_and_falls_back(monkeypatch) -> None:
 
     monkeypatch.setenv("X_INT", "nope")
     assert env_int("X_INT", 10, 1, 100) == 10
+
+
+def test_env_float_clamps_and_falls_back(monkeypatch) -> None:
+    monkeypatch.setenv("X_FLOAT", "999.5")
+    assert env_float("X_FLOAT", 10.0, 1.0, 100.0) == 100.0
+
+    monkeypatch.setenv("X_FLOAT", "nope")
+    assert env_float("X_FLOAT", 10.0, 1.0, 100.0) == 10.0
+
+    monkeypatch.delenv("X_FLOAT", raising=False)
+    assert env_float("X_FLOAT", 10.0, 1.0, 100.0) == 10.0
+
+
+def test_mcp_timeouts_are_read_from_skill_settings(monkeypatch) -> None:
+    monkeypatch.setenv("MCP_HANDSHAKE_TIMEOUT", "1.5")
+    monkeypatch.setenv("MCP_TOOL_CALL_TIMEOUT", "2.5")
+    monkeypatch.setenv("MCP_SHUTDOWN_TIMEOUT", "3.5")
+
+    assert mcp_handshake_timeout() == 1.5
+    assert mcp_tool_call_timeout() == 2.5
+    assert mcp_shutdown_timeout() == 3.5
 
     monkeypatch.delenv("X_INT", raising=False)
     assert env_int("X_INT", 10, 1, 100) == 10
