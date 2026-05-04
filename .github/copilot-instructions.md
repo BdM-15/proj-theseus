@@ -342,7 +342,7 @@ ALL development happens on feature branches. `main` is updated only via fast-for
 
 **Active integration branches:**
 
-- **`149-lightrag-json-extraction-epic`** (issue #124) — LightRAG tuple-to-JSON extraction migration. Sub-branches `150-phase0-dep-upgrade-baseline` through `160-phase4-lockin` FF into `149`. `149` only FFs to `main` at Phase 4 lockin with tag `v1.4.0`. `main` stays at v1.3.0 throughout. Prior epics: skills + MCP → `v1.2.0`; skills E2E hardening (`142`) → `v1.3.0`.
+- **`164-codebase-architecture-cleanup-epic`** — Codebase architecture cleanup and modularization. Work happens directly on this epic branch unless a slice becomes risky enough to split out. `164` only merges to `main` after the cleanup pass is complete, tests are green, and the user approves final integration. Prior epics: skills + MCP → `v1.2.0`; skills E2E hardening (`142`) → `v1.3.0`; LightRAG JSON extraction (`149`) → `v1.4.0`.
 
 **Standard fast-forward sequence** (after the user says "merge it" / "ship it" / "continue"):
 
