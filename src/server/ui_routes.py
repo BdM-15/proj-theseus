@@ -55,6 +55,10 @@ QueryDataFunc = Callable[
 
 from src.core import get_settings, reset_settings
 from src.ontology.schema import VALID_ENTITY_TYPES, VALID_RELATIONSHIP_TYPES
+from src.skills.context import (
+    build_skill_briefing_book,
+    retrieve_relevant_entities_for_skill,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -2120,166 +2124,15 @@ def register_ui(
         max_relationships_per_entity: int = 5,
         relevant_entity_names: Optional[set[str]] = None,
     ) -> dict[str, Any]:
-        """Build the source-grounded skill briefing book for the active workspace.
-
-        Returns a dict with three top-level keys (Phase 1.5 contract):
-
-        * ``entities`` — ``{entity_type: [{name, description, source_chunks}]}``
-          where ``source_chunks`` is the list of chunk IDs that produced the
-          entity (split from the LightRAG ``<SEP>``-joined ``source_id``).
-        * ``source_chunks`` — verbatim text + ``file_path`` for each chunk
-          referenced by the entity slice, capped at ``max_chunks_per_entity``
-          per entity to bound payload size. The model is instructed to quote
-          from these chunks (never paraphrase).
-        * ``relationships`` — typed KG edges where either endpoint is in the
-          entity slice, capped at ``max_relationships_per_entity`` per entity
-          (combined incoming + outgoing).
-
-        Reads the three VDB stores directly so we can hand the briefing book
-        to a skill prompt without booting the full LightRAG instance.
-
-        Phase 1.6: when ``relevant_entity_names`` is set (lowercased entity
-        name whitelist from the chat-grade retrieval helper), only entities in
-        that set survive the filter. ``entity_types`` and ``max_per_type``
-        still apply on top, so a tight retrieval result yields a tight slice.
-        """
-        ws_dir = _workspace_dir()
-
-        # ---- Phase A: load entities slice -------------------------------
-        entities_path = ws_dir / "vdb_entities.json"
-        if not entities_path.exists():
-            return {"entities": {}, "source_chunks": [], "relationships": []}
-        try:
-            raw = json.loads(entities_path.read_text(encoding="utf-8"))
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Failed to read entity store for skill context: %s", exc)
-            return {"entities": {}, "source_chunks": [], "relationships": []}
-
-        records: list[dict[str, Any]] = []
-        if isinstance(raw, dict) and isinstance(raw.get("data"), list):
-            records = [r for r in raw["data"] if isinstance(r, dict)]
-        elif isinstance(raw, list):
-            records = [r for r in raw if isinstance(r, dict)]
-
-        # When the UI doesn't pin entity_types, drop framework-noise buckets
-        # so the budget is spent on RFP-specific content. ``concept`` is the
-        # bucket where Shipley/methodology entities live (BD Lifecycle, color
-        # team reviews, etc.) — useful as background but not RFP source of
-        # truth. ``unknown`` is unclassified extraction residue.
-        _NOISE_BUCKETS = {"concept", "unknown"}
-
-        wanted = {t.lower() for t in entity_types} if entity_types else None
-        bucketed: dict[str, list[dict[str, Any]]] = {}
-        # entity_name -> list[chunk_id] (preserves ordering for chunk capping)
-        entity_chunk_map: dict[str, list[str]] = {}
-        # entity_name (lower) -> True (membership set for relationship filter)
-        entity_name_set: set[str] = set()
-
-        for ent in records:
-            etype = str(ent.get("entity_type", "")).lower()
-            name = ent.get("entity_name") or ent.get("name") or ""
-            name_lc = str(name).strip().lower()
-            # Phase 1.6: query-driven whitelist takes precedence. When the
-            # retrieval helper returned hits, only those entities pass —
-            # noise buckets are *kept* if they were retrieval-ranked because
-            # the user asked for them.
-            if relevant_entity_names is not None:
-                if not name_lc or name_lc not in relevant_entity_names:
-                    continue
-            else:
-                if wanted is None and etype in _NOISE_BUCKETS:
-                    continue
-            if wanted and etype not in wanted:
-                continue
-            bucket = bucketed.setdefault(etype or "unknown", [])
-            if len(bucket) >= max_per_type:
-                continue
-            # LightRAG joins multi-source chunk IDs with the literal token "<SEP>"
-            raw_src = str(ent.get("source_id") or "")
-            chunk_ids = [c.strip() for c in raw_src.split("<SEP>") if c.strip()]
-            bucket.append({
-                "name": name,
-                "description": (ent.get("description") or "")[:400],
-                "source_chunks": chunk_ids[:max_chunks_per_entity] if max_chunks_per_entity > 0 else [],
-            })
-            if name:
-                entity_chunk_map[name] = chunk_ids
-                entity_name_set.add(name_lc)
-
-        # ---- Phase B: collect verbatim source chunks --------------------
-        wanted_chunk_ids: set[str] = set()
-        if max_chunks_per_entity > 0:
-            for name, cids in entity_chunk_map.items():
-                for cid in cids[:max_chunks_per_entity]:
-                    wanted_chunk_ids.add(cid)
-
-        source_chunks: list[dict[str, Any]] = []
-        if wanted_chunk_ids:
-            chunks_path = ws_dir / "vdb_chunks.json"
-            if chunks_path.exists():
-                try:
-                    chunks_raw = json.loads(chunks_path.read_text(encoding="utf-8"))
-                    chunk_records: list[dict[str, Any]] = []
-                    if isinstance(chunks_raw, dict) and isinstance(chunks_raw.get("data"), list):
-                        chunk_records = [r for r in chunks_raw["data"] if isinstance(r, dict)]
-                    for rec in chunk_records:
-                        cid = rec.get("__id__")
-                        if cid not in wanted_chunk_ids:
-                            continue
-                        source_chunks.append({
-                            "chunk_id": cid,
-                            "file_path": rec.get("file_path"),
-                            "content": (rec.get("content") or "")[:1500],
-                        })
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning("Failed to read chunk store for skill context: %s", exc)
-
-        # ---- Phase C: collect KG relationships --------------------------
-        relationships: list[dict[str, Any]] = []
-        if max_relationships_per_entity > 0 and entity_name_set:
-            rels_path = ws_dir / "vdb_relationships.json"
-            if rels_path.exists():
-                try:
-                    rels_raw = json.loads(rels_path.read_text(encoding="utf-8"))
-                    rel_records: list[dict[str, Any]] = []
-                    if isinstance(rels_raw, dict) and isinstance(rels_raw.get("data"), list):
-                        rel_records = [r for r in rels_raw["data"] if isinstance(r, dict)]
-                    # Per-entity edge counter to enforce the cap fairly
-                    edge_count: dict[str, int] = {n: 0 for n in entity_name_set}
-                    for rec in rel_records:
-                        src = str(rec.get("src_id") or "")
-                        tgt = str(rec.get("tgt_id") or "")
-                        src_lc = src.lower()
-                        tgt_lc = tgt.lower()
-                        src_in = src_lc in entity_name_set
-                        tgt_in = tgt_lc in entity_name_set
-                        if not (src_in or tgt_in):
-                            continue
-                        # Throttle: don't emit if both sides have already hit cap
-                        if (
-                            (not src_in or edge_count.get(src_lc, 0) >= max_relationships_per_entity)
-                            and (not tgt_in or edge_count.get(tgt_lc, 0) >= max_relationships_per_entity)
-                        ):
-                            continue
-                        relationships.append({
-                            "src": src,
-                            "type": str(rec.get("keywords") or "").strip(),
-                            "tgt": tgt,
-                            "description": (rec.get("description") or "")[:300],
-                            "source_chunk": rec.get("source_id"),
-                        })
-                        if src_in:
-                            edge_count[src_lc] = edge_count.get(src_lc, 0) + 1
-                        if tgt_in:
-                            edge_count[tgt_lc] = edge_count.get(tgt_lc, 0) + 1
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning("Failed to read relationship store for skill context: %s", exc)
-
-        return {
-            "entities": bucketed,
-            "source_chunks": source_chunks,
-            "relationships": relationships,
-        }
+        """Build the source-grounded skill briefing book for the active workspace."""
+        return build_skill_briefing_book(
+            _workspace_dir(),
+            entity_types,
+            max_per_type,
+            max_chunks_per_entity=max_chunks_per_entity,
+            max_relationships_per_entity=max_relationships_per_entity,
+            relevant_entity_names=relevant_entity_names,
+        )
 
     async def _retrieve_relevant_entities_for_skill(
         prompt: str,
@@ -2287,92 +2140,14 @@ def register_ui(
         mode: str,
         top_k: int,
     ) -> dict[str, Any]:
-        """Run LightRAG aquery_data to rank entities relevant to a skill request.
-
-        Returns a dict ``{names, chunk_ids, metadata}`` where ``names`` is a
-        lowercased entity-name whitelist for ``_slice_workspace_entities``,
-        ``chunk_ids`` are the retrieval-ranked chunk IDs (used to *augment*
-        the source-grounding block with chunks the entity-anchored slice may
-        not surface), and ``metadata`` describes what the retriever did so
-        the briefing book and run envelope can advertise it.
-
-        When ``mode == 'off'``, retrieval is skipped and an empty whitelist is
-        returned (caller falls back to the Phase 1.5 bulk slice). When
-        ``data_func`` is unavailable (server started without one), behaves as
-        if ``mode == 'off'``.
-        """
-        meta: dict[str, Any] = {
-            "mode": mode,
-            "top_k": top_k,
-            "matched_entities": 0,
-            "matched_chunks": 0,
-            "used": False,
-            "reason": "",
-        }
-        if mode == "off":
-            meta["reason"] = "retrieval disabled (mode=off)"
-            return {"names": set(), "chunk_ids": set(), "metadata": meta}
-        if data_func is None:
-            meta["reason"] = "server has no data_func; falling back to bulk slice"
-            return {"names": set(), "chunk_ids": set(), "metadata": meta}
-        # Compose the retrieval query: user prompt + a one-line skill hint so
-        # an empty user prompt still gets a focused slice (e.g., proposal-
-        # generator returns Section L/M-relevant entities when invoked with
-        # defaults).
-        user_prompt = (prompt or "").strip()
-        hint = (skill_description or "").strip()
-        if not user_prompt and not hint:
-            meta["reason"] = "empty prompt + skill description; bulk slice"
-            return {"names": set(), "chunk_ids": set(), "metadata": meta}
-        retrieval_query = (
-            f"{user_prompt}\n\n[Skill context: {hint}]" if hint else user_prompt
+        """Run LightRAG structured retrieval for a skill request."""
+        return await retrieve_relevant_entities_for_skill(
+            data_func,
+            prompt,
+            skill_description,
+            mode,
+            top_k,
         )
-        # chunk_top_k is bounded by top_k so chunk retrieval scales with the
-        # entity budget. enable_rerank stays at the workspace default so
-        # skill retrieval matches chat retrieval quality.
-        overrides = {
-            "top_k": top_k,
-            "chunk_top_k": min(top_k, 30),
-            "only_need_context": True,
-        }
-        try:
-            data = await data_func(retrieval_query, mode, [], overrides)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Skill retrieval failed (mode=%s): %s", mode, exc)
-            meta["reason"] = f"retrieval error: {exc}"
-            return {"names": set(), "chunk_ids": set(), "metadata": meta}
-
-        # aquery_data returns {status, message, data: {entities, relationships, chunks, references}}
-        payload = data.get("data") if isinstance(data, dict) else None
-        if not isinstance(payload, dict):
-            meta["reason"] = "retrieval returned no data block"
-            return {"names": set(), "chunk_ids": set(), "metadata": meta}
-
-        names: set[str] = set()
-        for ent in payload.get("entities") or []:
-            if not isinstance(ent, dict):
-                continue
-            n = ent.get("entity_name") or ent.get("entity_id") or ent.get("name")
-            if n:
-                names.add(str(n).strip().lower())
-        # Cap to top_k just in case the retriever overshoots.
-        if len(names) > top_k:
-            names = set(list(names)[:top_k])
-
-        chunk_ids: set[str] = set()
-        for c in payload.get("chunks") or []:
-            if not isinstance(c, dict):
-                continue
-            cid = c.get("chunk_id") or c.get("__id__")
-            if cid:
-                chunk_ids.add(str(cid))
-
-        meta["matched_entities"] = len(names)
-        meta["matched_chunks"] = len(chunk_ids)
-        meta["used"] = bool(names)
-        if not names:
-            meta["reason"] = "retrieval returned 0 entities; falling back to bulk slice"
-        return {"names": names, "chunk_ids": chunk_ids, "metadata": meta}
 
     @app.get("/api/ui/skills", tags=["theseus-ui"])
     async def list_skills_route() -> JSONResponse:
