@@ -15,9 +15,10 @@ The skill runtime owns the multi-turn loop; this layer is just the wire.
 from __future__ import annotations
 
 import logging
-import os
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Callable, Optional
+
+from src.core.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -46,22 +47,27 @@ class ChatResponse:
     raw_message: dict[str, Any]  # exact dict to push back into messages list
 
 
-def _client_kwargs() -> dict[str, str]:
-    api_key = os.getenv("LLM_BINDING_API_KEY", "").strip()
+def _client_kwargs(
+    settings_provider: Callable[[], Settings] = get_settings,
+) -> dict[str, str]:
+    settings = settings_provider()
+    api_key = (settings.llm_binding_api_key or "").strip()
     if not api_key:
         raise RuntimeError(
             "LLM_BINDING_API_KEY not set — skill tool runtime cannot reach the LLM"
         )
-    base_url = os.getenv("LLM_BINDING_HOST", "").strip() or "https://api.openai.com/v1"
+    base_url = settings.llm_binding_host.strip() or "https://api.openai.com/v1"
     return {"api_key": api_key, "base_url": base_url}
 
 
-def _resolve_model() -> str:
+def _resolve_model(
+    settings_provider: Callable[[], Settings] = get_settings,
+) -> str:
     # Skills are multi-turn reasoning agents — always use the most powerful
-    # model available. Theseus pins this to QUERY_LLM_MODEL.
-    val = os.getenv("QUERY_LLM_MODEL", "").strip()
-    if val:
-        return val
+    # model available. Theseus maps QUERY_LLM_MODEL to reasoning_llm_name.
+    model_name = settings_provider().reasoning_llm_name.strip()
+    if model_name:
+        return model_name
     raise RuntimeError(
         "QUERY_LLM_MODEL not set — skill tool runtime requires the "
         "reasoning model to be configured in .env"
