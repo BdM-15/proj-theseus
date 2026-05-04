@@ -21,10 +21,7 @@ import asyncio
 import json
 import logging
 import os
-import re
-import sys
 import time
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, AsyncIterator, Awaitable, Callable, Optional, Union
 
@@ -52,7 +49,7 @@ QueryDataFunc = Callable[
     Awaitable[dict],
 ]
 
-from src.core import get_settings, reset_settings
+from src.core import get_settings
 from src.ontology.schema import VALID_ENTITY_TYPES, VALID_RELATIONSHIP_TYPES
 from src.server.chat_store import ChatStore
 from src.server.graph_snapshot import register_graph_routes
@@ -66,6 +63,12 @@ from src.server.query_settings import (
 )
 from src.server.reasoning_filter import ThinkStripper, strip_think
 from src.server.skill_ui_routes import register_skill_ui_routes
+from src.server.workspace_ui_routes import (
+    register_workspace_ui_routes,
+    safe_count_json_keys,
+    self_restart as _self_restart,
+    set_env_var as _set_env_var,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -111,34 +114,9 @@ class ChatMessageCreate(BaseModel):
     content: str = Field(..., min_length=1, max_length=20000)
 
 
-class WorkspaceSwitch(BaseModel):
-    name: str = Field(..., min_length=1, max_length=64)
-    create: bool = Field(default=False, description="Create the folder if it does not exist.")
-
-
-class WorkspaceDeleteScope(BaseModel):
-    """Which buckets of a workspace to delete. At least one must be true."""
-
-    neo4j: bool = Field(default=False, description="Delete the workspace's Neo4j subgraph.")
-    rag_storage: bool = Field(default=False, description="Delete rag_storage/<ws>/ (KV stores, VDBs, chats, log).")
-    inputs: bool = Field(default=False, description="Delete inputs/<ws>/ source documents (irrecoverable).")
-
-
-class WipeAllScope(BaseModel):
-    """Clean-slate wipe. Requires the literal confirmation phrase."""
-
-    neo4j: bool = Field(default=False)
-    rag_storage: bool = Field(default=False)
-    inputs: bool = Field(default=False)
-    confirm: str = Field(..., description="Must equal 'DELETE ALL'.")
-
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-_SAFE_WS = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
-
 
 from src.utils.time_utils import now_local_iso as _now_local_iso
 
@@ -208,45 +186,6 @@ def _trim_sources(data: dict) -> dict:
 # Stats helpers
 # ---------------------------------------------------------------------------
 
-def _safe_count_json_keys(path: Path) -> int:
-    """Count records in a LightRAG storage JSON file. Returns 0 on any error.
-
-    Handles two on-disk shapes used by LightRAG:
-    - kv_store_*.json: top-level dict keyed by record id -> count via len(dict)
-    - vdb_*.json:      {"embedding_dim": N, "data": [...records...], "matrix": "..."}
-                       -> count via len(data)
-
-    Results are cached by (path, mtime, size) so the multi-MB vdb files are
-    only re-read when they actually change.
-    """
-    try:
-        if not path.exists():
-            return 0
-        st = path.stat()
-        key = (str(path), st.st_mtime_ns, st.st_size)
-        cached = _COUNT_CACHE.get(key)
-        if cached is not None:
-            return cached
-        data = json.loads(path.read_text(encoding="utf-8"))
-        if isinstance(data, dict):
-            inner = data.get("data")
-            count = len(inner) if isinstance(inner, list) else len(data)
-        elif isinstance(data, list):
-            count = len(data)
-        else:
-            count = 0
-        # Drop any prior cached entries for this path before storing the new one
-        for k in [k for k in _COUNT_CACHE if k[0] == str(path)]:
-            _COUNT_CACHE.pop(k, None)
-        _COUNT_CACHE[key] = count
-        return count
-    except Exception:
-        return 0
-
-
-_COUNT_CACHE: dict[tuple[str, int, int], int] = {}
-
-
 def _stack_versions() -> dict[str, Optional[str]]:
     """Read installed package versions for the engine stack. Cached at import."""
     global _STACK_CACHE  # noqa: PLW0603
@@ -291,10 +230,10 @@ def _gather_stats() -> dict[str, Any]:
         "workspace": settings.workspace,
         "graph_storage": getattr(global_args, "graph_storage", "NetworkXStorage"),
         "working_dir": str(ws),
-        "documents": _safe_count_json_keys(ws / "kv_store_doc_status.json"),
-        "entities": _safe_count_json_keys(ws / "vdb_entities.json"),
-        "relationships": _safe_count_json_keys(ws / "vdb_relationships.json"),
-        "chunks": _safe_count_json_keys(ws / "vdb_chunks.json"),
+        "documents": safe_count_json_keys(ws / "kv_store_doc_status.json"),
+        "entities": safe_count_json_keys(ws / "vdb_entities.json"),
+        "relationships": safe_count_json_keys(ws / "vdb_relationships.json"),
+        "chunks": safe_count_json_keys(ws / "vdb_chunks.json"),
         "chats": sum(1 for _ in _chats_dir().glob("*.json")),
         "chat": {
             # How many recent user+assistant pairs travel with each query.
@@ -319,68 +258,6 @@ def _gather_stats() -> dict[str, Any]:
         "stack": _stack_versions(),
         "timestamp": _now_iso(),
     }
-
-
-# ---------------------------------------------------------------------------
-# Workspace discovery & switching
-# ---------------------------------------------------------------------------
-
-def _discover_workspaces() -> list[dict[str, Any]]:
-    """List candidate workspaces under the configured working_dir.
-
-    A directory is considered a valid workspace if it contains at least one
-    of the LightRAG storage signature files. We also report empty/new
-    directories so the UI can show them.
-    """
-    root = Path(global_args.working_dir)
-    if not root.exists():
-        return []
-    sig_files = ("kv_store_doc_status.json", "vdb_entities.json", "vdb_chunks.json")
-    out: list[dict[str, Any]] = []
-    for child in sorted(root.iterdir()):
-        if not child.is_dir() or child.name.startswith((".", "_")):
-            continue
-        has_data = any((child / f).exists() for f in sig_files)
-        out.append({
-            "name": child.name,
-            "has_data": has_data,
-            "documents": _safe_count_json_keys(child / "kv_store_doc_status.json"),
-            "entities": _safe_count_json_keys(child / "vdb_entities.json"),
-            "chats": sum(1 for _ in (child / "chats").glob("*.json")) if (child / "chats").exists() else 0,
-        })
-    return out
-
-
-def _set_env_var(key: str, value: str) -> None:
-    """Update or append KEY=value in the project .env file (atomic)."""
-    env_path = Path.cwd() / ".env"
-    lines: list[str] = []
-    found = False
-    if env_path.exists():
-        for raw in env_path.read_text(encoding="utf-8").splitlines():
-            stripped = raw.lstrip()
-            if stripped.startswith(f"{key}=") and not stripped.startswith("#"):
-                lines.append(f"{key}={value}")
-                found = True
-            else:
-                lines.append(raw)
-    if not found:
-        lines.append(f"{key}={value}")
-    tmp = env_path.with_suffix(".env.tmp")
-    tmp.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    tmp.replace(env_path)
-    os.environ[key] = value
-    reset_settings()
-
-
-def _self_restart() -> None:
-    """Re-exec the current python process with the same argv."""
-    logger.warning("♻️  Re-execing process: %s %s", sys.executable, sys.argv)
-    try:
-        os.execv(sys.executable, [sys.executable] + sys.argv)
-    except Exception as exc:  # pragma: no cover
-        logger.exception("Self-restart failed: %s", exc)
-        os._exit(1)
 
 
 # ---------------------------------------------------------------------------
@@ -764,257 +641,16 @@ def register_ui(
         working_dir=lambda: Path(global_args.working_dir),
     )
 
-    # ---- Workspaces (list / switch / restart) ------------------------------
-    @app.get("/api/ui/workspaces", tags=["theseus-ui"])
-    async def list_workspaces() -> JSONResponse:
-        """List discovered workspace directories under rag_storage/."""
-        return JSONResponse({
-            "active": get_settings().workspace,
-            "workspaces": _discover_workspaces(),
-        })
-
-    @app.post("/api/ui/workspaces/switch", tags=["theseus-ui"])
-    async def switch_workspace(payload: WorkspaceSwitch) -> JSONResponse:
-        """Persist WORKSPACE=<name> in .env and schedule a graceful self-restart.
-
-        The server returns immediately and re-execs the python process ~750ms
-        later so the response can flush. The browser polls /health and will
-        reconnect when the new process is up.
-        """
-        name = payload.name.strip()
-        if not _SAFE_WS.match(name):
-            raise HTTPException(400, "Invalid workspace name (use alphanumerics, _, -)")
-        existing = {w["name"] for w in _discover_workspaces()}
-        if not payload.create and name not in existing:
-            raise HTTPException(404, f"Workspace '{name}' does not exist")
-        # Create folder if requested
-        ws_root = Path(global_args.working_dir)
-        ws_root.mkdir(parents=True, exist_ok=True)
-        (ws_root / name).mkdir(parents=True, exist_ok=True)
-        # Persist
-        try:
-            _set_env_var("WORKSPACE", name)
-        except Exception as exc:
-            raise HTTPException(500, f"Failed updating .env: {exc}") from exc
-        # Schedule restart
-        asyncio.get_event_loop().call_later(0.75, _self_restart)
-        logger.warning("🔄 Workspace switch requested → '%s'. Restarting server…", name)
-        return JSONResponse({
-            "status": "restarting",
-            "workspace": name,
-            "message": "Server is restarting. The UI will reconnect automatically.",
-        })
-
-    # ---- Workspace inventory + deletion (Settings → Danger Zone) ---------
-    #
-    # The deletion paths intentionally reuse the same helpers as the
-    # `tools/workspace_cleanup.py` CLI — no second implementation. That
-    # keeps the two surfaces (CLI for ops, UI for end-users) in lockstep.
-
-    def _ws_inventory() -> dict[str, Any]:
-        """Combine rag_storage, Neo4j, and inputs/ views into one table."""
-        from tools.workspace_cleanup import (
-            _inputs_root,
-            _inputs_workspaces,
-            _neo4j_workspaces,
-            _rag_storage_root,
-            _storage_workspaces,
-        )
-
-        rag_root = _rag_storage_root()
-        inputs_root = _inputs_root()
-        storage_ws = _storage_workspaces(rag_root)
-        inputs_ws = _inputs_workspaces(inputs_root)
-
-        # Neo4j enumeration is best-effort — the driver may be unreachable in
-        # NetworkX-only deployments. Fall back to an empty map so the UI can
-        # still render rag_storage + inputs columns.
-        neo4j_ws: dict[str, int] = {}
-        backend = (getattr(global_args, "graph_storage", "") or "").lower()
-        if "neo4j" in backend:
-            try:
-                from src.inference.neo4j_graph_io import Neo4jGraphIO
-
-                io = Neo4jGraphIO()
-                try:
-                    neo4j_ws = _neo4j_workspaces(io)
-                finally:
-                    io.close()
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("Neo4j inventory failed: %s", exc)
-
-        all_names = sorted(
-            set(neo4j_ws) | set(storage_ws) | set(inputs_ws)
-        )
-        active = get_settings().workspace
-        rows: list[dict[str, Any]] = []
-        for name in all_names:
-            inp = inputs_ws.get(name)
-            rows.append({
-                "name": name,
-                "is_active": name == active,
-                "neo4j_nodes": neo4j_ws.get(name, 0),
-                "storage_mb": storage_ws.get(name),
-                "inputs_files": inp[0] if inp else 0,
-                "inputs_mb": inp[1] if inp else 0.0,
-            })
-        return {
-            "active": active,
-            "rag_storage_root": str(rag_root),
-            "inputs_root": str(inputs_root),
-            "neo4j_available": "neo4j" in backend,
-            "workspaces": rows,
-        }
-
-    @app.get("/api/ui/workspaces/inventory", tags=["theseus-ui"])
-    async def workspaces_inventory() -> JSONResponse:
-        """Per-workspace inventory: Neo4j node count, rag_storage size, inputs/ files."""
-        return JSONResponse(await asyncio.to_thread(_ws_inventory))
-
-    def _delete_workspace_sync(
-        name: str, scope: WorkspaceDeleteScope
-    ) -> dict[str, Any]:
-        """Worker thread: run the actual deletion using cleanup-tool helpers."""
-        from tools.workspace_cleanup import (
-            _delete_inputs_workspace,
-            _delete_neo4j_workspace,
-            _delete_storage_workspace,
-            _inputs_root,
-            _rag_storage_root,
-        )
-
-        result: dict[str, Any] = {"workspace": name, "deleted": {}}
-
-        if scope.neo4j:
-            backend = (getattr(global_args, "graph_storage", "") or "").lower()
-            if "neo4j" in backend:
-                try:
-                    from src.inference.neo4j_graph_io import Neo4jGraphIO
-
-                    io = Neo4jGraphIO()
-                    try:
-                        nodes = _delete_neo4j_workspace(io, name)
-                        result["deleted"]["neo4j_nodes"] = nodes
-                    finally:
-                        io.close()
-                except Exception as exc:  # noqa: BLE001
-                    result["deleted"]["neo4j_error"] = str(exc)
-            else:
-                result["deleted"]["neo4j_skipped"] = "backend is not Neo4j"
-
-        if scope.rag_storage:
-            try:
-                existed = _delete_storage_workspace(name, _rag_storage_root())
-                result["deleted"]["rag_storage"] = existed
-            except Exception as exc:  # noqa: BLE001
-                result["deleted"]["rag_storage_error"] = str(exc)
-
-        if scope.inputs:
-            try:
-                count, mb = _delete_inputs_workspace(name, _inputs_root())
-                # Also drop the now-empty inputs/<ws>/ dir so it disappears
-                # from the workspace list entirely.
-                ws_inputs = _inputs_root() / name
-                if ws_inputs.exists() and ws_inputs.is_dir() and not any(ws_inputs.iterdir()):
-                    try:
-                        ws_inputs.rmdir()
-                    except OSError:
-                        pass
-                result["deleted"]["inputs_files"] = count
-                result["deleted"]["inputs_mb"] = mb
-            except Exception as exc:  # noqa: BLE001
-                result["deleted"]["inputs_error"] = str(exc)
-
-        return result
-
-    @app.post("/api/ui/workspaces/{name}/delete", tags=["theseus-ui"])
-    async def delete_workspace(
-        name: str, scope: WorkspaceDeleteScope
-    ) -> JSONResponse:
-        """Delete one workspace's selected buckets (Neo4j / rag_storage / inputs).
-
-        Refuses to delete the currently-active workspace — switch first.
-        Source documents (`inputs/<ws>/`) are irrecoverable; the UI is
-        responsible for surfacing a type-to-confirm guard before calling
-        this endpoint with `inputs=true`.
-        """
-        if not _SAFE_WS.match(name):
-            raise HTTPException(400, "Invalid workspace name (use alphanumerics, _, -)")
-        if not (scope.neo4j or scope.rag_storage or scope.inputs):
-            raise HTTPException(400, "At least one scope (neo4j/rag_storage/inputs) must be true.")
-        if name == get_settings().workspace:
-            raise HTTPException(
-                409,
-                "Cannot delete the active workspace. Switch to another workspace first.",
-            )
-        logger.warning(
-            "🗑️  Deleting workspace '%s' (neo4j=%s, rag_storage=%s, inputs=%s)",
-            name, scope.neo4j, scope.rag_storage, scope.inputs,
-        )
-        result = await asyncio.to_thread(_delete_workspace_sync, name, scope)
-        return JSONResponse(result)
-
-    @app.post("/api/ui/workspaces/wipe-all", tags=["theseus-ui"])
-    async def wipe_all_workspaces(scope: WipeAllScope) -> JSONResponse:
-        """Clean-slate wipe across every workspace. Requires confirm='DELETE ALL'.
-
-        Triggers a server self-restart afterwards so the next boot lands on a
-        clean state. The active workspace folder is recreated empty so the
-        next process can start without crashing on a missing working dir.
-        """
-        if scope.confirm != "DELETE ALL":
-            raise HTTPException(400, "Confirmation phrase must equal 'DELETE ALL'.")
-        if not (scope.neo4j or scope.rag_storage or scope.inputs):
-            raise HTTPException(400, "At least one scope (neo4j/rag_storage/inputs) must be true.")
-
-        def _wipe_all_sync() -> dict[str, Any]:
-            inv = _ws_inventory()
-            names = [row["name"] for row in inv["workspaces"]]
-            results: list[dict[str, Any]] = []
-            per_scope = WorkspaceDeleteScope(
-                neo4j=scope.neo4j,
-                rag_storage=scope.rag_storage,
-                inputs=scope.inputs,
-            )
-            for nm in names:
-                results.append(_delete_workspace_sync(nm, per_scope))
-            # Make sure the active workspace's rag_storage folder still
-            # exists — LightRAG's storages assume it on next boot.
-            try:
-                from tools.workspace_cleanup import _rag_storage_root
-
-                (_rag_storage_root() / get_settings().workspace).mkdir(
-                    parents=True, exist_ok=True
-                )
-            except Exception:  # noqa: BLE001
-                pass
-            return {"deleted": results, "workspaces": len(results)}
-
-        logger.warning(
-            "🚨 WIPE ALL WORKSPACES requested (neo4j=%s, rag_storage=%s, inputs=%s)",
-            scope.neo4j, scope.rag_storage, scope.inputs,
-        )
-        result = await asyncio.to_thread(_wipe_all_sync)
-        # Restart so the UI reconnects to a clean process state.
-        asyncio.get_event_loop().call_later(0.75, _self_restart)
-        result["restarting"] = True
-        return JSONResponse(result)
-
-    @app.post("/api/ui/restart", tags=["theseus-ui"])
-    async def restart_server() -> JSONResponse:
-        """Schedule a graceful self-restart of the server process.
-
-        Identical mechanism to the workspace switch: re-execs ~750ms after
-        responding so the HTTP reply can flush. Browser polls /api/ui/stats
-        and reconnects automatically.
-        """
-        asyncio.get_event_loop().call_later(0.75, _self_restart)
-        logger.warning("🔄 Manual restart requested via Settings page.")
-        return JSONResponse({
-            "status": "restarting",
-            "workspace": get_settings().workspace,
-            "message": "Server is restarting. The UI will reconnect automatically.",
-        })
+    register_workspace_ui_routes(
+        app,
+        workspace_name=lambda: get_settings().workspace,
+        working_dir=lambda: Path(global_args.working_dir),
+        graph_storage=lambda: getattr(global_args, "graph_storage", "") or "",
+        set_env_var_func=_set_env_var,
+        schedule_restart=lambda delay: asyncio.get_event_loop().call_later(
+            delay, _self_restart
+        ),
+    )
 
     register_query_settings_routes(
         app,
