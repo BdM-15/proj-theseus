@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.server.prompt_library import PROMPT_LIBRARY
+from src.server.prompt_library import PROMPT_LIBRARY, register_prompt_library_routes
 
 
 def test_prompt_library_shape_and_phase_coverage() -> None:
@@ -18,14 +18,8 @@ def test_prompt_library_shape_and_phase_coverage() -> None:
 
 
 def test_prompt_library_route_returns_catalog() -> None:
-    from src.server.ui_routes import register_ui
-
     app = FastAPI()
-
-    async def _stub_query(*_args, **_kwargs):  # pragma: no cover - never called
-        return ""
-
-    register_ui(app, query_func=_stub_query)
+    register_prompt_library_routes(app)
     client = TestClient(app)
 
     response = client.get("/api/ui/prompt-library")

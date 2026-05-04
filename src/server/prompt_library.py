@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+
 # ---------------------------------------------------------------------------
 # Suggested prompt library (Shipley phases 3-6)
 #
@@ -125,5 +128,14 @@ PROMPT_LIBRARY: list[dict[str, str]] = [
     {"phase": "6", "category": "Submission", "title": "Final compliance sweep",
      "prompt": "Final pre-submission sweep: confirm every proposal_instruction (UCF Section L or equivalent) is answered, every evaluation_factor (UCF Section M or equivalent — including adjectival or LPTA schemes) is addressed, every page limit is met, every required artifact (volumes, certifications, reps & certs, pricing, model contract, oral slides) is named, every cross-reference is intact, and every page footer/header complies with format constraints."},
 ]
+
+
+def register_prompt_library_routes(app: FastAPI) -> None:
+    """Register the curated suggested-prompt catalog endpoint."""
+
+    @app.get("/api/ui/prompt-library", tags=["theseus-ui"])
+    async def ui_prompt_library() -> JSONResponse:
+        """Return the curated Shipley phase 4-6 suggested-prompt catalog."""
+        return JSONResponse({"prompts": PROMPT_LIBRARY})
 
 

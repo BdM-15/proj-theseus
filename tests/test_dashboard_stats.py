@@ -1,0 +1,96 @@
+import json
+from pathlib import Path
+from types import SimpleNamespace
+
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from src.ontology.schema import VALID_ENTITY_TYPES, VALID_RELATIONSHIP_TYPES
+from src.server.dashboard_stats import (
+    gather_stats,
+    register_dashboard_stats_routes,
+    ui_chat_history_pairs,
+)
+
+
+def _settings() -> SimpleNamespace:
+    return SimpleNamespace(
+        workspace="demo",
+        extraction_llm_name="extract-model",
+        reasoning_llm_name="reason-model",
+        embedding_model="embed-model",
+        rerank_model="rerank-model",
+        enable_rerank=True,
+    )
+
+
+def _write_json(path: Path, value) -> None:
+    path.write_text(json.dumps(value), encoding="utf-8")
+
+
+def test_ui_chat_history_pairs_uses_env_with_safe_fallback(monkeypatch) -> None:
+    monkeypatch.setenv("UI_CHAT_HISTORY_TURNS", "7")
+    assert ui_chat_history_pairs() == 7
+
+    monkeypatch.setenv("UI_CHAT_HISTORY_TURNS", "-2")
+    assert ui_chat_history_pairs() == 0
+
+    monkeypatch.setenv("UI_CHAT_HISTORY_TURNS", "not-a-number")
+    assert ui_chat_history_pairs() == 20
+
+
+def test_gather_stats_counts_workspace_and_shapes_payload(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("UI_CHAT_HISTORY_TURNS", "3")
+    workspace = tmp_path / "demo"
+    chats = workspace / "chats"
+    chats.mkdir(parents=True)
+    _write_json(workspace / "kv_store_doc_status.json", {"doc-a": {}, "doc-b": {}})
+    _write_json(workspace / "vdb_entities.json", {"data": [{}, {}, {}]})
+    _write_json(workspace / "vdb_relationships.json", {"r1": {}, "r2": {}})
+    _write_json(workspace / "vdb_chunks.json", [{}, {}, {}, {}])
+    (chats / "chat.json").write_text("{}", encoding="utf-8")
+
+    payload = gather_stats(
+        workspace_dir=lambda: workspace,
+        chats_dir=lambda: chats,
+        settings_provider=_settings,
+        graph_storage=lambda: "Neo4JStorage",
+        now=lambda: "2026-05-03T12:00:00-05:00",
+        stack_versions_func=lambda: {"lightrag": "test"},
+    )
+
+    assert payload["workspace"] == "demo"
+    assert payload["graph_storage"] == "Neo4JStorage"
+    assert payload["documents"] == 2
+    assert payload["entities"] == 3
+    assert payload["relationships"] == 2
+    assert payload["chunks"] == 4
+    assert payload["chats"] == 1
+    assert payload["chat"] == {"history_pairs_cap": 3}
+    assert payload["ontology"]["entity_type_count"] == len(VALID_ENTITY_TYPES)
+    assert payload["ontology"]["relationship_type_count"] == len(VALID_RELATIONSHIP_TYPES)
+    assert payload["models"]["rerank"] == "rerank-model"
+    assert payload["stack"] == {"lightrag": "test"}
+    assert payload["timestamp"] == "2026-05-03T12:00:00-05:00"
+
+
+def test_dashboard_stats_route_uses_injected_dependencies(tmp_path) -> None:
+    app = FastAPI()
+    workspace = tmp_path / "demo"
+    chats = workspace / "chats"
+    chats.mkdir(parents=True)
+    register_dashboard_stats_routes(
+        app,
+        workspace_dir=lambda: workspace,
+        chats_dir=lambda: chats,
+        settings_provider=_settings,
+        graph_storage=lambda: "NetworkXStorage",
+        now=lambda: "now",
+    )
+    client = TestClient(app)
+
+    response = client.get("/api/ui/stats")
+
+    assert response.status_code == 200, response.text
+    assert response.json()["workspace"] == "demo"
+    assert response.json()["graph_storage"] == "NetworkXStorage"

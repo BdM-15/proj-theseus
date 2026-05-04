@@ -15,11 +15,11 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from src.core import reset_settings
+from src.server.storage_counts import safe_count_json_keys
 
 logger = logging.getLogger(__name__)
 
 _SAFE_WS = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
-_COUNT_CACHE: dict[tuple[str, int, int], int] = {}
 
 
 class WorkspaceSwitch(BaseModel):
@@ -56,34 +56,6 @@ class WipeAllScope(BaseModel):
     rag_storage: bool = Field(default=False)
     inputs: bool = Field(default=False)
     confirm: str = Field(..., description="Must equal 'DELETE ALL'.")
-
-
-def safe_count_json_keys(path: Path) -> int:
-    """Count records in a LightRAG storage JSON file, returning 0 on errors."""
-    import json
-
-    try:
-        if not path.exists():
-            return 0
-        stat = path.stat()
-        key = (str(path), stat.st_mtime_ns, stat.st_size)
-        cached = _COUNT_CACHE.get(key)
-        if cached is not None:
-            return cached
-        data = json.loads(path.read_text(encoding="utf-8"))
-        if isinstance(data, dict):
-            inner = data.get("data")
-            count = len(inner) if isinstance(inner, list) else len(data)
-        elif isinstance(data, list):
-            count = len(data)
-        else:
-            count = 0
-        for old_key in [old_key for old_key in _COUNT_CACHE if old_key[0] == str(path)]:
-            _COUNT_CACHE.pop(old_key, None)
-        _COUNT_CACHE[key] = count
-        return count
-    except Exception:  # noqa: BLE001
-        return 0
 
 
 def discover_workspaces(working_dir: Path) -> list[dict[str, Any]]:

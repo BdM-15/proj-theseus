@@ -18,15 +18,11 @@ intentionally adds zero new Python dependencies.
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
-import os
-import time
 from pathlib import Path
-from typing import Any, AsyncIterator, Awaitable, Callable, Optional, Union
+from typing import AsyncIterator, Awaitable, Callable, Union
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from lightrag.api.config import global_args
 
@@ -49,13 +45,17 @@ QueryDataFunc = Callable[
 ]
 
 from src.core import get_settings
-from src.ontology.schema import VALID_ENTITY_TYPES, VALID_RELATIONSHIP_TYPES
 from src.server.chat_store import ChatStore
 from src.server.chat_ui_routes import register_chat_ui_routes
+from src.server.dashboard_stats import (
+    register_dashboard_stats_routes,
+    ui_chat_history_pairs,
+)
+from src.server.entity_chunk_routes import register_entity_chunk_routes
 from src.server.graph_snapshot import register_graph_routes
 from src.server.mcp_ui_routes import register_mcp_ui_routes
 from src.server.processing_log_routes import register_processing_log_routes
-from src.server.prompt_library import PROMPT_LIBRARY
+from src.server.prompt_library import register_prompt_library_routes
 from src.server.rfp_intelligence import register_intelligence_routes
 from src.server.query_settings import (
     QuerySettingsStore,
@@ -64,7 +64,6 @@ from src.server.query_settings import (
 from src.server.skill_ui_routes import register_skill_ui_routes
 from src.server.workspace_ui_routes import (
     register_workspace_ui_routes,
-    safe_count_json_keys,
     self_restart as _self_restart,
     set_env_var as _set_env_var,
 )
@@ -106,84 +105,6 @@ def _now_iso() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Stats helpers
-# ---------------------------------------------------------------------------
-
-def _stack_versions() -> dict[str, Optional[str]]:
-    """Read installed package versions for the engine stack. Cached at import."""
-    global _STACK_CACHE  # noqa: PLW0603
-    if _STACK_CACHE is not None:
-        return _STACK_CACHE
-    from importlib.metadata import PackageNotFoundError, version  # local
-
-    out: dict[str, Optional[str]] = {}
-    for key, dist in (
-        ("lightrag", "lightrag-hku"),
-        ("raganything", "raganything"),
-        ("mineru", "mineru"),
-        ("transformers", "transformers"),
-    ):
-        try:
-            out[key] = version(dist)
-        except PackageNotFoundError:
-            try:
-                out[key] = version(key)  # fall back to bare name
-            except PackageNotFoundError:
-                out[key] = None
-    _STACK_CACHE = out
-    return out
-
-
-_STACK_CACHE: Optional[dict[str, Optional[str]]] = None
-
-
-def _ui_chat_history_pairs() -> int:
-    """Resolve the per-query conversation_history cap (in user+assistant pairs)."""
-    try:
-        return max(0, int(os.getenv("UI_CHAT_HISTORY_TURNS", "20")))
-    except ValueError:
-        return 20
-
-
-def _gather_stats() -> dict[str, Any]:
-    settings = get_settings()
-    ws = _workspace_dir()
-    inference_only_relationship_types = {"REQUIRES", "ENABLED_BY", "RESPONSIBLE_FOR"}
-    return {
-        "workspace": settings.workspace,
-        "graph_storage": getattr(global_args, "graph_storage", "NetworkXStorage"),
-        "working_dir": str(ws),
-        "documents": safe_count_json_keys(ws / "kv_store_doc_status.json"),
-        "entities": safe_count_json_keys(ws / "vdb_entities.json"),
-        "relationships": safe_count_json_keys(ws / "vdb_relationships.json"),
-        "chunks": safe_count_json_keys(ws / "vdb_chunks.json"),
-        "chats": sum(1 for _ in _chats_dir().glob("*.json")),
-        "chat": {
-            # How many recent user+assistant pairs travel with each query.
-            # Mirrored from UI_CHAT_HISTORY_TURNS so the chat header can render
-            # an accurate "N turns in context" indicator.
-            "history_pairs_cap": _ui_chat_history_pairs(),
-        },
-        "ontology": {
-            "entity_type_count": len(VALID_ENTITY_TYPES),
-            "relationship_type_count": len(VALID_RELATIONSHIP_TYPES),
-            "extraction_relationship_type_count": len(
-                VALID_RELATIONSHIP_TYPES - inference_only_relationship_types
-            ),
-        },
-        "models": {
-            "extraction": settings.extraction_llm_name,
-            "reasoning": settings.reasoning_llm_name,
-            "embedding": settings.embedding_model,
-            "rerank": settings.rerank_model if settings.enable_rerank else None,
-            "rerank_enabled": settings.enable_rerank,
-        },
-        "stack": _stack_versions(),
-        "timestamp": _now_iso(),
-    }
-
-
-# ---------------------------------------------------------------------------
 # Registration
 # ---------------------------------------------------------------------------
 
@@ -222,7 +143,7 @@ def register_ui(
     chat_store = ChatStore(
         workspace_dir=_workspace_dir,
         now=_now_iso,
-        history_pairs=_ui_chat_history_pairs,
+        history_pairs=ui_chat_history_pairs,
     )
 
     # ---- Static SPA at /ui ------------------------------------------------
@@ -232,20 +153,18 @@ def register_ui(
         name="theseus-ui",
     )
 
-    # ---- Dashboard stats --------------------------------------------------
-    @app.get("/api/ui/stats", tags=["theseus-ui"])
-    async def ui_stats() -> JSONResponse:
-        """Return dashboard rollup metrics for the active workspace."""
-        return JSONResponse(_gather_stats())
+    register_dashboard_stats_routes(
+        app,
+        workspace_dir=_workspace_dir,
+        chats_dir=_chats_dir,
+        settings_provider=get_settings,
+        graph_storage=lambda: getattr(global_args, "graph_storage", "NetworkXStorage"),
+        now=_now_iso,
+    )
 
     register_processing_log_routes(app)
 
-
-    # ---- Prompt library ---------------------------------------------------
-    @app.get("/api/ui/prompt-library", tags=["theseus-ui"])
-    async def ui_prompt_library() -> JSONResponse:
-        """Return the curated Shipley phase 4-6 suggested-prompt catalog."""
-        return JSONResponse({"prompts": PROMPT_LIBRARY})
+    register_prompt_library_routes(app)
 
     register_chat_ui_routes(
         app,
@@ -256,42 +175,7 @@ def register_ui(
         now=_now_iso,
     )
 
-    # ---- Entity → source chunks (for KG explorer click-through) ----------
-    @app.get("/api/ui/entity/{name}/chunks", tags=["theseus-ui"])
-    async def entity_chunks(name: str, limit: int = 8) -> JSONResponse:
-        """Return the source text chunks that mention an entity, for KG drill-down."""
-        ws = _workspace_dir()
-        ec_path = ws / "kv_store_entity_chunks.json"
-        tc_path = ws / "kv_store_text_chunks.json"
-        if not ec_path.exists() or not tc_path.exists():
-            return JSONResponse({"entity": name, "chunks": []})
-        try:
-            entity_chunks_map = json.loads(ec_path.read_text(encoding="utf-8"))
-            text_chunks = json.loads(tc_path.read_text(encoding="utf-8"))
-        except Exception as exc:
-            logger.warning("Failed reading chunk stores: %s", exc)
-            return JSONResponse({"entity": name, "chunks": []})
-
-        # entity_chunks_map can key by raw name or by quoted variants
-        chunk_ids = (
-            entity_chunks_map.get(name)
-            or entity_chunks_map.get(name.strip('"'))
-            or []
-        )
-        if isinstance(chunk_ids, dict):
-            chunk_ids = list(chunk_ids.keys())
-
-        out = []
-        for cid in list(chunk_ids)[:limit]:
-            chunk = text_chunks.get(cid) or {}
-            content = chunk.get("content") or chunk.get("text") or ""
-            out.append({
-                "chunk_id": cid,
-                "file_path": chunk.get("file_path") or chunk.get("full_doc_id"),
-                "chunk_order_index": chunk.get("chunk_order_index"),
-                "snippet": content[:600] + ("…" if len(content) > 600 else ""),
-            })
-        return JSONResponse({"entity": name, "chunks": out})
+    register_entity_chunk_routes(app, workspace_dir=_workspace_dir)
 
     register_intelligence_routes(app, workspace_dir=_workspace_dir)
 
