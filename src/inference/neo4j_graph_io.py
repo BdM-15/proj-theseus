@@ -5,12 +5,20 @@ Handles reading and writing to Neo4j database for the knowledge graph.
 Provides clean interfaces for semantic relationship inference and post-processing.
 """
 
-import os
 import logging
-from typing import List, Dict, Tuple
+from typing import List, Dict
 from neo4j import GraphDatabase
 
 from src.core import get_settings
+from src.inference.neo4j_records import (
+    count_from_record,
+    entity_names_from_records,
+    entity_record_to_dict,
+    group_entities_by_type,
+    partition_entities_by_name,
+    relationship_record_to_dict,
+    type_counts_from_records,
+)
 from src.inference.relationship_payloads import (
     group_retype_updates,
     partition_relationships_by_type,
@@ -59,15 +67,7 @@ class Neo4jGraphIO:
         
         with self.driver.session(database=self.database) as session:
             result = session.run(query)
-            entities = []
-            for record in result:
-                entities.append({
-                    'id': record['id'],
-                    'entity_name': record['entity_name'],
-                    'entity_type': record['entity_type'],
-                    'description': record['description'],
-                    'source_id': record['source_id']
-                })
+            entities = [entity_record_to_dict(record) for record in result]
             
             logger.info(f"  📊 Fetched {len(entities)} entities from Neo4j")
             return entities
@@ -91,16 +91,7 @@ class Neo4jGraphIO:
         
         with self.driver.session(database=self.database) as session:
             result = session.run(query)
-            relationships = []
-            for record in result:
-                relationships.append({
-                    'source': record['source'],
-                    'target': record['target'],
-                    'type': record['rel_type'],
-                    'weight': record['weight'],
-                    'description': record['description'],
-                    'keywords': record['keywords']
-                })
+            relationships = [relationship_record_to_dict(record) for record in result]
             
             logger.info(f"  📊 Fetched {len(relationships)} relationships from Neo4j")
             return relationships
@@ -120,7 +111,7 @@ class Neo4jGraphIO:
         
         with self.driver.session(database=self.database) as session:
             result = session.run(query)
-            orphan_names = [record['entity_name'] for record in result]
+            orphan_names = entity_names_from_records(result)
             if orphan_names:
                 logger.info(f"  📊 Found {len(orphan_names)} truly orphaned entities in Neo4j")
             return orphan_names
@@ -149,7 +140,7 @@ class Neo4jGraphIO:
         with self.driver.session(database=self.database) as session:
             result = session.run(query, updates=entity_updates)
             record = result.single()
-            count = record['updated_count'] if record else 0
+            count = count_from_record(record, 'updated_count')
             
             logger.info(f"  ✅ Updated {count} entity types in Neo4j")
             return count
@@ -179,7 +170,7 @@ class Neo4jGraphIO:
         with self.driver.session(database=self.database) as session:
             result = session.run(query, updates=property_updates)
             record = result.single()
-            count = record['updated_count'] if record else 0
+            count = count_from_record(record, 'updated_count')
             
             logger.info(f"  ✅ Updated {count} entities with new properties in Neo4j")
             return count
@@ -250,7 +241,7 @@ class Neo4jGraphIO:
         with self.driver.session(database=self.database) as session:
             result = session.run(query, relationships=valid_relationships)
             record = result.single()
-            count = record['created_count'] if record else 0
+            count = count_from_record(record, 'created_count')
             
             logger.info(f"  💾 Created {count} new relationships in Neo4j")
             return count
@@ -305,7 +296,7 @@ class Neo4jGraphIO:
                         new_type=new_type
                     )
                     record = result.single()
-                    count = record['retyped_count'] if record else 0
+                    count = count_from_record(record, 'retyped_count')
                     total_retyped += count
                     if count > 0:
                         logger.info(f"    Retyped {count} relationships: {old_type} → {new_type}")
@@ -339,7 +330,7 @@ class Neo4jGraphIO:
         with self.driver.session(database=self.database) as session:
             result = session.run(query, updates=metadata_updates)
             record = result.single()
-            count = record['enriched_count'] if record else 0
+            count = count_from_record(record, 'enriched_count')
             
             logger.info(f"  ✅ Enriched {count} entities with metadata in Neo4j")
             return count
@@ -360,11 +351,7 @@ class Neo4jGraphIO:
         
         with self.driver.session(database=self.database) as session:
             result = session.run(query)
-            type_counts = {}
-            for record in result:
-                type_counts[record['type']] = record['count']
-            
-            return type_counts
+            return type_counts_from_records(result)
     
     def get_relationship_count_by_type(self) -> Dict[str, int]:
         """
@@ -381,11 +368,7 @@ class Neo4jGraphIO:
         
         with self.driver.session(database=self.database) as session:
             result = session.run(query)
-            type_counts = {}
-            for record in result:
-                type_counts[record['type']] = record['count']
-            
-            return type_counts
+            return type_counts_from_records(result)
     
     def create_entities(self, entities: List[Dict]) -> int:
         """
@@ -399,16 +382,17 @@ class Neo4jGraphIO:
         """
         # Filter out any entities that might have slipped through with None names
         # Note: LightRAG native extraction handles this, but this is a safety net.
-        valid_entities = []
-        for e in entities:
-            if e.get('entity_name'):
-                valid_entities.append(e)
-            else:
-                # This should rarely happen with native LightRAG extraction
-                logger.error(f"❌ Critical Error: Entity reached Neo4j without a name! Dropping to prevent DB corruption. Entity: {e}")
-        
-        if len(valid_entities) < len(entities):
-            logger.warning(f"⚠️ Skipped {len(entities) - len(valid_entities)} entities with missing names in Neo4j creation")
+        valid_entities, rejected_entities = partition_entities_by_name(entities)
+        for entity in rejected_entities:
+            # This should rarely happen with native LightRAG extraction
+            logger.error(f"❌ Critical Error: Entity reached Neo4j without a name! Dropping to prevent DB corruption. Entity: {entity}")
+
+        if rejected_entities:
+            logger.warning(f"⚠️ Skipped {len(rejected_entities)} entities with missing names in Neo4j creation")
+
+        if not valid_entities:
+            logger.info("  💾 No valid entities to create")
+            return 0
         
         # Note: We use MERGE on entity_name to avoid duplicates
         query = f"""
@@ -452,9 +436,9 @@ class Neo4jGraphIO:
         """
         
         with self.driver.session(database=self.database) as session:
-            result = session.run(query, entities=entities)
+            result = session.run(query, entities=valid_entities)
             record = result.single()
-            count = record['created_count'] if record else 0
+            count = count_from_record(record, 'created_count')
             
             logger.info(f"  💾 Created/Merged {count} entities in Neo4j")
             return count
@@ -481,27 +465,10 @@ class Neo4jGraphIO:
         with self.driver.session(database=self.database) as session:
             result = session.run(query, relationships=relationships)
             record = result.single()
-            count = record['created_count'] if record else 0
-            
+            count = count_from_record(record, 'created_count')
+
             logger.info(f"  💾 Created {count} typed relationships in Neo4j")
             return count
 
 
-def group_entities_by_type(entities: List[Dict]) -> Dict[str, List[Dict]]:
-    """
-    Group entities by type for efficient batching.
-    
-    Args:
-        entities: List of entity dicts with 'entity_type' key
-        
-    Returns:
-        Dict mapping entity_type (lowercase) to list of entities
-    """
-    grouped = {}
-    for entity in entities:
-        entity_type = entity.get('entity_type', '').lower()
-        if entity_type not in grouped:
-            grouped[entity_type] = []
-        grouped[entity_type].append(entity)
-    
-    return grouped
+__all__ = ["Neo4jGraphIO", "group_entities_by_type"]
