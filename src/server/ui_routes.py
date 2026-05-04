@@ -24,7 +24,6 @@ import os
 import re
 import sys
 import time
-import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, AsyncIterator, Awaitable, Callable, Optional, Union
@@ -55,6 +54,7 @@ QueryDataFunc = Callable[
 
 from src.core import get_settings, reset_settings
 from src.ontology.schema import VALID_ENTITY_TYPES, VALID_RELATIONSHIP_TYPES
+from src.server.chat_store import ChatStore
 from src.server.mcp_ui_routes import register_mcp_ui_routes
 from src.server.query_settings import (
     QuerySettingsStore,
@@ -209,7 +209,6 @@ class WipeAllScope(BaseModel):
 # Helpers
 # ---------------------------------------------------------------------------
 
-_SAFE_ID = re.compile(r"^[A-Za-z0-9_-]{6,64}$")
 _SAFE_WS = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 
 
@@ -274,46 +273,6 @@ def _trim_sources(data: dict) -> dict:
             "relationships": len(rels_in),
             "references": len(refs_out),
         },
-    }
-
-
-def _new_chat_id() -> str:
-    return uuid.uuid4().hex[:16]
-
-
-def _chat_path(chat_id: str) -> Path:
-    if not _SAFE_ID.match(chat_id):
-        raise HTTPException(status_code=400, detail="Invalid chat id")
-    return _chats_dir() / f"{chat_id}.json"
-
-
-def _read_chat(chat_id: str) -> dict[str, Any]:
-    path = _chat_path(chat_id)
-    if not path.exists():
-        raise HTTPException(status_code=404, detail="Chat not found")
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        logger.warning("Corrupt chat file %s: %s", path, exc)
-        raise HTTPException(status_code=500, detail="Chat file corrupt") from exc
-
-
-def _write_chat(chat: dict[str, Any]) -> None:
-    path = _chat_path(chat["id"])
-    tmp = path.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(chat, ensure_ascii=False, indent=2), encoding="utf-8")
-    tmp.replace(path)
-
-
-def _summary(chat: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "id": chat["id"],
-        "title": chat.get("title", "Untitled"),
-        "mode": chat.get("mode", "mix"),
-        "rfp_context": chat.get("rfp_context"),
-        "message_count": len(chat.get("messages", [])),
-        "created_at": chat.get("created_at"),
-        "updated_at": chat.get("updated_at"),
     }
 
 
@@ -1033,6 +992,11 @@ def register_ui(
         workspace_dir=_workspace_dir,
         settings_provider=get_settings,
     )
+    chat_store = ChatStore(
+        workspace_dir=_workspace_dir,
+        now=_now_iso,
+        history_pairs=_ui_chat_history_pairs,
+    )
 
     # ---- Static SPA at /ui ------------------------------------------------
     app.mount(
@@ -1112,59 +1076,39 @@ def register_ui(
     @app.get("/api/ui/chats", tags=["theseus-ui"])
     async def list_chats() -> JSONResponse:
         """List all saved chats for the active workspace, newest first."""
-        items = []
-        for path in _chats_dir().glob("*.json"):
-            try:
-                items.append(_summary(json.loads(path.read_text(encoding="utf-8"))))
-            except Exception as exc:  # pragma: no cover - defensive
-                logger.warning("Skipping corrupt chat %s: %s", path, exc)
-        items.sort(key=lambda c: c.get("updated_at") or "", reverse=True)
-        return JSONResponse({"chats": items})
+        return JSONResponse({"chats": chat_store.list_summaries()})
 
     @app.post("/api/ui/chats", tags=["theseus-ui"])
     async def create_chat(payload: ChatCreate) -> JSONResponse:
         """Create a new persistent chat session."""
-        chat_id = _new_chat_id()
-        now = _now_iso()
-        chat = {
-            "id": chat_id,
-            "title": payload.title.strip() or "New chat",
-            "mode": payload.mode,
-            "rfp_context": payload.rfp_context,
-            "messages": [],
-            "created_at": now,
-            "updated_at": now,
-        }
-        _write_chat(chat)
-        return JSONResponse(_summary(chat), status_code=201)
+        chat = chat_store.create(
+            title=payload.title,
+            mode=payload.mode,
+            rfp_context=payload.rfp_context,
+        )
+        return JSONResponse(chat_store.summary(chat), status_code=201)
 
     # ---- Chats: read/update/delete ---------------------------------------
     @app.get("/api/ui/chats/{chat_id}", tags=["theseus-ui"])
     async def get_chat(chat_id: str) -> JSONResponse:
         """Return full chat including all messages."""
-        return JSONResponse(_read_chat(chat_id))
+        return JSONResponse(chat_store.read(chat_id))
 
     @app.patch("/api/ui/chats/{chat_id}", tags=["theseus-ui"])
     async def update_chat(chat_id: str, payload: ChatUpdate) -> JSONResponse:
         """Rename a chat or update its mode / RFP context."""
-        chat = _read_chat(chat_id)
-        if payload.title is not None:
-            chat["title"] = payload.title.strip() or chat["title"]
-        if payload.mode is not None:
-            chat["mode"] = payload.mode
-        if payload.rfp_context is not None:
-            chat["rfp_context"] = payload.rfp_context or None
-        chat["updated_at"] = _now_iso()
-        _write_chat(chat)
-        return JSONResponse(_summary(chat))
+        chat = chat_store.update(
+            chat_id,
+            title=payload.title,
+            mode=payload.mode,
+            rfp_context=payload.rfp_context,
+        )
+        return JSONResponse(chat_store.summary(chat))
 
     @app.delete("/api/ui/chats/{chat_id}", tags=["theseus-ui"])
     async def delete_chat(chat_id: str) -> JSONResponse:
         """Permanently delete a chat."""
-        path = _chat_path(chat_id)
-        if not path.exists():
-            raise HTTPException(status_code=404, detail="Chat not found")
-        path.unlink()
+        chat_store.delete(chat_id)
         return JSONResponse({"status": "deleted", "id": chat_id})
 
     # ---- Chats: send message (calls LightRAG /query under the hood) ------
@@ -1173,32 +1117,10 @@ def register_ui(
     # ``_ui_chat_history_pairs`` and is also surfaced via /api/ui/stats so the
     # chat header can render an accurate "N turns in context" indicator.
 
-    def _build_history(chat: dict, exclude_last: bool = False) -> list[dict]:
-        """Build LightRAG conversation_history from persisted messages.
-
-        Returns the list of {role, content} dicts in chronological order, capped
-        at the most recent ``UI_CHAT_HISTORY_TURNS`` user+assistant pairs. If
-        exclude_last is True, drops the most recent message (used when we just
-        appended the new user message and want only the prior turns as context).
-        """
-        msgs = chat.get("messages", [])
-        if exclude_last and msgs:
-            msgs = msgs[:-1]
-        cleaned = [
-            {"role": m.get("role", "user"), "content": str(m.get("content", ""))}
-            for m in msgs
-            if m.get("role") in ("user", "assistant") and m.get("content")
-        ]
-        cap = _ui_chat_history_pairs()
-        if cap > 0:
-            # 1 pair = 1 user + 1 assistant message; keep the trailing slice.
-            return cleaned[-(cap * 2) :]
-        return cleaned
-
     @app.post("/api/ui/chats/{chat_id}/messages", tags=["theseus-ui"])
     async def post_message(chat_id: str, payload: ChatMessageCreate) -> JSONResponse:
         """Append a user message, invoke RAG query, persist the assistant reply."""
-        chat = _read_chat(chat_id)
+        chat = chat_store.read(chat_id)
         user_msg = {
             "role": "user",
             "content": payload.content,
@@ -1206,7 +1128,7 @@ def register_ui(
         }
         chat["messages"].append(user_msg)
 
-        history = _build_history(chat, exclude_last=True)
+        history = chat_store.build_history(chat, exclude_last=True)
         overrides = query_settings.build_overrides()
         try:
             answer = await query_func(
@@ -1227,10 +1149,14 @@ def register_ui(
 
         # Auto-title the chat from the first user prompt.
         if chat.get("title") in (None, "", "New chat") and len(chat["messages"]) <= 2:
-            chat["title"] = (payload.content[:60] + "…") if len(payload.content) > 60 else payload.content
+            chat_store.maybe_autotitle(chat, payload.content)
 
-        _write_chat(chat)
-        return JSONResponse({"user": user_msg, "assistant": assistant_msg, "chat": _summary(chat)})
+        chat_store.write(chat)
+        return JSONResponse({
+            "user": user_msg,
+            "assistant": assistant_msg,
+            "chat": chat_store.summary(chat),
+        })
 
     # ---- Chats: streaming variant (Server-Sent Events) -------------------
     @app.post("/api/ui/chats/{chat_id}/messages/stream", tags=["theseus-ui"])
@@ -1249,7 +1175,7 @@ def register_ui(
             event: error
             data: {"message": "..."}
         """
-        chat = _read_chat(chat_id)
+        chat = chat_store.read(chat_id)
         user_msg = {
             "role": "user",
             "content": payload.content,
@@ -1258,12 +1184,10 @@ def register_ui(
         chat["messages"].append(user_msg)
         # Persist the user turn immediately so a dropped connection doesn't lose it.
         if chat.get("title") in (None, "", "New chat") and len(chat["messages"]) <= 1:
-            chat["title"] = (
-                (payload.content[:60] + "…") if len(payload.content) > 60 else payload.content
-            )
-        _write_chat(chat)
+            chat_store.maybe_autotitle(chat, payload.content)
+        chat_store.write(chat)
 
-        history = _build_history(chat, exclude_last=True)
+        history = chat_store.build_history(chat, exclude_last=True)
         mode = chat.get("mode", "mix")
         overrides = query_settings.build_overrides()
 
@@ -1380,12 +1304,12 @@ def register_ui(
                 assistant_msg["sources"] = sources_payload
             # Re-read so we don't clobber concurrent edits to the same chat file.
             try:
-                latest = _read_chat(chat_id)
+                latest = chat_store.read(chat_id)
             except HTTPException:
                 latest = chat
             latest["messages"].append(assistant_msg)
             latest["updated_at"] = _now_iso()
-            _write_chat(latest)
+            chat_store.write(latest)
 
             logger.info(
                 "[chat] mode=%s ttft=%sms total=%sms chunks=%s chars=%s%s",
@@ -1402,7 +1326,7 @@ def register_ui(
                 + json.dumps(
                     {
                         "assistant": assistant_msg,
-                        "chat": _summary(latest),
+                        "chat": chat_store.summary(latest),
                         "timing": timing,
                     }
                 )
